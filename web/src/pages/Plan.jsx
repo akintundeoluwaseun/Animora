@@ -3,7 +3,7 @@
 // Pictures can be uploaded or pasted (Ctrl+V) anywhere on the page, up to 5. Special instructions come last.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { api, ASPECTS, duration } from '../lib.jsx';
+import { api, ASPECTS, duration, shrinkImage } from '../lib.jsx';
 import { Alert, Button, PageLoader, Spinner, Steps } from '../components/ui.jsx';
 import { StylePicker } from './Dashboard.jsx';
 
@@ -204,7 +204,7 @@ export default function Plan() {
     try {
       for (const f of files.slice(0, room)) {
         const form = new FormData();
-        form.append('file', f);
+        form.append('file', await shrinkImage(f));
         if (role) form.append('role', role);
         form.append('name', role === 'logo' ? 'logo' : f.name.replace(/\.[^.]+$/, '').slice(0, 40));
         const { asset } = await api(`/projects/${id}/assets`, { method: 'POST', form });

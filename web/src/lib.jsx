@@ -98,3 +98,26 @@ export function usePolling(fn, ms, active) {
     return () => { stop = true; };
   }, [active]); // eslint-disable-line react-hooks/exhaustive-deps
 }
+
+/**
+ * Shrink a picture before upload: phone photos are often 4-10 MB, and the server (Vercel) accepts about 4.5 MB.
+ * Keeps PNGs as PNG (logos keep their transparent background); other pictures become JPEG. Max side 1920 px.
+ */
+export async function shrinkImage(file, maxSide = 1920) {
+  if (!file?.type?.startsWith('image/') || /svg|gif/.test(file.type) || file.size < 1.2e6) return file;
+  try {
+    const bmp = await createImageBitmap(file);
+    const k = Math.min(1, maxSide / Math.max(bmp.width, bmp.height));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(bmp.width * k); canvas.height = Math.round(bmp.height * k);
+    canvas.getContext('2d').drawImage(bmp, 0, 0, canvas.width, canvas.height);
+    const png = file.type === 'image/png';
+    let blob = await new Promise((r) => canvas.toBlob(r, png ? 'image/png' : 'image/jpeg', 0.85));
+    if (png && blob && blob.size > 3.5e6) blob = await new Promise((r) => canvas.toBlob(r, 'image/jpeg', 0.85));
+    if (!blob || blob.size >= file.size) return file;
+    const ext = blob.type === 'image/png' ? 'png' : 'jpg';
+    return new File([blob], `${file.name.replace(/\.[^.]+$/, '') || 'picture'}.${ext}`, { type: blob.type });
+  } catch {
+    return file;
+  }
+}

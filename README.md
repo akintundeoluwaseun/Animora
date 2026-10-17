@@ -138,12 +138,12 @@ Environment variables (Project → Settings → Environment Variables), then red
 
 | Name | Value |
 |---|---|
+| `DATABASE_URL` | **Required.** Supabase → Connect → *Transaction pooler* URI (port 6543), with your database password in it. Projects, answers and uploaded pictures are all kept in this database. |
 | `GEMINI_API_KEY` | your Gemini key (without it the practice AI is used) |
 | `AUTH_SECRET` | any long random string |
-| `DATABASE_URL` | Supabase → Connect → Session pooler URI. **Without it every project is lost whenever Vercel restarts.** |
-| `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` | Supabase → Project Settings → API. Needed so uploaded logos and photos are kept. |
 
-Vercel limits uploads to about 4.5 MB per file. To switch on MP4 export later, run the Docker image below on
+Pictures are shrunk in the browser before upload, because Vercel accepts about 4.5 MB per request.
+To switch on MP4 export later, run the Docker image below on
 Railway or Render.com with the same Supabase settings.
 
 Render speed (measured on 2 vCPU, scales with cores):

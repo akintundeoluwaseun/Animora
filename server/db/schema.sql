@@ -174,3 +174,25 @@ ALTER TABLE projects ADD COLUMN IF NOT EXISTS brief_json jsonb;
 -- ---- v4: motion-graphics sound effects (on by default, per video) ----
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS sfx_on boolean NOT NULL DEFAULT true;
 ALTER TABLE renders  ADD COLUMN IF NOT EXISTS sfx_on boolean NOT NULL DEFAULT true;
+
+-- Uploaded files kept in the database (used on Vercel, where there is no lasting disk and no Supabase Storage key).
+CREATE TABLE IF NOT EXISTS files (
+  key          text PRIMARY KEY,
+  content_type text NOT NULL DEFAULT 'application/octet-stream',
+  data         bytea NOT NULL,
+  created_at   timestamptz NOT NULL DEFAULT now()
+);
+
+-- Supabase publishes tables in "public" through its REST API. The app connects as the database owner
+-- (which bypasses row level security), so switching RLS on with no policies keeps that API closed.
+ALTER TABLE users     ENABLE ROW LEVEL SECURITY;
+ALTER TABLE styles    ENABLE ROW LEVEL SECURITY;
+ALTER TABLE projects  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE assets    ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ads       ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ad_views  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE renders   ENABLE ROW LEVEL SECURITY;
+ALTER TABLE payouts   ENABLE ROW LEVEL SECURITY;
+ALTER TABLE royalties ENABLE ROW LEVEL SECURITY;
+ALTER TABLE payments  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE files     ENABLE ROW LEVEL SECURITY;

@@ -68,7 +68,10 @@ export const config = {
 // AUTH=off (default for now): no sign-in, no ads, no plan limits. Everyone is the local test user.
 config.noAuth = env('AUTH', 'off') !== 'on';
 
-config.storageMode = config.supabaseUrl && config.supabaseServiceKey ? 'supabase' : 'local';
+// Storage: Supabase Storage if its key is set; on Vercel with a database, files go in the database; else local disk.
+config.storageMode = config.supabaseUrl && config.supabaseServiceKey ? 'supabase'
+  : config.serverless && config.databaseUrl ? 'db' : 'local';
+if (['local', 'db', 'supabase'].includes(env('STORAGE_MODE'))) config.storageMode = env('STORAGE_MODE');
 config.useGemini = config.aiMode === 'gemini' || (config.aiMode === 'auto' && !!config.geminiApiKey);
 
 if (config.authSecret === 'dev-only-secret-change-me' && process.env.NODE_ENV === 'production') {

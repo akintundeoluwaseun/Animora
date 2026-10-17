@@ -7,7 +7,7 @@ import { pathToFileURL } from 'node:url';
 import { SFX_DIR, MUSIC_DIR } from './engine/sfx.js';
 import { config, ROOT } from './config.js';
 import { initDb, one } from './db/index.js';
-import { initStorage, localPathFor } from './storage.js';
+import { initStorage, localPathFor, getDbObject } from './storage.js';
 import { startWorker } from './worker.js';
 import { seed, syncStarterStyles } from './db/seed.js';
 import { aiMode } from './ai/index.js';
@@ -46,6 +46,15 @@ export async function createApp() {
     // CORS: animations load images with crossorigin="anonymous" (preview iframe and renderer both need this).
     app.use('/files', (req, res, next) => { res.set('Access-Control-Allow-Origin', '*'); next(); },
       express.static(localPathFor(''), { maxAge: '7d', fallthrough: false }));
+  }
+  if (config.storageMode === 'db') {
+    app.get(/^\/files\/(.+)$/, async (req, res, next) => {
+      try {
+        const f = await getDbObject(decodeURIComponent(req.params[0]));
+        if (!f) return res.status(404).send('File not found');
+        res.set({ 'Content-Type': f.type, 'Cache-Control': 'public, max-age=31536000, immutable', 'Access-Control-Allow-Origin': '*' }).send(f.data);
+      } catch (e) { next(e); }
+    });
   }
   // GSAP served from our own server for the preview iframe (same build the renderer uses).
   app.use('/sfx', express.static(SFX_DIR, { maxAge: '30d' }));   // sound effects for the live preview

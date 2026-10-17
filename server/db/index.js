@@ -15,7 +15,7 @@ export async function initDb() {
     const pool = new pg.Pool({
       connectionString: config.databaseUrl,
       ssl: /localhost|127\.0\.0\.1/.test(config.databaseUrl) ? false : { rejectUnauthorized: false },
-      max: 10,
+      max: config.serverless ? 3 : 10,
     });
     driver = {
       kind: 'postgres',

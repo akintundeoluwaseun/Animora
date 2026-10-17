@@ -3,6 +3,7 @@
 import { mkdir, writeFile, readFile, copyFile } from 'node:fs/promises';
 import path from 'node:path';
 import { config } from './config.js';
+import { q, one } from './db/index.js';
 
 const LOCAL_ROOT = path.join(config.dataDir, 'storage');
 
@@ -12,6 +13,7 @@ export async function initStorage() {
     console.log(`[storage] local disk (${LOCAL_ROOT})`);
     return;
   }
+  if (config.storageMode === 'db') { console.log('[storage] database (files table)'); return; }
   // Create the public bucket if it does not exist yet (ignore "already exists").
   const res = await fetch(`${config.supabaseUrl}/storage/v1/bucket`, {
     method: 'POST',
@@ -42,6 +44,11 @@ export async function putObject(key, source, contentType) {
     return `${config.publicBaseUrl}/files/${key}`;
   }
   const body = typeof source === 'string' ? await readFile(source) : source;
+  if (config.storageMode === 'db') {
+    await q(`INSERT INTO files (key, content_type, data) VALUES ($1,$2,$3)
+      ON CONFLICT (key) DO UPDATE SET content_type=EXCLUDED.content_type, data=EXCLUDED.data`, [key, contentType || 'application/octet-stream', Buffer.from(body)]);
+    return `${config.publicBaseUrl}/files/${key}`;
+  }
   const res = await fetch(`${config.supabaseUrl}/storage/v1/object/${config.supabaseBucket}/${key}`, {
     method: 'POST',
     headers: supabaseHeaders({ 'Content-Type': contentType || 'application/octet-stream', 'x-upsert': 'true', 'cache-control': '31536000' }),
@@ -49,4 +56,10 @@ export async function putObject(key, source, contentType) {
   });
   if (!res.ok) throw new Error(`Upload failed (${res.status}): ${(await res.text()).slice(0, 200)}`);
   return `${config.supabaseUrl}/storage/v1/object/public/${config.supabaseBucket}/${key}`;
+}
+
+/** Read a file stored in the database (storage mode 'db'). */
+export async function getDbObject(key) {
+  const row = await one('SELECT content_type, data FROM files WHERE key=$1', [key]);
+  return row ? { type: row.content_type, data: Buffer.from(row.data) } : null;
 }

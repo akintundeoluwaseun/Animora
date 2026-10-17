@@ -1,7 +1,7 @@
 // Page 2: live preview + edit by prompt + code view.
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { api, ASPECTS, duration } from '../lib.jsx';
+import { api, ASPECTS, duration, shrinkImage } from '../lib.jsx';
 import { Alert, Button, PageLoader, Spinner, Steps } from '../components/ui.jsx';
 import { LivePreview } from '../components/Preview.jsx';
 import VoicePanel from '../components/VoicePanel.jsx';
@@ -43,7 +43,7 @@ function EditPanel({ project, onUpdate }) {
     try {
       const form = new FormData();
       const name = `pasted picture ${Date.now() % 10000}`;
-      form.append('file', new File([f], `${name}.png`, { type: f.type })); form.append('role', 'photo'); form.append('name', name);
+      form.append('file', await shrinkImage(new File([f], `${name}.png`, { type: f.type }))); form.append('role', 'photo'); form.append('name', name);
       const { asset } = await api(`/projects/${project.id}/assets`, { method: 'POST', form });
       setText((t) => `${t ? `${t.trim()} ` : ''}(use the picture "${asset.name}")`);
     } catch (err) { setError(err.message); } finally { setPasting(false); }
