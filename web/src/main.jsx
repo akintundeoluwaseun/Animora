@@ -5,7 +5,7 @@ import './styles.css';
 import { AuthProvider, useAuth } from './lib.jsx';
 import { Nav, PageLoader } from './components/ui.jsx';
 import Home from './pages/Home.jsx';
-import ExportBar from './components/ExportBar.jsx';
+import ExportScreen from './components/ExportScreen.jsx';
 import InstallPrompt from './components/InstallApp.jsx';
 
 const Dashboard = lazy(() => import('./pages/Dashboard.jsx'));
@@ -68,7 +68,7 @@ function App() {
         <div className="app">
         <Nav />
         <main className="app-main">
-          <ExportBar />
+          <ExportScreen />
           <ErrorBoundary>
           <Suspense fallback={<PageLoader />}>
             <Routes>

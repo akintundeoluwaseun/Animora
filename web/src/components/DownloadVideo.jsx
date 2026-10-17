@@ -2,7 +2,7 @@
 // The recording itself runs in lib/exportJob.js so it continues while you move around the app.
 import { useState } from 'react';
 import { Button, Modal } from './ui.jsx';
-import { startExport, useExportJob } from '../lib/exportJob.js';
+import { minimizeExport, startExport, useExportJob } from '../lib/exportJob.js';
 
 export default function DownloadVideo({ project, size = 'md', className = '' }) {
   const job = useExportJob();
@@ -12,12 +12,12 @@ export default function DownloadVideo({ project, size = 'md', className = '' }) 
   const start = () => { setOpen(false); startExport({ project, quality }); };
   return (
     <>
-      <Button size={size} className={className} onClick={() => setOpen(true)} disabled={!project?.code || busy}>
-        {busy && job.projectId === project.id ? (job.progress?.stage === 'Recording' ? `Downloading ${Math.round((job.progress.done / Math.max(1, job.progress.total)) * 100)}%` : 'Getting ready…') : busy ? 'Another download is running' : 'Download MP4'}
+      <Button size={size} className={className} onClick={() => (busy ? minimizeExport(false) : setOpen(true))} disabled={!project?.code || (busy && job.projectId !== project.id)}>
+        {busy && job.projectId === project.id ? (job.progress?.stage === 'Paused' ? 'Paused · tap to see' : job.progress?.stage === 'Recording' ? `Downloading ${Math.round((job.progress.done / Math.max(1, job.progress.total)) * 100)}%` : 'Getting ready…') : busy ? 'Another download is running' : 'Download MP4'}
       </Button>
       <Modal open={open} onClose={() => setOpen(false)} label="Download your video">
         <h2 className="text-xl font-bold">Download your video</h2>
-        <p className="mt-2 text-sm text-ink-soft">Your phone or computer makes the MP4 and saves it to your downloads. The progress shows on this button and in your notifications. Keep Animora open until it's done.</p>
+        <p className="mt-2 text-sm text-ink-soft">Your phone or computer makes the MP4 and saves it to your downloads. Keep Animora open on screen until it's done: phones pause the video when you go to the home screen, and it carries on when you come back.</p>
         <div className="mt-4 grid grid-cols-2 gap-2" role="radiogroup" aria-label="Quality">
           {[['hd', 'HD 1080p', 'Sharpest, slower'], ['fast', 'Quick 720p', 'About 3× faster']].map(([v, l, d]) => (
             <button key={v} type="button" role="radio" aria-checked={quality === v} onClick={() => setQuality(v)}

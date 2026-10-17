@@ -121,42 +121,83 @@ export async function exportVideo({ html, aspect = '9:16', fps = 30, quality = '
       ...(audio ? { audio: { codec: a.mux, sampleRate: SR, numberOfChannels: 1 } } : {}),
     });
     let failure = null;
-    const venc = new VideoEncoder({ output: (chunk, meta) => muxer.addVideoChunk(chunk, meta), error: (e) => { failure = e; } });
-    venc.configure(v.config);
+    // Phones stop (and Chrome takes back) the video encoder when you leave the app. So when the page is
+    // hidden we pause, and when you come back we start a fresh encoder from the last frame that was saved.
+    let venc = null, outCount = 0, reclaimed = false;
+    const makeEncoder = () => {
+      const enc = new VideoEncoder({
+        output: (chunk, meta) => { muxer.addVideoChunk(chunk, meta); outCount++; },
+        error: (e) => { if (e?.name === 'QuotaExceededError' || /reclaim|inactiv/i.test(e?.message || '')) reclaimed = true; else failure = e; },
+      });
+      enc.configure(v.config);
+      return enc;
+    };
+    venc = makeEncoder();
 
     // draw frames: stylesheet, fonts and pictures are embedded once; several frames rasterize at the same time
     const capture = await prepareFastCapture(doc, { width: W, height: H, outWidth: width, outHeight: height });
     const canvas = document.createElement('canvas'); canvas.width = width; canvas.height = height;
     const g = canvas.getContext('2d');
     const bg = win.getComputedStyle(doc.body).backgroundColor || '#000';
-    const started = performance.now();
-    const queue = [];
-    let sent = 0;
+    let started = performance.now(), base = 0;
+    let queue = [];
+    let sent = 0, next = 0, forceKey = true;
+    const report = () => {
+      const elapsed = (performance.now() - started) / 1000, made = Math.max(1, sent - base);
+      onProgress({ stage: 'Recording', done: sent, total, eta: Math.round((elapsed / made) * (total - sent)) });
+    };
     const emit = async () => {
       const img = await queue.shift();
       g.fillStyle = bg; g.fillRect(0, 0, width, height);
       g.drawImage(img, 0, 0, width, height);
       const vf = new VideoFrame(canvas, { timestamp: Math.round((sent * 1e6) / fps), duration: Math.round(1e6 / fps) });
-      venc.encode(vf, { keyFrame: sent % (fps * 2) === 0 });
+      venc.encode(vf, { keyFrame: forceKey || sent % (fps * 2) === 0 });
+      forceKey = false;
       vf.close();
       sent++;
-      while (venc.encodeQueueSize > 6) await sleep(4);
-      const elapsed = (performance.now() - started) / 1000;
-      onProgress({ stage: 'Recording', done: sent, total, eta: Math.round((elapsed / sent) * (total - sent)) });
+      while (venc.state === 'configured' && venc.encodeQueueSize > 6) await sleep(4);
+      report();
     };
-    for (let i = 0; i < total; i++) {
+    const hidden = () => typeof document !== 'undefined' && document.visibilityState === 'hidden';
+    const pause = async () => {
+      onProgress({ stage: 'Paused', done: sent, total });
+      try { if (venc.state === 'configured') await Promise.race([venc.flush(), sleep(1500)]); } catch { /* taken back */ }
+      await new Promise((r) => {
+        const on = () => { if (!hidden()) { document.removeEventListener('visibilitychange', on); r(); } };
+        document.addEventListener('visibilitychange', on); on();
+      });
+      await sleep(250);
+      try { if (venc.state === 'configured') await venc.flush(); } catch { /* taken back */ }
+      if (reclaimed || venc.state !== 'configured' || outCount < sent) {
+        // start again from the last frame that made it into the file
+        try { if (venc.state !== 'closed') venc.close(); } catch { /* ignore */ }
+        reclaimed = false; failure = null;
+        venc = makeEncoder();
+        sent = outCount; next = outCount; queue = []; forceKey = true;
+      }
+      started = performance.now(); base = sent;
+      report();
+    };
+    while (sent < total) {
       if (signal?.aborted) throw new DOMException('Cancelled', 'AbortError');
+      if (hidden() || reclaimed) { await Promise.allSettled(queue); await pause(); continue; }
       if (failure) throw failure;
-      const t = Math.min(duration, i / fps);
-      tl.seek(t, false);
-      if (doc.getAnimations) for (const an of doc.getAnimations()) { an.pause(); an.currentTime = t * 1000; }
-      queue.push(capture());          // the copy of this frame is taken now; rasterizing runs in the background
-      if (queue.length >= 3) await emit();
+      if (next < total) {
+        const t = Math.min(duration, next / fps);
+        tl.seek(t, false);
+        if (doc.getAnimations) for (const an of doc.getAnimations()) { an.pause(); an.currentTime = t * 1000; }
+        queue.push(capture());          // the copy of this frame is taken now; rasterizing runs in the background
+        next++;
+        if (queue.length >= 3) await emit();
+      } else await emit();
     }
-    while (queue.length) await emit();
-    await venc.flush(); venc.close();
+    while (hidden()) await pause();
+    await venc.flush();
+    if (reclaimed || outCount < total) throw new Error('The phone stopped the recording. Press Download MP4 again and keep Animora open.');
+    venc.close();
 
     if (audio) {
+      while (hidden()) await new Promise((r) => setTimeout(r, 300));
       onProgress({ stage: 'Adding sound', done: total, total });
       const aenc = new AudioEncoder({ output: (chunk, meta) => muxer.addAudioChunk(chunk, meta), error: (e) => { failure = e; } });
       aenc.configure(a.config);
