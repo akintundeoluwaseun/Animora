@@ -18,7 +18,7 @@ const CODE_MODEL = process.env.GEMINI_CODE_MODEL || 'gemini-pro-latest';
 /**
  * messages: [{ role: 'user' | 'model', text, images?: [{ mimeType, data }] }]   (image data is base64)
  */
-export async function geminiGenerate({ system, messages, model = CHAT_MODEL, temperature = 0.7, maxOutputTokens = 8192, json = false, timeoutMs = 120000, apiKey = process.env.GEMINI_API_KEY }) {
+export async function geminiGenerate({ system, messages, model = CHAT_MODEL, temperature = 0.7, maxOutputTokens = 8192, json = false, timeoutMs = 120000, thinking = null, apiKey = process.env.GEMINI_API_KEY }) {
   if (!apiKey) throw new Error('GEMINI_API_KEY is not set');
   const body = {
     systemInstruction: { parts: [{ text: system }] },
@@ -44,11 +44,15 @@ export async function geminiGenerate({ system, messages, model = CHAT_MODEL, tem
   for (const m of chain) {
     for (let attempt = 0; attempt < 2; attempt++) {
       let res;
+      // 'low' thinking = much faster answers for structured jobs (directing shots, reading a brief).
+      // Models that don't know the setting get the request again without it.
+      const think = thinking && !noThinking.has(m) ? (/gemini-3/.test(m) ? { thinkingLevel: thinking } : /2\.5-flash/.test(m) ? { thinkingBudget: thinking === 'low' ? 512 : -1 } : null) : null;
+      const sendBody = think ? { ...body, generationConfig: { ...body.generationConfig, thinkingConfig: think } } : body;
       try {
         res = await fetch(`${API}/${m}:generateContent`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
-          body: JSON.stringify(body),
+          body: JSON.stringify(sendBody),
           signal: AbortSignal.timeout(timeoutMs),
         });
       } catch (e) {
@@ -64,7 +68,9 @@ export async function geminiGenerate({ system, messages, model = CHAT_MODEL, tem
         if (!text) throw new Error(`Gemini returned no text (finishReason: ${cand?.finishReason || out.promptFeedback?.blockReason || 'unknown'})`);
         return { text, finishReason: cand.finishReason, usage: out.usageMetadata, model: m };
       }
-      lastErr = new Error(`Gemini ${res.status} (${m}): ${(await res.text()).slice(0, 300)}`);
+      const errText = await res.text();
+      if (res.status === 400 && think && /thinking/i.test(errText)) { noThinking.add(m); attempt--; continue; }   // retry without the setting
+      lastErr = new Error(`Gemini ${res.status} (${m}): ${errText.slice(0, 300)}`);
       tried.push(`${m}: ${res.status}`);
       lastErr.status = res.status;
       if (res.status !== 429 && res.status < 500) break; // only retry rate limits / server errors
@@ -104,6 +110,7 @@ const FALLBACKS = {
   [CODE_MODEL]: ['gemini-pro-latest', 'gemini-2.5-pro', 'gemini-flash-latest', 'gemini-2.5-flash'],
 };
 const resolved = new Map();
+const noThinking = new Set();
 
 // ---------------------------------------------------------------------------
 // Page 1: planning chat

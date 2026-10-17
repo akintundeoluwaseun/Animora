@@ -198,3 +198,21 @@ ALTER TABLE payouts   ENABLE ROW LEVEL SECURITY;
 ALTER TABLE royalties ENABLE ROW LEVEL SECURITY;
 ALTER TABLE payments  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE files     ENABLE ROW LEVEL SECURITY;
+
+-- ---- v5: background video making + phone notifications ----
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS gen_state text;            -- working | done | failed
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS gen_message text;          -- what the AI is doing right now
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS gen_error text;
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS gen_started_at timestamptz;
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+  endpoint    text PRIMARY KEY,
+  user_id     uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  keys        jsonb NOT NULL,
+  created_at  timestamptz NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS settings (
+  key   text PRIMARY KEY,
+  value jsonb NOT NULL
+);
+ALTER TABLE push_subscriptions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE settings ENABLE ROW LEVEL SECURITY;

@@ -1,6 +1,7 @@
 // One video download at a time, shared by the whole app: it keeps going while you move between pages,
 // shows a bar at the top, notifies you when it's done, and remembers if the page was closed mid-way.
 import { useSyncExternalStore } from 'react';
+import { enablePush, showLocal } from './notify.js';
 
 const KEY = 'animora-export';
 let state = { status: 'idle' };   // idle | working | done | failed | interrupted
@@ -20,18 +21,13 @@ export const fileName = (title) => `${String(title || 'animora-video').replace(/
 let abort = null, wake = null, baseTitle = '';
 const onLeave = (e) => { if (state.status === 'working') { e.preventDefault(); e.returnValue = ''; } };
 
-async function notify(title, body) {
-  try {
-    if (!('Notification' in window) || Notification.permission !== 'granted') return;
-    const reg = await navigator.serviceWorker?.getRegistration?.();
-    if (reg?.showNotification) reg.showNotification(title, { body, icon: '/animora-icon.png', badge: '/favicon.png', tag: 'animora-export' });
-    else new Notification(title, { body, icon: '/animora-icon.png', tag: 'animora-export' });
-  } catch { /* notifications blocked */ }
-}
+const notify = (title, body, url) => showLocal(title, body, { silent: false, url });
+let lastShown = -1;
 
 export async function startExport({ project, quality }) {
   if (state.status === 'working') return;
-  try { if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission(); } catch { /* ignore */ }
+  enablePush();   // asks once for notifications on this device
+  lastShown = -1;
   abort = new AbortController();
   baseTitle = baseTitle || document.title;
   set({ status: 'working', projectId: project.id, title: project.title, progress: { stage: 'Getting ready', done: 0, total: 1 }, error: '', quality });
@@ -43,14 +39,20 @@ export async function startExport({ project, quality }) {
     const { prepareHtml } = await import('../components/Preview.jsx');
     const blob = await exportVideo({
       html: prepareHtml(project.code), aspect: project.aspectRatio || '9:16', fps: 30, quality, signal: abort.signal,
-      onProgress: (p) => { set({ progress: p }); const pct = Math.round((p.done / Math.max(1, p.total)) * 100); document.title = `${pct}% · Making your video`; },
+      onProgress: (p) => {
+        set({ progress: p });
+        const pct = Math.round((p.done / Math.max(1, p.total)) * 100);
+        document.title = `${pct}% · Making your video`;
+        // a notification that updates every 5% (visible when you switch to another app)
+        if (p.stage === 'Recording' && pct >= lastShown + 5) { lastShown = pct; showLocal(`Downloading ${project.title} · ${pct}%`, `${'▰'.repeat(Math.round(pct / 10))}${'▱'.repeat(10 - Math.round(pct / 10))}${p.eta != null ? `  about ${p.eta >= 60 ? `${Math.round(p.eta / 60)} min` : `${p.eta} s`} left` : ''}. Keep Animora open.`, { url: `/p/${project.id}/studio` }); }
+      },
     });
     saveBlob(blob, fileName(project.title));
     set({ status: 'done', blob });
-    notify('Your video is ready', `${fileName(project.title)} is in your downloads.`);
+    notify('Download done', `${fileName(project.title)} is in your downloads.`, `/p/${project.id}/studio`);
   } catch (e) {
     if (e?.name === 'AbortError') set({ status: 'idle' });
-    else { set({ status: 'failed', error: e?.message || "Couldn't make the video." }); notify("Your video didn't finish", 'Open Animora and press Download MP4 to try again.'); }
+    else { set({ status: 'failed', error: e?.message || "Couldn't make the video." }); notify("Your download didn't finish", 'Open Animora and press Download MP4 to try again.', `/p/${project.id}/studio`); }
   } finally {
     remember(null);
     window.removeEventListener('beforeunload', onLeave);

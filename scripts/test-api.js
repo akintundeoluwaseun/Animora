@@ -63,8 +63,11 @@ try {
   let chat = await api('POST', `/api/projects/${P}/chat`, { message: 'yes, generate it' }, T);
   ok('chat produces a plan', chat.planReady && chat.project.plan?.scenes?.length > 2, `${chat.project.plan?.scenes?.length} scenes, ${chat.project.durationSeconds}s`);
 
-  const gen = await api('POST', `/api/projects/${P}/generate`, {}, T);
-  ok('code generated', gen.project?.code?.includes('window.__timeline'), gen.source);
+  // making the video runs in the background: start it, then check until it's done (like the page does)
+  let gen = await api('POST', `/api/projects/${P}/generate`, {}, T);
+  ok('generate starts in the background', gen.project?.gen?.state === 'working', gen.project?.gen?.message);
+  for (let i = 0; i < 120 && gen.project?.gen?.state === 'working'; i++) { await new Promise((r) => setTimeout(r, 500)); gen = await api('GET', `/api/projects/${P}`, null, T); }
+  ok('code generated', gen.project?.code?.includes('window.__timeline') && gen.project?.gen?.state === 'done', gen.project?.aiSource);
   const ed = await api('POST', `/api/projects/${P}/edit`, { instruction: 'make the text bigger' }, T);
   ok('edit by prompt', ed.changed && ed.project.code.includes('--scale: 1.3'), ed.summary);
   const un = await api('POST', `/api/projects/${P}/undo`, {}, T);

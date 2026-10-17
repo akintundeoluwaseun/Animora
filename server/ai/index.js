@@ -3,6 +3,7 @@
 // Offline mode (no key) or Gemini failure: our practice planner + template engine,
 // so the product never dead-ends in front of a customer (or a judge).
 import { config } from '../config.js';
+import { getDbObject } from '../storage.js';
 import { planChat, generateAnimation, editAnimation } from '../engine/gemini.js';
 import { validatePlan } from '../engine/validate.js';
 import { offlinePlannerTurn } from './offline.js';
@@ -23,14 +24,20 @@ export function limitsFor(user) {
 export const themeKeyFor = (style) => style?.palette?.theme || 'bold';
 
 async function imageParts(assets) {
+  // The AI only needs to see the pictures roughly: logo first, at most 3, about 3 MB in total.
+  // Files kept in our own database are read directly (no extra web request).
   const out = [];
-  for (const a of assets.filter((x) => x.kind === 'image').slice(-3)) {
+  let total = 0;
+  const imgs = assets.filter((x) => x.kind === 'image').sort((a, b) => (b.role === 'logo') - (a.role === 'logo')).slice(0, 3);
+  for (const a of imgs) {
     try {
-      const res = await fetch(a.url);
-      if (!res.ok) continue;
-      const buf = Buffer.from(await res.arrayBuffer());
-      if (buf.length > 4e6) continue;
-      out.push({ mimeType: a.mime || res.headers.get('content-type') || 'image/png', data: buf.toString('base64') });
+      let buf = null, type = a.mime;
+      const key = config.storageMode === 'db' && String(a.url).includes('/files/') ? decodeURIComponent(String(a.url).split('/files/')[1]) : null;
+      if (key) { const f = await getDbObject(key); if (f) { buf = f.data; type = type || f.type; } }
+      if (!buf) { const res = await fetch(a.url, { signal: AbortSignal.timeout(8000) }); if (!res.ok) continue; buf = Buffer.from(await res.arrayBuffer()); type = type || res.headers.get('content-type'); }
+      if (buf.length > 2.5e6 || total + buf.length > 3.2e6) continue;
+      total += buf.length;
+      out.push({ mimeType: type || 'image/png', data: buf.toString('base64') });
     } catch { /* image is optional context */ }
   }
   return out;

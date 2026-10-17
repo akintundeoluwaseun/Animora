@@ -13,6 +13,7 @@ import { seed, syncStarterStyles } from './db/seed.js';
 import { aiMode } from './ai/index.js';
 import { provider } from './payments.js';
 import authRoutes from './routes/auth.js';
+import { requireAuth } from './auth.js';
 import projectRoutes from './routes/projects.js';
 import renderRoutes from './routes/renders.js';
 import moneyRoutes from './routes/money.js';
@@ -54,6 +55,9 @@ export async function createApp() {
     const { liveModels } = await import('./engine/gemini.js');
     res.json({ configured: config.useGemini, models: config.useGemini ? await liveModels() : null });
   });
+  // phone notifications (Web Push)
+  app.get('/api/push/key', async (req, res, next) => { try { const { publicKey } = await import('./push.js'); res.json({ key: await publicKey() }); } catch (e) { next(e); } });
+  app.post('/api/push/subscribe', requireAuth, async (req, res, next) => { try { const { saveSubscription } = await import('./push.js'); await saveSubscription(req.user.id, req.body?.subscription); res.json({ ok: true }); } catch (e) { next(e); } });
   app.use('/api/auth', authRoutes);
   app.use('/api/projects', projectRoutes);
   app.use('/api', renderRoutes);

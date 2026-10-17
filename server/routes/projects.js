@@ -4,6 +4,8 @@ import { randomBytes } from 'node:crypto';
 import { one, q } from '../db/index.js';
 import { requireAuth } from '../auth.js';
 import { putObject } from '../storage.js';
+import { waitUntil } from '@vercel/functions';
+import { notifyUser } from '../push.js';
 import { chatTurn, generateCode, editCode, limitsFor, aiMode } from '../ai/index.js';
 import { validateHtml, inspectProblems, validatePlan } from '../engine/validate.js';
 import { inspectAnimation, snapshotFrames } from '../engine/renderer.js';
@@ -53,12 +55,18 @@ function shape(p, extra = {}) {
     styleId: p.style_id, plan: p.plan_json, planSummary: p.plan_summary, chat: p.chat_history,
     code: p.code_html, versions: (p.code_versions || []).length, editHistory: p.edit_history,
     brief: p.brief_json || null, sfx: p.sfx_on !== false, aiSource: p.ai_source, thumbnailUrl: p.thumbnail_url, createdAt: p.created_at, updatedAt: p.updated_at,
+    gen: p.gen_state ? {
+      state: p.gen_state === 'working' && p.gen_started_at && Date.now() - new Date(p.gen_started_at).getTime() > 6 * 60e3 ? 'failed' : p.gen_state,
+      message: p.gen_message || '', error: p.gen_error || (p.gen_state === 'working' && p.gen_started_at && Date.now() - new Date(p.gen_started_at).getTime() > 6 * 60e3 ? "It didn't finish. Press Make my video to try again." : ''),
+      startedAt: p.gen_started_at,
+    } : null,
     voice: p.voice_url ? { url: p.voice_url, duration: Number(p.voice_duration), source: p.voice_source, fitToVoice: p.fit_to_voice } : null,
     ...extra,
   };
 }
 
 async function thumbnail(projectId, html, aspect) {
+  if (!config.renderEnabled) return null;   // needs Chrome (not on Vercel)
   try {
     const [img] = await snapshotFrames(html, [1.6], { aspectRatio: aspect, scale: 0.35 });
     const url = await putObject(`thumbs/${projectId}-${randomBytes(3).toString('hex')}.jpg`, img, 'image/jpeg');
@@ -244,24 +252,37 @@ r.put('/:id/plan', async (req, res) => {
 });
 
 // ---------------- Page 2: code generation, edits, undo ----------------
+// Making the video runs in the background on the server: the page can close; the phone is notified when it's done.
 r.post('/:id/generate', async (req, res) => {
   const p = await loadProject(req, res); if (!p) return;
   if (!p.plan_json) return res.status(400).json({ error: 'Finish planning in the chat first.' });
   const problems = validatePlan(p.plan_json, limitsFor(req.user));
   if (problems.length) return res.status(400).json({ error: `The plan needs fixing: ${problems.join('; ')}` });
-  await q("UPDATE projects SET status='coding' WHERE id=$1", [p.id]);
-  try {
-    const out = await generateCode({ plan: p.plan_json, style: await loadStyle(p.style_id), assets: await projectAssets(p.id), brief: p.brief_json || null, previous: p.code_html || null });
-    const versions = [...(p.code_versions || []), ...(p.code_html ? [p.code_html] : [])].slice(-MAX_VERSIONS);
-    const u = await one(`UPDATE projects SET code_html=$2, code_versions=$3, status='ready', ai_source=$4, edit_history='[]'::jsonb, updated_at=now()
-      WHERE id=$1 RETURNING *`, [p.id, out.html, JSON.stringify(versions), out.source]);
-    thumbnail(p.id, out.html, u.aspect_ratio);
-    res.json({ project: shape(u), notice: out.notice, source: out.source });
-  } catch (e) {
-    await q("UPDATE projects SET status=CASE WHEN code_html IS NULL THEN 'planning' ELSE 'ready' END WHERE id=$1", [p.id]);
-    throw e;
-  }
+  const fresh = p.gen_state === 'working' && p.gen_started_at && Date.now() - new Date(p.gen_started_at).getTime() < 6 * 60e3;
+  if (fresh) return res.status(202).json({ project: shape(p), started: false });
+  const u = await one("UPDATE projects SET status='coding', gen_state='working', gen_message='Reading your answers', gen_error=NULL, gen_started_at=now() WHERE id=$1 RETURNING *", [p.id]);
+  res.status(202).json({ project: shape(u), started: true });
+  const job = runGenerate(p, req.user);
+  if (config.serverless) waitUntil(job); else job.catch(() => {});
 });
+
+async function runGenerate(p, user) {
+  const setMsg = (m) => q('UPDATE projects SET gen_message=$2 WHERE id=$1', [p.id, String(m).slice(0, 120)]).catch(() => {});
+  const name = p.brief_json?.name || p.title;
+  try {
+    const out = await generateCode({ plan: p.plan_json, style: await loadStyle(p.style_id), assets: await projectAssets(p.id), brief: p.brief_json || null, previous: p.code_html || null, onStatus: setMsg });
+    const versions = [...(p.code_versions || []), ...(p.code_html ? [p.code_html] : [])].slice(-MAX_VERSIONS);
+    const u = await one(`UPDATE projects SET code_html=$2, code_versions=$3, status='ready', ai_source=$4, edit_history='[]'::jsonb, updated_at=now(),
+      gen_state='done', gen_message=$5, gen_error=NULL WHERE id=$1 RETURNING *`, [p.id, out.html, JSON.stringify(versions), out.source, out.notice || '']);
+    thumbnail(p.id, out.html, u.aspect_ratio);
+    await notifyUser(user.id, { title: 'Your video is ready', body: `${name}: tap to watch it and download the MP4.`, url: `/p/${p.id}/studio`, tag: `gen-${p.id}` });
+  } catch (e) {
+    console.error('[generate]', e);
+    await q(`UPDATE projects SET status=CASE WHEN code_html IS NULL THEN 'planning' ELSE 'ready' END, gen_state='failed', gen_error=$2 WHERE id=$1`,
+      [p.id, `Something went wrong making the video (${String(e.message).slice(0, 120)}). Press Make my video to try again.`]).catch(() => {});
+    await notifyUser(user.id, { title: "Your video didn't finish", body: `${name}: open Animora and press Make my video to try again.`, url: `/p/${p.id}/studio`, tag: `gen-${p.id}` });
+  }
+}
 
 r.post('/:id/edit', async (req, res) => {
   const p = await loadProject(req, res); if (!p) return;

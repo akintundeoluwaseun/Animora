@@ -250,7 +250,7 @@ Direct the ${duration}s video now.`;
   const { text } = await geminiGenerate({
     system: directorSystem({ duration, aspect: plan.aspect_ratio, style, themeKey }),
     messages: [{ role: 'user', text: user, images }],
-    model: DIRECTOR_MODEL, temperature: 0.9, maxOutputTokens: 24576, json: true, timeoutMs: 150000,
+    model: DIRECTOR_MODEL, temperature: 0.9, maxOutputTokens: 24576, json: true, timeoutMs: 150000, thinking: 'low',
   });
   const out = parseJson(text);
   const beats = sanitizeBeats(out, { duration, assets, plan, calm });
@@ -301,7 +301,7 @@ get as close as possible with the shots and cuts available and say so in the sum
   const { text } = await geminiGenerate({
     system,
     messages: [{ role: 'user', images, text: `CURRENT BEATS:\n${JSON.stringify(current)}\n\nIMAGES AVAILABLE:\n${assetLines(assets)}\n\nCHANGE REQUEST: ${instruction}` }],
-    model: DIRECTOR_MODEL, temperature: 0.5, maxOutputTokens: 24576, json: true, timeoutMs: 150000,
+    model: DIRECTOR_MODEL, temperature: 0.5, maxOutputTokens: 24576, json: true, timeoutMs: 150000, thinking: 'low',
   });
   const out = parseJson(text);
   const beats = sanitizeBeats(out.beats || out, { duration, assets, plan: plan || {}, calm: !!THEMES[themeKey]?.calm });

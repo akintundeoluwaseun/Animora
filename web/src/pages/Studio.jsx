@@ -7,22 +7,26 @@ import MicButton from '../components/MicButton.jsx';
 import { LivePreview } from '../components/Preview.jsx';
 import VoicePanel from '../components/VoicePanel.jsx';
 import DownloadVideo from '../components/DownloadVideo.jsx';
+import { enablePush } from '../lib/notify.js';
 
 const SUGGESTIONS = ['Start by zooming into my logo', 'Make the text bigger', 'Use calmer, premium transitions', 'Make the price stand out more'];
-const WAIT = ['Reading your plan…', 'Designing the scenes…', 'Animating every shot…', 'Checking every frame…', 'Almost there…'];
-
-function Generating() {
-  const [i, setI] = useState(0);
-  useEffect(() => { const t = setInterval(() => setI((x) => Math.min(x + 1, WAIT.length - 1)), 6000); return () => clearInterval(t); }, []);
+// While the server makes the video: what it's doing now, and that it's safe to leave.
+function Generating({ message, startedAt, pushOn }) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
+  const secs = startedAt ? Math.max(0, Math.round((now - new Date(startedAt).getTime()) / 1000)) : 0;
   return (
     <div className="grid min-h-[60vh] place-items-center px-4 text-center">
-      <div>
+      <div className="max-w-sm">
         <div className="stage mx-auto grid size-28 place-items-center !rounded-[2rem]">
           <img src="/animora-mark.png" width="56" height="56" alt="" className="animate-pulse" />
         </div>
-        <p className="mt-6 font-display text-3xl font-extrabold" aria-live="polite">{WAIT[i]}</p>
-        <p className="mt-2 text-ink-soft">This usually takes under a minute.</p>
-        <Spinner className="mx-auto mt-5 size-6 text-ink-mute" />
+        <p className="mt-6 text-2xl font-bold tracking-[-0.03em]" aria-live="polite">{message || 'Making your video'}…</p>
+        <p className="mt-2 tabular-nums text-ink-mute">{secs >= 60 ? `${Math.floor(secs / 60)} min ${secs % 60} s` : `${secs} s`}</p>
+        <div className="mx-auto mt-5 h-1 w-48 overflow-hidden rounded-full bg-lilac"><div className="gen-sweep h-full w-1/3 rounded-full bg-danfo" /></div>
+        <p className="mt-6 text-sm leading-relaxed text-ink-soft">
+          {pushOn ? "You can close Animora. We'll send a notification to this device when your video is ready." : 'You can leave this page; your video keeps being made. Allow notifications to get told when it is ready.'}
+        </p>
       </div>
     </div>
   );
@@ -128,18 +132,41 @@ export default function Studio() {
   const [notice, setNotice] = useState('');
   const started = useRef(false);
 
+  const [pushOn, setPushOn] = useState(() => typeof Notification !== 'undefined' && Notification.permission === 'granted');
+  const poll = useRef(null);
+  const watch = () => {
+    clearInterval(poll.current);
+    setGenerating(true);
+    poll.current = setInterval(async () => {
+      try {
+        const r = await api(`/projects/${id}`);
+        setProject(r.project);
+        const g = r.project.gen;
+        if (!g || g.state !== 'working') {
+          clearInterval(poll.current); setGenerating(false); setParams({}, { replace: true });
+          if (g?.state === 'failed') setError(g.error || "Your video didn't finish. Press Make my video to try again.");
+          else if (g?.message) setNotice(g.message);
+          if (r.project.plan?.voiceover?.enabled) setTab('voice');
+        }
+      } catch { /* network blip: keep checking */ }
+    }, 2500);
+  };
+  useEffect(() => () => clearInterval(poll.current), []);
+
   const generate = async () => {
-    setGenerating(true); setError('');
+    setError(''); setNotice('');
+    enablePush().then(setPushOn);
     try {
       const r = await api(`/projects/${id}/generate`, { method: 'POST' });
-      setProject(r.project); if (r.notice) setNotice(r.notice);
-      if (r.project.plan?.voiceover?.enabled) setTab('voice');
-    } catch (e) { setError(e.message); } finally { setGenerating(false); setParams({}, { replace: true }); }
+      setProject(r.project);
+      watch();
+    } catch (e) { setError(e.message); setGenerating(false); }
   };
 
   useEffect(() => {
     api(`/projects/${id}`).then((r) => {
       setProject(r.project);
+      if (r.project.gen?.state === 'working') { started.current = true; watch(); return; }   // still being made (e.g. after closing the app)
       if (!started.current && r.project.plan && (params.get('generate') === '1' || !r.project.code)) { started.current = true; generate(); }
     }).catch((e) => setError(e.message));
   }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -150,7 +177,7 @@ export default function Studio() {
   if (!project.plan) {
     return <div className="mx-auto max-w-xl p-8 text-center"><p className="text-ink-soft">Plan your video first.</p><Button as={Link} to={`/p/${id}/plan`} className="mt-4">Answer the questions</Button></div>;
   }
-  if (generating) return <Generating />;
+  if (generating) return <Generating message={project.gen?.message} startedAt={project.gen?.startedAt} pushOn={pushOn} />;
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-5">

@@ -132,3 +132,7 @@ button:disabled { cursor: not-allowed; }
 .ask-block { animation: ask-in .35s cubic-bezier(.2, .8, .2, 1) both; }
 @keyframes ask-in { from { opacity: 0; transform: translateY(8px); } }
 @media (prefers-reduced-motion: reduce) { .ask-block { animation: none; } .chat-progress > div { transition: none; } }
+
+.gen-sweep { animation: gen-sweep 1.4s ease-in-out infinite; }
+@keyframes gen-sweep { 0% { transform: translateX(-100%); } 100% { transform: translateX(300%); } }
+@media (prefers-reduced-motion: reduce) { .gen-sweep { animation: none; width: 100%; opacity: .5; } }

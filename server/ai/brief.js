@@ -203,7 +203,7 @@ export async function suggest(kind, brief) {
     const { text } = await geminiGenerate({
       system: 'You write copy for short video ads for Nigerian small businesses. Return JSON only: { "options": ["...", "..."] }. Use the business name naturally; never invent prices or numbers.',
       messages: [{ role: 'user', text: `${ask}\nBusiness: ${b.name} (${b.category || 'business'}). Goal: ${b.goal || 'more customers'}.${b.headlines?.length ? ` Messages: ${b.headlines.join(' / ')}.` : ''}` }],
-      json: true, temperature: 1, timeoutMs: 30000, maxOutputTokens: 4096,
+      json: true, temperature: 1, timeoutMs: 30000, maxOutputTokens: 4096, thinking: 'low',
     });
     const opts = (JSON.parse(text).options || []).map((x) => str(x, 70)).filter(Boolean).slice(0, kind === 'features' ? 8 : 5);
     return opts.length >= 2 ? opts : fallback;
@@ -261,7 +261,7 @@ export async function parseBrief(text, current = {}) {
   "aspect": "9:16" | "16:9" | "1:1", "duration": seconds, "voiceover": true/false, "sound": "all" | "sfx" | "none",
   "extra": any other instructions about the look, scenes, pictures or style, in their words }`,
       messages: [{ role: 'user', text: `Already known: ${JSON.stringify({ name: current.name, category: current.category })}\n\nTHEIR TEXT:\n${String(text).slice(0, 6000)}` }],
-      json: true, temperature: 0.2, timeoutMs: 50000, maxOutputTokens: 8192,
+      json: true, temperature: 0.2, timeoutMs: 50000, maxOutputTokens: 8192, thinking: 'low',
     });
     const g = JSON.parse(out);
     // the AI wins where it found something; rules fill gaps (phone numbers, aspect words); keep the full text for the director
