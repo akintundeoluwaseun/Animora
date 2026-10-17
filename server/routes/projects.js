@@ -10,7 +10,7 @@ import { inspectAnimation, snapshotFrames } from '../engine/renderer.js';
 import { probeBuffer, toMp3 } from '../media.js';
 import { voiceoverFormats, generateVoiceTrack, VOICES, hasOfflineVoice } from '../ai/voice.js';
 import { config } from '../config.js';
-import { cleanBrief, briefToPlanRules, suggest, autoStyleSlug } from '../ai/brief.js';
+import { cleanBrief, briefToPlanRules, suggest, autoStyleSlug, parseBrief } from '../ai/brief.js';
 
 const MAX_IMAGES = 5;
 
@@ -163,6 +163,19 @@ r.patch('/:id/brief', async (req, res) => {
 });
 
 // AI-suggested options for the open questions (headline, selling points)
+// "I'll paste everything": read the text into the brief; the page then asks only what's missing.
+r.post('/:id/brief/parse', async (req, res) => {
+  const p = await loadProject(req, res); if (!p) return;
+  const text = String(req.body?.text || '').trim();
+  if (text.length < 10) return res.status(400).json({ error: 'Paste a few sentences about your business and the ad you want.' });
+  const current = p.brief_json || {};
+  const found = await parseBrief(text, current);
+  // never overwrite answers the user already gave one by one
+  const merged = cleanBrief({ ...found, ...Object.fromEntries(Object.entries(current).filter(([, v]) => v !== undefined && v !== '')), extra: found.extra || current.extra, mode: 'paste' });
+  const u = await one('UPDATE projects SET brief_json=$2, updated_at=now() WHERE id=$1 RETURNING *', [p.id, JSON.stringify(merged)]);
+  res.json({ project: shape(u, { assets: await projectAssets(p.id) }), found: ['name', 'category', 'goals', 'headlines', 'features', 'products', 'ctas', 'contact', 'aspect', 'duration', 'voiceover', 'sound'].filter((k) => found[k] !== undefined && found[k] !== '' && !(Array.isArray(found[k]) && !found[k].length)) });
+});
+
 r.post('/:id/suggest', async (req, res) => {
   const p = await loadProject(req, res); if (!p) return;
   const kind = req.body?.kind === 'features' ? 'features' : 'headline';

@@ -29,7 +29,7 @@ export function cleanBrief(b = {}) {
     colors: b.colors && typeof b.colors === 'object' ? Object.fromEntries(Object.entries(b.colors).filter(([k, v]) => ['primary', 'secondary', 'background', 'text'].includes(k) && /^#[0-9a-f]{6}$/i.test(v))) : undefined,
     voiceover: b.voiceover === undefined || b.voiceover === null ? undefined : b.voiceover === true || b.voiceover === 'yes',
     sound: ['all', 'sfx', 'none', 'own'].includes(b.sound) ? b.sound : b.sfx === true || b.sfx === 'yes' ? 'all' : b.sfx === false || b.sfx === 'no' ? 'none' : undefined,
-    extra: str(b.extra, 1500), done: !!b.done,
+    extra: str(b.extra, 3000), done: !!b.done, mode: ['steps', 'paste'].includes(b.mode) ? b.mode : undefined, pasted: b.pasted ? true : undefined,
     colorMode: ['style', 'logo', 'own'].includes(b.colorMode) ? b.colorMode : undefined, picturesDone: b.picturesDone ? true : undefined,
   };
   // optional questions the user skipped (so they are not asked again)
@@ -219,4 +219,57 @@ export function autoStyleSlug(brief) {
     food: 'naija-bold', fashion: 'street-hype', beauty: 'beauty-bloom', tech: 'midnight-glow', finance: 'fintech-blue', health: 'health-pulse',
     realestate: 'prime-estate', events: 'owambe-party', education: 'clean-pro', default: 'studio-white',
   }[catKey(b.category)];
+}
+
+// ---------------------------------------------------------------------------
+// "Paste everything at once": read a free-text description into brief fields.
+// Only fields the text actually states are returned; the plan page then asks for the rest.
+// ---------------------------------------------------------------------------
+const ASPECT_WORDS = [[/landscape|16\s*[:x/]\s*9|youtube|horizontal|wide/i, '16:9'], [/square|1\s*[:x/]\s*1|instagram feed|facebook feed/i, '1:1'], [/portrait|vertical|9\s*[:x/]\s*16|tiktok|reels?|status|shorts|stories/i, '9:16']];
+
+export function parseBriefRules(text) {
+  const t = String(text || '');
+  const out = {};
+  const phone = t.match(PHONE_RE)?.[0];
+  const site = t.match(URL_RE)?.[0];
+  const addr = t.match(/(?:address|located at|we are at|find us at|location)\s*[:-]?\s*([^\n.]{4,80})/i)?.[1];
+  const contact = [phone, site, addr].filter(Boolean).join(', ');
+  if (contact) out.contact = contact;
+  for (const [re, v] of ASPECT_WORDS) if (re.test(t)) { out.aspect = v; break; }
+  const sec = t.match(/(\d{1,3})\s*(?:s\b|secs?\b|seconds?\b)/i)?.[1] || (t.match(/(\d)\s*(?:min|minutes?)\b/i)?.[1] * 60);
+  if (sec) out.duration = Number(sec);
+  const name = t.match(/(?:business(?:\s+name)?\s*(?:is|:|-)|(?:company|brand|shop|store)\s+(?:name\s+)?(?:is|:)|(?:called|named))\s*["']?([A-Z0-9][\w&'. -]{1,40}?)["']?(?=[,.\n]|\s+(?:and|we|i|in|at|is)\b|$)/i)?.[1];
+  if (name) out.name = name.trim();
+  const priced = t.split(/\n|;|\.\s+(?=[A-Z])/).map((l) => l.trim()).filter((l) => /(₦|N\s?\d|naira|\d+k\b)/i.test(l) && l.length < 70);
+  if (priced.length) out.products = priced.slice(0, 8);
+  if (/no (music|sound|audio)|without (music|sound)|silent/i.test(t)) out.sound = 'none';
+  else if (/only (sound )?effects|no music/i.test(t)) out.sound = 'sfx';
+  if (/voice[- ]?over|narrat/i.test(t)) out.voiceover = !/no (voice|narrat)/i.test(t);
+  out.extra = str(t, 3000);   // the whole text also goes to the AI director as special instructions
+  return out;
+}
+
+export async function parseBrief(text, current = {}) {
+  const rules = parseBriefRules(text);
+  if (!config.useGemini) return cleanBrief({ ...rules, mode: 'paste' });
+  try {
+    const { text: out } = await geminiGenerate({
+      system: `You read a business owner's description of the video ad they want and fill in a form. Return JSON only with any of these keys, and ONLY for things the text clearly says (leave everything else out, never invent):
+{ "name": business name, "category": what the business does (2-4 words), "goals": ["..."] (why they want the ad),
+  "headlines": ["..."] (the main messages / slogans for the video, short), "features": ["..."] (selling points, 2-5 words each),
+  "products": ["Product ₦price", ...], "ctas": ["Order on WhatsApp", "Call now", ...] (what viewers should do), "contact": phone / website / address,
+  "aspect": "9:16" | "16:9" | "1:1", "duration": seconds, "voiceover": true/false, "sound": "all" | "sfx" | "none",
+  "extra": any other instructions about the look, scenes, pictures or style, in their words }`,
+      messages: [{ role: 'user', text: `Already known: ${JSON.stringify({ name: current.name, category: current.category })}\n\nTHEIR TEXT:\n${String(text).slice(0, 6000)}` }],
+      json: true, temperature: 0.2, timeoutMs: 20000, maxOutputTokens: 2048,
+    });
+    const g = JSON.parse(out);
+    // the AI wins where it found something; rules fill gaps (phone numbers, aspect words); keep the full text for the director
+    const merged = { ...rules, ...Object.fromEntries(Object.entries(g).filter(([, v]) => v !== null && v !== '' && !(Array.isArray(v) && !v.length))) };
+    merged.extra = str([g.extra, `Original description: ${String(text).slice(0, 2500)}`].filter(Boolean).join('\n\n'), 3000);
+    return cleanBrief({ ...merged, mode: 'paste' });
+  } catch (e) {
+    console.warn('[brief] Gemini paste reading failed, using rules:', e.message);
+    return cleanBrief({ ...rules, mode: 'paste' });
+  }
 }

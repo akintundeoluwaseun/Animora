@@ -17,11 +17,17 @@ const ASPECT_OPTS = [
   { v: '16:9', l: 'Landscape 16:9', d: 'YouTube · TV · websites' },
   { v: '1:1', l: 'Square 1:1', d: 'Instagram & Facebook feed' },
 ];
+const FOUND_LABEL = { name: 'business name', category: 'business type', goals: 'goal', headlines: 'message', features: 'selling points', products: 'products', ctas: 'call to action', contact: 'contact', aspect: 'format', duration: 'length', voiceover: 'voice-over choice', sound: 'sound choice' };
 const EXTRA_CHIPS = ['Zoom into my logo at the start', 'Make the price really big', 'Keep it calm and premium', 'Make it loud and energetic', 'Show my photos more'];
 
 // The questions, in order. `show` hides a question that doesn't apply; `optional` adds a Skip button.
 const QUESTIONS = [
-  { id: 'name', type: 'text', ask: () => "Hi! I'm your Animora director. Let's make your ad. What's your business name?", placeholder: 'e.g. Kemi Cakes' },
+  { id: 'mode', type: 'single', options: [
+    { v: 'steps', l: 'Ask me one question at a time' },
+    { v: 'paste', l: "I'll paste everything at once", d: "Write or paste all your details. I'll only ask what's missing." },
+  ], ask: () => "Hi! I'm your Animora director. Let's make your ad. Should I ask you questions one by one, or will you paste all your details at once?" },
+  { id: 'paste', type: 'long', show: (b) => b.mode === 'paste', ask: () => 'Paste or type everything about your business and the ad: name, what you sell, your message, prices, contact, where you\'ll post it, how long, anything special.', placeholder: 'e.g. My business is Oluwaseun Computers in Ado Ekiti. We sell and repair laptops. HP EliteBook ₦250,000, Dell ₦300,000. Call or WhatsApp 0807 691 1614. Landscape for YouTube, about 30 seconds, calm and premium.' },
+  { id: 'name', type: 'text', ask: () => "What's your business name?", placeholder: 'e.g. Kemi Cakes' },
   { id: 'category', type: 'single', options: CATEGORIES, typed: true, ask: (b) => `Nice! What does ${b.name} do?`, placeholder: 'Or type it, e.g. "laptop repairs"' },
   { id: 'goal', type: 'multi', max: 6, options: GOALS, typed: true, ask: () => "What's the goal of this ad? Pick one or more.", placeholder: 'Or type your own goal' },
   { id: 'headline', type: 'multi', max: 8, suggest: 'headline', typed: true, ask: () => "What's the main message? Pick as many as you like (up to 8), or type your own. More messages make a longer video.", placeholder: 'Add your own message' },
@@ -41,6 +47,8 @@ const QUESTIONS = [
 
 const label = (q, v, b, styles) => {
   if (v == null || v === '' || (Array.isArray(v) && !v.length)) return 'Skipped';
+  if (q.id === 'mode') return v === 'paste' ? "I'll paste everything at once" : 'One question at a time';
+  if (q.id === 'paste') return 'My details (pasted)';
   if (q.id === 'aspect') return ASPECT_OPTS.find((o) => o.v === v)?.l || v;
   if (q.id === 'duration') return `${v} seconds`;
   if (q.id === 'voiceover') return v === true || v === 'yes' ? 'Yes, write me a script' : 'No script';
@@ -53,6 +61,8 @@ const label = (q, v, b, styles) => {
 
 // answers live in the brief under the question id (with a few special cases)
 function valueOf(q, b, pics) {
+  if (q.show && !q.show(b)) return 'hidden';
+  if (q.id === 'paste') return b.pasted ? true : undefined;
   if (q.id === 'headline') return b.headlines || (b.headline ? [b.headline] : undefined);
   if (q.id === 'goal') return b.goals || (b.goal ? [b.goal] : undefined);
   if (q.id === 'cta') return b.ctas || (b.cta ? [b.cta] : undefined);
@@ -180,13 +190,27 @@ export default function Plan() {
 
   const advance = (next) => {
     if (editing) { setEditing(false); const brief = next; const f = QUESTIONS.findIndex((qq) => valueOf(qq, brief, pics.length) === undefined && !(qq.optional && brief[`${qq.id}Skipped`])); setStep(f < 0 ? QUESTIONS.length : f); return; }
-    setStep((s) => s + 1);
+    const f = QUESTIONS.findIndex((qq) => valueOf(qq, next, pics.length) === undefined && !(qq.optional && next[`${qq.id}Skipped`]));
+    setStep(f < 0 ? QUESTIONS.length : f);
   };
 
   const answer = async (value, extra = {}) => {
     if (!q) return;
     setError('');
     let patch;
+    if (q.id === 'paste') {
+      setBuilding(true);
+      try {
+        const r = await api(`/projects/${id}/brief/parse`, { method: 'POST', body: { text: value } });
+        const brief = { ...(r.project.brief || {}), pasted: true };
+        setProject((p) => ({ ...p, ...r.project, assets: r.project.assets || p.assets }));
+        const next = await save({ pasted: true });
+        setB(brief);
+        setToast(r.found?.length ? `Got it. I found your ${r.found.map((k) => FOUND_LABEL[k] || k).join(', ')}.` : 'Got it.'); setTimeout(() => setToast(''), 4000);
+        advance({ ...next, ...brief });
+      } catch (e) { setError(e.message); } finally { setBuilding(false); }
+      return;
+    }
     if (q.id === 'voiceover') patch = { voiceover: value === 'yes' };
 
     else if (q.id === 'duration') patch = { duration: Number(value) };
@@ -250,7 +274,7 @@ export default function Plan() {
         <section className="flex h-[calc(100vh-11rem)] min-h-[520px] flex-col overflow-hidden surface" aria-label="Questions">
           <div className="h-1.5 bg-lilac"><div className="h-full rounded-r-full bg-danfo transition-all" style={{ width: `${Math.round((Math.min(step, visible.length) / visible.length) * 100)}%` }} /></div>
           <div className="flex-1 space-y-3 overflow-y-auto p-4 sm:p-6" aria-live="polite">
-            {answered.map((qq, i) => (
+            {answered.map((qq, i) => (qq.show && !qq.show(b)) ? null : (
               <div key={qq.id} className="space-y-2">
                 <Bubble who="ai">{qq.ask(b)}</Bubble>
                 <Bubble who="me" onEdit={building ? null : () => { setEditing(true); setStep(i); }}>{label(qq, valueOf(qq, b, pics.length), b, styles)}</Bubble>
