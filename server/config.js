@@ -36,7 +36,12 @@ export const config = {
   // Render worker
   runWorkerInProcess: env('RUN_WORKER', 'true') !== 'false',
   // MP4 export needs Chrome + FFmpeg running for minutes, which serverless hosts (Vercel) can't do.
-  renderEnabled: env('RENDER_ENABLED', SERVERLESS ? 'false' : 'true') !== 'false',
+  // On Vercel, MP4s are made by a GitHub Actions run (see .github/workflows/render.yml) when GH_DISPATCH_TOKEN is set.
+  githubRender: !!env('GH_DISPATCH_TOKEN'),
+  githubToken: env('GH_DISPATCH_TOKEN'),
+  githubRepo: env('GH_REPO', process.env.VERCEL_GIT_REPO_OWNER && process.env.VERCEL_GIT_REPO_SLUG ? `${process.env.VERCEL_GIT_REPO_OWNER}/${process.env.VERCEL_GIT_REPO_SLUG}` : 'akintundeoluwaseun/animora'),
+  githubRef: env('GH_REF', process.env.VERCEL_GIT_COMMIT_REF || 'main'),
+  renderEnabled: env('RENDER_ENABLED', SERVERLESS ? (env('GH_DISPATCH_TOKEN') ? 'true' : 'false') : 'true') !== 'false',
   workerConcurrency: num('WORKER_CONCURRENCY', 1),
 
   // Payments

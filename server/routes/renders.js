@@ -4,6 +4,7 @@ import { requireAuth, publicUser, loadUser } from '../auth.js';
 import { createRender, startAdView, completeAdView, renderAllowance } from '../billing.js';
 import { queuePosition } from '../worker.js';
 import { config } from '../config.js';
+import { dispatchRender } from './renderJobs.js';
 
 const r = Router();
 r.use(['/projects', '/renders', '/ads'], requireAuth);
@@ -33,6 +34,7 @@ r.post('/projects/:id/renders', async (req, res) => {
   if (!p) return res.status(404).json({ error: 'Project not found.' });
   try {
     const render = await createRender(req.user, p, { adViewId: req.body?.adViewId });
+    if (config.githubRender && config.serverless) await dispatchRender(render);   // a GitHub Actions run makes the MP4
     res.json({ render: shape(render, { queuePosition: await queuePosition(render.id) }), user: publicUser(await loadUser(req.user.id)) });
   } catch (e) {
     res.status(e.status || 500).json({ error: e.message, code: e.code });

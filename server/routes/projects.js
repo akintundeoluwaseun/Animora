@@ -66,7 +66,7 @@ function shape(p, extra = {}) {
 }
 
 async function thumbnail(projectId, html, aspect) {
-  if (!config.renderEnabled) { await q('UPDATE projects SET thumbnail_url=NULL WHERE id=$1', [projectId]).catch(() => {}); return null; }   // needs Chrome (not on Vercel): the browser makes it
+  if (config.serverless) { await q('UPDATE projects SET thumbnail_url=NULL WHERE id=$1', [projectId]).catch(() => {}); return null; }   // needs Chrome (not on Vercel): the browser makes it
   try {
     const [img] = await snapshotFrames(html, [1.6], { aspectRatio: aspect, scale: 0.35 });
     const url = await putObject(`thumbs/${projectId}-${randomBytes(3).toString('hex')}.jpg`, img, 'image/jpeg');

@@ -81,10 +81,45 @@ function Progress({ render, onCancel }) {
   );
 }
 
+// Fetch the whole MP4. Videos made online come back in 4 MB ranges, so ask for each part in turn.
+async function fetchVideo(url, onProgress = () => {}) {
+  const first = await fetch(url, { headers: { Range: 'bytes=0-' } });
+  if (first.status !== 206) return first.blob();
+  const total = Number((first.headers.get('content-range') || '').split('/')[1]) || 0;
+  const parts = [await first.arrayBuffer()];
+  let got = parts[0].byteLength;
+  while (total && got < total) {
+    onProgress(got / total);
+    const r = await fetch(url, { headers: { Range: `bytes=${got}-` } });
+    const b = await r.arrayBuffer();
+    if (!b.byteLength) break;
+    parts.push(b); got += b.byteLength;
+  }
+  return new Blob(parts, { type: 'video/mp4' });
+}
+
+async function downloadVideo(render, title, onProgress) {
+  const blob = await fetchVideo(render.videoUrl, onProgress);
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `${String(title || 'animora-video').replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '-').replace(/-{2,}/g, '-') || 'animora-video'}.mp4`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
+
+function DownloadButton({ render, title }) {
+  const [pct, setPct] = useState(null);
+  return (
+    <Button size="lg" loading={pct != null} onClick={async () => { setPct(0); try { await downloadVideo(render, title, setPct); } finally { setPct(null); } }}>
+      {pct != null ? `Saving ${Math.round(pct * 100)}%` : 'Download MP4'}
+    </Button>
+  );
+}
+
 async function shareVideo(render, title) {
   try {
-    const blob = await (await fetch(render.videoUrl)).blob();
-    const file = new File([blob], `${title || 'adflash-video'}.mp4`, { type: 'video/mp4' });
+    const blob = await fetchVideo(render.videoUrl);
+    const file = new File([blob], `${title || 'animora-video'}.mp4`, { type: 'video/mp4' });
     if (navigator.canShare?.({ files: [file] })) { await navigator.share({ files: [file], title }); return true; }
   } catch { /* fall through */ }
   return false;
@@ -174,7 +209,7 @@ export default function Render() {
               <h2 className="mt-1 text-3xl font-extrabold">Download and post it</h2>
               <p className="mt-2 text-ink-soft">{duration(render.durationSeconds)} · {ASPECTS[render.aspectRatio]?.w}×{ASPECTS[render.aspectRatio]?.h} silent MP4 · {(render.fileSize / 1e6).toFixed(1)} MB · plays on every phone.</p>
               <div className="mt-6 flex flex-wrap gap-3">
-                <Button as="a" href={`/download/${render.id}`} size="lg">Download MP4</Button>
+                <DownloadButton render={render} title={project.title} />
                 {project.plan?.voiceover?.enabled && (script
                   ? <Button variant="outline" size="lg" onClick={downloadScript}>Download narration script</Button>
                   : <Button as={Link} to={`/p/${id}/studio`} variant="outline" size="lg">Open narration script</Button>)}

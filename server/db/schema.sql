@@ -216,3 +216,8 @@ CREATE TABLE IF NOT EXISTS settings (
 );
 ALTER TABLE push_subscriptions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE settings ENABLE ROW LEVEL SECURITY;
+
+-- ---- v6: MP4s made by GitHub Actions (Vercel has no Chrome); the file comes back in pieces ----
+ALTER TABLE renders ADD COLUMN IF NOT EXISTS job_token text;
+ALTER TABLE renders ADD COLUMN IF NOT EXISTS chunk_count integer;
+ALTER TABLE renders ADD COLUMN IF NOT EXISTS chunk_size integer;
