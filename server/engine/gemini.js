@@ -33,9 +33,14 @@ export async function geminiGenerate({ system, messages, model = CHAT_MODEL, tem
   };
 
   // Busy (429/5xx) or missing (404) models: retry briefly, then move to the next model in the chain,
-  // so one overloaded model never sends the user to the backup template.
-  const chain = [resolved.get(model) || model, ...(FALLBACKS[model] || [])].filter((m, i, a) => a.indexOf(m) === i);
+  // so one overloaded model never sends the user to the backup template. The chain starts with the newest
+  // models Google currently lists for this key (Google retires old names, so never rely on hard-coded ones).
+  const live = await liveModels(apiKey);
+  const kind = /pro/i.test(model) ? 'pro' : 'flash';
+  const chain = [resolved.get(model), ...(live[kind] || []), ...(kind === 'pro' ? live.flash || [] : []), model, ...(FALLBACKS[model] || [])]
+    .filter(Boolean).filter((m, i, a) => a.indexOf(m) === i);
   let lastErr;
+  const tried = [];
   for (const m of chain) {
     for (let attempt = 0; attempt < 2; attempt++) {
       let res;
@@ -59,7 +64,8 @@ export async function geminiGenerate({ system, messages, model = CHAT_MODEL, tem
         if (!text) throw new Error(`Gemini returned no text (finishReason: ${cand?.finishReason || out.promptFeedback?.blockReason || 'unknown'})`);
         return { text, finishReason: cand.finishReason, usage: out.usageMetadata, model: m };
       }
-      lastErr = new Error(`Gemini ${res.status} (${m}): ${(await res.text()).slice(0, 500)}`);
+      lastErr = new Error(`Gemini ${res.status} (${m}): ${(await res.text()).slice(0, 300)}`);
+      tried.push(`${m}: ${res.status}`);
       lastErr.status = res.status;
       if (res.status !== 429 && res.status < 500) break; // only retry rate limits / server errors
       await new Promise((r) => setTimeout(r, 1200 * (attempt + 1)));
@@ -67,7 +73,30 @@ export async function geminiGenerate({ system, messages, model = CHAT_MODEL, tem
     if (![404, 429, 503, 500, 502, 504].includes(lastErr.status) && lastErr.status < 500) break; // a bad key or bad request won't be fixed by another model
     if (resolved.get(model) === m) resolved.delete(model);
   }
+  if (lastErr && tried.length > 1) lastErr.message += ` [tried ${tried.join(', ')}]`;
   throw lastErr;
+}
+
+// The models this key can use right now, newest first: { flash: [...], pro: [...] }. Cached for an hour.
+let modelCache = { at: 0, list: null };
+export async function liveModels(apiKey = process.env.GEMINI_API_KEY) {
+  if (modelCache.list && Date.now() - modelCache.at < 3600e3) return modelCache.list;
+  try {
+    const res = await fetch(`${API}?pageSize=200`, { headers: { 'x-goog-api-key': apiKey }, signal: AbortSignal.timeout(8000) });
+    if (!res.ok) throw new Error(String(res.status));
+    const { models = [] } = await res.json();
+    const usable = models.filter((x) => (x.supportedGenerationMethods || []).includes('generateContent'))
+      .map((x) => x.name.replace(/^models\//, ''))
+      .filter((n) => /^gemini-/.test(n) && !/(image|tts|audio|live|embedding|vision|thinking-exp|learnlm|robotics|computer-use|nano)/i.test(n));
+    const ver = (n) => { const m = n.match(/gemini-(\d+(?:\.\d+)?)/); return m ? Number(m[1]) : 0; };
+    const score = (n) => ver(n) * 100 - (/preview|exp/i.test(n) ? 5 : 0) - (/lite/i.test(n) ? 20 : 0) - (/\d{3,}$|-\d{2}-\d{2}/.test(n) ? 1 : 0);
+    const pick = (re) => usable.filter((n) => re.test(n)).sort((a, b) => score(b) - score(a)).slice(0, 4);
+    modelCache = { at: Date.now(), list: { flash: pick(/flash/i), pro: pick(/pro/i) } };
+  } catch (e) {
+    console.warn('[gemini] could not list models:', e.message);
+    modelCache = { at: Date.now() - 3300e3, list: { flash: [], pro: [] } };   // retry in ~5 minutes
+  }
+  return modelCache.list;
 }
 
 const FALLBACKS = {

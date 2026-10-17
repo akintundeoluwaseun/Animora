@@ -1,4 +1,4 @@
-import { StrictMode, lazy, Suspense } from 'react';
+import { Component, StrictMode, lazy, Suspense } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import './styles.css';
@@ -13,6 +13,30 @@ const Studio = lazy(() => import('./pages/Studio.jsx'));
 const Render = lazy(() => import('./pages/Render.jsx'));
 const Pricing = lazy(() => import('./pages/Pricing.jsx'));
 const Checkout = lazy(() => import('./pages/Checkout.jsx'));
+
+// After a new version is deployed, the old page's files are gone: reload once to get the new ones.
+window.addEventListener('vite:preloadError', (e) => {
+  e.preventDefault();
+  try { if (sessionStorage.getItem('animora-reloaded') !== location.pathname) { sessionStorage.setItem('animora-reloaded', location.pathname); location.reload(); } } catch { location.reload(); }
+});
+
+// Never a blank white page: show what happened and a way out.
+class ErrorBoundary extends Component {
+  constructor(props) { super(props); this.state = { error: null }; }
+  static getDerivedStateFromError(error) { return { error }; }
+  componentDidCatch(error) { console.error('[page error]', error); }
+  render() {
+    if (!this.state.error) return this.props.children;
+    const stale = /dynamically imported module|Failed to fetch|Importing a module script failed|ChunkLoadError/i.test(String(this.state.error?.message));
+    return (
+      <div className="mx-auto max-w-lg px-4 py-24 text-center">
+        <h1 className="text-2xl font-bold">{stale ? 'Animora was just updated' : 'Something went wrong on this page'}</h1>
+        <p className="mt-3 text-ink-soft">{stale ? 'Reload to get the new version. Your answers are saved.' : 'Your work is saved. Reload the page to continue.'}</p>
+        <button className="mt-6 rounded-[10px] bg-danfo px-5 py-3 font-semibold text-white" onClick={() => location.reload()}>Reload</button>
+      </div>
+    );
+  }
+}
 
 function Private({ children, roles }) {
   const { user, loading, serverError } = useAuth();
@@ -42,6 +66,7 @@ function App() {
         <div className="app">
         <Nav />
         <main className="app-main">
+          <ErrorBoundary>
           <Suspense fallback={<PageLoader />}>
             <Routes>
               <Route path="/" element={<Home />} />
@@ -60,6 +85,7 @@ function App() {
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>
+          </ErrorBoundary>
         </main>
         </div>
       </AuthProvider>

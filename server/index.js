@@ -40,13 +40,14 @@ export async function createApp() {
   // Is the AI working? Runs one tiny Gemini request and reports the result (no secrets).
   app.get('/api/ai-check', async (req, res) => {
     if (!config.useGemini) return res.json({ ok: false, reason: 'No GEMINI_API_KEY on this server' });
-    const { geminiGenerate } = await import('./engine/gemini.js');
+    const { geminiGenerate, liveModels } = await import('./engine/gemini.js');
     const t = Date.now();
+    const models = await liveModels();
     try {
       const r = await geminiGenerate({ system: 'Reply with JSON only.', messages: [{ role: 'user', text: 'Return {"ok": true}' }], json: true, timeoutMs: 40000, maxOutputTokens: 2048 });
-      res.json({ ok: true, model: r.model, seconds: (Date.now() - t) / 1000, reply: r.text.slice(0, 60), finishReason: r.finishReason });
+      res.json({ ok: true, model: r.model, models, seconds: (Date.now() - t) / 1000, reply: r.text.slice(0, 60), finishReason: r.finishReason });
     } catch (e) {
-      res.json({ ok: false, seconds: (Date.now() - t) / 1000, error: String(e.message).replace(/key=\S+/g, '').slice(0, 400) });
+      res.json({ ok: false, models, seconds: (Date.now() - t) / 1000, error: String(e.message).replace(/key=\S+/g, '').slice(0, 400) });
     }
   });
   app.use('/api/auth', authRoutes);

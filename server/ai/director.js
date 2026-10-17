@@ -236,7 +236,7 @@ export async function directVideo({ plan, brief = null, style = null, themeKey, 
   const duration = Number(plan.duration_seconds) || 20;
   const calm = !!THEMES[themeKey]?.calm;
   const scenes = (plan.scenes || []).map((s) => `- ${s.start}-${s.end}s ${s.purpose || ''}: ${[].concat(s.on_screen_text || []).filter(Boolean).join(' | ')}${s.images?.length ? ` [images: ${s.images.map((i) => i.asset).join(', ')}]` : ''}`).join('\n');
-  const special = str(brief?.extra || plan.special_instructions, 1500);
+  const special = str([brief?.extra, brief?.pasteText && `THE OWNER'S FULL DESCRIPTION (follow every point that fits): ${brief.pasteText}`].filter(Boolean).join('\n\n') || plan.special_instructions, 5000);
   const user = `BUSINESS: ${plan.business?.name || ''} (${plan.business?.category || brief?.category || ''})${plan.business?.location ? `, ${plan.business.location}` : ''}
 GOAL: ${brief?.goal || plan.goal || ''}
 CALL TO ACTION: ${plan.cta || ''}

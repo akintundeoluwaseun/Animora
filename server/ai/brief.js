@@ -29,7 +29,7 @@ export function cleanBrief(b = {}) {
     colors: b.colors && typeof b.colors === 'object' ? Object.fromEntries(Object.entries(b.colors).filter(([k, v]) => ['primary', 'secondary', 'background', 'text'].includes(k) && /^#[0-9a-f]{6}$/i.test(v))) : undefined,
     voiceover: b.voiceover === undefined || b.voiceover === null ? undefined : b.voiceover === true || b.voiceover === 'yes',
     sound: ['all', 'sfx', 'none', 'own'].includes(b.sound) ? b.sound : b.sfx === true || b.sfx === 'yes' ? 'all' : b.sfx === false || b.sfx === 'no' ? 'none' : undefined,
-    extra: str(b.extra, 3000), done: !!b.done, mode: ['steps', 'paste'].includes(b.mode) ? b.mode : undefined, pasted: b.pasted ? true : undefined,
+    extra: str(b.extra, 3000), done: !!b.done, mode: ['steps', 'paste'].includes(b.mode) ? b.mode : undefined, pasted: b.pasted ? true : undefined, pasteText: str(b.pasteText, 6000),
     colorMode: ['style', 'logo', 'own'].includes(b.colorMode) ? b.colorMode : undefined, picturesDone: b.picturesDone ? true : undefined,
   };
   // optional questions the user skipped (so they are not asked again)
@@ -103,7 +103,7 @@ export function briefToPlanRules(brief, { assets = [], limits = { minSeconds: 15
     voiceover: b.voiceover ? { enabled: true, source: 'ai', voice_style: 'warm, friendly and confident', captions: true } : { enabled: false },
     cta: ctaLine,
     goal: b.goal || '',
-    special_instructions: b.extra || '',
+    special_instructions: [b.extra, b.pasteText && `The business owner's full description (follow it): ${b.pasteText}`].filter(Boolean).join('\n\n'),
     sound: b.sound || 'all',
     sfx: b.sound !== 'none',
     music_url: b.sound === 'own' ? (assets.find((a) => a.kind === 'audio' && a.role === 'music') || {}).url || '' : '',
@@ -245,7 +245,7 @@ export function parseBriefRules(text) {
   if (/no (music|sound|audio)|without (music|sound)|silent/i.test(t)) out.sound = 'none';
   else if (/only (sound )?effects|no music/i.test(t)) out.sound = 'sfx';
   if (/voice[- ]?over|narrat/i.test(t)) out.voiceover = !/no (voice|narrat)/i.test(t);
-  out.extra = str(t, 3000);   // the whole text also goes to the AI director as special instructions
+  out.pasteText = str(t, 6000);   // the whole text also goes to the AI director (kept apart from the last question's answer)
   return out;
 }
 
@@ -266,7 +266,7 @@ export async function parseBrief(text, current = {}) {
     const g = JSON.parse(out);
     // the AI wins where it found something; rules fill gaps (phone numbers, aspect words); keep the full text for the director
     const merged = { ...rules, ...Object.fromEntries(Object.entries(g).filter(([, v]) => v !== null && v !== '' && !(Array.isArray(v) && !v.length))) };
-    merged.extra = str([g.extra, `Original description: ${String(text).slice(0, 2500)}`].filter(Boolean).join('\n\n'), 3000);
+    delete merged.extra;   // the last question asks for anything extra; the full text goes to the director as pasteText
     return cleanBrief({ ...merged, mode: 'paste' });
   } catch (e) {
     console.warn('[brief] Gemini paste reading failed, using rules:', e.message);
