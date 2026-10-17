@@ -203,7 +203,7 @@ export async function suggest(kind, brief) {
     const { text } = await geminiGenerate({
       system: 'You write copy for short video ads for Nigerian small businesses. Return JSON only: { "options": ["...", "..."] }. Use the business name naturally; never invent prices or numbers.',
       messages: [{ role: 'user', text: `${ask}\nBusiness: ${b.name} (${b.category || 'business'}). Goal: ${b.goal || 'more customers'}.${b.headlines?.length ? ` Messages: ${b.headlines.join(' / ')}.` : ''}` }],
-      json: true, temperature: 1, timeoutMs: 15000, maxOutputTokens: 1024,
+      json: true, temperature: 1, timeoutMs: 30000, maxOutputTokens: 4096,
     });
     const opts = (JSON.parse(text).options || []).map((x) => str(x, 70)).filter(Boolean).slice(0, kind === 'features' ? 8 : 5);
     return opts.length >= 2 ? opts : fallback;
@@ -238,7 +238,7 @@ export function parseBriefRules(text) {
   for (const [re, v] of ASPECT_WORDS) if (re.test(t)) { out.aspect = v; break; }
   const sec = t.match(/(\d{1,3})\s*(?:s\b|secs?\b|seconds?\b)/i)?.[1] || (t.match(/(\d)\s*(?:min|minutes?)\b/i)?.[1] * 60);
   if (sec) out.duration = Number(sec);
-  const name = t.match(/(?:business(?:\s+name)?\s*(?:is|:|-)|(?:company|brand|shop|store)\s+(?:name\s+)?(?:is|:)|(?:called|named))\s*["']?([A-Z0-9][\w&'. -]{1,40}?)["']?(?=[,.\n]|\s+(?:and|we|i|in|at|is)\b|$)/i)?.[1];
+  const name = t.match(/(?:business(?:\s+name)?\s*(?:is|:|-)|(?:company|brand|shop|store)\s+(?:name\s+)?(?:is|:)|(?:called|named))\s*["'“‘]?([A-Z0-9][\w&'’. -]{1,40}?)["'”’]?(?=[,.\n”"]|\s+(?:and|we|i|in|at|is)\b|$)/i)?.[1];
   if (name) out.name = name.trim();
   const priced = t.split(/\n|;|\.\s+(?=[A-Z])/).map((l) => l.trim()).filter((l) => /(₦|N\s?\d|naira|\d+k\b)/i.test(l) && l.length < 70);
   if (priced.length) out.products = priced.slice(0, 8);
@@ -261,7 +261,7 @@ export async function parseBrief(text, current = {}) {
   "aspect": "9:16" | "16:9" | "1:1", "duration": seconds, "voiceover": true/false, "sound": "all" | "sfx" | "none",
   "extra": any other instructions about the look, scenes, pictures or style, in their words }`,
       messages: [{ role: 'user', text: `Already known: ${JSON.stringify({ name: current.name, category: current.category })}\n\nTHEIR TEXT:\n${String(text).slice(0, 6000)}` }],
-      json: true, temperature: 0.2, timeoutMs: 20000, maxOutputTokens: 2048,
+      json: true, temperature: 0.2, timeoutMs: 50000, maxOutputTokens: 8192,
     });
     const g = JSON.parse(out);
     // the AI wins where it found something; rules fill gaps (phone numbers, aspect words); keep the full text for the director
@@ -270,6 +270,6 @@ export async function parseBrief(text, current = {}) {
     return cleanBrief({ ...merged, mode: 'paste' });
   } catch (e) {
     console.warn('[brief] Gemini paste reading failed, using rules:', e.message);
-    return cleanBrief({ ...rules, mode: 'paste' });
+    return { ...cleanBrief({ ...rules, mode: 'paste' }), aiError: String(e.message).slice(0, 160) };
   }
 }

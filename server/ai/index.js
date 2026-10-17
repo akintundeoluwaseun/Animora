@@ -90,6 +90,16 @@ export function enrichPlan(plan, assets) {
   };
 }
 
+/** A short, plain reason for an AI failure (shown to the user; never contains the key). */
+export function aiReason(e) {
+  const m = String(e?.message || e);
+  if (/429|quota|RESOURCE_EXHAUSTED/i.test(m)) return 'your Gemini key has hit its usage limit';
+  if (/40[03]|API key|PERMISSION_DENIED|API_KEY_INVALID/i.test(m)) return 'the Gemini key was refused';
+  if (/timeout|aborted|TimeoutError/i.test(m)) return 'Gemini took too long';
+  if (/JSON|Unexpected token|no text|MAX_TOKENS/i.test(m)) return "Gemini's answer was cut off";
+  return m.replace(/key=\S+/g, '').slice(0, 100);
+}
+
 /** Plan -> HTML. Returns { html, source, problems, notice? } */
 export async function generateCode({ plan, style, assets, brief = null, previous = null, onStatus }) {
   const planWithAssets = enrichPlan(plan, assets);
@@ -102,7 +112,7 @@ export async function generateCode({ plan, style, assets, brief = null, previous
       return { html, source: 'gemini', problems: [] };
     } catch (e) {
       console.warn('[ai] Gemini director failed:', e.message);
-      return { html: rule(), source: 'template', problems: [], notice: 'The AI director was busy, so this version was arranged automatically. Press Regenerate to try the AI again.' };
+      return { html: rule(), source: 'template', problems: [], notice: `The AI director couldn't finish (${aiReason(e)}), so this version was arranged automatically. Press Regenerate to try the AI again.` };
     }
   }
   if (config.useGemini) {

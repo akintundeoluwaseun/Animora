@@ -37,6 +37,18 @@ export async function createApp() {
     ok: true, auth: config.noAuth ? 'off' : 'on', ai: aiMode(), storage: config.storageMode, payments: provider().name,
     database: config.databaseUrl ? 'postgres' : 'local', worker: config.runWorkerInProcess, render: config.renderEnabled,
   }));
+  // Is the AI working? Runs one tiny Gemini request and reports the result (no secrets).
+  app.get('/api/ai-check', async (req, res) => {
+    if (!config.useGemini) return res.json({ ok: false, reason: 'No GEMINI_API_KEY on this server' });
+    const { geminiGenerate } = await import('./engine/gemini.js');
+    const t = Date.now();
+    try {
+      const r = await geminiGenerate({ system: 'Reply with JSON only.', messages: [{ role: 'user', text: 'Return {"ok": true}' }], json: true, timeoutMs: 40000, maxOutputTokens: 2048 });
+      res.json({ ok: true, model: r.model, seconds: (Date.now() - t) / 1000, reply: r.text.slice(0, 60), finishReason: r.finishReason });
+    } catch (e) {
+      res.json({ ok: false, seconds: (Date.now() - t) / 1000, error: String(e.message).replace(/key=\S+/g, '').slice(0, 400) });
+    }
+  });
   app.use('/api/auth', authRoutes);
   app.use('/api/projects', projectRoutes);
   app.use('/api', renderRoutes);

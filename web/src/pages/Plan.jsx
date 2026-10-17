@@ -129,6 +129,7 @@ export default function Plan() {
   const [loadingSug, setLoadingSug] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [building, setBuilding] = useState(false);
+  const [reading, setReading] = useState(false);   // reading a pasted description
   const [error, setError] = useState('');
   const [toast, setToast] = useState('');
   const endRef = useRef(null);
@@ -148,7 +149,7 @@ export default function Plan() {
         const r = await api(`/projects/${id}`);
         setProject(r.project); if (r.limits) setLimits(r.limits);
         const brief = r.project.brief || {};
-        setB(brief);
+        bRef.current = brief; setB(brief);
         const { styles: st } = await api('/styles'); setStyles(st);
         const imgs = (r.project.assets || []).filter((a) => a.kind === 'image').length;
         const first = QUESTIONS.findIndex((qq) => { const v = valueOf(qq, brief, imgs); return v === undefined && !(qq.optional && brief[`${qq.id}Skipped`]); });
@@ -181,13 +182,19 @@ export default function Plan() {
     return () => window.removeEventListener('paste', onPaste);
   });
 
-  const save = async (patch) => {
-    const next = { ...b, ...patch };
-    setB(next);
-    try { const r = await api(`/projects/${id}/brief`, { method: 'PATCH', body: { brief: patch } }); setProject((p) => ({ ...p, ...r.project, assets: r.project.assets || p.assets })); }
-    catch (e) { setError(e.message); }
+  // Saving is instant on screen; the server copy is updated in the background, one request at a time
+  // (so answers never wait on the network, and quick taps can't overwrite each other).
+  const bRef = useRef(b);
+  const saving = useRef(Promise.resolve());
+  const save = (patch) => {
+    const next = { ...bRef.current, ...patch };
+    bRef.current = next; setB(next);
+    saving.current = saving.current.then(() => api(`/projects/${id}/brief`, { method: 'PATCH', body: { brief: patch } })
+      .then((r) => setProject((p) => ({ ...p, ...r.project, assets: r.project.assets || p.assets })))
+      .catch((e) => setError(e.message)));
     return next;
   };
+  const saved = () => saving.current;
 
   const advance = (next) => {
     if (editing) { setEditing(false); const brief = next; const f = QUESTIONS.findIndex((qq) => valueOf(qq, brief, pics.length) === undefined && !(qq.optional && brief[`${qq.id}Skipped`])); setStep(f < 0 ? QUESTIONS.length : f); return; }
@@ -196,20 +203,21 @@ export default function Plan() {
   };
 
   const answer = async (value, extra = {}) => {
-    if (!q) return;
+    if (!q || reading) return;
     setError('');
     let patch;
     if (q.id === 'paste') {
-      setBuilding(true);
+      setReading(true);
       try {
+        await saved();
         const r = await api(`/projects/${id}/brief/parse`, { method: 'POST', body: { text: value } });
-        const brief = { ...(r.project.brief || {}), pasted: true };
         setProject((p) => ({ ...p, ...r.project, assets: r.project.assets || p.assets }));
-        const next = await save({ pasted: true });
-        setB(brief);
-        setToast(r.found?.length ? `Got it. I found your ${r.found.map((k) => FOUND_LABEL[k] || k).join(', ')}.` : 'Got it.'); setTimeout(() => setToast(''), 4000);
-        advance({ ...next, ...brief });
-      } catch (e) { setError(e.message); } finally { setBuilding(false); }
+        bRef.current = { ...(r.project.brief || {}) };
+        const next = save({ pasted: true });
+        if (r.aiError) setError(`The AI couldn't read all of it (${r.aiError.slice(0, 90)}). I picked up what I could and will ask about the rest.`);
+        setToast(r.found?.length ? `Got it. I found your ${r.found.map((k) => FOUND_LABEL[k] || k).join(', ')}.` : "Got it. I'll ask about the rest."); setTimeout(() => setToast(''), 5000);
+        advance(next);
+      } catch (e) { setError(e.message); } finally { setReading(false); }
       return;
     }
     if (q.id === 'voiceover') patch = { voiceover: value === 'yes' };
@@ -219,10 +227,10 @@ export default function Plan() {
     else if (q.id === 'goal') patch = { goals: value, goal: value.join(' + ') };
     else if (q.id === 'cta') patch = { ctas: value, cta: value[0] };
     else patch = { [q.id]: value };
-    const next = await save({ ...patch, ...extra, [`${q.id}Skipped`]: false });
+    const next = save({ ...patch, ...extra, [`${q.id}Skipped`]: false });
     advance(next);
   };
-  const skip = async () => { const next = await save({ [`${q.id}Skipped`]: true, ...(q.id === 'pictures' ? { picturesDone: true } : {}) }); advance(next); };
+  const skip = () => { const next = save({ [`${q.id}Skipped`]: true, ...(q.id === 'pictures' ? { picturesDone: true } : {}) }); advance(next); };
 
   const upload = async (files, role) => {
     setError('');
@@ -257,7 +265,7 @@ export default function Plan() {
   };
 
   // finishing the last question builds the video
-  const finish = async (value) => { const next = await save({ extra: value || '', extraSkipped: !value, done: true }); build(next); };
+  const finish = async (value) => { const next = save({ extra: value || '', extraSkipped: !value, done: true }); setBuilding(true); await saved(); build(next); };
 
   if (!project) return error ? <div className="mx-auto max-w-xl p-8"><Alert>{error}</Alert></div> : <PageLoader />;
   const answered = visible.slice(0, Math.min(step, visible.length));
@@ -298,6 +306,20 @@ export default function Plan() {
                       }}>{l}</Chip>;
                     })}
                     {q.type === 'multi' && multi.filter((v) => !opts.includes(v)).map((v) => <Chip key={v} active onClick={() => setMulti((m) => m.filter((x) => x !== v))}>{v}</Chip>)}
+                  </div>
+                )}
+                {q.type === 'multi' && (
+                  <div className="flex items-center gap-3 pl-1">
+                    <Button size="sm" variant="dark" disabled={!multi.length && !text.trim()} onClick={() => { const v = text.trim(); answer([...multi, ...(v && !multi.includes(v) ? [v] : [])]); }}>
+                      {multi.length ? `Next (${multi.length} picked)` : 'Pick at least one'}
+                    </Button>
+                    <span className="text-sm text-ink-mute">Tap all that apply, then Next.</span>
+                  </div>
+                )}
+                {reading && (
+                  <div className="space-y-2">
+                    <Bubble who="me">My details (pasted)</Bubble>
+                    <div className="flex items-center gap-3"><div className="bubble-ai typing px-4 py-3.5"><span /><span /><span /></div><span className="text-sm text-ink-mute">Reading your details…</span></div>
                   </div>
                 )}
 
@@ -396,7 +418,7 @@ export default function Plan() {
                 )}
                 <MicButton onText={(t) => setText((x) => (x.trim() ? `${x.trim()} ${t}` : t))} onError={setError} />
                 <div className="flex flex-col gap-2">
-                  <Button type="submit" variant="dark" className="h-12" disabled={q.done ? false : q.type === 'multi' ? !multi.length && !text.trim() : !text.trim()}>
+                  <Button type="submit" variant="dark" className="h-12" loading={reading} disabled={reading || (q.done ? false : q.type === 'multi' ? !multi.length && !text.trim() : !text.trim())}>
                     {q.done ? (text.trim() ? 'Make my video' : "No, that's all") : q.type === 'multi' ? 'Next' : 'Send'}
                   </Button>
                   {q.optional && !q.done && <button type="button" onClick={skip} className="text-sm font-semibold text-ink-mute underline">Skip</button>}
