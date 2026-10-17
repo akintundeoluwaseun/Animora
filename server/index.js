@@ -32,7 +32,7 @@ export async function createApp() {
   // --- API ---
   app.get('/api/status', (req, res) => res.json({
     ok: true, auth: config.noAuth ? 'off' : 'on', ai: aiMode(), storage: config.storageMode, payments: provider().name,
-    database: config.databaseUrl ? 'postgres' : 'local', worker: config.runWorkerInProcess,
+    database: config.databaseUrl ? 'postgres' : 'local', worker: config.runWorkerInProcess, render: config.renderEnabled,
   }));
   app.use('/api/auth', authRoutes);
   app.use('/api/projects', projectRoutes);

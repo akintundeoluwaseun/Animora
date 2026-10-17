@@ -10,11 +10,15 @@ const env = (k, d = '') => (process.env[k] ?? '').trim() || d;
 const num = (k, d) => (process.env[k] ? Number(process.env[k]) : d);
 
 const PORT = num('PORT', 3000);
+// On Vercel the app runs as a serverless function: the disk is read-only except /tmp, and long jobs are cut off.
+const SERVERLESS = !!process.env.VERCEL;
+const vercelUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL || process.env.VERCEL_URL;
 
 export const config = {
   port: PORT,
-  publicBaseUrl: env('PUBLIC_BASE_URL', `http://localhost:${PORT}`).replace(/\/$/, ''),
-  dataDir: path.resolve(ROOT, env('DATA_DIR', 'data')),
+  serverless: SERVERLESS,
+  publicBaseUrl: env('PUBLIC_BASE_URL', SERVERLESS && vercelUrl ? `https://${vercelUrl}` : `http://localhost:${PORT}`).replace(/\/$/, ''),
+  dataDir: path.resolve(ROOT, env('DATA_DIR', SERVERLESS ? '/tmp/animora' : 'data')),
   authSecret: env('AUTH_SECRET', 'dev-only-secret-change-me'),
 
   // Database: Supabase Postgres connection string in production; embedded Postgres (PGlite) locally.
@@ -31,6 +35,8 @@ export const config = {
 
   // Render worker
   runWorkerInProcess: env('RUN_WORKER', 'true') !== 'false',
+  // MP4 export needs Chrome + FFmpeg running for minutes, which serverless hosts (Vercel) can't do.
+  renderEnabled: env('RENDER_ENABLED', SERVERLESS ? 'false' : 'true') !== 'false',
   workerConcurrency: num('WORKER_CONCURRENCY', 1),
 
   // Payments

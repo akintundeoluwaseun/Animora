@@ -117,6 +117,8 @@ export default function Studio() {
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const [project, setProject] = useState(null);
+  const [canRender, setCanRender] = useState(true);
+  useEffect(() => { api('/status').then((st) => setCanRender(st.render !== false)).catch(() => {}); }, []);
   const [tab, setTab] = useState('edit');
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState('');
@@ -156,7 +158,7 @@ export default function Studio() {
         </div>
         <div className="flex items-center gap-3">
           <Steps current="studio" projectId={id} hasPlan hasCode={!!project.code} />
-          {project.code && <span className="hidden lg:block"><Button onClick={() => navigate(`/p/${id}/render`)}>Generate Video</Button></span>}
+          {project.code && <span className="hidden lg:block">{canRender ? <Button onClick={() => navigate(`/p/${id}/render`)}>Generate Video</Button> : <span className="text-sm text-ink-mute">MP4 download is coming soon</span>}</span>}
         </div>
       </div>
       {error && <div className="mt-4"><Alert onClose={() => setError('')}>{error}</Alert></div>}
@@ -172,7 +174,7 @@ export default function Studio() {
             <div className="mt-6 flex flex-wrap justify-center gap-2">
               <Button variant="glass" size="sm" onClick={undo} disabled={!project.versions}>Undo</Button>
               <Button variant="glass" size="sm" onClick={() => { if (confirm('Write the animation again from the plan? Your edits will be replaced (you can undo).')) generate(); }}>Regenerate</Button>
-              <Button size="lg" className="w-full sm:ml-2 sm:w-auto lg:hidden" onClick={() => navigate(`/p/${id}/render`)}>Generate Video</Button>
+              {canRender ? <Button size="lg" className="w-full sm:ml-2 sm:w-auto lg:hidden" onClick={() => navigate(`/p/${id}/render`)}>Generate Video</Button> : <p className="w-full text-center text-sm text-ink-mute sm:ml-2 sm:w-auto lg:hidden">MP4 download is coming soon</p>}
             </div>
           </section>
 

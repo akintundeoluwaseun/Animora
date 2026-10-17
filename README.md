@@ -128,6 +128,24 @@ docker run -p 3000:3000 -v adflash-data:/data --env-file .env adflash
 - More render capacity: run extra workers on other machines with `npm run worker` (same `DATABASE_URL`,
   Supabase storage required) and set `RUN_WORKER=false` on the web server if you like.
 
+### Vercel (website, planning, preview and edits; no MP4 export)
+
+`vercel.json` is set up: import the repo at vercel.com/new and press Deploy (no settings to change).
+The API runs as one serverless function and the website, demo videos, sounds and GSAP are served as static files.
+The "Generate Video" button shows "MP4 download is coming soon", because Vercel can't run the minutes-long render.
+
+Environment variables (Project → Settings → Environment Variables), then redeploy:
+
+| Name | Value |
+|---|---|
+| `GEMINI_API_KEY` | your Gemini key (without it the practice AI is used) |
+| `AUTH_SECRET` | any long random string |
+| `DATABASE_URL` | Supabase → Connect → Session pooler URI. **Without it every project is lost whenever Vercel restarts.** |
+| `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` | Supabase → Project Settings → API. Needed so uploaded logos and photos are kept. |
+
+Vercel limits uploads to about 4.5 MB per file. To switch on MP4 export later, run the Docker image below on
+Railway or Render.com with the same Supabase settings.
+
 Render speed (measured on 2 vCPU, scales with cores):
 
 | Video | 2 vCPU | 4 vCPU (est.) |

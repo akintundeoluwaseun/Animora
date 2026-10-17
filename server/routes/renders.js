@@ -3,6 +3,7 @@ import { one, q } from '../db/index.js';
 import { requireAuth, publicUser, loadUser } from '../auth.js';
 import { createRender, startAdView, completeAdView, renderAllowance } from '../billing.js';
 import { queuePosition } from '../worker.js';
+import { config } from '../config.js';
 
 const r = Router();
 r.use(['/projects', '/renders', '/ads'], requireAuth);
@@ -25,6 +26,9 @@ r.get('/projects/:id/render-check', async (req, res) => {
 });
 
 r.post('/projects/:id/renders', async (req, res) => {
+  if (!config.renderEnabled) {
+    return res.status(503).json({ code: 'NO_RENDERER', error: "MP4 export isn't switched on for this website yet. You can still plan, preview and edit your video." });
+  }
   const p = await one('SELECT * FROM projects WHERE id=$1 AND user_id=$2', [req.params.id, req.user.id]);
   if (!p) return res.status(404).json({ error: 'Project not found.' });
   try {

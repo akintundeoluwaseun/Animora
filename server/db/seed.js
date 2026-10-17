@@ -3,6 +3,7 @@
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
+import { config } from '../config.js';
 import { ROOT } from '../config.js';
 import { initDb, one, q, closeDb } from './index.js';
 import { initStorage, putObject } from '../storage.js';
@@ -16,6 +17,8 @@ const PASSWORD = 'demo1234';
 const STYLE_ASSETS_VERSION = 5;
 
 async function upload(rel, type, prefix = 'demo') {
+  // On Vercel the demo videos are served as static files (copied to web/dist/demo by scripts/vercel-build.js).
+  if (config.serverless) return /^(styles|ads)\//.test(rel) ? `/demo/${rel}` : null;
   const file = path.join(ASSETS, rel);
   return existsSync(file) ? putObject(`${prefix}/${rel}`, file, type) : null;
 }
