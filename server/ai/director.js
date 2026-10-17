@@ -186,7 +186,7 @@ export function sanitizeBeats(raw, { duration, assets = [], plan = {}, calm = fa
 function assetLines(assets) {
   const images = assets.filter((a) => (a.kind || 'image') === 'image');
   if (!images.length) return '- none (no logo or photos: do not use logo, hero or collage-with-imgs)';
-  return images.map((a) => `- "${a.name}" (${a.role || 'photo'}${a.width ? `, ${a.width}x${a.height}` : ''}${a.has_alpha || a.transparent ? ', transparent' : ''})`).join('\n');
+  return images.map((a) => `- "${a.name}" (${a.role || 'photo'}${a.width ? `, ${a.width}x${a.height}` : ''}${a.has_alpha || a.transparent ? ', transparent' : ''})${a.description ? ` SHOWS: ${a.description}` : ''}`).join('\n');
 }
 
 function styleLines(style, themeKey) {
@@ -224,6 +224,7 @@ DIRECTION RULES
 - Open with a strong hook in the first 2 seconds. End with a "lockup" beat (at least 2.5 s) with the phone/website in "button".
 - Keep on-screen text SHORT (headlines under 7 words). Use the business's exact names, prices, phone numbers and addresses; never invent them.
 - Use the uploaded images where they help: the logo (shot "logo", then cut "dive" to fly into it, or in the lockup), product photos in "hero" or "collage".
+- PICTURES AND WORDS MUST MATCH. Each image's "SHOWS:" line says what is really in it. A beat with an img must talk about what that picture shows (rice bags -> rice / foodstuff, never "chicken"). Never put a picture next to words about something else; if no uploaded picture shows a product you want to mention, mention it in a beat without an img.
 - The user's SPECIAL INSTRUCTIONS are the most important part of the brief. Follow every one of them literally.
 - Every video must be ORIGINAL: design it around the CREATIVE CONCEPT given in the brief, so this ad does not look like a template
   with the text swapped. Rewrite the copy into sharp ad lines (you may reword the plan's lines; keep facts exact).

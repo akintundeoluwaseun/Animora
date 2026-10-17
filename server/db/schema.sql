@@ -176,6 +176,7 @@ ALTER TABLE projects ADD COLUMN IF NOT EXISTS sfx_on boolean NOT NULL DEFAULT tr
 ALTER TABLE renders  ADD COLUMN IF NOT EXISTS sfx_on boolean NOT NULL DEFAULT true;
 
 ALTER TABLE assets   ADD COLUMN IF NOT EXISTS is_light boolean;   -- light logo (needs a dark background)
+ALTER TABLE assets   ADD COLUMN IF NOT EXISTS description text;   -- what the picture shows (asked once, used to match words to pictures)
 
 -- Uploaded files kept in the database (used on Vercel, where there is no lasting disk and no Supabase Storage key).
 CREATE TABLE IF NOT EXISTS files (

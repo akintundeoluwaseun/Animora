@@ -9,6 +9,7 @@ import { validatePlan } from '../engine/validate.js';
 import { offlinePlannerTurn } from './offline.js';
 import { templateFromPlan, offlineEdit } from './templates.js';
 import { directedHtml, directorEdit, readData } from './director.js';
+import { describeAssets, upgradeRuntime } from './describe.js';
 
 // 'director' (default): Gemini directs the shots, our motion engine animates them (fast, always renders).
 // 'html': Gemini writes the whole HTML/GSAP file itself (slower, experimental).
@@ -23,6 +24,15 @@ export function limitsFor(user) {
 
 export const themeKeyFor = (style) => style?.palette?.theme || 'bold';
 
+/** The bytes of an uploaded picture (from our own database when it lives there). */
+export async function loadImage(a) {
+  let buf = null, type = a.mime;
+  const key = config.storageMode === 'db' && String(a.url).includes('/files/') ? decodeURIComponent(String(a.url).split('/files/')[1]) : null;
+  if (key) { const f = await getDbObject(key); if (f) { buf = f.data; type = type || f.type; } }
+  if (!buf) { const res = await fetch(a.url, { signal: AbortSignal.timeout(8000) }); if (!res.ok) return null; buf = Buffer.from(await res.arrayBuffer()); type = type || res.headers.get('content-type'); }
+  return { buf, type: type || 'image/png' };
+}
+
 async function imageParts(assets) {
   // The AI only needs to see the pictures roughly: logo first, at most 3, about 3 MB in total.
   // Files kept in our own database are read directly (no extra web request).
@@ -31,10 +41,8 @@ async function imageParts(assets) {
   const imgs = assets.filter((x) => x.kind === 'image').sort((a, b) => (b.role === 'logo') - (a.role === 'logo')).slice(0, 3);
   for (const a of imgs) {
     try {
-      let buf = null, type = a.mime;
-      const key = config.storageMode === 'db' && String(a.url).includes('/files/') ? decodeURIComponent(String(a.url).split('/files/')[1]) : null;
-      if (key) { const f = await getDbObject(key); if (f) { buf = f.data; type = type || f.type; } }
-      if (!buf) { const res = await fetch(a.url, { signal: AbortSignal.timeout(8000) }); if (!res.ok) continue; buf = Buffer.from(await res.arrayBuffer()); type = type || res.headers.get('content-type'); }
+      const got = await loadImage(a); if (!got) continue;
+      const { buf, type } = got;
       if (buf.length > 2.5e6 || total + buf.length > 3.2e6) continue;
       total += buf.length;
       out.push({ mimeType: type || 'image/png', data: buf.toString('base64') });
@@ -81,7 +89,7 @@ export async function chatTurn({ history, user, style, assets, newAssets = [] })
  */
 export function enrichPlan(plan, assets) {
   const images = assets.filter((a) => a.kind === 'image');
-  const meta = (a) => ({ name: a.name, url: a.url, role: a.role || (/logo/i.test(a.name) ? 'logo' : 'photo'), width: a.width || undefined, height: a.height || undefined, transparent: !!a.has_alpha, light: a.is_light ?? undefined });
+  const meta = (a) => ({ name: a.name, url: a.url, role: a.role || (/logo/i.test(a.name) ? 'logo' : 'photo'), width: a.width || undefined, height: a.height || undefined, transparent: !!a.has_alpha, light: a.is_light ?? undefined, description: a.description || undefined });
   const find = (ref) => {
     const key = String(ref || '').toLowerCase().trim();
     return images.find((a) => a.url === ref || a.name.toLowerCase() === key) || images.find((a) => key && (a.name.toLowerCase().includes(key) || key.includes(a.name.toLowerCase())))
@@ -109,6 +117,7 @@ export function aiReason(e) {
 
 /** Plan -> HTML. Returns { html, source, problems, notice? } */
 export async function generateCode({ plan, style, assets, brief = null, previous = null, onStatus }) {
+  if (config.useGemini) { onStatus?.('Looking at your pictures'); assets = await describeAssets(assets, loadImage); }
   const planWithAssets = enrichPlan(plan, assets);
   const themeKey = themeKeyFor(style);
   const rule = () => templateFromPlan(planWithAssets, { themeKey, salt: previous ? String(Date.now()) : '' });   // regenerate = a different arrangement
@@ -139,6 +148,8 @@ export async function generateCode({ plan, style, assets, brief = null, previous
 
 /** Plain-words edit. Returns { html, source, summary } */
 export async function editCode({ html, instruction, aspectRatio, duration, plan = null, assets = [], onStatus }) {
+  if (config.useGemini) assets = await describeAssets(assets, loadImage);
+  html = upgradeRuntime(html, assets);
   const directed = !!readData(html)?.beats;
   if (config.useGemini) {
     try {

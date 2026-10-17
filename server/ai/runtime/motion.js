@@ -197,15 +197,24 @@
   }
   function mark(parent, size) {   // the brand mark: uploaded logo, or a monogram tile
     const m = el('div', 'mark', parent);
-    m.style.width = N(size) + 'px'; m.style.height = N(size) + 'px';
-    if (DATA.logo) {
+    const L = DATA.logo;
+    // a logo that comes with its own background (a JPEG) is shown as it is, in its own shape, so it stays big
+    const boxed = L && !L.transparent;
+    const ratio = boxed && L.ratio ? Math.max(1, Math.min(1.9, L.ratio)) : 1;
+    const side = ratio > 1 ? size * 0.86 : size;
+    m.style.width = N(side * ratio) + 'px'; m.style.height = N(side) + 'px';
+    if (L) {
       m.classList.add('logo');
-      // a card behind the logo when it has its own background, or when its colours would vanish on this background
-      const bgHex = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim().replace('#', '');
-      const darkBg = bgHex.length >= 6 && (0.299 * parseInt(bgHex.slice(0, 2), 16) + 0.587 * parseInt(bgHex.slice(2, 4), 16) + 0.114 * parseInt(bgHex.slice(4, 6), 16)) < 110;
-      if (!DATA.logo.transparent || (DATA.logo.light === true && !darkBg) || (DATA.logo.light === false && darkBg)) m.classList.add('card');
-      if (DATA.logo.light === true && (DATA.logo.transparent || !darkBg)) m.classList.add('ink');
-      m.innerHTML = '<img src="' + esc(DATA.logo.url) + '" crossorigin="anonymous" alt="">';
+      if (boxed) {
+        m.classList.add('card', 'photo'); m.style.borderRadius = N(side * 0.16) + 'px';
+      } else {
+        // a card behind a see-through logo only when its colours would vanish on this background
+        const bgHex = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim().replace('#', '');
+        const darkBg = bgHex.length >= 6 && (0.299 * parseInt(bgHex.slice(0, 2), 16) + 0.587 * parseInt(bgHex.slice(2, 4), 16) + 0.114 * parseInt(bgHex.slice(4, 6), 16)) < 110;
+        if ((L.light === true && !darkBg) || (L.light === false && darkBg)) m.classList.add('card');
+        if (L.light === true && !darkBg) m.classList.add('ink');
+      }
+      m.innerHTML = '<img src="' + esc(L.url) + '" crossorigin="anonymous" alt=""' + (boxed && (!L.ratio || Math.abs(L.ratio - ratio) > 0.06) ? ' style="object-fit:contain"' : '') + '>';
     } else {
       m.classList.add('mono'); m.style.fontSize = N(size * 0.52) + 'px';
       m.innerHTML = '<span>' + esc((String(DATA.brand || 'A').trim()[0] || 'A').toUpperCase()) + '</span>';

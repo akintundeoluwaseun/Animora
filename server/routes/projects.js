@@ -37,7 +37,7 @@ async function loadStyle(id) {
     .then((s) => s && { ...s, creatorName: s.creator_name });
 }
 
-const projectAssets = (projectId) => q(`SELECT id, name, kind, role, mime, url, width, height, has_alpha, duration_seconds, is_light
+const projectAssets = (projectId) => q(`SELECT id, name, kind, role, mime, url, width, height, has_alpha, duration_seconds, is_light, description
   FROM assets WHERE project_id=$1 AND (role IS NULL OR role <> 'voice') ORDER BY created_at`, [projectId]);
 
 // Whole-second total length: the final scene absorbs any fraction.
