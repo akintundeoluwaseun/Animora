@@ -199,7 +199,12 @@
     const m = el('div', 'mark', parent);
     m.style.width = N(size) + 'px'; m.style.height = N(size) + 'px';
     if (DATA.logo) {
-      m.classList.add('logo'); if (!DATA.logo.transparent) m.classList.add('card');
+      m.classList.add('logo');
+      // a card behind the logo when it has its own background, or when its colours would vanish on this background
+      const bgHex = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim().replace('#', '');
+      const darkBg = bgHex.length >= 6 && (0.299 * parseInt(bgHex.slice(0, 2), 16) + 0.587 * parseInt(bgHex.slice(2, 4), 16) + 0.114 * parseInt(bgHex.slice(4, 6), 16)) < 110;
+      if (!DATA.logo.transparent || (DATA.logo.light === true && !darkBg) || (DATA.logo.light === false && darkBg)) m.classList.add('card');
+      if (DATA.logo.light === true && (DATA.logo.transparent || !darkBg)) m.classList.add('ink');
       m.innerHTML = '<img src="' + esc(DATA.logo.url) + '" crossorigin="anonymous" alt="">';
     } else {
       m.classList.add('mono'); m.style.fontSize = N(size * 0.52) + 'px';

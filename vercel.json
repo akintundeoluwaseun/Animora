@@ -11,9 +11,24 @@
     }
   },
   "rewrites": [
-    { "source": "/api/:path*", "destination": "/api" },
-    { "source": "/files/:path*", "destination": "/api" },
-    { "source": "/download/:path*", "destination": "/api" },
-    { "source": "/(.*)", "destination": "/index.html" }
+    {
+      "source": "/api/:path*",
+      "destination": "/api"
+    },
+    {
+      "source": "/files/:path*",
+      "destination": "/api"
+    },
+    {
+      "source": "/download/:path*",
+      "destination": "/api"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ],
+  "regions": [
+    "lhr1"
   ]
 }

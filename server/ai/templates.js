@@ -435,6 +435,7 @@ function css(theme, c, W, H) {
     font-weight: 800; font-family: ${theme.stack}; box-shadow: var(--shadow); }
   .mark.logo img { width: 100%; height: 100%; object-fit: contain; }
   .mark.logo.card { background: #fff; padding: 12%; box-shadow: var(--shadow); }
+  .mark.logo.card.ink { background: #0B0A12; }   /* light logos sit on a dark card */
   .chips { display: flex; flex-wrap: wrap; justify-content: center; gap: ${n(16)}; max-width: ${W - side * 0.14}px; }
   .chip { font-family: ${subStack}; font-weight: 600; font-size: ${n(40)}; padding: ${n(14)} ${n(30)}; border-radius: 999px; background: var(--surface); border: ${n(2)} solid var(--line); }
   .burst-dot { position: absolute; left: 50%; top: 50%; margin: -6px 0 0 -6px; border-radius: 50%; background: var(--primary); z-index: 0; }
@@ -752,7 +753,7 @@ export function templateFromPlan(plan, { themeKey = 'bold', assets = plan.assets
 
   const data = {
     W, H, duration, seed, brand,
-    logo: logoAsset ? { url: logoAsset.url, transparent: !!(logoAsset.transparent ?? logoAsset.has_alpha) } : null,
+    logo: logoAsset ? { url: logoAsset.url, transparent: !!(logoAsset.transparent ?? logoAsset.has_alpha), light: logoAsset.light ?? logoAsset.is_light ?? null } : null,
     theme: { key, energy: theme.energy, accentStyle: theme.accentStyle, textIn: theme.textIn, ambient: theme.ambient, textScale: theme.textScale || 1, drift: theme.drift || 0, calm: !!theme.calm, ...(look || {}), ...(sound === 'none' ? { sound: 'off' } : {}) },
     music,
     beats: finalBeats.map((b) => { const o = { ...b }; delete o.scene; return o; }),

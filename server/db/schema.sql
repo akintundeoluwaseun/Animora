@@ -175,6 +175,8 @@ ALTER TABLE projects ADD COLUMN IF NOT EXISTS brief_json jsonb;
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS sfx_on boolean NOT NULL DEFAULT true;
 ALTER TABLE renders  ADD COLUMN IF NOT EXISTS sfx_on boolean NOT NULL DEFAULT true;
 
+ALTER TABLE assets   ADD COLUMN IF NOT EXISTS is_light boolean;   -- light logo (needs a dark background)
+
 -- Uploaded files kept in the database (used on Vercel, where there is no lasting disk and no Supabase Storage key).
 CREATE TABLE IF NOT EXISTS files (
   key          text PRIMARY KEY,

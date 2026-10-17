@@ -124,3 +124,20 @@ export async function shrinkImage(file, maxSide = 1920) {
     return file;
   }
 }
+
+/** How a picture looks: { alpha: has see-through pixels, light: its visible pixels are mostly light }. */
+export async function imageLook(file) {
+  try {
+    const bmp = await createImageBitmap(file);
+    const k = Math.min(1, 96 / Math.max(bmp.width, bmp.height));
+    const c = document.createElement('canvas'); c.width = Math.max(1, Math.round(bmp.width * k)); c.height = Math.max(1, Math.round(bmp.height * k));
+    const g = c.getContext('2d'); g.drawImage(bmp, 0, 0, c.width, c.height);
+    const d = g.getImageData(0, 0, c.width, c.height).data;
+    let clear = 0, n = 0, lum = 0;
+    for (let i = 0; i < d.length; i += 4) {
+      if (d[i + 3] < 200) { clear++; continue; }
+      n++; lum += (0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]) / 255;
+    }
+    return { alpha: clear > d.length / 4 * 0.02, light: n ? lum / n > 0.72 : null };
+  } catch { return {}; }
+}

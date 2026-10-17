@@ -74,7 +74,7 @@ export async function chatTurn({ history, user, style, assets, newAssets = [] })
  */
 export function enrichPlan(plan, assets) {
   const images = assets.filter((a) => a.kind === 'image');
-  const meta = (a) => ({ name: a.name, url: a.url, role: a.role || (/logo/i.test(a.name) ? 'logo' : 'photo'), width: a.width || undefined, height: a.height || undefined, transparent: !!a.has_alpha });
+  const meta = (a) => ({ name: a.name, url: a.url, role: a.role || (/logo/i.test(a.name) ? 'logo' : 'photo'), width: a.width || undefined, height: a.height || undefined, transparent: !!a.has_alpha, light: a.is_light ?? undefined });
   const find = (ref) => {
     const key = String(ref || '').toLowerCase().trim();
     return images.find((a) => a.url === ref || a.name.toLowerCase() === key) || images.find((a) => key && (a.name.toLowerCase().includes(key) || key.includes(a.name.toLowerCase())))

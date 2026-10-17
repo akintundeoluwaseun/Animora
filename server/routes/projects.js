@@ -35,7 +35,7 @@ async function loadStyle(id) {
     .then((s) => s && { ...s, creatorName: s.creator_name });
 }
 
-const projectAssets = (projectId) => q(`SELECT id, name, kind, role, mime, url, width, height, has_alpha, duration_seconds
+const projectAssets = (projectId) => q(`SELECT id, name, kind, role, mime, url, width, height, has_alpha, duration_seconds, is_light
   FROM assets WHERE project_id=$1 AND (role IS NULL OR role <> 'voice') ORDER BY created_at`, [projectId]);
 
 // Whole-second total length: the final scene absorbs any fraction.
@@ -138,10 +138,13 @@ r.post('/:id/assets', upload.single('file'), async (req, res) => {
   let label = (req.body.name || (role === 'logo' ? 'logo' : f.originalname.replace(/\.[^.]+$/, ''))).replace(/[^\w\s&'-]+/g, ' ').trim().slice(0, 50) || role;
   const taken = new Set((await q('SELECT lower(name) AS n FROM assets WHERE project_id=$1', [p.id])).map((r) => r.n));
   for (let k = 2, base = label; taken.has(label.toLowerCase()); k++) label = `${base} ${k}`;
-  const asset = await one(`INSERT INTO assets (user_id, project_id, name, kind, role, mime, url, width, height, has_alpha, duration_seconds)
-    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
-    RETURNING id, name, kind, role, mime, url, width, height, has_alpha, duration_seconds`,
-  [req.user.id, p.id, label, kind, role, f.mimetype, url, meta.width || null, meta.height || null, meta.hasAlpha ?? null, meta.duration || null]);
+  // the browser measures how light the picture is (a white logo needs a dark card behind it)
+  const isLight = req.body.light === 'true' ? true : req.body.light === 'false' ? false : null;
+  const hasAlpha = meta.hasAlpha ?? (req.body.alpha === 'true' ? true : req.body.alpha === 'false' ? false : null);
+  const asset = await one(`INSERT INTO assets (user_id, project_id, name, kind, role, mime, url, width, height, has_alpha, duration_seconds, is_light)
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+    RETURNING id, name, kind, role, mime, url, width, height, has_alpha, duration_seconds, is_light`,
+  [req.user.id, p.id, label, kind, role, f.mimetype, url, meta.width || null, meta.height || null, hasAlpha, meta.duration || null, isLight]);
   res.json({ asset });
 });
 

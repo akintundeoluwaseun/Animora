@@ -44,11 +44,15 @@ export async function createApp() {
     const t = Date.now();
     const models = await liveModels();
     try {
-      const r = await geminiGenerate({ system: 'Reply with JSON only.', messages: [{ role: 'user', text: 'Return {"ok": true}' }], json: true, timeoutMs: 40000, maxOutputTokens: 2048 });
+      const r = await geminiGenerate({ system: 'Reply with JSON only.', messages: [{ role: 'user', text: 'Return {"ok": true}' }], json: true, timeoutMs: 20000, maxOutputTokens: 2048 });
       res.json({ ok: true, model: r.model, models, seconds: (Date.now() - t) / 1000, reply: r.text.slice(0, 60), finishReason: r.finishReason });
     } catch (e) {
       res.json({ ok: false, models, seconds: (Date.now() - t) / 1000, error: String(e.message).replace(/key=\S+/g, '').slice(0, 400) });
     }
+  });
+  app.get('/api/ai-models', async (req, res) => {
+    const { liveModels } = await import('./engine/gemini.js');
+    res.json({ configured: config.useGemini, models: config.useGemini ? await liveModels() : null });
   });
   app.use('/api/auth', authRoutes);
   app.use('/api/projects', projectRoutes);

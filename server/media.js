@@ -33,9 +33,37 @@ export async function probeFile(file) {
   return info;
 }
 
+/** Size + transparency straight from PNG / JPEG / WebP / GIF headers (no ffprobe needed, e.g. on Vercel). */
+export function imageHeaderInfo(buf) {
+  try {
+    if (buf.length > 26 && buf.readUInt32BE(0) === 0x89504e47) {   // PNG
+      const colorType = buf[25];
+      return { width: buf.readUInt32BE(16), height: buf.readUInt32BE(20), hasAlpha: colorType === 4 || colorType === 6 || buf.indexOf('tRNS') > 0 };
+    }
+    if (buf[0] === 0xff && buf[1] === 0xd8) {                        // JPEG: find the SOF marker
+      for (let i = 2; i < buf.length - 9;) {
+        if (buf[i] !== 0xff) { i++; continue; }
+        const m = buf[i + 1], len = buf.readUInt16BE(i + 2);
+        if (m >= 0xc0 && m <= 0xcf && ![0xc4, 0xc8, 0xcc].includes(m)) return { width: buf.readUInt16BE(i + 7), height: buf.readUInt16BE(i + 5), hasAlpha: false };
+        i += 2 + len;
+      }
+    }
+    if (buf.toString('ascii', 0, 4) === 'RIFF' && buf.toString('ascii', 8, 12) === 'WEBP') {
+      const fmt = buf.toString('ascii', 12, 16);
+      if (fmt === 'VP8X') return { width: 1 + buf.readUIntLE(24, 3), height: 1 + buf.readUIntLE(27, 3), hasAlpha: !!(buf[20] & 0x10) };
+      if (fmt === 'VP8L') { const b0 = buf.readUInt32LE(21); return { width: (b0 & 0x3fff) + 1, height: ((b0 >> 14) & 0x3fff) + 1, hasAlpha: !!((b0 >> 28) & 1) }; }
+      if (fmt === 'VP8 ') return { width: buf.readUInt16LE(26) & 0x3fff, height: buf.readUInt16LE(28) & 0x3fff, hasAlpha: false };
+    }
+    if (buf.toString('ascii', 0, 3) === 'GIF') return { width: buf.readUInt16LE(6), height: buf.readUInt16LE(8), hasAlpha: true };
+  } catch { /* not an image we can read */ }
+  return {};
+}
+
 /** Probe uploaded bytes (images: size + transparency; audio: duration). SVGs are skipped. */
 export async function probeBuffer(buf, ext = '') {
   if (/svg/i.test(ext)) return {};
+  const header = imageHeaderInfo(buf);
+  if (header.width) return header;
   return withTemp(async (dir) => {
     const f = path.join(dir, `in${ext || '.bin'}`);
     await writeFile(f, buf);
