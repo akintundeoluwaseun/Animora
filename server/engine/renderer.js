@@ -20,7 +20,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 const require = createRequire(import.meta.url);
-const GSAP_DIST = path.dirname(require.resolve('gsap/dist/gsap.min.js'));
+const GSAP_DIST = (() => { try { return path.dirname(require.resolve('gsap/dist/gsap.min.js')); } catch { return path.resolve('node_modules/gsap/dist'); } })();
 
 export const CANVAS = {
   '9:16': { width: 1080, height: 1920 },

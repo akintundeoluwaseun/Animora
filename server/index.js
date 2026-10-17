@@ -50,7 +50,9 @@ export async function createApp() {
   // GSAP served from our own server for the preview iframe (same build the renderer uses).
   app.use('/sfx', express.static(SFX_DIR, { maxAge: '30d' }));   // sound effects for the live preview
   app.use('/music', express.static(MUSIC_DIR, { maxAge: '30d' })); // background music beds
-  app.use('/vendor/gsap', express.static(path.dirname(require.resolve('gsap/dist/gsap.min.js')), { maxAge: '30d' }));
+  // (on Vercel these are static files copied by scripts/vercel-build.js, and gsap isn't in the function bundle)
+  try { app.use('/vendor/gsap', express.static(path.dirname(require.resolve('gsap/dist/gsap.min.js')), { maxAge: '30d' })); }
+  catch { console.warn('[gsap] not found; /vendor/gsap must be served as static files'); }
   // Download with a friendly filename.
   app.get('/download/:renderId', async (req, res) => {
     const r = await one(`SELECT r.video_url, p.title FROM renders r JOIN projects p ON p.id=r.project_id WHERE r.id=$1 AND r.status='done'`, [req.params.renderId]);
@@ -80,7 +82,7 @@ export async function createApp() {
   return app;
 }
 
-if (import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
+if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
   const app = await createApp();
   app.listen(config.port, () => {
     console.log(`\n  Animora running at ${config.publicBaseUrl}`);
