@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api, ASPECTS, duration, shrinkImage } from '../lib.jsx';
 import { Alert, Button, PageLoader, Spinner, Steps } from '../components/ui.jsx';
+import MicButton from '../components/MicButton.jsx';
 import { StylePicker } from './Dashboard.jsx';
 
 const MAX_PICS = 5;
@@ -393,6 +394,7 @@ export default function Plan() {
                   <input value={text} onChange={(e) => setText(e.target.value)} autoFocus placeholder={q.placeholder || (q.typed ? 'Or type your own answer…' : 'Type your answer…')} aria-label="Your answer"
                     className="h-12 flex-1 rounded-[10px] border border-ink/15 bg-white px-4 text-[15px] focus:border-ink focus:outline-none" />
                 )}
+                <MicButton onText={(t) => setText((x) => (x.trim() ? `${x.trim()} ${t}` : t))} onError={setError} />
                 <div className="flex flex-col gap-2">
                   <Button type="submit" variant="dark" className="h-12" disabled={q.done ? false : q.type === 'multi' ? !multi.length && !text.trim() : !text.trim()}>
                     {q.done ? (text.trim() ? 'Make my video' : "No, that's all") : q.type === 'multi' ? 'Next' : 'Send'}

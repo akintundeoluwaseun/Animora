@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { api, ASPECTS, duration, shrinkImage } from '../lib.jsx';
 import { Alert, Button, PageLoader, Spinner, Steps } from '../components/ui.jsx';
+import MicButton from '../components/MicButton.jsx';
 import { LivePreview } from '../components/Preview.jsx';
 import VoicePanel from '../components/VoicePanel.jsx';
 
@@ -79,6 +80,7 @@ function EditPanel({ project, onUpdate }) {
         <form onSubmit={(e) => { e.preventDefault(); send(); }} className="flex gap-2">
           <input value={text} onChange={(e) => setText(e.target.value)} onPaste={onPaste} placeholder={pasting ? 'Adding your picture…' : 'e.g. "Zoom into the logo first" (you can paste a picture)'} aria-label="Describe a change"
             className="h-12 flex-1 rounded-[10px] border border-ink/15 bg-white px-4 text-[15px] focus:border-ink focus:outline-none" />
+          <MicButton onText={(t) => setText((x) => (x.trim() ? `${x.trim()} ${t}` : t))} onError={setError} />
           <Button type="submit" variant="dark" className="h-12" loading={busy} disabled={!text.trim()}>Apply</Button>
         </form>
       </div>

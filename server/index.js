@@ -16,6 +16,7 @@ import authRoutes from './routes/auth.js';
 import projectRoutes from './routes/projects.js';
 import renderRoutes from './routes/renders.js';
 import moneyRoutes from './routes/money.js';
+import transcribeRoutes from './routes/transcribe.js';
 
 const require = createRequire(import.meta.url);
 
@@ -40,6 +41,7 @@ export async function createApp() {
   app.use('/api/projects', projectRoutes);
   app.use('/api', renderRoutes);
   app.use('/api', moneyRoutes);
+  app.use('/api', transcribeRoutes);
   app.use('/api', (req, res) => res.status(404).json({ error: 'Not found' }));
 
   // --- files ---
