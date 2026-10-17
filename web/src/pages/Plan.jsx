@@ -27,7 +27,7 @@ const QUESTIONS = [
   { id: 'headline', type: 'multi', max: 8, suggest: 'headline', typed: true, ask: () => "What's the main message? Pick as many as you like (up to 8), or type your own. More messages make a longer video.", placeholder: 'Add your own message' },
   { id: 'features', type: 'multi', max: 8, suggest: 'features', typed: true, optional: true, ask: (b) => `What makes ${b.name} stand out? Pick as many as you like (up to 8).`, placeholder: 'Add your own' },
   { id: 'products', type: 'long', optional: true, ask: () => 'Any products, services or prices to show? One per line.', placeholder: 'Jollof rice ₦2,500\nFried rice ₦2,800\nSmall chops ₦1,500' },
-  { id: 'cta', type: 'single', options: CTAS, typed: true, ask: () => 'What should people do after watching?' },
+  { id: 'cta', type: 'multi', max: 5, options: CTAS, typed: true, ask: () => 'What should people do after watching? Pick one or more.', placeholder: 'Or type your own, e.g. "Send us a DM"' },
   { id: 'contact', type: 'text', optional: true, ask: () => 'Your phone number, website or address for the end of the video?', placeholder: '0803 123 4567 · www.yoursite.com · 12 Allen Ave, Ikeja' },
   { id: 'aspect', type: 'single', options: ASPECT_OPTS, ask: () => 'Where will you post it?' },
   { id: 'duration', type: 'single', options: [15, 20, 30, 45, 60], ask: () => "How long should it be? If you picked a lot, I'll make it longer so everything fits." },
@@ -55,6 +55,7 @@ const label = (q, v, b, styles) => {
 function valueOf(q, b, pics) {
   if (q.id === 'headline') return b.headlines || (b.headline ? [b.headline] : undefined);
   if (q.id === 'goal') return b.goals || (b.goal ? [b.goal] : undefined);
+  if (q.id === 'cta') return b.ctas || (b.cta ? [b.cta] : undefined);
   if (q.id === 'style') return b.styleAuto ? 'auto' : b.styleId;
   if (q.id === 'colors') return b.colorMode;
   if (q.id === 'pictures') return b.picturesDone ? pics : undefined;
@@ -145,7 +146,7 @@ export default function Plan() {
     })();
   }, [id]);
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }); }, [step, uploading, suggestions, building]);
-  useEffect(() => { setText(''); const cur = q?.id === 'headline' ? (b.headlines || (b.headline ? [b.headline] : [])) : q?.id === 'goal' ? (b.goals || (b.goal ? [b.goal] : [])) : b[q?.id]; setMulti(Array.isArray(cur) ? cur : []); }, [step]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { setText(''); const cur = q?.id === 'headline' ? (b.headlines || (b.headline ? [b.headline] : [])) : q?.id === 'goal' ? (b.goals || (b.goal ? [b.goal] : [])) : q?.id === 'cta' ? (b.ctas || (b.cta ? [b.cta] : [])) : b[q?.id]; setMulti(Array.isArray(cur) ? cur : []); }, [step]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // AI suggestions for the open questions
   useEffect(() => {
@@ -191,6 +192,7 @@ export default function Plan() {
     else if (q.id === 'duration') patch = { duration: Number(value) };
     else if (q.id === 'headline') patch = { headlines: value, headline: value[0] };
     else if (q.id === 'goal') patch = { goals: value, goal: value.join(' + ') };
+    else if (q.id === 'cta') patch = { ctas: value, cta: value[0] };
     else patch = { [q.id]: value };
     const next = await save({ ...patch, ...extra, [`${q.id}Skipped`]: false });
     advance(next);

@@ -244,7 +244,7 @@ PLAN (content to cover, in order):
 ${scenes}
 UPLOADED IMAGES:
 ${assetLines(assets)}
-${brief ? `ANSWERS FROM THE BUSINESS: ${JSON.stringify({ messages: brief.headlines || [brief.headline].filter(Boolean), strengths: brief.features, products: brief.products, action: brief.cta, contact: brief.contact })}\n` : ''}CREATIVE CONCEPT FOR THIS VIDEO: ${CONCEPTS[Math.floor(Math.random() * CONCEPTS.length)]} (adapt it to the business; the special instructions win if they conflict)
+${brief ? `ANSWERS FROM THE BUSINESS: ${JSON.stringify({ messages: brief.headlines || [brief.headline].filter(Boolean), strengths: brief.features, products: brief.products, actions: brief.ctas || [brief.cta].filter(Boolean), contact: brief.contact })}\n` : ''}CREATIVE CONCEPT FOR THIS VIDEO: ${CONCEPTS[Math.floor(Math.random() * CONCEPTS.length)]} (adapt it to the business; the special instructions win if they conflict)
 ${avoid.length ? `The previous version used these shots in this order: ${avoid.join(', ')}. Make this version clearly different (other shots, other order, other cuts).\n` : ''}${special ? `\nSPECIAL INSTRUCTIONS FROM THE USER (follow exactly):\n${special}\n` : ''}
 Direct the ${duration}s video now.`;
   const { text } = await geminiGenerate({

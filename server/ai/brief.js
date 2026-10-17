@@ -22,7 +22,9 @@ export function cleanBrief(b = {}) {
     // main message: one or more (up to 8); `headline` is the first, `headlines` all of them
     headlines: list(Array.isArray(b.headlines) ? b.headlines : Array.isArray(b.headline) ? b.headline : b.headline ? [b.headline] : []).slice(0, 8),
     products: list(b.products).slice(0, 8), features: list(b.features).slice(0, 8),
-    cta: str(b.cta, 60), contact: str(b.contact, 120), aspect: ['9:16', '16:9', '1:1'].includes(b.aspect) ? b.aspect : undefined,
+    // what to do after watching: one or more; `cta` is the first, `ctas` all of them
+    ctas: list(Array.isArray(b.ctas) ? b.ctas : Array.isArray(b.cta) ? b.cta : b.cta ? [b.cta] : []).slice(0, 5),
+    contact: str(b.contact, 120), aspect: ['9:16', '16:9', '1:1'].includes(b.aspect) ? b.aspect : undefined,
     duration: Number(b.duration) || undefined, styleId: b.styleId ? String(b.styleId) : undefined, styleAuto: !!b.styleAuto,
     colors: b.colors && typeof b.colors === 'object' ? Object.fromEntries(Object.entries(b.colors).filter(([k, v]) => ['primary', 'secondary', 'background', 'text'].includes(k) && /^#[0-9a-f]{6}$/i.test(v))) : undefined,
     voiceover: b.voiceover === undefined || b.voiceover === null ? undefined : b.voiceover === true || b.voiceover === 'yes',
@@ -33,6 +35,7 @@ export function cleanBrief(b = {}) {
   // optional questions the user skipped (so they are not asked again)
   for (const k of ['features', 'products', 'contact', 'pictures', 'extra']) if (b[`${k}Skipped`] !== undefined) out[`${k}Skipped`] = !!b[`${k}Skipped`];
   if (out.headlines.length) out.headline = out.headlines[0]; else delete out.headlines;
+  if (out.ctas.length) out.cta = str(out.ctas[0], 60); else delete out.ctas;
   if (out.goals.length) out.goal = str(out.goals.join(' + '), 200); else delete out.goals;
   for (const k of Object.keys(out)) if (out[k] === undefined || out[k] === '') delete out[k];
   return out;
@@ -58,7 +61,8 @@ export function briefToPlanRules(brief, { assets = [], limits = { minSeconds: 15
   const site = (b.contact || '').match(URL_RE)?.[0] || '';
   const place = str((b.contact || '').replace(phone, '').replace(site, '').replace(/^[\s,·|-]+|[\s,·|-]+$/g, ''), 60);
   const action = b.cta || (phone ? 'Call or WhatsApp us' : site ? 'Visit our website' : 'Contact us today');
-  const ctaLine = [action, phone || site].filter(Boolean).join(' ');
+  const otherActions = (b.ctas || []).slice(1);
+  const ctaLine = [[action, ...otherActions].join(' or '), phone || site].filter(Boolean).join(' ');
 
   const scenes = [];
   const add = (purpose, text, weight, imgs = []) => scenes.push({ purpose, on_screen_text: text.filter(Boolean), weight, images: imgs });
@@ -71,7 +75,7 @@ export function briefToPlanRules(brief, { assets = [], limits = { minSeconds: 15
   for (let i = 0; i < rest.length; i += 3) add('detail', rest.slice(i, i + 3), 1);
   if (b.products.length) add('menu', b.products.slice(0, 6), 1.3);
   if (photos[1]) add('offer', [b.products[0] || b.headline || b.name], 1, [{ asset: photos[1].name, placement: 'background', fit: 'cover' }]);
-  add('cta', [action, phone || site, place].filter(Boolean), 1.2, logo ? [{ asset: logo.name, placement: 'corner', fit: 'contain' }] : []);
+  add('cta', [action, phone || site, otherActions.join(' · '), place].filter(Boolean), 1.2, logo ? [{ asset: logo.name, placement: 'corner', fit: 'contain' }] : []);
 
   // More answers = a longer video: every scene gets at least ~3.5 s, up to the plan's maximum length.
   const maxD = limits.maxSeconds || 300;
