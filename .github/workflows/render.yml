@@ -20,8 +20,25 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      # FFmpeg + fonts are kept between runs (first run installs them, ~20 s; later runs ~2 s)
+      - uses: actions/cache@v4
+        id: tools
+        with:
+          path: ~/tools
+          key: tools-v1-${{ runner.os }}
       - name: Install FFmpeg and fonts
-        run: command -v ffmpeg || (sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends ffmpeg fonts-noto-core fonts-noto-color-emoji fonts-dejavu-core > /dev/null)
+        if: steps.tools.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/tools/bin ~/tools/fonts
+          sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends fonts-noto-core fonts-noto-color-emoji fonts-dejavu-core > /dev/null
+          curl -sL https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz | tar -xJ -C /tmp && cp /tmp/ffmpeg-*-static/ffmpeg /tmp/ffmpeg-*-static/ffprobe ~/tools/bin/ || (sudo apt-get install -y -qq ffmpeg > /dev/null && ln -sf "$(command -v ffmpeg)" ~/tools/bin/ffmpeg)
+          cp -r /usr/share/fonts/truetype/noto /usr/share/fonts/truetype/dejavu ~/tools/fonts/ 2>/dev/null || true
+      - name: Use FFmpeg and fonts
+        run: |
+          echo "$HOME/tools/bin" >> "$GITHUB_PATH"
+          mkdir -p ~/.local/share/fonts && cp -r ~/tools/fonts/* ~/.local/share/fonts/ 2>/dev/null || true
+          fc-cache -f > /dev/null 2>&1 || true
+          ~/tools/bin/ffmpeg -version | head -1
       - name: Install
         run: npm ci --no-audit --no-fund --omit=dev
         env:
