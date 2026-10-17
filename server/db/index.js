@@ -7,16 +7,36 @@ import { config, ROOT } from '../config.js';
 let driver; // { query(sql, params) -> {rows}, exec(sql), transaction(fn) }
 
 /**
- * Split a postgres:// URL by hand so passwords with symbols (# @ / ? %) work without URL-encoding:
- * the password is everything between the first ':' after the user and the LAST '@'.
+ * Read DATABASE_URL by hand so it works however it was pasted: passwords with symbols (# @ / ? %),
+ * leftover [ ] around the password, quotes around the whole thing, or a "DATABASE_URL=" in front.
+ * The password is everything between the first ':' after the user name and the LAST '@'.
  */
 export function connectionParts(url) {
-  const m = String(url).trim().match(/^postgres(?:ql)?:\/\/([^:@/]+)(?::(.*))?@([^@/?#]+?)(?::(\d+))?\/([^?#]*)(?:\?.*)?$/s);
-  if (!m) return { connectionString: url };
-  const [, user, rawPass = '', host, port, database] = m;
-  const password = /^\[.*\]$/.test(rawPass) ? rawPass.slice(1, -1) : rawPass;   // someone left the [ ] from [YOUR-PASSWORD]
+  let s = String(url || '').trim().replace(/^DATABASE_URL\s*=\s*/i, '').trim().replace(/^["'`]+|["'`]+$/g, '').trim();
+  const i = s.indexOf('://');
+  if (i < 0) return { invalid: 'it does not start with postgresql://' };
+  const rest = s.slice(i + 3);
+  const at = rest.lastIndexOf('@');
+  if (at < 0) return { invalid: 'it has no @ between the password and the address' };
+  const userinfo = rest.slice(0, at), hostpart = rest.slice(at + 1);
+  const c = userinfo.indexOf(':');
+  const user = c < 0 ? userinfo : userinfo.slice(0, c);
+  let password = c < 0 ? '' : userinfo.slice(c + 1);
+  if (/^\[.*\]$/.test(password)) password = password.slice(1, -1);       // someone left the [ ] from [YOUR-PASSWORD]
   const dec = (x) => { try { return decodeURIComponent(x); } catch { return x; } };
-  return { user: dec(user), password: /%[0-9a-f]{2}/i.test(password) ? dec(password) : password, host, port: Number(port) || 5432, database: dec(database) || 'postgres' };
+  if (/%[0-9a-f]{2}/i.test(password)) password = dec(password);
+  const [hostport, dbq = ''] = hostpart.split(/\/(.*)/s);
+  const [host, port] = hostport.split(':');
+  const database = dec(dbq.split('?')[0]) || 'postgres';
+  if (!host) return { invalid: 'the address after @ is empty' };
+  return { user: dec(user), password, host, port: Number(port) || 5432, database };
+}
+
+/** The connection string with the password hidden, for error messages. */
+export function maskedUrl(url) {
+  const p = connectionParts(url);
+  if (p.invalid) return `(unreadable, ${String(url || '').trim().length} characters)`;   // never echo it: it might be the password
+  return `postgresql://${p.user}:****@${p.host}:${p.port}/${p.database}`;
 }
 
 export async function initDb() {
@@ -25,17 +45,19 @@ export async function initDb() {
     const pg = (await import('pg')).default;
     pg.types.setTypeParser(1700, (v) => (v === null ? null : Number(v))); // numeric -> number
     pg.types.setTypeParser(20, (v) => (v === null ? null : Number(v)));   // bigint -> number
+    const parts = connectionParts(config.databaseUrl);
+    if (parts.invalid) throw new Error(`DATABASE_URL (${String(config.databaseUrl).trim().length} characters) can't be read: ${parts.invalid}. It should look like postgresql://postgres.<project id>:<password>@aws-1-eu-west-2.pooler.supabase.com:6543/postgres`);
+    const { invalid, ...conn } = parts; // eslint-disable-line no-unused-vars
     const pool = new pg.Pool({
-      ...connectionParts(config.databaseUrl),
+      ...conn,
       ssl: /localhost|127\.0\.0\.1/.test(config.databaseUrl) ? false : { rejectUnauthorized: false },
       max: config.serverless ? 3 : 10,
       connectionTimeoutMillis: 10000,
     });
     // Fail fast with the address we tried (never the password), instead of hanging until the host times out.
-    const parts = connectionParts(config.databaseUrl);
     try { await pool.query('SELECT 1'); } catch (e) {
       await pool.end().catch(() => {});
-      throw new Error(`database ${parts.user || '?'}@${parts.host || '?'}:${parts.port || '?'} - ${e.message}`);
+      throw new Error(`database ${maskedUrl(config.databaseUrl)} - ${e.message}`);
     }
     driver = {
       kind: 'postgres',

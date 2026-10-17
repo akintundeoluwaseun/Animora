@@ -11,8 +11,8 @@ export default async function handler(req, res) {
   } catch (e) {
     // Startup failed (usually DATABASE_URL). Say why instead of a bare 500, without echoing the connection string.
     console.error('[startup]', e);
-    const msg = String(e?.message || e).replace(/postgres(ql)?:\/\/\S+/g, '[connection string]');
-    const hint = /password authentication/i.test(msg) ? ' The password in DATABASE_URL is wrong.'
+    const msg = String(e?.message || e).replace(/(postgres(?:ql)?:\/\/[^:\s/]+:)(?!\*{4}@)\S*@/g, '$1****@'); // hide any password
+    const hint = /can't be read/i.test(msg) ? '' : /password authentication/i.test(msg) ? ' The password in DATABASE_URL is wrong.'
       : /ENOTFOUND|getaddrinfo|ENETUNREACH|EHOSTUNREACH|timeout|ETIMEDOUT/i.test(msg) ? ' The address in DATABASE_URL can\'t be reached from Vercel. In Supabase click Connect and copy the "Transaction pooler" string (it ends in pooler.supabase.com:6543).'
       : /Tenant or user not found/i.test(msg) ? ' The user name must be postgres.<project id>, as in the Transaction pooler string.' : '';
     res.statusCode = 503;
