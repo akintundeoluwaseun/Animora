@@ -23,14 +23,14 @@ const EXTRA_CHIPS = ['Zoom into my logo at the start', 'Make the price really bi
 const QUESTIONS = [
   { id: 'name', type: 'text', ask: () => "Hi! I'm your Animora director. Let's make your ad. What's your business name?", placeholder: 'e.g. Kemi Cakes' },
   { id: 'category', type: 'single', options: CATEGORIES, typed: true, ask: (b) => `Nice! What does ${b.name} do?`, placeholder: 'Or type it, e.g. "laptop repairs"' },
-  { id: 'goal', type: 'single', options: GOALS, typed: true, ask: () => "What's the goal of this ad?" },
-  { id: 'headline', type: 'multi', max: 3, suggest: 'headline', typed: true, ask: () => "What's the main message? Pick up to 3 that I wrote for you, or type your own.", placeholder: 'Add your own message' },
+  { id: 'goal', type: 'multi', max: 6, options: GOALS, typed: true, ask: () => "What's the goal of this ad? Pick one or more.", placeholder: 'Or type your own goal' },
+  { id: 'headline', type: 'multi', max: 8, suggest: 'headline', typed: true, ask: () => "What's the main message? Pick as many as you like (up to 8), or type your own. More messages make a longer video.", placeholder: 'Add your own message' },
   { id: 'features', type: 'multi', max: 8, suggest: 'features', typed: true, optional: true, ask: (b) => `What makes ${b.name} stand out? Pick as many as you like (up to 8).`, placeholder: 'Add your own' },
   { id: 'products', type: 'long', optional: true, ask: () => 'Any products, services or prices to show? One per line.', placeholder: 'Jollof rice ₦2,500\nFried rice ₦2,800\nSmall chops ₦1,500' },
   { id: 'cta', type: 'single', options: CTAS, typed: true, ask: () => 'What should people do after watching?' },
   { id: 'contact', type: 'text', optional: true, ask: () => 'Your phone number, website or address for the end of the video?', placeholder: '0803 123 4567 · www.yoursite.com · 12 Allen Ave, Ikeja' },
   { id: 'aspect', type: 'single', options: ASPECT_OPTS, ask: () => 'Where will you post it?' },
-  { id: 'duration', type: 'single', options: [15, 20, 30, 45, 60], ask: () => 'How long should it be?' },
+  { id: 'duration', type: 'single', options: [15, 20, 30, 45, 60], ask: () => "How long should it be? If you picked a lot, I'll make it longer so everything fits." },
   { id: 'pictures', type: 'upload', optional: true, ask: () => `Add your logo and product photos (up to ${MAX_PICS}). You can also paste a picture with Ctrl+V.` },
   { id: 'colors', type: 'colors', ask: () => 'Which colours should the video use?' },
   { id: 'style', type: 'style', ask: () => 'Pick a look for your video, or let me choose one that fits.' },
@@ -54,6 +54,7 @@ const label = (q, v, b, styles) => {
 // answers live in the brief under the question id (with a few special cases)
 function valueOf(q, b, pics) {
   if (q.id === 'headline') return b.headlines || (b.headline ? [b.headline] : undefined);
+  if (q.id === 'goal') return b.goals || (b.goal ? [b.goal] : undefined);
   if (q.id === 'style') return b.styleAuto ? 'auto' : b.styleId;
   if (q.id === 'colors') return b.colorMode;
   if (q.id === 'pictures') return b.picturesDone ? pics : undefined;
@@ -144,7 +145,7 @@ export default function Plan() {
     })();
   }, [id]);
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }); }, [step, uploading, suggestions, building]);
-  useEffect(() => { setText(''); const cur = q?.id === 'headline' ? (b.headlines || (b.headline ? [b.headline] : [])) : b[q?.id]; setMulti(Array.isArray(cur) ? cur : []); }, [step]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { setText(''); const cur = q?.id === 'headline' ? (b.headlines || (b.headline ? [b.headline] : [])) : q?.id === 'goal' ? (b.goals || (b.goal ? [b.goal] : [])) : b[q?.id]; setMulti(Array.isArray(cur) ? cur : []); }, [step]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // AI suggestions for the open questions
   useEffect(() => {
@@ -189,6 +190,7 @@ export default function Plan() {
 
     else if (q.id === 'duration') patch = { duration: Number(value) };
     else if (q.id === 'headline') patch = { headlines: value, headline: value[0] };
+    else if (q.id === 'goal') patch = { goals: value, goal: value.join(' + ') };
     else patch = { [q.id]: value };
     const next = await save({ ...patch, ...extra, [`${q.id}Skipped`]: false });
     advance(next);
