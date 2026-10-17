@@ -31,7 +31,7 @@ const QUESTIONS = [
   { id: 'contact', type: 'text', optional: true, ask: () => 'Your phone number, website or address for the end of the video?', placeholder: '0803 123 4567 · www.yoursite.com · 12 Allen Ave, Ikeja' },
   { id: 'aspect', type: 'single', options: ASPECT_OPTS, ask: () => 'Where will you post it?' },
   { id: 'duration', type: 'single', options: [15, 20, 30, 45, 60], ask: () => "How long should it be? If you picked a lot, I'll make it longer so everything fits." },
-  { id: 'pictures', type: 'upload', optional: true, ask: () => `Add your logo and product photos (up to ${MAX_PICS}). You can also paste a picture with Ctrl+V.` },
+  { id: 'pictures', type: 'upload', optional: true, ask: () => `Add your logo and product photos if you have them (up to ${MAX_PICS}). Both are optional. You can also paste a picture with Ctrl+V.` },
   { id: 'colors', type: 'colors', ask: () => 'Which colours should the video use?' },
   { id: 'style', type: 'style', ask: () => 'Pick a look for your video, or let me choose one that fits.' },
   { id: 'voiceover', type: 'single', options: [{ v: 'yes', l: 'Yes, write me a script', d: 'For ElevenLabs, CapCut and other voice apps' }, { v: 'no', l: 'No, just on-screen text' }], ask: () => 'Do you want a narration script for a voice-over app?' },
@@ -298,7 +298,7 @@ export default function Plan() {
                     )}
                     {uploading && <p className="mt-2 flex items-center gap-2 text-sm text-ink-soft"><Spinner className="size-4" />Uploading…</p>}
                     <div className="mt-3 flex gap-2">
-                      <Button size="sm" onClick={() => answer(pics.length, { picturesDone: true })} disabled={uploading || !pics.length}>Continue</Button>
+                      <Button size="sm" onClick={() => (pics.length ? answer(pics.length, { picturesDone: true }) : skip())} disabled={uploading}>{pics.length ? 'Continue' : 'Continue without pictures'}</Button>
                     </div>
                   </div>
                 )}
