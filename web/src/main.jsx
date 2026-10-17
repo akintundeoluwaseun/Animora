@@ -15,9 +15,9 @@ const Pricing = lazy(() => import('./pages/Pricing.jsx'));
 const Checkout = lazy(() => import('./pages/Checkout.jsx'));
 
 function Private({ children, roles }) {
-  const { user, loading } = useAuth();
+  const { user, loading, serverError } = useAuth();
   if (loading) return <PageLoader />;
-  if (!user) return <div className="mx-auto max-w-lg px-4 py-24 text-center text-ink-soft">Can't reach the Animora server. Is it running (npm start)?</div>;
+  if (!user) return <div className="mx-auto max-w-lg px-4 py-24 text-center text-ink-soft">{serverError || "Can't reach the Animora server. Check your connection and refresh the page."}</div>;
   if (roles && !roles.includes(user.role)) return <Navigate to="/videos" replace />;
   return children;
 }

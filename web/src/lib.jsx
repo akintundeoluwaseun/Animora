@@ -32,9 +32,12 @@ const AuthCtx = createContext(null);
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [serverError, setServerError] = useState('');
 
   const refresh = useCallback(async () => {
-    try { const { user: u } = await api('/auth/me'); setUser(u); return u; } catch { setUser(null); return null; } finally { setLoading(false); }
+    try { const { user: u } = await api('/auth/me'); setUser(u); setServerError(''); return u; }
+    catch (e) { setUser(null); setServerError(e.status && e.status !== 401 ? e.message : ''); return null; }
+    finally { setLoading(false); }
   }, []);
 
   useEffect(() => {
@@ -54,7 +57,7 @@ export function AuthProvider({ children }) {
   };
   const logout = () => { setToken(null); setUser(null); };
 
-  return <AuthCtx.Provider value={{ user, setUser, loading, login, signup, logout, refresh }}>{children}</AuthCtx.Provider>;
+  return <AuthCtx.Provider value={{ user, setUser, loading, login, signup, logout, refresh, serverError }}>{children}</AuthCtx.Provider>;
 }
 
 export const useAuth = () => useContext(AuthCtx);

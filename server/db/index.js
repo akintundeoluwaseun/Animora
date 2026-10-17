@@ -29,7 +29,14 @@ export async function initDb() {
       ...connectionParts(config.databaseUrl),
       ssl: /localhost|127\.0\.0\.1/.test(config.databaseUrl) ? false : { rejectUnauthorized: false },
       max: config.serverless ? 3 : 10,
+      connectionTimeoutMillis: 10000,
     });
+    // Fail fast with the address we tried (never the password), instead of hanging until the host times out.
+    const parts = connectionParts(config.databaseUrl);
+    try { await pool.query('SELECT 1'); } catch (e) {
+      await pool.end().catch(() => {});
+      throw new Error(`database ${parts.user || '?'}@${parts.host || '?'}:${parts.port || '?'} - ${e.message}`);
+    }
     driver = {
       kind: 'postgres',
       query: (sql, params) => pool.query(sql, params),

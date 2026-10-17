@@ -13,7 +13,8 @@ export default async function handler(req, res) {
     console.error('[startup]', e);
     const msg = String(e?.message || e).replace(/postgres(ql)?:\/\/\S+/g, '[connection string]');
     const hint = /password authentication/i.test(msg) ? ' The password in DATABASE_URL is wrong.'
-      : /ENOTFOUND|getaddrinfo|ENETUNREACH/i.test(msg) ? ' The address in DATABASE_URL is wrong; use the Transaction pooler string.' : '';
+      : /ENOTFOUND|getaddrinfo|ENETUNREACH|EHOSTUNREACH|timeout|ETIMEDOUT/i.test(msg) ? ' The address in DATABASE_URL can\'t be reached from Vercel. In Supabase click Connect and copy the "Transaction pooler" string (it ends in pooler.supabase.com:6543).'
+      : /Tenant or user not found/i.test(msg) ? ' The user name must be postgres.<project id>, as in the Transaction pooler string.' : '';
     res.statusCode = 503;
     res.setHeader('Content-Type', 'application/json');
     return res.end(JSON.stringify({ error: `The server couldn't start: ${msg.slice(0, 200)}.${hint}` }));
