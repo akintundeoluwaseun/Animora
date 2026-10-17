@@ -1,8 +1,8 @@
 // Make the MP4 in the browser, straight from the video's code: no video server and nothing stored online.
-// The animation plays frame by frame in a hidden frame; each frame is drawn to a canvas (modern-screenshot),
+// The animation plays frame by frame in a hidden frame; each frame is drawn to a canvas (fastCapture.js),
 // encoded to H.264 with the browser's WebCodecs encoder, and the music + sound effects are mixed and
 // encoded to AAC. mp4-muxer packs both into an .mp4 the user downloads.
-import { createContext, destroyContext, domToCanvas } from 'modern-screenshot';
+import { prepareFastCapture } from './fastCapture.js';
 import { Muxer, ArrayBufferTarget } from 'mp4-muxer';
 
 const SIZES = { '9:16': [1080, 1920], '16:9': [1920, 1080], '1:1': [1080, 1080] };
@@ -124,26 +124,36 @@ export async function exportVideo({ html, aspect = '9:16', fps = 30, quality = '
     const venc = new VideoEncoder({ output: (chunk, meta) => muxer.addVideoChunk(chunk, meta), error: (e) => { failure = e; } });
     venc.configure(v.config);
 
-    // draw frames: the context keeps fonts and pictures loaded between frames, so each frame is fast
-    const root = doc.documentElement;
+    // draw frames: stylesheet, fonts and pictures are embedded once; several frames rasterize at the same time
+    const capture = await prepareFastCapture(doc, { width: W, height: H, outWidth: width, outHeight: height });
+    const canvas = document.createElement('canvas'); canvas.width = width; canvas.height = height;
+    const g = canvas.getContext('2d');
     const bg = win.getComputedStyle(doc.body).backgroundColor || '#000';
-    const ctx = await createContext(root, { width: W, height: H, scale: k, backgroundColor: bg, autoDestruct: false, timeout: 15000 });
     const started = performance.now();
+    const queue = [];
+    let sent = 0;
+    const emit = async () => {
+      const img = await queue.shift();
+      g.fillStyle = bg; g.fillRect(0, 0, width, height);
+      g.drawImage(img, 0, 0, width, height);
+      const vf = new VideoFrame(canvas, { timestamp: Math.round((sent * 1e6) / fps), duration: Math.round(1e6 / fps) });
+      venc.encode(vf, { keyFrame: sent % (fps * 2) === 0 });
+      vf.close();
+      sent++;
+      while (venc.encodeQueueSize > 6) await sleep(4);
+      const elapsed = (performance.now() - started) / 1000;
+      onProgress({ stage: 'Recording', done: sent, total, eta: Math.round((elapsed / sent) * (total - sent)) });
+    };
     for (let i = 0; i < total; i++) {
       if (signal?.aborted) throw new DOMException('Cancelled', 'AbortError');
       if (failure) throw failure;
       const t = Math.min(duration, i / fps);
       tl.seek(t, false);
-      if (doc.getAnimations) for (const a of doc.getAnimations()) { a.pause(); a.currentTime = t * 1000; }
-      const canvas = await domToCanvas(ctx);
-      const vf = new VideoFrame(canvas, { timestamp: Math.round((i * 1e6) / fps), duration: Math.round(1e6 / fps) });
-      venc.encode(vf, { keyFrame: i % (fps * 2) === 0 });
-      vf.close();
-      while (venc.encodeQueueSize > 4) await sleep(5);
-      const elapsed = (performance.now() - started) / 1000;
-      onProgress({ stage: 'Recording', done: i + 1, total, eta: Math.round((elapsed / (i + 1)) * (total - i - 1)) });
+      if (doc.getAnimations) for (const an of doc.getAnimations()) { an.pause(); an.currentTime = t * 1000; }
+      queue.push(capture());          // the copy of this frame is taken now; rasterizing runs in the background
+      if (queue.length >= 3) await emit();
     }
-    destroyContext(ctx);
+    while (queue.length) await emit();
     await venc.flush(); venc.close();
 
     if (audio) {
