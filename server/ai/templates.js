@@ -227,6 +227,70 @@ function makePlanner(theme, rnd) {
   };
 }
 
+/**
+ * No shot may hang on screen. A beat much longer than ~3 s (a 60 s video with only a few shots) is cut down,
+ * and the freed time is filled with new shots built from the video's own words (messages, selling points,
+ * products, the brand), each animated differently, so long videos keep moving instead of holding still.
+ */
+function fillPacing(beats, duration, plan, theme, rnd) {
+  if (!beats?.length) return beats;
+  const L = duration <= 20 ? 2.8 : duration <= 40 ? 3.1 : 3.4;
+  const used = new Set(beats.map((b) => String(b.text || '').toLowerCase()));
+  const pool = [];
+  for (const sc of plan.scenes || []) for (const t of [].concat(sc.on_screen_text || [])) {
+    for (const part of String(t || '').split(/\s*[·|•]\s*/)) {
+      const x = part.trim();
+      if (x.length >= 3 && x.length <= 60 && !used.has(x.toLowerCase()) && !/^(\+?\d[\d\s-]{6,})$/.test(x)) { pool.push(x); used.add(x.toLowerCase()); }
+    }
+  }
+  const brand = plan.business?.name;
+  const textShots = (theme.calm ? ['sentence', 'flip', 'scatter', 'words', 'type'] : ['kinetic', 'sentence', 'split', 'words', 'flip', 'type']);
+  const shotFor = (text, avoid) => {
+    const ok = textShots.filter((k) => SHOT_VALID[k] && SHOT_VALID[k]({ text }) && k !== avoid);
+    return ok.length ? ok[Math.floor(rnd() * ok.length)] : 'words';
+  };
+  const cuts = ['focus', 'morph', 'swoosh', 'whip', 'dive', 'zoom'].filter((c) => !theme.calm || c !== 'zoom');
+  const out = [];
+  let pi = 0;
+  beats.forEach((b, i) => {
+    const len = b.t1 - b.t0;
+    const isLast = i === beats.length - 1;
+    const keep = isLast ? Math.min(len, Math.max(L, 3.2)) : L;
+    if (len <= keep * 1.45) { out.push(b); return; }
+    // the original shot keeps the start of its slot (the final call to action keeps the end)
+    const extraTime = len - keep;
+    const n = Math.max(1, Math.round(extraTime / L));
+    const step = extraTime / n;
+    const fresh = [];
+    // nothing new left: restate the key lines in turn (each in a different animation), never the same twice in a row
+    const again = [...new Set([b.text, brand, ...(plan.scenes || []).map((sc) => [].concat(sc.on_screen_text || [])[0])].map((x) => String(x || '').trim()).filter((x) => x && x.length <= 60))];
+    let ri = 0;
+    for (let k = 0; k < n; k++) {
+      let text = pool[pi++];
+      if (!text) {
+        const prev = (fresh[fresh.length - 1] || b).text;
+        text = again.find((x, j) => j >= ri && x !== prev) || again.find((x) => x !== prev) || again[0];
+        ri = (again.indexOf(text) + 1) % Math.max(1, again.length);
+      }
+      if (!text) break;
+      fresh.push({ shot: shotFor(text, (fresh[fresh.length - 1] || b).shot), text, cut: { type: cuts[Math.floor(rnd() * cuts.length)], d: 0.3 } });
+    }
+    if (!fresh.length) { out.push(b); return; }
+    const realStep = extraTime / fresh.length;
+    if (isLast) {
+      let t = b.t0;
+      fresh.forEach((f) => { out.push({ ...f, t0: Math.round(t * 100) / 100, t1: Math.round((t + realStep) * 100) / 100 }); t += realStep; });
+      out.push({ ...b, t0: Math.round(t * 100) / 100 });
+    } else {
+      const t = b.t0 + keep;
+      out.push({ ...b, t1: Math.round(t * 100) / 100, cut: b.cut || { type: 'focus', d: 0.3 } });
+      fresh.forEach((f, k) => out.push({ ...f, t0: Math.round((t + k * realStep) * 100) / 100, t1: k === fresh.length - 1 ? b.t1 : Math.round((t + (k + 1) * realStep) * 100) / 100, ...(k === fresh.length - 1 && b.cut ? { cut: b.cut } : {}) }));
+    }
+    void step;
+  });
+  return out;
+}
+
 function planBeats(plan, scenes, theme, rnd, ctx) {
   const pick0 = makePlanner(theme, rnd);
   const pick = (cat, b, extra = []) => pick0(cat, b, theme.calm ? extra.filter((x) => !['zoomword', 'kinetic', 'split'].includes(x)) : extra);
@@ -735,7 +799,8 @@ export function templateFromPlan(plan, { themeKey = 'bold', assets = plan.assets
   const sound = plan.sound || (plan.sfx === false ? 'none' : 'sfx');
   const mood = MUSIC[look?.music] ? look.music : MUSIC[plan.music_mood] ? plan.music_mood : MUSIC_FOR_THEME[key] || 'calm';
   const music = sound === 'all' && MUSIC[mood] ? { k: mood, bpm: MUSIC[mood].bpm } : sound === 'own' && plan.music_url ? { url: plan.music_url } : null;
-  let finalBeats = music?.bpm ? snapToBeat(beats, music.bpm, duration) : beats;
+  const paced = fillPacing(beats, duration, plan, theme, rnd);
+  let finalBeats = music?.bpm ? snapToBeat(paced, music.bpm, duration) : paced;
   // "zoom into the logo" in the special instructions (no AI director): open on the logo and dive into it
   if (!directed?.length && logoAsset && /logo/i.test(plan.special_instructions || '') && /(zoom|dive|fly|start|open|first|begin)/i.test(plan.special_instructions || '')) {
     finalBeats[0] = { ...finalBeats[0], shot: 'logo', text: brand, sub: '', hasLogo: true, cut: { type: 'dive', d: 0.42 } };

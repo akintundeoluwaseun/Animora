@@ -219,7 +219,7 @@ LOOK: also choose the visual look of THIS video in "look": { "ambient": [up to 3
 Return { "concept": "one line describing your idea", "look": {...}, "beats": [...] }.
 
 DIRECTION RULES
-- The video is ${duration} seconds, ${aspect}. Use about one beat per ${duration <= 20 ? '1.5-2.2' : '2-3'} seconds; the "seconds" values should add up to about ${duration}.
+- The video is ${duration} seconds, ${aspect}. Use about one beat per ${duration <= 20 ? '1.5-2.2' : '2-3'} seconds, so return AT LEAST ${Math.ceil(duration / 3)} beats; no beat longer than 3.5 seconds. If the answers run out, write new short lines from the business info (benefits, a question to the viewer, how it works, a promise) instead of repeating. The "seconds" values should add up to about ${duration}.
 - Every beat shows ONE idea. Never repeat the same shot twice in a row, and vary the shots across the video; it must not feel like a pattern.
 - Open with a strong hook in the first 2 seconds. End with a "lockup" beat (at least 2.5 s) with the phone/website in "button".
 - Keep on-screen text SHORT (headlines under 7 words). Use the business's exact names, prices, phone numbers and addresses; never invent them.
