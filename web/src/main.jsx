@@ -5,6 +5,8 @@ import './styles.css';
 import { AuthProvider, useAuth } from './lib.jsx';
 import { Nav, PageLoader } from './components/ui.jsx';
 import Home from './pages/Home.jsx';
+import ExportBar from './components/ExportBar.jsx';
+import InstallPrompt from './components/InstallApp.jsx';
 
 const Dashboard = lazy(() => import('./pages/Dashboard.jsx'));
 const Styles = lazy(() => import('./pages/Styles.jsx'));
@@ -66,6 +68,7 @@ function App() {
         <div className="app">
         <Nav />
         <main className="app-main">
+          <ExportBar />
           <ErrorBoundary>
           <Suspense fallback={<PageLoader />}>
             <Routes>
@@ -87,6 +90,7 @@ function App() {
           </Suspense>
           </ErrorBoundary>
         </main>
+        <InstallPrompt />
         </div>
       </AuthProvider>
     </BrowserRouter>

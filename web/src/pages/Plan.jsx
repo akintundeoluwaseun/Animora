@@ -30,11 +30,11 @@ const QUESTIONS = [
   { id: 'paste', type: 'long', show: (b) => b.mode === 'paste', ask: () => 'Paste or type everything about your business and the ad: name, what you sell, your message, prices, contact, where you\'ll post it, how long, anything special.', placeholder: 'e.g. My business is Oluwaseun Computers in Ado Ekiti. We sell and repair laptops. HP EliteBook ₦250,000, Dell ₦300,000. Call or WhatsApp 0807 691 1614. Landscape for YouTube, about 30 seconds, calm and premium.' },
   { id: 'name', type: 'text', ask: () => "What's your business name?", placeholder: 'e.g. Kemi Cakes' },
   { id: 'category', type: 'single', options: CATEGORIES, typed: true, ask: (b) => `Nice! What does ${b.name} do?`, placeholder: 'Or type it, e.g. "laptop repairs"' },
-  { id: 'goal', type: 'multi', max: 6, options: GOALS, typed: true, ask: () => "What's the goal of this ad? Pick one or more.", placeholder: 'Or type your own goal' },
-  { id: 'headline', type: 'multi', max: 8, suggest: 'headline', typed: true, ask: () => "What's the main message? Pick as many as you like (up to 8), or type your own. More messages make a longer video.", placeholder: 'Add your own message' },
-  { id: 'features', type: 'multi', max: 8, suggest: 'features', typed: true, optional: true, ask: (b) => `What makes ${b.name} stand out? Pick as many as you like (up to 8).`, placeholder: 'Add your own' },
+  { id: 'goal', type: 'multi', max: 6, options: GOALS, typed: true, ask: () => "What's the goal of this ad?", placeholder: 'Or type your own goal' },
+  { id: 'headline', type: 'multi', max: 8, suggest: 'headline', typed: true, ask: () => "What's the main message of your ad?", hint: 'Pick as many as you like, or type your own. More messages make a longer video.', placeholder: 'Add your own message' },
+  { id: 'features', type: 'multi', max: 8, suggest: 'features', typed: true, optional: true, ask: (b) => `What makes ${b.name} stand out?`, hint: 'Pick as many as you like, or type your own.', placeholder: 'Add your own' },
   { id: 'products', type: 'long', optional: true, ask: () => 'Any products, services or prices to show? One per line.', placeholder: 'Jollof rice ₦2,500\nFried rice ₦2,800\nSmall chops ₦1,500' },
-  { id: 'cta', type: 'multi', max: 5, options: CTAS, typed: true, ask: () => 'What should people do after watching? Pick one or more.', placeholder: 'Or type your own, e.g. "Send us a DM"' },
+  { id: 'cta', type: 'multi', max: 5, options: CTAS, typed: true, ask: () => 'What should people do after watching?', placeholder: 'Or type your own, e.g. "Send us a DM"' },
   { id: 'contact', type: 'text', optional: true, ask: () => 'Your phone number, website or address for the end of the video?', placeholder: '0803 123 4567 · www.yoursite.com · 12 Allen Ave, Ikeja' },
   { id: 'aspect', type: 'single', options: ASPECT_OPTS, ask: () => 'Where will you post it?' },
   { id: 'duration', type: 'single', options: [15, 20, 30, 45, 60], ask: () => "How long should it be? If you picked a lot, I'll make it longer so everything fits." },
@@ -95,21 +95,32 @@ async function logoColors(url) {
   return { primary: top[0], secondary: top.find((x) => x !== top[0]) || top[0] };
 }
 
-function Bubble({ who, children, onEdit }) {
-  return (
-    <div className={`flex ${who === 'me' ? 'justify-end' : 'justify-start'}`}>
-      <div className={`group relative max-w-[85%] whitespace-pre-wrap px-4 py-3 text-[15px] leading-relaxed ${who === 'me' ? 'bubble-user' : 'bubble-ai'}`}>
-        {children}
-        {onEdit && <button onClick={onEdit} className="ml-3 text-xs font-semibold underline opacity-70 hover:opacity-100">Change</button>}
+// The conversation: Animora's questions sit on the left with its mark; your answers are light chips on the right.
+function Bubble({ who, children, onEdit, current }) {
+  if (who === 'me') {
+    return (
+      <div className="flex justify-end">
+        <button type="button" onClick={onEdit || undefined} disabled={!onEdit} aria-label={onEdit ? `Change answer: ${typeof children === 'string' ? children : ''}` : undefined}
+          className="answer-chip group max-w-[85%] whitespace-pre-wrap text-left">
+          <span>{children}</span>
+          {onEdit && <svg className="ml-2 inline size-3.5 shrink-0 opacity-40 group-hover:opacity-90" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>}
+        </button>
       </div>
+    );
+  }
+  return (
+    <div className={`flex items-start gap-3 ${current ? 'ask-current' : ''}`}>
+      <img src="/animora-mark.png" alt="" className={`mt-0.5 shrink-0 ${current ? 'size-8' : 'size-6 opacity-70'}`} />
+      <p className={`min-w-0 whitespace-pre-wrap ${current ? 'text-[19px] font-semibold leading-snug tracking-[-0.015em] text-ink sm:text-[21px]' : 'pt-0.5 text-[14px] leading-relaxed text-ink-mute'}`}>{children}</p>
     </div>
   );
 }
 
-function Chip({ active, onClick, children, sub }) {
+function Chip({ active, onClick, children, sub, multi }) {
   return (
-    <button type="button" onClick={onClick} aria-pressed={!!active} className="chip press !h-auto !py-2.5 text-left">
-      <span>{children}{sub && <span className="block text-xs font-normal opacity-70">{sub}</span>}</span>
+    <button type="button" onClick={onClick} aria-pressed={!!active} className="option press">
+      {multi && <span className="option-check" aria-hidden="true">{active && <svg viewBox="0 0 16 16" className="size-3"><path d="M3.5 8.5 6.5 11.5 12.5 4.5" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" /></svg>}</span>}
+      <span className="min-w-0">{children}{sub && <span className="mt-0.5 block text-[13px] font-normal leading-snug text-ink-mute">{sub}</span>}</span>
     </button>
   );
 }
@@ -277,16 +288,16 @@ export default function Plan() {
   const finished = step >= visible.length;
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="truncate text-xl font-extrabold sm:text-2xl">{b.name || project.title}</h1>
+    <div className="mx-auto max-w-6xl px-0 sm:px-4 sm:py-5">
+      <div className="hidden flex-wrap items-center justify-between gap-3 sm:flex">
+        <h1 className="truncate text-xl font-bold tracking-[-0.03em] sm:text-2xl">{b.name || project.title}</h1>
         <Steps current="plan" projectId={id} hasPlan={!!project.plan} hasCode={!!project.code} />
       </div>
 
-      <div className="mt-5 grid gap-6 lg:grid-cols-[1fr_340px]">
-        <section className="flex h-[calc(100vh-11rem)] min-h-[520px] flex-col overflow-hidden surface" aria-label="Questions">
-          <div className="h-1.5 bg-lilac"><div className="h-full rounded-r-full bg-danfo transition-all" style={{ width: `${Math.round((Math.min(step, visible.length) / visible.length) * 100)}%` }} /></div>
-          <div className="flex-1 space-y-3 overflow-y-auto p-4 sm:p-6" aria-live="polite">
+      <div className="grid gap-6 sm:mt-5 lg:grid-cols-[1fr_320px]">
+        <section className="chat flex h-[calc(100dvh-3.5rem)] flex-col overflow-hidden sm:h-[calc(100dvh-9.5rem)] sm:min-h-[560px]" aria-label="Questions">
+          <div className="chat-progress" aria-hidden="true"><div style={{ width: `${Math.round((Math.min(step, visible.length) / visible.length) * 100)}%` }} /></div>
+          <div className="flex-1 space-y-5 overflow-y-auto px-4 py-5 sm:px-8 sm:py-7" aria-live="polite">
             {answered.map((qq, i) => (qq.show && !qq.show(b)) ? null : (
               <div key={qq.id} className="space-y-2">
                 <Bubble who="ai">{qq.ask(b)}</Bubble>
@@ -295,31 +306,24 @@ export default function Plan() {
             ))}
 
             {!finished && q && (
-              <div className="space-y-3">
-                <Bubble who="ai">{q.ask(b)}</Bubble>
+              <div key={q.id} className="ask-block space-y-4 pt-2">
+                <Bubble who="ai" current>{q.ask(b)}</Bubble>
 
                 {(q.type === 'single' || q.type === 'multi') && (
-                  <div className="flex flex-wrap gap-2 pl-1">
+                  <div className={`options pl-11 ${opts.some((o) => o.d || String(o.l ?? o).length > 26) ? 'options-wide' : ''}`}>
                     {loadingSug && !opts.length && <span className="flex items-center gap-2 text-sm text-ink-mute"><Spinner className="size-4" />Writing some ideas…</span>}
                     {opts.filter((o) => q.id !== 'duration' || (o >= limits.minSeconds && o <= limits.maxSeconds)).map((o) => {
                       const v = o.v ?? o, l = o.l ?? (q.id === 'duration' ? `${o} seconds` : o);
                       const on = q.type === 'multi' ? multi.includes(v) : b[q.id] === v;
-                      return <Chip key={v} active={on} sub={o.d} onClick={() => {
+                      return <Chip key={v} active={on} sub={o.d} multi={q.type === 'multi'} onClick={() => {
                         if (q.type === 'single') return answer(v);
                         setMulti((m) => (m.includes(v) ? m.filter((x) => x !== v) : m.length >= (q.max || 9) ? m : [...m, v]));
                       }}>{l}</Chip>;
                     })}
-                    {q.type === 'multi' && multi.filter((v) => !opts.includes(v)).map((v) => <Chip key={v} active onClick={() => setMulti((m) => m.filter((x) => x !== v))}>{v}</Chip>)}
+                    {q.type === 'multi' && multi.filter((v) => !opts.includes(v)).map((v) => <Chip key={v} active multi onClick={() => setMulti((m) => m.filter((x) => x !== v))}>{v}</Chip>)}
                   </div>
                 )}
-                {q.type === 'multi' && (
-                  <div className="flex items-center gap-3 pl-1">
-                    <Button size="sm" variant="dark" disabled={!multi.length && !text.trim()} onClick={() => { const v = text.trim(); answer([...multi, ...(v && !multi.includes(v) ? [v] : [])]); }}>
-                      {multi.length ? `Next (${multi.length} picked)` : 'Pick at least one'}
-                    </Button>
-                    <span className="text-sm text-ink-mute">Tap all that apply, then Next.</span>
-                  </div>
-                )}
+                {q.type === 'multi' && <p className="pl-11 text-[13px] text-ink-mute">{q.hint || 'Pick one or more, or type your own.'}</p>}
                 {reading && (
                   <div className="space-y-2">
                     <Bubble who="me">My details (pasted)</Bubble>
@@ -328,7 +332,7 @@ export default function Plan() {
                 )}
 
                 {q.type === 'upload' && (
-                  <div className="rounded-3xl border-2 border-dashed border-ink/15 bg-lilac/40 p-4">
+                  <div className="ml-11 rounded-2xl border border-dashed border-ink/20 bg-white p-4">
                     <input ref={logoRef} type="file" accept="image/*" hidden onChange={(e) => upload([...e.target.files], 'logo')} />
                     <input ref={photoRef} type="file" accept="image/*" multiple hidden onChange={(e) => upload([...e.target.files], 'photo')} />
                     <div className="flex flex-wrap gap-2">
@@ -355,7 +359,7 @@ export default function Plan() {
                 )}
 
                 {q.type === 'sound' && (
-                  <div className="flex flex-wrap gap-2 pl-1">
+                  <div className="options options-wide pl-11">
                     <input ref={musicRef} type="file" accept="audio/*" hidden onChange={async (e) => {
                       const f = e.target.files?.[0]; if (!f) return;
                       setUploading(true); setError('');
@@ -370,7 +374,7 @@ export default function Plan() {
                 )}
 
                 {q.type === 'colors' && (
-                  <div className="flex flex-wrap gap-2 pl-1">
+                  <div className="options pl-11">
                     <Chip onClick={() => answer('style', { colorMode: 'style', colors: {} })}>The style's colours</Chip>
                     {logo && <Chip onClick={async () => { try { const c = await logoColors(logo.url); answer('logo', { colorMode: 'logo', colors: c || {} }); } catch { answer('style', { colorMode: 'style', colors: {} }); } }}>Match my logo</Chip>}
                     <ColorPick onPick={(c) => answer('own', { colorMode: 'own', colors: c })} />
@@ -378,14 +382,14 @@ export default function Plan() {
                 )}
 
                 {q.type === 'style' && (
-                  <div className="rounded-3xl bg-lilac/40 p-3">
+                  <div className="sm:ml-11">
                     <Button size="sm" className="mb-3" onClick={() => answer('auto', { styleAuto: true, styleId: undefined })}>Let Animora choose for me</Button>
                     <StylePicker value={b.styleId} onPick={(s) => answer(s.id, { styleId: s.id, styleAuto: false })} />
                   </div>
                 )}
 
                 {q.chips && (
-                  <div className="flex flex-wrap gap-2 pl-1">
+                  <div className="options pl-11">
                     {q.chips.map((c) => <Chip key={c} onClick={() => setText((t) => (t ? `${t.trim()}\n${c}` : c))}>{c}</Chip>)}
                   </div>
                 )}
@@ -394,63 +398,61 @@ export default function Plan() {
 
             {finished && (
               <div className="space-y-3">
-                <Bubble who="ai">{building ? "Great, I have everything. I'm planning your scenes now…" : project.plan ? 'Your answers are saved. Change any answer above, or make the video.' : 'All set!'}</Bubble>
+                <Bubble who="ai" current>{building ? "Great, I have everything. I'm planning your scenes now…" : project.plan ? 'Your answers are saved. Change any answer above, or make the video.' : 'All set!'}</Bubble>
                 {building && <div className="flex"><div className="bubble-ai typing px-4 py-3.5"><span /><span /><span /></div></div>}
               </div>
             )}
             <div ref={endRef} />
           </div>
 
-          {/* composer: always lets you type your own answer */}
-          {!finished && q && ['text', 'long', 'single', 'multi'].includes(q.type) && (q.typed || q.type === 'text' || q.type === 'long' || q.type === 'multi') && (
-            <div className="border-t border-ink/8 bg-lilac/40 p-3">
-              {error && <div className="mb-2"><Alert onClose={() => setError('')}>{error}</Alert></div>}
-              <form className="flex items-end gap-2" onSubmit={(e) => {
+          {/* composer: always lets you type (or say) your own answer */}
+          <div className="composer">
+            {error && <div className="mb-2"><Alert onClose={() => setError('')}>{error}</Alert></div>}
+            {!finished && q && (
+              <div className="mb-2 flex items-center justify-between px-1 text-[12.5px] text-ink-mute">
+                <span>Question {step + 1} of {visible.length}</span>
+                {q.optional && !q.done && <button type="button" onClick={skip} className="font-semibold text-ink-soft hover:text-ink">Skip this one</button>}
+              </div>
+            )}
+            {!finished && q && ['text', 'long', 'single', 'multi'].includes(q.type) && (q.typed || q.type === 'text' || q.type === 'long' || q.type === 'multi') && (
+              <form className="composer-box" onSubmit={(e) => {
                 e.preventDefault();
                 const v = text.trim();
-                if (q.type === 'multi') { const all = [...multi, ...(v ? [v] : [])]; if (!all.length) return; return answer(all); }
+                if (q.type === 'multi') { const all = [...multi, ...(v && !multi.includes(v) ? [v] : [])]; if (!all.length) return; return answer(all); }
                 if (q.done) return finish(v);
                 if (!v) return;
                 answer(q.type === 'long' ? v.split('\n').map((x) => x.trim()).filter(Boolean).join(q.id === 'products' ? '\n' : ' ') : v);
               }}>
                 {q.type === 'long' ? (
-                  <textarea value={text} onChange={(e) => setText(e.target.value)} rows={3} placeholder={q.placeholder} aria-label="Your answer"
-                    className="max-h-48 min-h-20 flex-1 resize-none rounded-[10px] border border-ink/15 bg-white px-4 py-3 text-[15px] focus:border-ink focus:outline-none" />
+                  <textarea value={text} onChange={(e) => setText(e.target.value)} rows={q.id === 'paste' ? 5 : 3} placeholder={q.placeholder} aria-label="Your answer"
+                    className="composer-input max-h-56 min-h-[4.5rem] resize-none py-3" />
                 ) : (
                   <input value={text} onChange={(e) => setText(e.target.value)} autoFocus placeholder={q.placeholder || (q.typed ? 'Or type your own answer…' : 'Type your answer…')} aria-label="Your answer"
-                    className="h-12 flex-1 rounded-[10px] border border-ink/15 bg-white px-4 text-[15px] focus:border-ink focus:outline-none" />
+                    className="composer-input h-12" />
                 )}
-                <MicButton onText={(t) => setText((x) => (x.trim() ? `${x.trim()} ${t}` : t))} onError={setError} />
-                <div className="flex flex-col gap-2">
-                  <Button type="submit" variant="dark" className="h-12" loading={reading} disabled={reading || (q.done ? false : q.type === 'multi' ? !multi.length && !text.trim() : !text.trim())}>
-                    {q.done ? (text.trim() ? 'Make my video' : "No, that's all") : q.type === 'multi' ? 'Next' : 'Send'}
+                <div className="flex shrink-0 items-center gap-1.5 self-end p-1.5">
+                  <MicButton onText={(t) => setText((x) => (x.trim() ? `${x.trim()} ${t}` : t))} onError={setError} className="!size-10 !rounded-full !border-0 !bg-transparent hover:!bg-ink/5" />
+                  <Button type="submit" className="!h-10 !rounded-full !px-4" loading={reading}
+                    disabled={reading || (q.done ? false : q.type === 'multi' ? !multi.length && !text.trim() : !text.trim())}>
+                    {q.done ? (text.trim() ? 'Make my video' : "No, that's all") : q.type === 'multi' ? (multi.length ? `Continue · ${multi.length + (text.trim() && !multi.includes(text.trim()) ? 1 : 0)}` : 'Continue') : q.id === 'paste' ? 'Read it' : (
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-label="Send"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+                    )}
                   </Button>
-                  {q.optional && !q.done && <button type="button" onClick={skip} className="text-sm font-semibold text-ink-mute underline">Skip</button>}
                 </div>
               </form>
-            </div>
-          )}
-          {!finished && q && !['text', 'long', 'multi'].includes(q.type) && !q.typed && (
-            <div className="border-t border-ink/8 bg-lilac/40 p-3">
-              {error && <div className="mb-2"><Alert onClose={() => setError('')}>{error}</Alert></div>}
-              <div className="flex items-center justify-between text-sm text-ink-mute">
-                <span>Question {step + 1} of {visible.length}</span>
-                {q.optional && <button type="button" onClick={skip} className="font-semibold underline">Skip</button>}
-              </div>
-            </div>
-          )}
-          {finished && (
-            <div className="border-t border-ink/8 bg-lilac/40 p-3">
-              {error && <div className="mb-2"><Alert onClose={() => setError('')}>{error}</Alert></div>}
-              <Button size="lg" className="w-full" loading={building} onClick={() => (project.plan && b.done ? navigate(`/p/${id}/studio${project.code ? '' : '?generate=1'}`) : build(b))}>
-                {project.plan ? (project.code ? 'Open my video' : 'Make my video') : 'Make my video'}
-              </Button>
-              {project.plan && <button onClick={() => build(b)} disabled={building} className="mt-2 w-full text-sm font-semibold text-ink-mute underline">Re-plan from my answers</button>}
-            </div>
-          )}
+            )}
+            {finished && (
+              <>
+                <Button size="lg" className="w-full" loading={building} onClick={() => (project.plan && b.done ? navigate(`/p/${id}/studio${project.code ? '' : '?generate=1'}`) : build(b))}>
+                  {project.plan ? (project.code ? 'Open my video' : 'Make my video') : 'Make my video'}
+                </Button>
+                {project.plan && <button onClick={() => build(b)} disabled={building} className="mt-2 w-full text-sm font-semibold text-ink-mute hover:text-ink">Plan again from my answers</button>}
+              </>
+            )}
+          </div>
         </section>
 
-        <aside className="space-y-4">
+        <aside className="hidden space-y-4 lg:block">
           <div className="surface p-5">
             <h2 className="font-bold">Your ad so far</h2>
             <dl className="mt-3 space-y-2 text-sm">

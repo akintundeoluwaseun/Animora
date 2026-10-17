@@ -9,7 +9,7 @@ import VoicePanel from '../components/VoicePanel.jsx';
 import DownloadVideo from '../components/DownloadVideo.jsx';
 
 const SUGGESTIONS = ['Start by zooming into my logo', 'Make the text bigger', 'Use calmer, premium transitions', 'Make the price stand out more'];
-const WAIT = ['Reading your plan…', 'Designing the scenes…', 'Writing the animation code…', 'Checking every frame…', 'Almost there…'];
+const WAIT = ['Reading your plan…', 'Designing the scenes…', 'Animating every shot…', 'Checking every frame…', 'Almost there…'];
 
 function Generating() {
   const [i, setI] = useState(0);
@@ -183,14 +183,13 @@ export default function Studio() {
 
           <section className="flex h-[calc(100vh-12rem)] min-h-[520px] flex-col overflow-hidden surface">
             <div className="segmented m-2" role="tablist">
-              {[['edit', 'Edit'], ['voice', 'Script'], ['plan', 'Scenes'], ['code', 'Code']].map(([k, l]) => (
+              {[['edit', 'Edit'], ['voice', 'Script'], ['plan', 'Scenes']].map(([k, l]) => (
                 <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)}
                   className="press">{l}</button>
               ))}
             </div>
             <div className="min-h-0 flex-1">
               {tab === 'edit' && <EditPanel project={project} onUpdate={setProject} />}
-              {tab === 'code' && <CodePanel project={project} onUpdate={setProject} />}
               {tab === 'voice' && <VoicePanel project={project} />}
               {tab === 'plan' && (
                 <div className="h-full overflow-y-auto p-4">
@@ -211,7 +210,7 @@ export default function Studio() {
           </section>
         </div>
       ) : (
-        <div className="mt-10 text-center"><Button onClick={generate}>Generate Code</Button></div>
+        <div className="mt-10 text-center"><Button onClick={generate}>Make my video</Button></div>
       )}
     </div>
   );

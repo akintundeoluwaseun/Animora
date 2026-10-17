@@ -1,6 +1,7 @@
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { useAuth, api } from '../lib.jsx';
+import { useInstall } from './InstallApp.jsx';
 
 export function Logo({ light = false }) {
   return (
@@ -98,6 +99,7 @@ export function Nav() {
   const [open, setOpen] = useState(false);
   const [status, setStatus] = useState(null);
   const navigate = useNavigate();
+  const inst = useInstall();
   useEffect(() => { api('/status').then(setStatus).catch(() => {}); }, []);
   const links = [['/', 'Home', 'home'], ['/videos', 'My videos', 'videos'], ['/styles', 'Styles', 'styles'], ['/pricing', 'Pricing', 'pricing']];
   const railLink = () => ({ isActive }) => `rail-link ${isActive ? 'is-active' : ''}`;
@@ -115,6 +117,7 @@ export function Nav() {
           {links.map(([to, l, k]) => <NavLink key={l} to={to} end={to === '/'} className={railLink(to)}><Icon k={k} />{l}</NavLink>)}
         </nav>
         <div className="mt-auto space-y-3 p-5 text-sm">
+          {inst.can && <button onClick={inst.install} className="flex w-full items-center gap-2 rounded-[10px] border border-white/12 px-3 py-2.5 font-semibold text-white/80 hover:text-white"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 21h14" /></svg>Install the app</button>}
           {status && status.ai === 'offline' && <p className="rounded-lg border border-white/10 p-3 text-xs leading-relaxed text-white/55">Practice mode: add a Gemini API key for the full AI director.</p>}
           {user && !user.testMode && (
             <div className="flex items-center justify-between text-white/70">

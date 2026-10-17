@@ -1,0 +1,16 @@
+{
+  "name": "Animora",
+  "short_name": "Animora",
+  "description": "Motion-design video ads for your business, made by chatting with AI.",
+  "start_url": "/videos",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0B0A12",
+  "theme_color": "#0B0A12",
+  "orientation": "portrait",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

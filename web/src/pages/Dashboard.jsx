@@ -74,7 +74,7 @@ function statusLabel(p) {
   if (r?.status === 'queued') return { t: 'In the queue', c: 'bg-danfo text-white' };
   if (r?.status === 'done') return { t: 'Video ready', c: 'bg-money text-white' };
   if (r?.status === 'failed') return { t: 'Render failed', c: 'bg-alert text-white' };
-  return { planning: { t: 'Planning', c: 'bg-white text-ink' }, coding: { t: 'Writing code', c: 'bg-white text-ink' }, ready: { t: 'Ready to render', c: 'bg-ink text-white' }, rendered: { t: 'Video ready', c: 'bg-money text-white' } }[p.status];
+  return { planning: { t: 'Planning', c: 'bg-white text-ink' }, coding: { t: 'Making video', c: 'bg-white text-ink' }, ready: { t: 'Ready', c: 'bg-ink text-white' }, rendered: { t: 'Video ready', c: 'bg-money text-white' } }[p.status];
 }
 
 function nextStep(p) {
