@@ -62,20 +62,25 @@ function AdGate({ open, projectId, onDone, onCancel }) {
 function Progress({ render, onCancel }) {
   const pct = Number(render.progress) || 0;
   const queued = render.status === 'queued';
+  const [since] = useState(() => Date.now());
+  const [, tick] = useState(0);
+  useEffect(() => { if (!queued) return undefined; const t = setInterval(() => tick((n) => n + 1), 1000); return () => clearInterval(t); }, [queued]);
+  const waited = Math.round((Date.now() - since) / 1000);
   return (
     <div className="surface mx-auto max-w-lg p-6 text-center sm:p-8">
       <p className="font-display text-7xl font-extrabold tabular-nums" aria-live="polite">{queued ? '…' : `${Math.round(pct)}%`}</p>
-      <p className="mt-2 font-semibold">{queued ? (render.queuePosition ? `In the queue · ${render.queuePosition} video${render.queuePosition > 1 ? 's' : ''} ahead of yours` : 'Starting the renderer…') : pct >= 98 ? 'Finishing and saving your MP4…' : 'Rendering your video frame by frame'}</p>
+      <p className="mt-2 font-semibold">{queued ? (render.queuePosition ? `In the queue · ${render.queuePosition} video${render.queuePosition > 1 ? 's' : ''} ahead of yours` : `Starting the video server · ${waited} s`) : pct >= 98 ? 'Finishing and saving your MP4…' : 'Rendering your video frame by frame'}</p>
       <div className="mt-6 h-3 overflow-hidden rounded-full bg-lilac" role="progressbar" aria-valuenow={Math.round(pct)} aria-valuemin={0} aria-valuemax={100}>
-        <div className="h-full rounded-full bg-danfo transition-[width] duration-700" style={{ width: `${queued ? 2 : pct}%` }} />
+        <div className="h-full rounded-full bg-danfo transition-[width] duration-700" style={{ width: `${queued ? Math.min(12, 2 + waited / 4) : pct}%` }} />
       </div>
+      {queued && <p className="mt-3 text-sm text-ink-soft">A computer on GitHub is getting ready. This usually takes 20 to 40 seconds, then recording starts.</p>}
       {!queued && (
         <p className="mt-3 text-sm tabular-nums text-ink-soft">
           Frame {render.framesDone.toLocaleString()} of {render.totalFrames.toLocaleString()}
           {render.etaSeconds > 0 && ` · about ${clock(render.etaSeconds)} left`}
         </p>
       )}
-      <p className="mt-6 text-sm text-ink-mute">You can leave this page. Your video keeps rendering and will be in "My videos".</p>
+      <p className="mt-6 text-sm text-ink-mute">You can close Animora. It keeps going, and you get a notification when your MP4 is ready.</p>
       <button onClick={onCancel} className="mt-3 text-sm font-semibold text-alert hover:underline">Cancel render</button>
     </div>
   );
