@@ -69,7 +69,7 @@ async function mixAudio(sfx, music, duration) {
 }
 
 /** Load the video code in a hidden same-origin frame at full size and wait until it is ready to seek. */
-async function loadFrame(html, width, height) {
+export async function loadFrame(html, width, height) {
   const frame = document.createElement('iframe');
   frame.setAttribute('aria-hidden', 'true');
   frame.style.cssText = `position:fixed;left:-${width + 100}px;top:0;width:${width}px;height:${height}px;border:0;pointer-events:none;`;
@@ -184,4 +184,20 @@ export function saveBlob(blob, name) {
   const a = document.createElement('a');
   a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
+
+/** A still picture of the video (for the thumbnail in My videos). Returns a JPEG Blob. */
+export async function snapshot({ html, aspect = '9:16', at = 1.8, width = 360 }) {
+  const [W, H] = SIZES[aspect] || SIZES['9:16'];
+  const height = Math.round((width * H) / W);
+  const { frame, win, doc, tl } = await loadFrame(html, W, H);
+  try {
+    const capture = await prepareFastCapture(doc, { width: W, height: H, outWidth: width, outHeight: height });
+    tl.seek(Math.min(at, tl.duration() * 0.4), false);
+    const img = await capture();
+    const c = document.createElement('canvas'); c.width = width; c.height = height;
+    const g = c.getContext('2d'); g.fillStyle = win.getComputedStyle(doc.body).backgroundColor || '#000'; g.fillRect(0, 0, width, height);
+    g.drawImage(img, 0, 0, width, height);
+    return await new Promise((r) => c.toBlob(r, 'image/jpeg', 0.82));
+  } finally { frame.remove(); }
 }

@@ -38,7 +38,7 @@ export async function startExport({ project, quality }) {
     const { exportVideo, saveBlob } = await import('./exportVideo.js');
     const { prepareHtml } = await import('../components/Preview.jsx');
     const blob = await exportVideo({
-      html: prepareHtml(project.code), aspect: project.aspectRatio || '9:16', fps: 30, quality, signal: abort.signal,
+      html: prepareHtml(project.code), aspect: project.aspectRatio || '9:16', fps: quality === 'fast' ? 24 : 30, quality, signal: abort.signal,
       onProgress: (p) => {
         set({ progress: p });
         const pct = Math.round((p.done / Math.max(1, p.total)) * 100);

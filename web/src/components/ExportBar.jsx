@@ -6,7 +6,8 @@ const mmss = (s) => (s >= 60 ? `${Math.floor(s / 60)} min ${Math.round(s % 60)} 
 
 export default function ExportBar() {
   const job = useExportJob();
-  if (job.status === 'idle') return null;
+  // while recording, progress shows on the Download button and in the phone's notifications (no bar)
+  if (job.status === 'idle' || job.status === 'working') return null;
   const pct = job.progress ? Math.round((job.progress.done / Math.max(1, job.progress.total)) * 100) : 0;
   const tone = job.status === 'failed' || job.status === 'interrupted' ? 'bg-alert' : job.status === 'done' ? 'bg-money' : 'bg-danfo';
   return (

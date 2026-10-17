@@ -66,7 +66,7 @@ function shape(p, extra = {}) {
 }
 
 async function thumbnail(projectId, html, aspect) {
-  if (!config.renderEnabled) return null;   // needs Chrome (not on Vercel)
+  if (!config.renderEnabled) { await q('UPDATE projects SET thumbnail_url=NULL WHERE id=$1', [projectId]).catch(() => {}); return null; }   // needs Chrome (not on Vercel): the browser makes it
   try {
     const [img] = await snapshotFrames(html, [1.6], { aspectRatio: aspect, scale: 0.35 });
     const url = await putObject(`thumbs/${projectId}-${randomBytes(3).toString('hex')}.jpg`, img, 'image/jpeg');
@@ -154,6 +154,15 @@ r.post('/:id/assets', upload.single('file'), async (req, res) => {
     RETURNING id, name, kind, role, mime, url, width, height, has_alpha, duration_seconds, is_light`,
   [req.user.id, p.id, label, kind, role, f.mimetype, url, meta.width || null, meta.height || null, hasAlpha, meta.duration || null, isLight]);
   res.json({ asset });
+});
+
+// The browser makes the thumbnail (a still of the video) when the server can't (no Chrome on Vercel).
+r.post('/:id/thumbnail', upload.single('file'), async (req, res) => {
+  const p = await loadProject(req, res); if (!p) return;
+  if (!req.file || !/^image\/(jpeg|png|webp)$/.test(req.file.mimetype) || req.file.size > 600e3) return res.status(400).json({ error: 'Bad thumbnail' });
+  const url = await putObject(`thumbs/${p.id}-${randomBytes(3).toString('hex')}.jpg`, req.file.buffer, req.file.mimetype);
+  await q('UPDATE projects SET thumbnail_url=$2 WHERE id=$1', [p.id, url]);
+  res.json({ thumbnailUrl: url });
 });
 
 r.delete('/:id/assets/:assetId', async (req, res) => {

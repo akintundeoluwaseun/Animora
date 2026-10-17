@@ -92,6 +92,30 @@ export default function Dashboard() {
 
   const load = async () => { try { setProjects((await api('/projects')).projects); } catch (e) { setError(e.message); } };
   useEffect(() => { load(); refresh(); api('/pricing').then((r) => setPricing(r.pricing)).catch(() => {}); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // videos made online have no thumbnail yet: make them here, one at a time, in the background
+  const thumbing = useRef(false);
+  useEffect(() => {
+    if (!projects || thumbing.current) return;
+    const missing = projects.filter((p) => !p.thumbnail_url && ['ready', 'rendered'].includes(p.status)).slice(0, 6);
+    if (!missing.length) return;
+    thumbing.current = true;
+    (async () => {
+      try {
+        const { snapshot } = await import('../lib/exportVideo.js');
+        const { prepareHtml } = await import('../components/Preview.jsx');
+        for (const m of missing) {
+          try {
+            const { project } = await api(`/projects/${m.id}`);
+            if (!project.code) continue;
+            const blob = await snapshot({ html: prepareHtml(project.code), aspect: project.aspectRatio });
+            const form = new FormData(); form.append('file', blob, 'thumb.jpg');
+            const r = await api(`/projects/${m.id}/thumbnail`, { method: 'POST', form });
+            setProjects((list) => list?.map((x) => (x.id === m.id ? { ...x, thumbnail_url: r.thumbnailUrl } : x)));
+          } catch { /* skip this one */ }
+        }
+      } finally { thumbing.current = false; }
+    })();
+  }, [projects?.length]); // eslint-disable-line react-hooks/exhaustive-deps
   const active = projects?.some((p) => ['queued', 'rendering'].includes(p.last_render?.status));
   usePolling(load, 3000, active);
 
@@ -131,7 +155,8 @@ export default function Dashboard() {
                 <Link to={nextStep(p)} className="block">
                   <div className="relative grid aspect-[4/5] place-items-center overflow-hidden rounded-xl bg-[#0B0A12]">
                     <div className={`relative ${ratio} overflow-hidden`}>
-                      {p.thumbnail_url ? <img src={p.thumbnail_url} alt="" className="size-full object-cover" loading="lazy" /> : null}
+                      {p.thumbnail_url ? <img src={p.thumbnail_url} alt="" className="size-full object-cover" loading="lazy" />
+                        : <span className="grid size-full place-items-center"><img src="/animora-mark.png" alt="" className="size-10 animate-pulse opacity-60" /></span>}
                     </div>
                     <span className={`absolute left-2.5 top-2.5 rounded-md px-2 py-0.5 text-xs font-semibold ${st.c}`}>{st.t}</span>
                   </div>

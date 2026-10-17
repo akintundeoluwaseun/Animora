@@ -171,6 +171,25 @@ export default function Studio() {
     }).catch((e) => setError(e.message));
   }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // no thumbnail yet (made online without Chrome): take a still of the video in the browser and save it
+  const thumbFor = useRef('');
+  useEffect(() => {
+    if (!project?.code || project.thumbnailUrl || generating || thumbFor.current === project.code) return;
+    thumbFor.current = project.code;
+    const t = setTimeout(async () => {
+      try {
+        const { snapshot } = await import('../lib/exportVideo.js');
+        const { prepareHtml } = await import('../components/Preview.jsx');
+        const blob = await snapshot({ html: prepareHtml(project.code), aspect: project.aspectRatio });
+        if (!blob) return;
+        const form = new FormData(); form.append('file', blob, 'thumb.jpg');
+        const r = await api(`/projects/${id}/thumbnail`, { method: 'POST', form });
+        setProject((p) => (p ? { ...p, thumbnailUrl: r.thumbnailUrl } : p));
+      } catch { /* the thumbnail is optional */ }
+    }, 1500);
+    return () => clearTimeout(t);
+  }, [project?.code, project?.thumbnailUrl, generating]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const undo = async () => { try { setProject((await api(`/projects/${id}/undo`, { method: 'POST' })).project); } catch (e) { setError(e.message); } };
 
   if (!project) return error ? <div className="mx-auto max-w-xl p-8"><Alert>{error}</Alert></div> : <PageLoader />;
