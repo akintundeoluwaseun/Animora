@@ -19,6 +19,7 @@ export default function Home() {
   }, []);
   const reel = ['studio-white', 'naija-bold', 'midnight-glow', 'owambe-party', 'fintech-blue', 'neon-nights'].map((k) => styles.find((s) => s.slug === k)).filter((s) => s?.preview_url);
   const [hero, ...more] = reel;
+  const [playing, setPlaying] = useState(null);
 
   return (
     <div>
@@ -34,11 +35,18 @@ export default function Home() {
               <Button as={Link} to="/styles" variant="glass" size="lg">Browse styles</Button>
             </div>
           </div>
-          <figure className="mx-auto w-full max-w-[330px]">
-            <div className="relative aspect-[9/16] overflow-hidden rounded-[18px] bg-black ring-1 ring-white/12">
-              {hero && <video src={hero.preview_url} poster={hero.poster_url} className="absolute inset-0 size-full object-cover" muted autoPlay loop playsInline />}
+          <figure className="mx-auto w-full max-w-[380px]" aria-label="Frames from videos made with Animora">
+            <div className="ring-stage" aria-hidden="true">
+              <div className="ring-spin" style={{ '--n': Math.max(reel.length, 1) }}>
+                {reel.map((s, i) => (
+                  <div key={s.id} className="ring-card" style={{ '--i': i }}>
+                    <img src={s.poster_url} alt="" loading="eager" decoding="async" />
+                  </div>
+                ))}
+              </div>
+              <div className="ring-floor" />
             </div>
-            {hero && <figcaption className="mt-3 text-sm text-white/45">Made with Animora, in the {hero.name} style</figcaption>}
+            <figcaption className="mt-2 text-center text-sm text-white/45">{reel.length ? `${reel.length} of the ${styles.length} looks, all made with Animora` : '\u00a0'}</figcaption>
           </figure>
         </div>
       </section>
@@ -65,9 +73,16 @@ export default function Home() {
           <div className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
             {more.map((s) => (
               <div key={s.id}>
-                <div className="relative aspect-[9/16] overflow-hidden rounded-xl bg-ink">
-                  <video src={s.preview_url} poster={s.poster_url} className="absolute inset-0 size-full object-cover" muted autoPlay loop playsInline preload="metadata" />
-                </div>
+                <button type="button" className="group relative block aspect-[9/16] w-full overflow-hidden rounded-xl bg-ink" onClick={() => setPlaying(playing === s.id ? null : s.id)} aria-label={playing === s.id ? `Stop the ${s.name} video` : `Play the ${s.name} video`}>
+                  {playing === s.id
+                    ? <video src={s.preview_url} poster={s.poster_url} className="absolute inset-0 size-full object-cover" muted autoPlay loop playsInline />
+                    : <>
+                        <img src={s.poster_url} alt="" loading="lazy" decoding="async" className="absolute inset-0 size-full object-cover" />
+                        <span className="absolute bottom-2 left-2 grid size-9 place-items-center rounded-full bg-black/55 text-white transition-transform group-hover:scale-110" aria-hidden="true">
+                          <svg viewBox="0 0 24 24" className="ml-0.5 size-4" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
+                        </span>
+                      </>}
+                </button>
                 <p className="mt-2 text-sm font-medium">{s.name}</p>
               </div>
             ))}

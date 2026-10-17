@@ -136,3 +136,17 @@ button:disabled { cursor: not-allowed; }
 .gen-sweep { animation: gen-sweep 1.4s ease-in-out infinite; }
 @keyframes gen-sweep { 0% { transform: translateX(-100%); } 100% { transform: translateX(300%); } }
 @media (prefers-reduced-motion: reduce) { .gen-sweep { animation: none; width: 100%; opacity: .5; } }
+
+/* Home: a ring of real video frames turning in 3D (GPU transforms only, no video playing) */
+.ring-stage { position: relative; height: 440px; overflow: hidden; perspective: 900px; perspective-origin: 50% 30%; }
+.ring-spin { --w: 158px; position: absolute; left: 50%; top: 24px; width: var(--w); aspect-ratio: 9 / 16; margin-left: calc(var(--w) / -2);
+  transform-style: preserve-3d; animation: ring-turn 36s linear infinite; will-change: transform; }
+.ring-card { position: absolute; inset: 0; border-radius: 14px; overflow: hidden; background: #14112B;
+  transform: rotateY(calc(var(--i) * 360deg / var(--n))) translateZ(calc(var(--w) * 0.98)); backface-visibility: hidden; -webkit-backface-visibility: hidden;
+  box-shadow: 0 30px 60px -20px rgba(0, 0, 0, .7), 0 0 0 1px rgba(255, 255, 255, .08); -webkit-box-reflect: below 10px linear-gradient(transparent 70%, rgba(255, 255, 255, .14)); }
+.ring-card img { width: 100% !important; height: 100% !important; max-width: none; object-fit: cover; display: block; }
+.ring-floor { position: absolute; left: 10%; right: 10%; bottom: 0; height: 90px; border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(85, 70, 255, .35), transparent); filter: blur(6px); }
+@keyframes ring-turn { from { transform: rotateX(-8deg) rotateY(0deg); } to { transform: rotateX(-8deg) rotateY(-360deg); } }
+@media (max-width: 640px) { .ring-stage { height: 380px; } .ring-spin { --w: 132px; } }
+@media (prefers-reduced-motion: reduce) { .ring-spin { animation: none; transform: rotateX(-8deg) rotateY(-20deg); } }
