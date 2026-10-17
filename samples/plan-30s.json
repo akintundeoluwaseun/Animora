@@ -1,0 +1,17 @@
+{
+  "title": "Iya Basira's Kitchen - Weekend Jollof Promo",
+  "business": { "name": "Iya Basira's Kitchen", "category": "restaurant", "location": "12 Ajilosun Road, Ado Ekiti", "phone": "0803 123 4567", "handle": "@iyabasiraskitchen" },
+  "aspect_ratio": "9:16",
+  "duration_seconds": 30,
+  "style": { "mood": "bold & energetic", "colors": { "primary": "#E8530E", "secondary": "#FFC93C", "background": "#1B0F08", "text": "#FFF6E9" }, "font": "Poppins" },
+  "assets": [],
+  "scenes": [
+    { "id": 1, "start": 0, "end": 4, "purpose": "hook", "on_screen_text": ["Weekend Jollof Special!"], "visuals": "Big headline punches in word by word over a smoky orange background", "transition_out": "zoom out" },
+    { "id": 2, "start": 4, "end": 10, "purpose": "brand", "on_screen_text": ["Iya Basira's Kitchen", "Ado Ekiti's tastiest"], "visuals": "Round text logo spins in, name rises, tagline letter-spaces in", "transition_out": "slide up" },
+    { "id": 3, "start": 10, "end": 16, "purpose": "hero offer", "on_screen_text": ["Smoky Party Jollof", "₦2,500", "with chicken & dodo"], "visuals": "CSS-drawn plate of jollof with steam, price counts up from 0", "transition_out": "fade" },
+    { "id": 4, "start": 16, "end": 23, "purpose": "menu", "on_screen_text": ["Fried Rice & Turkey ₦3,500", "Pounded Yam & Egusi ₦3,000", "Asun ₦2,800", "Zobo ₦700"], "visuals": "Menu rows slide in alternately from left and right", "transition_out": "slide left" },
+    { "id": 5, "start": 23, "end": 30, "purpose": "call to action", "on_screen_text": ["Order on WhatsApp", "0803 123 4567", "12 Ajilosun Road, Ado Ekiti"], "visuals": "Green WhatsApp-style button bounces in and pulses, address fades in", "transition_out": "none" }
+  ],
+  "cta": "Order on WhatsApp 0803 123 4567",
+  "music_mood": "upbeat afrobeats"
+}

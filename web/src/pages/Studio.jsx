@@ -1,0 +1,213 @@
+// Page 2: live preview + edit by prompt + code view.
+import { useEffect, useRef, useState } from 'react';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { api, ASPECTS, duration } from '../lib.jsx';
+import { Alert, Button, PageLoader, Spinner, Steps } from '../components/ui.jsx';
+import { LivePreview } from '../components/Preview.jsx';
+import VoicePanel from '../components/VoicePanel.jsx';
+
+const SUGGESTIONS = ['Start by zooming into my logo', 'Make the text bigger', 'Use calmer, premium transitions', 'Make the price stand out more'];
+const WAIT = ['Reading your plan…', 'Designing the scenes…', 'Writing the animation code…', 'Checking every frame…', 'Almost there…'];
+
+function Generating() {
+  const [i, setI] = useState(0);
+  useEffect(() => { const t = setInterval(() => setI((x) => Math.min(x + 1, WAIT.length - 1)), 6000); return () => clearInterval(t); }, []);
+  return (
+    <div className="grid min-h-[60vh] place-items-center px-4 text-center">
+      <div>
+        <div className="stage mx-auto grid size-28 place-items-center !rounded-[2rem]">
+          <img src="/animora-mark.png" width="56" height="56" alt="" className="animate-pulse" />
+        </div>
+        <p className="mt-6 font-display text-3xl font-extrabold" aria-live="polite">{WAIT[i]}</p>
+        <p className="mt-2 text-ink-soft">This usually takes under a minute.</p>
+        <Spinner className="mx-auto mt-5 size-6 text-ink-mute" />
+      </div>
+    </div>
+  );
+}
+
+function EditPanel({ project, onUpdate }) {
+  const [text, setText] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const endRef = useRef(null);
+  const history = project.editHistory || [];
+  useEffect(() => { endRef.current?.scrollIntoView({ block: 'end' }); }, [history.length, busy]);
+
+  const [pasting, setPasting] = useState(false);
+  // paste a picture into the edit box: it is uploaded and named in the instruction so the AI can use it
+  const onPaste = async (e) => {
+    const f = [...(e.clipboardData?.files || [])].find((x) => x.type.startsWith('image/'));
+    if (!f) return;
+    e.preventDefault(); setPasting(true); setError('');
+    try {
+      const form = new FormData();
+      const name = `pasted picture ${Date.now() % 10000}`;
+      form.append('file', new File([f], `${name}.png`, { type: f.type })); form.append('role', 'photo'); form.append('name', name);
+      const { asset } = await api(`/projects/${project.id}/assets`, { method: 'POST', form });
+      setText((t) => `${t ? `${t.trim()} ` : ''}(use the picture "${asset.name}")`);
+    } catch (err) { setError(err.message); } finally { setPasting(false); }
+  };
+
+  const send = async (instruction) => {
+    const msg = (instruction ?? text).trim();
+    if (!msg || busy) return;
+    setBusy(true); setError(''); setText('');
+    try {
+      const r = await api(`/projects/${project.id}/edit`, { method: 'POST', body: { instruction: msg } });
+      onUpdate(r.project);
+    } catch (e) { setError(e.message); setText(msg); } finally { setBusy(false); }
+  };
+
+  return (
+    <div className="flex h-full flex-col">
+      <div className="flex-1 space-y-3 overflow-y-auto p-4" aria-live="polite">
+        {history.length === 0 && <p className="text-ink-soft">Tell me what to change, in your own words. I'll update the video and you'll see it straight away.</p>}
+        {history.map((m, i) => (
+          <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : ''}`}>
+            <div className={`max-w-[88%] px-4 py-2.5 text-[15px] ${m.role === 'user' ? 'bubble-user' : 'bubble-ai'}`}>{m.text}</div>
+          </div>
+        ))}
+        {busy && <div className="flex"><div className="bubble-ai typing px-4 py-3.5"><span /><span /><span /></div></div>}
+        <div ref={endRef} />
+      </div>
+      <div className="border-t border-ink/8 bg-lilac/40 p-3">
+        {error && <div className="mb-2"><Alert onClose={() => setError('')}>{error}</Alert></div>}
+        <div className="mb-2 flex flex-wrap gap-1.5">
+          {SUGGESTIONS.map((s) => <button key={s} disabled={busy} onClick={() => send(s)} className="chip press !px-3 !py-1.5 !text-xs">{s}</button>)}
+        </div>
+        <form onSubmit={(e) => { e.preventDefault(); send(); }} className="flex gap-2">
+          <input value={text} onChange={(e) => setText(e.target.value)} onPaste={onPaste} placeholder={pasting ? 'Adding your picture…' : 'e.g. "Zoom into the logo first" (you can paste a picture)'} aria-label="Describe a change"
+            className="h-12 flex-1 rounded-[10px] border border-ink/15 bg-white px-4 text-[15px] focus:border-ink focus:outline-none" />
+          <Button type="submit" variant="dark" className="h-12" loading={busy} disabled={!text.trim()}>Apply</Button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function CodePanel({ project, onUpdate }) {
+  const [code, setCode] = useState(project.code);
+  const [busy, setBusy] = useState(false);
+  const [problems, setProblems] = useState(null);
+  const [saved, setSaved] = useState(false);
+  useEffect(() => { setCode(project.code); }, [project.code]);
+  const save = async () => {
+    setBusy(true); setProblems(null); setSaved(false);
+    try { const r = await api(`/projects/${project.id}/code`, { method: 'PUT', body: { html: code } }); onUpdate(r.project); setSaved(true); }
+    catch (e) { setProblems(e.data?.problems || [e.message]); } finally { setBusy(false); }
+  };
+  return (
+    <div className="flex h-full flex-col p-4">
+      <p className="mb-2 text-sm text-ink-soft">The AI-written HTML/CSS/GSAP code. Edit it directly if you know code; it's checked before saving.</p>
+      <textarea value={code} onChange={(e) => { setCode(e.target.value); setSaved(false); }} spellCheck={false} aria-label="Animation code"
+        className="min-h-0 flex-1 resize-none rounded-2xl bg-[#14102E] p-3 font-mono text-xs leading-relaxed text-[#E8E4FF] focus:outline-none" />
+      {problems && <div className="mt-2"><Alert>{problems.map((p) => <div key={p}>• {p}</div>)}</Alert></div>}
+      {saved && <div className="mt-2"><Alert kind="success">Saved. The preview has been updated.</Alert></div>}
+      <div className="mt-3 flex gap-2">
+        <Button variant="dark" size="sm" onClick={save} loading={busy} disabled={code === project.code}>Save code</Button>
+        <Button variant="ghost" size="sm" onClick={() => navigator.clipboard?.writeText(code)}>Copy</Button>
+      </div>
+    </div>
+  );
+}
+
+export default function Studio() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const [params, setParams] = useSearchParams();
+  const [project, setProject] = useState(null);
+  const [tab, setTab] = useState('edit');
+  const [generating, setGenerating] = useState(false);
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+  const started = useRef(false);
+
+  const generate = async () => {
+    setGenerating(true); setError('');
+    try {
+      const r = await api(`/projects/${id}/generate`, { method: 'POST' });
+      setProject(r.project); if (r.notice) setNotice(r.notice);
+      if (r.project.plan?.voiceover?.enabled) setTab('voice');
+    } catch (e) { setError(e.message); } finally { setGenerating(false); setParams({}, { replace: true }); }
+  };
+
+  useEffect(() => {
+    api(`/projects/${id}`).then((r) => {
+      setProject(r.project);
+      if (!started.current && r.project.plan && (params.get('generate') === '1' || !r.project.code)) { started.current = true; generate(); }
+    }).catch((e) => setError(e.message));
+  }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const undo = async () => { try { setProject((await api(`/projects/${id}/undo`, { method: 'POST' })).project); } catch (e) { setError(e.message); } };
+
+  if (!project) return error ? <div className="mx-auto max-w-xl p-8"><Alert>{error}</Alert></div> : <PageLoader />;
+  if (!project.plan) {
+    return <div className="mx-auto max-w-xl p-8 text-center"><p className="text-ink-soft">Plan your video first.</p><Button as={Link} to={`/p/${id}/plan`} className="mt-4">Answer the questions</Button></div>;
+  }
+  if (generating) return <Generating />;
+
+  return (
+    <div className="mx-auto max-w-6xl px-4 py-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="truncate text-xl font-extrabold sm:text-2xl">{project.title}</h1>
+          <p className="text-sm text-ink-mute">{duration(project.durationSeconds)} · {ASPECTS[project.aspectRatio]?.label}</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <Steps current="studio" projectId={id} hasPlan hasCode={!!project.code} />
+          {project.code && <span className="hidden lg:block"><Button onClick={() => navigate(`/p/${id}/render`)}>Generate Video</Button></span>}
+        </div>
+      </div>
+      {error && <div className="mt-4"><Alert onClose={() => setError('')}>{error}</Alert></div>}
+      {notice && <div className="mt-4"><Alert kind="warn" onClose={() => setNotice('')}>{notice}</Alert></div>}
+
+      {project.code ? (
+        <div className="mt-5 grid gap-6 lg:grid-cols-[minmax(0,1fr)_420px]">
+          <section aria-label="Preview" className="stage flex flex-col justify-center px-4 py-8 sm:px-8">
+            <LivePreview html={project.code} aspect={project.aspectRatio} maxWidth={project.aspectRatio === '16:9' ? 320 : 290}
+              sound={project.sfx !== false}
+              onSoundChange={async (on) => { setProject((p) => ({ ...p, sfx: on })); try { const r = await api(`/projects/${id}`, { method: 'PATCH', body: { sfx: on } }); setProject((p) => ({ ...p, code: r.project.code, sfx: r.project.sfx })); } catch { /* keep the local choice */ } }} />
+            <p className="mt-3 text-center text-xs text-white/55">{project.sfx !== false ? 'Sound is on. Tap play to hear it; the same music and effects go into your MP4.' : 'Sound is off for this video.'}</p>
+            <div className="mt-6 flex flex-wrap justify-center gap-2">
+              <Button variant="glass" size="sm" onClick={undo} disabled={!project.versions}>Undo</Button>
+              <Button variant="glass" size="sm" onClick={() => { if (confirm('Write the animation again from the plan? Your edits will be replaced (you can undo).')) generate(); }}>Regenerate</Button>
+              <Button size="lg" className="w-full sm:ml-2 sm:w-auto lg:hidden" onClick={() => navigate(`/p/${id}/render`)}>Generate Video</Button>
+            </div>
+          </section>
+
+          <section className="flex h-[calc(100vh-12rem)] min-h-[520px] flex-col overflow-hidden surface">
+            <div className="segmented m-2" role="tablist">
+              {[['edit', 'Edit'], ['voice', 'Script'], ['plan', 'Scenes'], ['code', 'Code']].map(([k, l]) => (
+                <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)}
+                  className="press">{l}</button>
+              ))}
+            </div>
+            <div className="min-h-0 flex-1">
+              {tab === 'edit' && <EditPanel project={project} onUpdate={setProject} />}
+              {tab === 'code' && <CodePanel project={project} onUpdate={setProject} />}
+              {tab === 'voice' && <VoicePanel project={project} />}
+              {tab === 'plan' && (
+                <div className="h-full overflow-y-auto p-4">
+                  <ol className="space-y-2">
+                    {project.plan.scenes.map((s) => (
+                      <li key={s.id} className="rounded-2xl bg-lilac p-3.5 text-sm">
+                        <p className="tabular-nums text-ink-mute">{s.start}–{s.end}s · {s.purpose}</p>
+                        <p className="mt-0.5 font-semibold">{[].concat(s.on_screen_text).filter(Boolean).join(' · ')}</p>
+                        {s.images?.length > 0 && <p className="mt-1 text-ink-soft">🖼 {s.images.map((im) => `${im.asset} (${String(im.placement || '').split(',')[0]})`).join(', ')}</p>}
+                        {s.voiceover && <p className="mt-1 italic text-ink-soft">🎙 “{s.voiceover}”</p>}
+                      </li>
+                    ))}
+                  </ol>
+                  <Button as={Link} to={`/p/${id}/plan`} variant="ghost" size="sm" className="mt-3">Change my answers</Button>
+                </div>
+              )}
+            </div>
+          </section>
+        </div>
+      ) : (
+        <div className="mt-10 text-center"><Button onClick={generate}>Generate Code</Button></div>
+      )}
+    </div>
+  );
+}

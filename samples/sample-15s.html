@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="adflash" content="width=1080,height=1920,duration=15,fps=30">
+<title>Iya Basira's Kitchen - 15s ad</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;700;900&display=block" rel="stylesheet">
+<style>
+  :root {
+    --brand: #E8530E;      /* jollof orange */
+    --brand-dark: #8A2A04;
+    --accent: #FFC93C;     /* palm-oil yellow */
+    --green: #1F8A4C;
+    --ink: #1B0F08;
+    --cream: #FFF6E9;
+  }
+  html, body { margin: 0; width: 1080px; height: 1920px; overflow: hidden; background: var(--ink); }
+  * { box-sizing: border-box; }
+  #stage {
+    position: relative; width: 1080px; height: 1920px; overflow: hidden;
+    font-family: 'Inter', 'DejaVu Sans', Arial, sans-serif; color: var(--cream);
+    background: radial-gradient(circle at 50% 30%, #3A1A0A 0%, var(--ink) 70%);
+  }
+  .blob { position: absolute; border-radius: 50%; filter: blur(60px); opacity: .55; }
+  #blob1 { width: 700px; height: 700px; background: var(--brand); left: -200px; top: 200px; }
+  #blob2 { width: 600px; height: 600px; background: var(--accent); right: -220px; top: 1100px; opacity: .35; }
+  .scene { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; opacity: 0; }
+
+  /* Scene 1: brand */
+  #logo { width: 320px; height: 320px; border-radius: 50%; background: var(--brand);
+    display: flex; align-items: center; justify-content: center; font-size: 150px; font-weight: 900;
+    color: var(--cream); box-shadow: 0 0 0 18px rgba(255,201,60,.25); }
+  #brandName { margin-top: 70px; font-size: 104px; font-weight: 900; text-align: center; line-height: 1.05; }
+  #brandName span { display: inline-block; }
+  #tagline { margin-top: 30px; font-size: 46px; font-weight: 500; color: var(--accent); letter-spacing: 6px; text-transform: uppercase; }
+
+  /* Scene 2: hero dish */
+  #plate { position: relative; width: 640px; height: 640px; border-radius: 50%;
+    background: radial-gradient(circle, #fff 0 58%, #EADFD0 59% 100%); box-shadow: 0 40px 80px rgba(0,0,0,.5); }
+  #rice { position: absolute; left: 110px; top: 110px; width: 420px; height: 420px; border-radius: 50%;
+    background: radial-gradient(circle at 40% 35%, #FF8A3D 0%, var(--brand) 55%, var(--brand-dark) 100%); }
+  .chicken { position: absolute; width: 170px; height: 120px; border-radius: 60% 40% 55% 45%;
+    background: radial-gradient(circle at 35% 30%, #C9752B, #7A3510); }
+  #ch1 { left: 330px; top: 170px; transform: rotate(20deg); }
+  #ch2 { left: 140px; top: 330px; transform: rotate(-15deg); }
+  .plantain { position: absolute; width: 90px; height: 50px; border-radius: 50%; background: #F2B33D; border: 6px solid #B9741A; }
+  #pl1 { left: 360px; top: 380px; } #pl2 { left: 430px; top: 320px; } #pl3 { left: 300px; top: 450px; }
+  .steam { position: absolute; width: 26px; height: 160px; border-radius: 13px; background: rgba(255,255,255,.35); filter: blur(6px); top: -120px; }
+  #st1 { left: 250px; } #st2 { left: 320px; } #st3 { left: 390px; }
+  #dishName { margin-top: 80px; font-size: 88px; font-weight: 900; text-align: center; }
+  #priceTag { margin-top: 30px; padding: 22px 54px; border-radius: 80px; background: var(--accent); color: var(--ink);
+    font-size: 84px; font-weight: 900; }
+
+  /* Scene 3: menu */
+  #menuTitle { font-size: 80px; font-weight: 900; margin-bottom: 70px; }
+  .row { width: 860px; display: flex; justify-content: space-between; align-items: center; padding: 38px 48px;
+    margin: 16px 0; border-radius: 34px; background: rgba(255,246,233,.08); border: 3px solid rgba(255,201,60,.35);
+    font-size: 58px; font-weight: 700; }
+  .row b { color: var(--accent); font-weight: 900; }
+
+  /* Scene 4: CTA */
+  #ctaTop { font-size: 70px; font-weight: 900; text-align: center; line-height: 1.15; }
+  #waBtn { margin-top: 80px; display: flex; align-items: center; gap: 30px; padding: 40px 64px; border-radius: 100px;
+    background: var(--green); font-size: 64px; font-weight: 900; box-shadow: 0 20px 50px rgba(31,138,76,.5); }
+  #waIcon { width: 90px; height: 90px; border-radius: 50%; background: var(--cream); color: var(--green);
+    display: flex; align-items: center; justify-content: center; font-size: 56px; }
+  #address { margin-top: 70px; font-size: 44px; font-weight: 500; opacity: .85; text-align: center; }
+
+  #progress { position: absolute; left: 0; bottom: 0; height: 14px; width: 1080px; background: var(--accent); transform-origin: left center; transform: scaleX(0); }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div class="blob" id="blob1"></div>
+  <div class="blob" id="blob2"></div>
+
+  <section class="scene" id="s1">
+    <div id="logo">IB</div>
+    <div id="brandName"><span>Iya</span> <span>Basira's</span><br><span>Kitchen</span></div>
+    <div id="tagline">Ado Ekiti's tastiest</div>
+  </section>
+
+  <section class="scene" id="s2">
+    <div id="plate">
+      <div class="steam" id="st1"></div><div class="steam" id="st2"></div><div class="steam" id="st3"></div>
+      <div id="rice"></div>
+      <div class="chicken" id="ch1"></div><div class="chicken" id="ch2"></div>
+      <div class="plantain" id="pl1"></div><div class="plantain" id="pl2"></div><div class="plantain" id="pl3"></div>
+    </div>
+    <div id="dishName">Smoky Party Jollof</div>
+    <div id="priceTag">₦<span id="price">0</span></div>
+  </section>
+
+  <section class="scene" id="s3">
+    <div id="menuTitle">Today's Menu</div>
+    <div class="row"><span>Fried Rice &amp; Turkey</span><b>₦3,500</b></div>
+    <div class="row"><span>Pounded Yam &amp; Egusi</span><b>₦3,000</b></div>
+    <div class="row"><span>Asun (Spicy Goat)</span><b>₦2,800</b></div>
+    <div class="row"><span>Zobo (50cl)</span><b>₦700</b></div>
+  </section>
+
+  <section class="scene" id="s4">
+    <div id="ctaTop">Hungry?<br>We deliver hot!</div>
+    <div id="waBtn"><div id="waIcon">✆</div><span>0803 123 4567</span></div>
+    <div id="address">12 Ajilosun Road, Ado Ekiti<br>Open daily 9am – 10pm</div>
+  </section>
+
+  <div id="progress"></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.13.0/gsap.min.js"></script>
+<script>
+  const DURATION = 15;
+  const tl = gsap.timeline({ paused: true, defaults: { ease: 'power3.out' } });
+
+  // ---- Background: runs for the full duration, tied to the timeline ----
+  tl.to('#blob1', { x: 380, y: 520, scale: 1.3, duration: DURATION, ease: 'sine.inOut' }, 0);
+  tl.to('#blob2', { x: -420, y: -600, scale: 1.2, duration: DURATION, ease: 'sine.inOut' }, 0);
+  tl.to('#progress', { scaleX: 1, duration: DURATION, ease: 'none' }, 0);
+
+  // ---- Scene 1 (0 - 3.5s): brand intro ----
+  tl.set('#s1', { opacity: 1 }, 0);
+  tl.from('#logo', { scale: 0, rotation: -180, duration: 0.9, ease: 'back.out(1.7)' }, 0.2);
+  tl.from('#brandName span', { y: 120, opacity: 0, duration: 0.7, stagger: 0.15 }, 0.7);
+  tl.from('#tagline', { opacity: 0, letterSpacing: '30px', duration: 0.9 }, 1.4);
+  tl.to('#s1', { opacity: 0, y: -120, duration: 0.5, ease: 'power2.in' }, 3.0);
+
+  // ---- Scene 2 (3.5 - 7.5s): hero dish + counting price ----
+  tl.set('#s2', { opacity: 1 }, 3.5);
+  tl.from('#plate', { scale: 0.3, rotation: 90, opacity: 0, duration: 0.9, ease: 'back.out(1.4)' }, 3.5);
+  tl.from('.chicken, .plantain', { scale: 0, duration: 0.5, stagger: 0.08, ease: 'back.out(2)' }, 4.1);
+  tl.fromTo('.steam', { y: 60, opacity: 0 }, { y: -80, opacity: 1, duration: 1.2, stagger: 0.25, ease: 'sine.out' }, 4.3);
+  tl.to('.steam', { opacity: 0, duration: 0.8, stagger: 0.25 }, 5.5);
+  tl.from('#dishName', { y: 80, opacity: 0, duration: 0.6 }, 4.4);
+  tl.from('#priceTag', { scale: 0, duration: 0.6, ease: 'back.out(2)' }, 4.9);
+  const price = { v: 0 };
+  tl.to(price, {
+    v: 2500, duration: 1.2, ease: 'power2.out',
+    onUpdate: () => { document.getElementById('price').textContent = Math.round(price.v).toLocaleString('en-NG'); }
+  }, 5.0);
+  tl.to('#priceTag', { scale: 1.12, duration: 0.25, yoyo: true, repeat: 1, ease: 'sine.inOut' }, 6.3);
+  tl.to('#s2', { opacity: 0, scale: 0.9, duration: 0.5, ease: 'power2.in' }, 7.0);
+
+  // ---- Scene 3 (7.5 - 11.5s): menu ----
+  tl.set('#s3', { opacity: 1 }, 7.5);
+  tl.from('#menuTitle', { y: -80, opacity: 0, duration: 0.6 }, 7.5);
+  tl.from('#s3 .row', { x: (i) => (i % 2 ? 1100 : -1100), duration: 0.7, stagger: 0.2 }, 7.8);
+  tl.to('#s3', { opacity: 0, x: -200, duration: 0.5, ease: 'power2.in' }, 11.0);
+
+  // ---- Scene 4 (11.5 - 15s): call to action ----
+  tl.set('#s4', { opacity: 1 }, 11.5);
+  tl.from('#ctaTop', { scale: 1.6, opacity: 0, duration: 0.7 }, 11.5);
+  tl.from('#waBtn', { y: 200, opacity: 0, duration: 0.7, ease: 'back.out(1.6)' }, 12.0);
+  tl.to('#waBtn', { scale: 1.07, duration: 0.4, yoyo: true, repeat: 3, ease: 'sine.inOut' }, 12.8);
+  tl.from('#address', { opacity: 0, y: 40, duration: 0.6 }, 12.6);
+
+  // Lock the exact total length, then expose for preview + renderer.
+  tl.set({}, {}, DURATION);
+  window.__timeline = tl;
+</script>
+</body>
+</html>

@@ -1,0 +1,105 @@
+@import "tailwindcss";
+
+@theme {
+  --color-ink: #14112B;
+  --color-ink-soft: #4A4470;
+  --color-ink-mute: #7C77A0;
+  --color-danfo: #5546FF;
+  --color-danfo-deep: #4334E6;
+  --color-paper: #FFFFFF;
+  --color-lilac: #F2F0FA;
+  --color-lilac-deep: #E4E0F5;
+  --color-money: #0E9F6E;
+  --color-alert: #D93A45;
+  --font-display: "Geist", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-body: "Geist", system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  /* Everything is rounder: these scale every rounded-* class in the app. */
+  /* Restrained corners: media and panels are crisp, not bubbly */
+  --radius-md: 0.4rem;
+  --radius-lg: 0.55rem;
+  --radius-xl: 0.7rem;
+  --radius-2xl: 0.85rem;
+  --radius-3xl: 1rem;
+  --radius-4xl: 1.25rem;
+}
+
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; font-family: var(--font-body); color: var(--color-ink); -webkit-font-smoothing: antialiased; background: #F7F7F9; min-height: 100vh; font-feature-settings: 'ss01'; }
+
+/* App shell: dark editing-suite rail on the left, quiet light canvas on the right */
+.app { min-height: 100vh; }
+@media (min-width: 1024px) { .app { display: grid; grid-template-columns: 248px minmax(0, 1fr); } }
+.app-main { min-width: 0; padding-bottom: 3rem; }
+.rail { display: none; }
+@media (min-width: 1024px) {
+  .rail { position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column; color: #fff;
+    background: #0B0A12; border-right: 1px solid rgba(255,255,255,.06); }
+}
+.rail-link { display: flex; align-items: center; gap: .75rem; padding: .6rem .8rem; border-radius: 8px; font-weight: 500; font-size: 14.5px; color: rgba(255,255,255,.6); }
+.rail-link:hover { color: #fff; background: rgba(255,255,255,.06); }
+.rail-link.is-active { color: #fff; background: rgba(255,255,255,.07); }
+.rail-link.is-active svg { color: var(--color-danfo); }
+
+/* The screening monitor on the dashboard: a reel of real style videos drifting past */
+@keyframes reel { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+.reel { display: flex; gap: 14px; width: max-content; animation: reel 60s linear infinite; }
+.reel-mask { -webkit-mask: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent); mask: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent); }
+.monitor:hover .reel { animation-play-state: paused; }
+h1, h2, h3, .font-display { font-family: var(--font-display); letter-spacing: -0.035em; }
+:focus-visible { outline: 3px solid var(--color-danfo); outline-offset: 2px; border-radius: 10px; }
+button { cursor: pointer; }
+button:disabled { cursor: not-allowed; }
+::selection { background: var(--color-danfo); color: #fff; }
+
+/* Floating white surface: the default container for panels and cards */
+.surface { background: #fff; border: 1px solid rgba(27, 20, 70, .1); border-radius: var(--radius-3xl); }
+.surface-soft { background: rgba(255, 255, 255, .7); border: 1px solid rgba(27, 20, 70, .06); border-radius: var(--radius-3xl); backdrop-filter: blur(10px); }
+
+/* The studio stage: a flat, dark screening room for every video and preview */
+.stage { position: relative; overflow: hidden; isolation: isolate; color: #fff; border-radius: var(--radius-4xl); background: #0B0A12; }
+.stage-floor { display: none; }
+
+/* The phone that frames every preview and video */
+.phone { background: #000; border-radius: 18px; padding: 0; box-shadow: 0 0 0 1px rgba(255, 255, 255, .12); }
+.phone-screen { border-radius: 18px; overflow: hidden; background: #000; position: relative; }
+
+.bubble-user { background: var(--color-ink); color: #fff; border-radius: 16px 16px 4px 16px; }
+.bubble-ai { background: #fff; color: var(--color-ink); border-radius: 16px 16px 16px 4px; border: 1px solid rgba(27, 20, 70, .1); }
+
+/* Chips used for filters, suggestions and tabs */
+.chip { display: inline-flex; align-items: center; gap: .4rem; border-radius: 999px; padding: .5rem 1rem; font-weight: 600; font-size: .875rem;
+  background: #fff; border: 1px solid rgba(27, 20, 70, .1); color: var(--color-ink-soft); }
+.chip:hover { color: var(--color-ink); border-color: rgba(27, 20, 70, .25); }
+.chip[aria-pressed="true"], .chip[aria-selected="true"] { background: var(--color-ink); color: #fff; border-color: var(--color-ink); }
+
+.segmented { display: flex; gap: 4px; padding: 4px; border-radius: 10px; background: #EFEEF4; }
+.segmented > button { flex: 1; border-radius: 7px; padding: .55rem .75rem; font-size: .875rem; font-weight: 600; color: var(--color-ink-soft); }
+.segmented > button[aria-selected="true"] { background: #fff; color: var(--color-ink); box-shadow: 0 0 0 1px rgba(27, 20, 70, .1); }
+
+/* Gentle press feedback for every button-like control */
+.press { transition: transform .12s ease, background-color .15s ease, box-shadow .15s ease, border-color .15s ease; }
+.press:active:not(:disabled) { transform: scale(.96); }
+
+/* Style card: video plays on hover/focus, lifts slightly */
+.style-card { transition: transform .2s ease, box-shadow .2s ease; }
+.style-card:hover, .style-card:focus-visible { transform: translateY(-2px); }
+
+.range { -webkit-appearance: none; appearance: none; height: 6px; border-radius: 999px; background: rgba(255, 255, 255, .18); }
+.range.light { background: var(--color-lilac-deep); }
+.range::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: var(--color-danfo); border: 3px solid #fff; box-shadow: 0 1px 6px rgba(0,0,0,.35); }
+.range::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: var(--color-danfo); border: 3px solid #fff; }
+
+/* The one orchestrated moment: the hero's videos fan out on load */
+@keyframes fan-in { from { opacity: 0; transform: translateY(40px) rotate(0deg) scale(.9); } }
+.fan > * { animation: fan-in .8s cubic-bezier(.2, .9, .2, 1.1) both; }
+.fan > *:nth-child(2) { animation-delay: .08s; } .fan > *:nth-child(3) { animation-delay: .16s; }
+.fan > *:nth-child(4) { animation-delay: .24s; } .fan > *:nth-child(5) { animation-delay: .32s; }
+
+@keyframes typing { 0%, 80%, 100% { opacity: .25 } 40% { opacity: 1 } }
+.typing span { animation: typing 1.2s infinite; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--color-ink-mute); margin: 0 2px; }
+.typing span:nth-child(2) { animation-delay: .15s } .typing span:nth-child(3) { animation-delay: .3s }
+
+.no-scrollbar { scrollbar-width: none; } .no-scrollbar::-webkit-scrollbar { display: none; }
+
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
