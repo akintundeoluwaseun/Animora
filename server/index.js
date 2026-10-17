@@ -6,7 +6,7 @@ import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
 import { SFX_DIR, MUSIC_DIR } from './engine/sfx.js';
 import { config, ROOT } from './config.js';
-import { initDb, one } from './db/index.js';
+import { initDb, one, withStartupLock } from './db/index.js';
 import { initStorage, localPathFor, getDbObject } from './storage.js';
 import { startWorker } from './worker.js';
 import { seed, syncStarterStyles } from './db/seed.js';
@@ -22,8 +22,10 @@ const require = createRequire(import.meta.url);
 export async function createApp() {
   await initDb();
   await initStorage();
-  if (!(await one('SELECT id FROM styles LIMIT 1'))) await seed();
-  else await syncStarterStyles().catch((e) => console.warn('[styles] sync failed:', e.message));
+  await withStartupLock(async () => {
+    if (!(await one('SELECT id FROM styles LIMIT 1'))) await seed();
+    else await syncStarterStyles().catch((e) => console.warn('[styles] sync failed:', e.message));
+  });
 
   const app = express();
   app.disable('x-powered-by');

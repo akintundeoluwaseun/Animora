@@ -77,6 +77,24 @@ export async function initDb() {
           client.release();
         }
       },
+      // Run fn while holding a database-wide lock, so several servers starting at once (Vercel) take turns
+      // setting up tables and starter styles instead of deadlocking. A transaction-level lock works through
+      // Supabase's transaction pooler; fn itself uses the other pool connections.
+      async locked(fn) {
+        const client = await pool.connect();
+        try {
+          await client.query('BEGIN');
+          await client.query('SELECT pg_advisory_xact_lock(81726354)');
+          const out = await fn();
+          await client.query('COMMIT');
+          return out;
+        } catch (e) {
+          await client.query('ROLLBACK').catch(() => {});
+          throw e;
+        } finally {
+          client.release();
+        }
+      },
       close: () => pool.end(),
     };
   } else {
@@ -101,7 +119,7 @@ export async function initDb() {
     };
   }
   const schema = await readFile(path.join(ROOT, 'server/db/schema.sql'), 'utf8');
-  await driver.exec(schema);
+  if (driver.locked) await driver.locked(() => driver.exec(schema)); else await driver.exec(schema);
   console.log(`[db] ready (${driver.kind})`);
   return driver;
 }
@@ -113,3 +131,5 @@ export const tx = (fn) => driver.transaction(async (t) => fn({
   one: async (s, p = []) => (await t.query(s, p)).rows[0] || null,
 }));
 export const closeDb = () => driver?.close();
+/** Run fn under the startup lock (Postgres) or directly (PGlite, single process). */
+export const withStartupLock = (fn) => (driver?.locked ? driver.locked(fn) : fn());

@@ -23,6 +23,9 @@ async function upload(rel, type, prefix = 'demo') {
   return existsSync(file) ? putObject(`${prefix}/${rel}`, file, type) : null;
 }
 
+const sortKeys = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, sortKeys(v[k])])) : v);
+const sameJson = (a, b) => JSON.stringify(sortKeys(a)) === JSON.stringify(sortKeys(b));
+
 async function ensureUser({ name, email, role, plan = 'free', used = 0, business }) {
   const existing = await one('SELECT * FROM users WHERE email=$1', [email]);
   if (existing) return existing;
@@ -38,10 +41,14 @@ async function ensureUser({ name, email, role, plan = 'free', used = 0, business
 export async function syncStarterStyles(creatorRow) {
   const creator = creatorRow || await ensureUser({ name: 'Tunde Motion', email: 'creator@adflash.ng', role: 'creator' });
   const styles = {};
+  // one query for all starter rows; rows that are already up to date are not written again
+  const existing = Object.fromEntries((await q('SELECT * FROM styles WHERE slug = ANY($1)', [STARTER_STYLES.map((x) => x.slug)])).map((r) => [r.slug, r]));
   for (const s of STARTER_STYLES) {
     const html = templateFromPlan(s.example, { themeKey: s.palette.theme });
     const palette = JSON.stringify({ ...s.palette, category: s.category, assets_v: STYLE_ASSETS_VERSION });
-    let row = await one('SELECT * FROM styles WHERE slug=$1', [s.slug]);
+    let row = existing[s.slug] || null;
+    if (row && row.base_code === html && row.name === s.name && row.description === s.description && row.rules === s.rules && row.font === s.font
+      && row.preview_url && sameJson(row.palette, JSON.parse(palette))) { styles[s.slug] = row; continue; }
     // Copy the preview video/poster into storage only when they are new or were re-rendered (version bump).
     const fresh = !row || !row.preview_url || row.palette?.assets_v !== STYLE_ASSETS_VERSION;
     const preview = fresh ? await upload(`styles/${s.slug}.mp4`, 'video/mp4', `demo/v${STYLE_ASSETS_VERSION}`) : null;
