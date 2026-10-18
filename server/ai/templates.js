@@ -800,7 +800,8 @@ export function templateFromPlan(plan, { themeKey = 'bold', assets = plan.assets
   // sound: 'all' = soft music + effects, 'sfx' = effects only, 'own' = the user's music + effects, 'none' = silent
   const sound = plan.sound || (plan.sfx === false ? 'none' : 'sfx');
   const mood = MUSIC[look?.music] ? look.music : MUSIC[plan.music_mood] ? plan.music_mood : MUSIC_FOR_THEME[key] || 'calm';
-  const music = sound === 'all' && MUSIC[mood] ? { k: mood, bpm: MUSIC[mood].bpm } : sound === 'own' && plan.music_url ? { url: plan.music_url } : null;
+  // built-in background songs are off (people preferred effects only); only the owner's own music is used
+  const music = sound === 'own' && plan.music_url ? { url: plan.music_url } : null;
   const paced = fillPacing(beats, duration, plan, theme, rnd);
   let finalBeats = music?.bpm ? snapToBeat(paced, music.bpm, duration) : paced;
   // "zoom into the logo" in the special instructions (no AI director): open on the logo and dive into it

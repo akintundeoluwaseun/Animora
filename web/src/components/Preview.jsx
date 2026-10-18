@@ -103,7 +103,7 @@ export function LivePreview({ html, aspect = '9:16', autoPlay = true, maxWidth =
         setReady(true); setD(m.d); sfxRef.current = m.sfx || []; lastT.current = 0;
         // background music: an <audio> element kept in step with the timeline
         if (musicRef.current) { musicRef.current.pause(); musicRef.current = null; }
-        if (m.music) { const a = new Audio(m.music.url || `/music/${m.music.k}.mp3`); a.loop = true; a.volume = 0.45; a.preload = 'auto'; musicRef.current = a; }
+        if (m.music?.url) { const a = new Audio(m.music.url); a.loop = true; a.volume = 0.45; a.preload = 'auto'; musicRef.current = a; }
         if (ctx()) [...new Set(sfxRef.current.map((e) => e.k))].forEach((k) => sound(k));
         if (autoPlay) send({ cmd: 'play' });
       }

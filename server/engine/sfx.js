@@ -44,7 +44,8 @@ function decode(src) {
     p.on('close', (c) => { if (c) return reject(new Error(`decode: ${err}`)); const b = Buffer.concat(out); resolve(new Float32Array(b.buffer, b.byteOffset, Math.floor(b.length / 4))); });
   });
 }
-const musicSource = (m) => (m?.k ? path.join(MUSIC_DIR, `${String(m.k).replace(/[^a-z]/g, '')}.mp3`) : m?.url || null);
+// Only the owner's own uploaded music is mixed in; the built-in background songs are retired (effects only).
+const musicSource = (m) => m?.url || null;
 
 /** Mix the cues into a WAV buffer (mono, 44.1 kHz) of `duration` seconds. timeScale stretches cue times. */
 export function mixSfx(events, duration, { timeScale = 1, gain = 0.6, music = null } = {}) {

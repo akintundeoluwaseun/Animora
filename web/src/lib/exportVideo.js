@@ -55,7 +55,7 @@ async function mixAudio(sfx, music, duration) {
   let peak = 0; for (let i = 0; i < n; i++) peak = Math.max(peak, Math.abs(mix[i]));
   const lift = peak > 0 ? Math.min(2, (music ? 0.38 : 0.45) / peak) : 1;
   for (let i = 0; i < n; i++) mix[i] *= lift;
-  const musicUrl = music?.k ? `/music/${String(music.k).replace(/[^a-z]/g, '')}.mp3` : music?.url || null;
+  const musicUrl = music?.url || null;   // built-in songs retired: effects only, or the owner's own music
   const mb = musicUrl ? await load(musicUrl) : null;
   if (mb) {
     const m = mb.getChannelData(0);

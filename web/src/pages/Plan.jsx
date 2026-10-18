@@ -21,6 +21,23 @@ const ASPECT_OPTS = [
 const FOUND_LABEL = { name: 'business name', category: 'business type', goals: 'goal', headlines: 'message', features: 'selling points', products: 'products', ctas: 'call to action', contact: 'contact', aspect: 'format', duration: 'length', voiceover: 'voice-over choice', sound: 'sound choice' };
 const EXTRA_CHIPS = ['Zoom into my logo at the start', 'Make the price really big', 'Keep it calm and premium', 'Make it loud and energetic', 'Show my photos more'];
 
+// How long the answers need: an opening, one shot per message, about two selling points or products per shot,
+// extra actions, and the ending. About 4 seconds a shot (with its move in and out). Too long feels slow and repeats; too short flashes by.
+const listOf = (v) => (Array.isArray(v) ? v : String(v || '').split('\n')).map((x) => String(x).trim()).filter(Boolean);
+export function fitSeconds(b = {}) {
+  const shots = 2 + Math.max(1, listOf(b.headlines || b.headline).length) + Math.ceil(listOf(b.features).length / 2)
+    + Math.ceil(listOf(b.products).length / 2) + Math.max(0, listOf(b.ctas || b.cta).length - 1)
+    + (b.pasteText ? Math.min(4, Math.floor(String(b.pasteText).length / 450)) : 0);
+  return Math.max(20, Math.min(120, Math.round((shots * 4) / 5) * 5));
+}
+export function lengthWarning(b, v) {
+  const rec = fitSeconds(b), sec = Number(v);
+  if (!sec) return null;
+  if (sec >= rec * 1.6 && sec - rec >= 15) return { rec, text: `Your details fill about ${rec} seconds. At ${sec} seconds the AI has to stretch them, so the video can feel slow and repeat itself. Add more messages, selling points or products, or choose ${rec} seconds.` };
+  if (sec <= rec * 0.7 && rec - sec >= 10) return { rec, text: `That's a lot for ${sec} seconds: everything will flash by too fast to read. ${rec} seconds fits your details, or remove some of them.` };
+  return null;
+}
+
 // The questions, in order. `show` hides a question that doesn't apply; `optional` adds a Skip button.
 const QUESTIONS = [
   { id: 'mode', type: 'single', options: [
@@ -37,7 +54,7 @@ const QUESTIONS = [
   { id: 'cta', type: 'multi', max: 5, options: CTAS, typed: true, ask: () => 'What should people do after watching?', placeholder: 'Or type your own, e.g. "Send us a DM"' },
   { id: 'contact', type: 'text', optional: true, ask: () => 'Your phone number, website or address for the end of the video?', placeholder: '0803 123 4567 · www.yoursite.com · 12 Allen Ave, Ikeja' },
   { id: 'aspect', type: 'single', options: ASPECT_OPTS, ask: () => 'Where will you post it?' },
-  { id: 'duration', type: 'single', options: [15, 20, 30, 45, 60], ask: () => "How long should it be? If you picked a lot, I'll make it longer so everything fits." },
+  { id: 'duration', type: 'single', options: [15, 20, 25, 30, 45, 60], ask: (b) => `How long should it be? Your details fit about ${fitSeconds(b)} seconds.` },
   { id: 'pictures', type: 'upload', optional: true, ask: () => `Add your logo and product photos if you have them (up to ${MAX_PICS}). Both are optional. You can also paste a picture with Ctrl+V.` },
   { id: 'colors', type: 'colors', ask: () => 'Which colours should the video use?' },
   { id: 'style', type: 'style', ask: () => 'Pick a look for your video, or let me choose one that fits.' },
@@ -80,7 +97,7 @@ const label = (q, v, b, styles) => {
   if (q.id === 'aspect') return ASPECT_OPTS.find((o) => o.v === v)?.l || v;
   if (q.id === 'duration') return `${v} seconds`;
   if (q.id === 'voiceover') return v === true || v === 'yes' ? 'Yes, write me a script' : 'No script';
-  if (q.id === 'sound') return { all: 'Soft music and sound effects', sfx: 'Only sound effects', none: 'No sound', own: 'My own music' }[v] || v;
+  if (q.id === 'sound') return { all: 'Sound effects', sfx: 'Sound effects', none: 'No sound', own: 'My own music' }[v] || v;
   if (q.id === 'style') return b.styleAuto ? 'Let Animora choose' : styles?.find((s) => s.id === v)?.name || 'Chosen';
   if (q.id === 'colors') return v === 'style' ? "The style's colours" : v === 'logo' ? 'Matched to my logo' : 'My own colours';
   if (q.id === 'pictures') return `${v} picture${v === 1 ? '' : 's'}`;
@@ -170,6 +187,7 @@ export default function Plan() {
   const [reading, setReading] = useState(false);   // reading a pasted description
   const [error, setError] = useState('');
   const [toast, setToast] = useState('');
+  const [lenWarn, setLenWarn] = useState(null);   // { v, rec, text } while the person decides
   const endRef = useRef(null);
   const logoRef = useRef(null);
   const photoRef = useRef(null);
@@ -345,12 +363,23 @@ export default function Plan() {
                     {opts.filter((o) => q.id !== 'duration' || (o >= limits.minSeconds && o <= limits.maxSeconds)).map((o) => {
                       const v = o.v ?? o, l = o.l ?? (q.id === 'duration' ? `${o} seconds` : o);
                       const on = q.type === 'multi' ? multi.includes(v) : b[q.id] === v;
-                      return <Chip key={v} active={on} sub={o.d} multi={q.type === 'multi'} onClick={() => {
+                      const best = q.id === 'duration' && v === fitSeconds(b);
+                      return <Chip key={v} active={on} sub={o.d || (best ? 'Fits your details best' : undefined)} multi={q.type === 'multi'} onClick={() => {
+                        if (q.id === 'duration') { const w = lengthWarning(b, v); if (w) { setLenWarn({ v, ...w }); return undefined; } setLenWarn(null); }
                         if (q.type === 'single') return answer(v);
                         setMulti((m) => (m.includes(v) ? m.filter((x) => x !== v) : m.length >= (q.max || 9) ? m : [...m, v]));
                       }}>{l}</Chip>;
                     })}
                     {q.type === 'multi' && multi.filter((v) => !opts.includes(v)).map((v) => <Chip key={v} active multi onClick={() => setMulti((m) => m.filter((x) => x !== v))}>{v}</Chip>)}
+                  </div>
+                )}
+                {q.id === 'duration' && lenWarn && (
+                  <div className="ml-11 rounded-[14px] border border-amber-300 bg-amber-50 p-4 text-[14px] leading-relaxed text-ink" role="alert">
+                    <p>{lenWarn.text}</p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Button size="sm" onClick={() => { const v = lenWarn.rec; setLenWarn(null); answer(v); }}>Use {lenWarn.rec} seconds</Button>
+                      <Button size="sm" variant="outline" onClick={() => { const v = lenWarn.v; setLenWarn(null); answer(v); }}>Keep {lenWarn.v} seconds</Button>
+                    </div>
                   </div>
                 )}
                 {q.type === 'multi' && <p className="pl-11 text-[13px] text-ink-mute">{q.hint || 'Pick one or more, or type your own.'}</p>}
@@ -396,8 +425,7 @@ export default function Plan() {
                       try { const form = new FormData(); form.append('file', f); form.append('role', 'music'); form.append('name', 'my music'); await api(`/projects/${id}/assets`, { method: 'POST', form }); answer('own'); }
                       catch (err) { setError(err.message); } finally { setUploading(false); e.target.value = ''; }
                     }} />
-                    <Chip sub="Calm background music with gentle effects. Cuts land on the beat." onClick={() => answer('all')}>Soft music and sound effects</Chip>
-                    <Chip sub="Gentle whooshes, pops and clicks, no music" onClick={() => answer('sfx')}>Only sound effects</Chip>
+                    <Chip sub="Smooth whooshes, pops and clicks timed to the motion" onClick={() => answer('sfx')}>Sound effects</Chip>
                     <Chip sub="Upload an MP3 or WAV" onClick={() => musicRef.current?.click()}>{uploading ? 'Uploading…' : 'Use my own music'}</Chip>
                     <Chip onClick={() => answer('none')}>No sound</Chip>
                   </div>
@@ -473,6 +501,12 @@ export default function Plan() {
             )}
             {finished && (
               <>
+                {what === 'video' && !project.code && lengthWarning(b, b.duration) && (
+                  <div className="mb-3 rounded-[14px] border border-amber-300 bg-amber-50 p-4 text-[14px] leading-relaxed text-ink" role="alert">
+                    <p>{lengthWarning(b, b.duration).text}</p>
+                    <Button size="sm" className="mt-3" onClick={() => save({ duration: lengthWarning(b, b.duration).rec })}>Use {lengthWarning(b, b.duration).rec} seconds</Button>
+                  </div>
+                )}
                 <Button size="lg" className="w-full" loading={building} onClick={() => (project.plan && b.done ? navigate(`/p/${id}/studio${project.code ? '' : '?generate=1'}`) : build(b))}>
                   {project.plan && project.code ? `Open my ${what}` : `Make my ${what}`}
                 </Button>
