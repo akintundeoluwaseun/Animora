@@ -48,6 +48,12 @@ const shotBlock = (src, name) => { const a = src.indexOf(`SHOTS.${name} = (b, bi
 
 export function upgradeRuntime(html, assets = []) {
   let out = String(html || '');
+  // whole engine swap: an older video gets every new shot, cut and the film finish the next time it's edited
+  const a = out.indexOf('/* AdFlash motion runtime'), b = a >= 0 ? out.indexOf('</script>', a) : -1;
+  if (a >= 0 && b > a && RUNTIME) {
+    out = out.slice(0, a) + RUNTIME.trimEnd() + '\n' + out.slice(b);
+    out = out.replace(/engine=motion-v3"/, 'engine=motion-v4"');
+  }
   for (const name of ['iconmorph']) {   // shots fixed since (text that could be cut off)
     const f = shotBlock(out, name), t = shotBlock(RUNTIME, name);
     if (f && t && out.indexOf('afterFonts') > 0) out = out.slice(0, f[0]) + RUNTIME.slice(t[0], t[1]) + out.slice(f[1]);

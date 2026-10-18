@@ -15,6 +15,12 @@ const DIRECTOR_MODEL = process.env.GEMINI_DIRECTOR_MODEL || process.env.GEMINI_C
 
 // What each shot looks like and which fields it uses. Shown to Gemini, and used to clean its answer.
 export const SHOTS = {
+  slam: { f: 'text (1-3 words, max 18 letters), sub?', d: 'PREMIUM KINETIC: one giant word slams into the screen letter by letter with an impact; outline copies stack above and below. The strongest hook.' },
+  poster: { f: 'lines (2-5 short lines, each max 12 letters, e.g. ["FRESH","BREAD","DAILY"])', d: 'PREMIUM KINETIC: a full-frame type poster, every line sized to fill the width, solid / outline / highlighted last line.' },
+  reveal: { f: 'text (max 34 chars), sub?', d: 'PREMIUM: a colour bar sweeps across and leaves the words behind it (After Effects box reveal). Clean and classy.' },
+  tunnel: { f: 'text (the line it lands on), imgs (2-6 asset names) or items (2-6 short words)', d: 'PREMIUM 3D: the camera flies through a 3D corridor of photos or words and lands on the line. Great opener or product showcase.' },
+  parallax: { f: 'img (asset name), text, sub? or price?', d: 'PREMIUM 3D: the photo as a glossy card turning in 3D over a blurred copy of itself, shapes floating at other depths. Best way to show a product photo.' },
+  marquee3d: { f: 'text, sub?, word? (word repeated on the wall; default the brand)', d: 'PREMIUM 3D: a tilted 3D wall of the brand name scrolls behind the main line.' },
   logo: { f: 'text?, sub?', d: 'the business LOGO big in the centre, rings pulse out, name rises below. Needs an uploaded logo. Follow it with cut "dive" to zoom the camera INTO the logo.' },
   sentence: { f: 'text, sub?', d: 'premium: a short sentence builds word by word, the last word in the accent colour (letters drop in).' },
   flip: { f: 'text (2-6 words)', d: 'words replace each other one at a time in the centre ("Introducing" / "TechDesk" / "AI").' },
@@ -49,8 +55,20 @@ export const CUTS = {
   whip: 'fast sideways motion-blur whip', rise: 'vertical motion-blur push', zoom: 'zoom-through', morph: 'collapse into a dot and burst out',
   line: 'a glowing line draws across', wipe: 'two-colour panel wipe', flash: 'white flash with camera punch',
   swoosh: 'a thick curved ribbon swoops across', dive: 'camera dives INTO the key word or the logo', focus: 'soft blur-focus dissolve',
+  iris: 'the next shot opens in an expanding circle with a colour ring', cover: 'two liquid colour circles flood the frame and drain away',
+  cube: '3D cube turn', glitch: 'digital glitch with colour split', shutter: 'colour bars drop like a shutter and lift away',
 };
-const CUT_D = { wipe: 0.34, dive: 0.42, swoosh: 0.36 };
+const CUT_D = { wipe: 0.34, dive: 0.42, swoosh: 0.36, cover: 0.42, cube: 0.36, shutter: 0.36, glitch: 0.2, iris: 0.3 };
+
+// One consistent LOOK per video (like a real motion designer's style frame): shots, cuts, type motion and finish.
+export const PRESETS = {
+  cinematic: { d: 'film look: big photos in 3D, slow camera, soft light leaks and grain', shots: ['parallax', 'tunnel', 'reveal', 'sentence', 'hero', 'logo', 'lockup'], cuts: ['focus', 'iris', 'dive', 'cover'], look: { textIn: 'focus', energy: 1, drift: 0.6, finish: 1.2, leaks: 1, chroma: 0, ambient: ['glow'] } },
+  kinetic: { d: 'kinetic typography: giant type fills the frame and slams on the beat', shots: ['slam', 'poster', 'reveal', 'kinetic', 'zoomword', 'marquee3d', 'flip'], cuts: ['whip', 'glitch', 'shutter', 'zoom'], look: { textIn: 'chars', energy: 3, finish: 0.8, chroma: 1, leaks: 0, ambient: ['grid'] } },
+  editorial: { d: 'calm and elegant, one strong line at a time, lots of space', shots: ['reveal', 'sentence', 'flip', 'parallax', 'ticker', 'iconmorph'], cuts: ['focus', 'iris', 'line', 'cube'], look: { textIn: 'focus', energy: 1, drift: 0.4, finish: 0.7, leaks: 0.6, chroma: 0, ambient: ['frame'] } },
+  hype: { d: 'loud pop energy for promos, sales and launches', shots: ['slam', 'poster', 'marquee3d', 'counter', 'parallax', 'zoomword', 'pills'], cuts: ['cover', 'glitch', 'whip', 'shutter', 'flash'], look: { textIn: 'chars', energy: 3, finish: 0.6, chroma: 1, leaks: 0, ambient: ['rays', 'particles'] } },
+  luxury: { d: 'luxury: slow, golden, glossy 3D product shots', shots: ['reveal', 'parallax', 'sentence', 'tunnel', 'logo', 'isocard'], cuts: ['focus', 'cube', 'iris', 'line'], look: { textIn: 'focus', energy: 1, drift: 0.5, finish: 1, leaks: 1, chroma: 0, ambient: ['glow', 'sparkles'] } },
+  tech: { d: 'tech / app: UI pieces, 3D depth, glitch cuts', shots: ['iconmorph', 'widgets', 'tunnel', 'poster', 'notify', 'chat', 'reveal'], cuts: ['glitch', 'cube', 'morph', 'whip'], look: { textIn: 'chars', energy: 2, finish: 0.7, chroma: 0.7, leaks: 0, ambient: ['grid', 'dots'] } },
+};
 
 // Creative concepts: each video gets a different one, so two ads never share the same structure.
 export const CONCEPTS = [
@@ -76,6 +94,11 @@ export function sanitizeLook(look) {
   const e = Number(look.energy); if (e >= 1 && e <= 3) out.energy = Math.round(e);
   const d = Number(look.drift); if (d >= 0 && d <= 1.5) out.drift = d;
   if (look.sound === 'off') out.sound = 'off';
+  if (look.textIn === 'chars') out.textIn = 'chars';
+  for (const k of ['finish', 'leaks', 'chroma']) { const v = Number(look[k]); if (look[k] != null && v >= 0 && v <= 1.5) out[k] = v; }
+  const t = Number(look.tempo); if (t >= 80 && t <= 140) out.tempo = Math.round(t);
+  const pre = PRESETS[look.preset];
+  if (pre) { out.preset = look.preset; for (const [k, v] of Object.entries(pre.look)) if (out[k] == null) out[k] = v; }
   if (['calm', 'pulse', 'warm', 'cinematic', 'bright'].includes(look.music)) out.music = look.music;
   return Object.keys(out).length ? out : null;
 }
@@ -129,6 +152,8 @@ export function sanitizeBeats(raw, { duration, assets = [], plan = {}, calm = fa
       title: str(b.title, 50),
       number: str(b.number, 14),
       cut: CUTS[b.cut] ? b.cut : null,
+      lines: (Array.isArray(b.lines) ? b.lines : []).map((x) => str(x, 16)).filter(Boolean).slice(0, 5),
+      word: str(b.word, 20),
     };
     const price = num(b.price); if (price != null) o.price = price;
     o.icon = ICON_NAMES.includes(b.icon) ? b.icon : iconFor(`${o.text} ${o.sub}`, 'sparkle');
@@ -139,6 +164,8 @@ export function sanitizeBeats(raw, { duration, assets = [], plan = {}, calm = fa
     if (Array.isArray(b.imgs)) o.imgs = b.imgs.map((r) => findAsset(r, images)?.url).filter(Boolean).slice(0, 8);
     if (shot === 'lockup' && !o.text) o.text = brand;
     if (shot === 'brand' && !o.text) o.text = brand;
+    if (shot === 'poster' && !o.text && o.lines?.length) o.text = o.lines.join(' ');
+    if (shot === 'parallax' && !o.img) { const a = images.find((x) => x.role !== 'logo'); if (a) { o.img = a.url; o.imgRatio = a.width && a.height ? a.height / a.width : 1; } }
     o.hasLogo = !!logo;
     for (const k of Object.keys(o)) if (o[k] === '' || (Array.isArray(o[k]) && !o[k].length && k !== 'subs')) delete o[k];
     if (!o.subs) o.subs = [];
@@ -148,6 +175,7 @@ export function sanitizeBeats(raw, { duration, assets = [], plan = {}, calm = fa
       if (shot === 'logo' && !logo) o.shot = 'brand';
       else if (o.items?.length >= 2) o.shot = o.items.length <= 4 ? (calm ? 'stack' : 'pills') : 'grid';
       else if (o.price != null) o.shot = 'counter';
+      else if (o.lines?.length >= 2) { o.shot = 'poster'; if (!o.text) o.text = o.lines.join(' '); }
       else if (o.text) o.shot = calm ? 'sentence' : 'words';
       else return null;
       if (!SHOT_VALID[o.shot](o)) o.shot = calm ? 'sentence' : 'words';
@@ -213,14 +241,21 @@ Images are referenced by their asset NAME exactly as listed.
 
 CUTS (between beats): ${CUT_MENU()}
 
-LOOK: also choose the visual look of THIS video in "look": { "ambient": [up to 3 of ${AMBIENT.join(', ')}],
-"textIn": "rise|blur|slide|focus", "accentStyle": "marker|color", "energy": 1-3, "drift": 0-1.2 (slow camera tilt),
-"music": "calm|pulse|warm|cinematic|bright" (background music mood; the cuts snap to its beat) }.
+LOOK: first pick ONE preset for the whole video, the way a motion designer picks a style frame:
+${Object.entries(PRESETS).map(([k, v]) => `- ${k}: ${v.d}. Signature shots: ${v.shots.join(', ')}. Cuts: ${v.cuts.join(', ')}.`).join('\n')}
+Then "look": { "preset": "<one of ${Object.keys(PRESETS).join(', ')}>", "ambient"?: [up to 3 of ${AMBIENT.join(', ')}],
+"textIn"?: "rise|blur|slide|focus|chars" (chars = every letter animates), "accentStyle"?: "marker|color", "energy"?: 1-3, "tempo"?: 90-130 (beats per minute; cuts land on the beat) }.
 Return { "concept": "one line describing your idea", "look": {...}, "beats": [...] }.
 
 DIRECTION RULES
 - The video is ${duration} seconds, ${aspect}. Use about one beat per ${duration <= 20 ? '1.5-2.2' : '2-3'} seconds, so return AT LEAST ${Math.ceil(duration / 3)} beats; no beat longer than 3.5 seconds. If the answers run out, write new short lines from the business info (benefits, a question to the viewer, how it works, a promise) instead of repeating. The "seconds" values should add up to about ${duration}.
 - Every beat shows ONE idea. Never repeat the same shot twice in a row, and vary the shots across the video; it must not feel like a pattern.
+- PREMIUM DIRECTION (this is what separates a top motion designer from a template):
+  * At least half of the beats use the chosen preset's signature shots. Use only 2-3 cut types from the preset in the whole video, so it feels like one film.
+  * Contrast scale: follow a giant-type beat (slam / poster / zoomword) with a calmer detail beat, then a 3D beat (tunnel / parallax / marquee3d / isocard). Never three similar beats in a row.
+  * The first beat is the strongest: slam, poster, tunnel, logo+dive or parallax. Short punchy words on screen (1-4 words for slam / poster).
+  * Rhythm: beats of 1.5-2.5 s, a few faster ones (about 1 s) right before the reveal of the offer or the brand.
+  * Every uploaded product photo should appear at least once, ideally in parallax or tunnel.
 - Open with a strong hook in the first 2 seconds. End with a "lockup" beat (at least 2.5 s) with the phone/website in "button".
 - Keep on-screen text SHORT (headlines under 7 words, card and button text under 26 characters). Use the business's exact names, prices, phone numbers and addresses; never invent them.
 - TRUTH: never invent people's names, counts, numbers, percentages, reviews, testimonials, awards or claims (no "148 new inquiries", "Hundreds in hours", "from Sarah", "#1 in Lagos", "10,000 happy customers"). Only use numbers and facts that appear in the brief. In chat / notification shots write plain generic messages ("New message", "Can you make my video ad?").

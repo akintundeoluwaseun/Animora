@@ -93,7 +93,7 @@ try {
   const code = gen.project.code;
   ok('code uses the uploaded images', [logo, cake, cup].every((a) => code.includes(a.asset.url)));
   ok('code has captions', /"captions":\[\{/.test(code) && code.includes("'cap'"));
-  ok('code uses the motion engine v3 (beats with cuts, one at a time)', code.includes('engine=motion-v3') && code.includes('window.ADFLASH_DATA') && code.includes('"cut":'));
+  ok('code uses the motion engine v4 (beats with cuts, one at a time)', code.includes('engine=motion-v4') && code.includes('window.ADFLASH_DATA') && code.includes('"cut":'));
 
   const vo = await api('GET', `/projects/${P}/voiceover`);
   ok('TTS-ready script: prices and phone spelled out', vo.formats.plain.includes('fifteen thousand naira') && vo.formats.plain.includes('zero eight zero six, one two three, four five six seven'));

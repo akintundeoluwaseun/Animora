@@ -197,6 +197,12 @@ export const SHOT_VALID = {
   collage: (b) => !!b.text && String(b.text).length <= 40 && ((b.imgs && b.imgs.length >= 4) || (b.items && b.items.length >= 3)),
   stack: (b) => b.items && b.items.length >= 2 && b.items.length <= 4,
   chat: (b) => !!b.text && String(b.text).length <= 60,
+  slam: (b) => words(b.text).length >= 1 && words(b.text).length <= 3 && String(b.text).length <= 18,
+  poster: (b) => (b.lines && b.lines.length >= 2 && b.lines.length <= 5 && b.lines.every((l) => String(l).length <= 14)) || (words(b.text).length >= 2 && words(b.text).length <= 5 && String(b.text).length <= 36),
+  reveal: (b) => !!b.text && String(b.text).length <= 34,
+  tunnel: (b) => !!b.text && String(b.text).length <= 40 && ((b.imgs && b.imgs.length >= 2) || (b.items && b.items.length >= 2)),
+  parallax: (b) => !!b.img && !!b.text && String(b.text).length <= 50,
+  marquee3d: (b) => !!b.text && String(b.text).length <= 40,
 };
 const VALID = SHOT_VALID;
 export const ICON_NAMES = ['phone','chat','pin','clock','cart','star','heart','check','bolt','gift','truck','leaf','cup','food','cake','calendar','shield','tag','home','sparkle','scissors','book','dumbbell','music','wifi','card','users','trophy','camera','globe','arrow','bed','car','school','fire','shirt','drop','sun'];
@@ -205,7 +211,7 @@ export { iconFor, priceOf };
 function makePlanner(theme, rnd) {
   const counters = {};
   const used = {};
-  const LIMIT = { logo: 1, widgets: 1, iconmorph: 1, isocard: 1, ticker: 1, collage: 1, stack: 1, chat: 1, scatter: 2, flip: 2, split: 1, card: 1, counter: 1, notify: 1, orbit: 1, phone: 1, brand: 1, wheel: 1, pills: 1, grid: 1, flow: 1, stat: 1, type: 2, hero: 2, zoomword: 3, kinetic: 3 };
+  const LIMIT = { slam: 2, poster: 2, reveal: 2, tunnel: 1, parallax: 2, marquee3d: 1, logo: 1, widgets: 1, iconmorph: 1, isocard: 1, ticker: 1, collage: 1, stack: 1, chat: 1, scatter: 2, flip: 2, split: 1, card: 1, counter: 1, notify: 1, orbit: 1, phone: 1, brand: 1, wheel: 1, pills: 1, grid: 1, flow: 1, stat: 1, type: 2, hero: 2, zoomword: 3, kinetic: 3 };
   let last = '';
   const ok = (shot, b) => VALID[shot] && VALID[shot](b) && (used[shot] || 0) < (LIMIT[shot] || 9);
   const take = (shot) => { used[shot] = (used[shot] || 0) + 1; last = shot; return shot; };
@@ -382,7 +388,7 @@ function planBeats(plan, scenes, theme, rnd, ctx) {
 
     // ---- text scenes
     if (photoUrl || s.bg) {
-      add(s, [{ shot: 'hero', text: s.head, img: (s.bg || s.photo).url, imgRatio: photoRatio, full: !!s.bg, bigword: ctx.brand }]);
+      add(s, [{ shot: !s.bg && String(s.head || '').length <= 50 ? 'parallax' : 'hero', text: s.head, img: (s.bg || s.photo).url, imgRatio: photoRatio, full: !!s.bg, bigword: ctx.brand }]);
       return;
     }
     let parts = s.head.split(SPLIT_RE).filter(Boolean);
@@ -803,7 +809,8 @@ export function templateFromPlan(plan, { themeKey = 'bold', assets = plan.assets
   // built-in background songs are off (people preferred effects only); only the owner's own music is used
   const music = sound === 'own' && plan.music_url ? { url: plan.music_url } : null;
   const paced = fillPacing(beats, duration, plan, theme, rnd);
-  let finalBeats = music?.bpm ? snapToBeat(paced, music.bpm, duration) : paced;
+  const tempo = music?.bpm || Number(look?.tempo) || ({ 1: 96, 2: 112, 3: 124 }[look?.energy || theme.energy] || 112);
+  let finalBeats = directed?.length ? snapToBeat(paced, tempo, duration) : paced;
   // "zoom into the logo" in the special instructions (no AI director): open on the logo and dive into it
   if (!directed?.length && logoAsset && /logo/i.test(plan.special_instructions || '') && /(zoom|dive|fly|start|open|first|begin)/i.test(plan.special_instructions || '')) {
     finalBeats[0] = { ...finalBeats[0], shot: 'logo', text: brand, sub: '', hasLogo: true, cut: { type: 'dive', d: 0.42 } };
@@ -822,7 +829,7 @@ export function templateFromPlan(plan, { themeKey = 'bold', assets = plan.assets
   const data = {
     W, H, duration, seed, brand,
     logo: logoAsset ? { url: logoAsset.url, transparent: !!(logoAsset.transparent ?? logoAsset.has_alpha), light: logoAsset.light ?? logoAsset.is_light ?? null, ratio: logoAsset.width && logoAsset.height ? Math.round((logoAsset.width / logoAsset.height) * 100) / 100 : null } : null,
-    theme: { key, energy: theme.energy, accentStyle: theme.accentStyle, textIn: theme.textIn, ambient: theme.ambient, textScale: theme.textScale || 1, drift: theme.drift || 0, calm: !!theme.calm, ...(look || {}), ...(sound === 'none' ? { sound: 'off' } : {}) },
+    theme: { key, energy: theme.energy, accentStyle: theme.accentStyle, textIn: theme.textIn, ambient: theme.ambient, textScale: theme.textScale || 1, drift: theme.drift || 0, calm: !!theme.calm, finish: theme.calm ? 0.9 : 0.8, leaks: theme.calm || theme.energy === 1 ? 0.8 : 0, chroma: theme.energy >= 3 ? 0.8 : 0, ...(look || {}), ...(sound === 'none' ? { sound: 'off' } : {}) },
     music,
     beats: finalBeats.map((b) => { const o = { ...b }; delete o.scene; return o; }),
     captions,
@@ -832,7 +839,7 @@ export function templateFromPlan(plan, { themeKey = 'bold', assets = plan.assets
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="adflash" content="width=${W},height=${H},duration=${duration},fps=30,engine=motion-v3">
+<meta name="adflash" content="width=${W},height=${H},duration=${duration},fps=30,engine=motion-v4">
 <title>${esc(plan.title || 'Animora video')}</title>
 <link href="https://fonts.googleapis.com/css2?family=${theme.fontParam}&display=block" rel="stylesheet">
 <style>${css(theme, c, W, H)}

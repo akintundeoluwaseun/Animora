@@ -14,8 +14,8 @@ const sans = (f) => `'${f}','Inter','Poppins','DejaVu Sans',Arial,sans-serif`;
 const serif = (f) => `'${f}','Playfair Display','DejaVu Serif',Georgia,serif`;
 
 const P = (o) => ({
-  hook: ['zoomword', 'kinetic', 'type', 'words'],
-  text: ['words', 'split', 'kinetic', 'type'],
+  hook: ['slam', 'zoomword', 'poster', 'kinetic', 'type', 'words'],
+  text: ['reveal', 'words', 'split', 'marquee3d', 'kinetic', 'type'],
   price: ['counter', 'card', 'hero'],
   list: ['wheel', 'pills', 'phone', 'grid'],
   features: ['flow', 'grid', 'orbit', 'wheel'],
@@ -278,3 +278,10 @@ for (const t of Object.values(THEMES)) {
 }
 
 export const THEME_KEYS = Object.keys(THEMES);
+
+// v4 premium shots join every style's rotation: giant type slams / posters for loud styles, box reveals for calm ones.
+for (const t of Object.values(THEMES)) {
+  const add = (cat, front, back = []) => { t.prefer[cat] = [...new Set([...front, ...(t.prefer[cat] || []), ...back])]; };
+  if (t.calm) { add('hook', ['reveal'], []); add('text', ['reveal']); }
+  else { add('hook', t.energy >= 3 ? ['slam', 'poster'] : ['poster', 'slam']); add('text', ['reveal'], ['marquee3d']); }
+}

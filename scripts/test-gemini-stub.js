@@ -50,7 +50,7 @@ const beatsJson = JSON.stringify({ beats: [
   { shot: 'lockup', seconds: 3, text: 'TechDesk', subs: ['techdesk.space'], button: 'Try the AI chatbot' } ] });
 script = [beatsJson];
 const g = await generateCode({ plan: dplan, style: { name: 'Midnight Glow', palette: { theme: 'midnight' } }, assets, brief: { extra: 'Zoom into the logo of the chatbot first' } });
-ok('director builds the video', g.source === 'gemini' && g.html.includes('engine=motion-v3') && g.html.includes('"shot":"logo"'));
+ok('director builds the video', g.source === 'gemini' && g.html.includes('engine=motion-v4') && g.html.includes('"shot":"logo"'));
 ok('special instructions reach the director', calls.at(-1).last.includes('Zoom into the logo of the chatbot first'));
 ok('director prompt lists the shot menu', calls.at(-1).system.includes('iconmorph') && calls.at(-1).system.includes('dive'));
 ok('unknown shots are repaired', !g.html.includes('nonsense') && g.html.includes('"cut":{"type":"dive"'));

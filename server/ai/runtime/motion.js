@@ -190,6 +190,13 @@
       tl.from(wis, { opacity: 0, y: N(24), filter: 'blur(' + N(14) + 'px)', duration: 0.7 / SP, stagger: 0.09 / SP, ease: 'power3.out' }, at);
     } else if (variant === 'slide') {
       tl.from(wis, { xPercent: -60, opacity: 0, duration: 0.55 / SP, stagger: 0.06 / SP, ease: 'expo.out' }, at);
+    } else if (variant === 'chars') {   // every letter rises out of its word's mask with a small turn
+      const cs = [];
+      wis.forEach((w) => {
+        if (!w.dataset.split) { w.dataset.split = '1'; w.innerHTML = Array.from(w.textContent).map((c) => '<span class="cr">' + esc(c) + '</span>').join(''); }
+        cs.push(...$$('.cr', w));
+      });
+      tl.from(cs, { yPercent: 118, rotation: 14, duration: 0.62 / SP, stagger: Math.min(0.028, 0.55 / Math.max(1, cs.length)) / SP, ease: 'expo.out' }, at);
     } else {
       tl.from(wis, { yPercent: 115, duration: 0.65 / SP, stagger: 0.075 / SP, ease: 'expo.out' }, at);
     }
@@ -880,6 +887,187 @@
     }
   };
 
+  // ------------------------------------------------------------------ premium shots (v4)
+  // Big type that fills the frame, real 3D depth, photo parallax. Built like After Effects motion design:
+  // one strong move per shot, hard landings on an impact, everything keeps drifting until the cut.
+  const textInOr = (v) => (TH.textIn === 'chars' ? 'chars' : v);
+
+  // A giant word slams into the screen letter by letter; outline copies stack above and below and drift apart.
+  SHOTS.slam = (b, bi) => {
+    const txt = String(b.text);
+    const box = el('div', 'fitbox slam', bi);
+    box.dataset.maxw = String(W * (WIDE ? 0.74 : 0.86));   // big, but never touching the edges
+    const size = Math.min(WIDE ? 340 : 320, (WIDE ? 1700 : 980) / Math.max(3, txt.length * 0.6));
+    const echoes = [-2, -1, 1, 2].map((k) => {
+      const e = el('div', 'slam-echo', box, esc(txt)); e.style.fontSize = FS(size); e.style.marginTop = (k * 0.9) + 'em';
+      gsap.set(e, { xPercent: -50, yPercent: -50 });
+      return { e, k };
+    });
+    const main = el('div', 'slam-main', box, Array.from(txt).map((c) => '<span class="sc">' + (c === ' ' ? '&nbsp;' : esc(c)) + '</span>').join(''));
+    main.style.fontSize = FS(size); main.style.letterSpacing = '0.04em';   // widest it gets, so the fit is measured at full width
+    const bar = el('i', 'slam-bar', main);
+    const cs = $$('.sc', main);
+    const st = Math.min(0.045, 0.34 / cs.length) / SP, land = b.in + 0.3 / SP + st * Math.ceil(cs.length / 2);
+    tl.fromTo(cs, { opacity: 0, scale: 2.8, yPercent: -24, filter: 'blur(' + N(12) + 'px)' },
+      { opacity: 1, scale: 1, yPercent: 0, filter: 'blur(0px)', duration: 0.3 / SP, ease: 'power4.in', stagger: { each: st, from: 'center' }, immediateRender: true }, b.in);
+    sfx(b.in, 'whoosh', 0.35); sfx(land, 'impact', 0.75); shake(land, 16);
+    tl.fromTo(echoes.map((x) => x.e), { opacity: 0, scale: 0.92 }, { opacity: (i) => 0.6 / Math.abs(echoes[i].k), scale: 1, duration: 0.5, ease: 'expo.out', immediateRender: true }, land);
+    echoes.forEach(({ e, k }) => tl.to(e, { y: k * N(70), duration: Math.max(0.4, b.t1 - land), ease: 'none' }, land));
+    tl.fromTo(bar, { scaleX: 0 }, { scaleX: 1, duration: 0.45, ease: 'expo.inOut', immediateRender: true }, land + 0.08);
+    tl.fromTo(main, { letterSpacing: '-0.02em' }, { letterSpacing: '0.04em', duration: Math.max(0.4, b.t1 - land), ease: 'power1.out', immediateRender: true }, land);
+    tl.fromTo(main, { scale: 1.06 }, { scale: 1, duration: 0.5, ease: 'expo.out', immediateRender: false }, land);
+    if (b.sub) { const s = el('div', 'slam-sub', box, esc(b.sub)); s.style.fontSize = FS(44); gsap.set(s, { xPercent: -50 }); tl.from(s, { opacity: 0, y: N(24), duration: 0.45 }, land + 0.25); }
+  };
+
+  // A type poster: 2-5 short lines, each sized to fill the width, solid / outline / highlighted.
+  SHOTS.poster = (b, bi) => {
+    let lines = (b.lines || []).map(String).filter(Boolean);
+    if (lines.length < 2) {
+      const w = String(b.text).split(/\s+/).filter(Boolean); lines = [];
+      for (let k = 0; k < w.length;) { const two = w[k + 1] && w[k].length + w[k + 1].length <= 8; lines.push(w.slice(k, k + (two ? 2 : 1)).join(' ')); k += two ? 2 : 1; }
+    }
+    lines = lines.slice(0, 5);
+    const box = el('div', 'fitbox poster', bi);
+    const maxW = WIDE ? W * 0.58 : W * 0.84, acc = lines.length - 1;
+    const onP = getComputedStyle(document.documentElement).getPropertyValue('--on-primary').trim() || '#fff';
+    const rows = lines.map((ln, k) => {
+      const r = el('div', 'pst-row', box);
+      const bar = k === acc ? el('i', 'pst-bar', r) : null;
+      const t = el('span', 'pst-t' + (k === acc ? ' acc' : k % 2 ? ' out' : ''), r, esc(ln));
+      t.style.fontSize = N(Math.min(300, (maxW / U) / Math.max(2, ln.length * 0.62))) + 'px';
+      return { r, t, bar };
+    });
+    // every line exactly as wide as the widest allowed (measured once the font is in)
+    beforeFit.push(() => rows.forEach(({ t }) => { const w = t.offsetWidth, s = parseFloat(t.style.fontSize); if (w > 0 && s > 0) t.style.fontSize = Math.min(N(330), s * maxW / w) + 'px'; }));
+    rows.forEach(({ r, t }, k) => {
+      const at = b.in + k * 0.085 / SP;
+      tl.fromTo(t, { yPercent: 112, rotation: 4 }, { yPercent: 0, rotation: 0, duration: 0.62 / SP, ease: 'expo.out', immediateRender: true }, at);
+      tl.to(r, { x: (k % 2 ? -1 : 1) * N(34), duration: Math.max(0.5, b.t1 - at - 0.45), ease: 'none' }, at + 0.45);
+    });
+    const hot = rows[acc], barAt = b.in + rows.length * 0.085 / SP + 0.35;
+    tl.fromTo(hot.bar, { scaleX: 0 }, { scaleX: 1, duration: 0.42 / SP, ease: 'expo.inOut', immediateRender: true }, barAt);
+    tl.set(hot.t, { color: onP }, barAt + 0.18);
+    sfx(b.in, 'whoosh', 0.45); sfx(barAt + 0.1, 'impact', 0.35);
+    tl.fromTo(box, { scale: 1 }, { scale: 1.05, duration: Math.max(0.5, b.t1 - b.t0), ease: 'none', immediateRender: false }, b.t0);
+  };
+
+  // Box reveal: a colour bar sweeps across and leaves the words behind it.
+  SHOTS.reveal = (b, bi) => {
+    const box = el('div', 'fitbox col center rv', bi);
+    [b.text, b.sub].filter(Boolean).forEach((ln, k) => {
+      const row = el('div', 'rv-row' + (k ? ' sub' : ''), box);
+      const t = el('div', 'rv-t', row, esc(ln)); t.style.fontSize = FS(k ? 44 : sizeRaw(ln, 2300, 66, 156));
+      const bar = el('i', 'rv-bar' + (k ? ' b2' : ''), row);
+      const at = b.in + k * 0.3 / SP, h = 0.3 / SP;
+      tl.fromTo(bar, { scaleX: 0, transformOrigin: '0% 50%' }, { scaleX: 1, duration: h, ease: 'power3.inOut', immediateRender: true }, at);
+      tl.fromTo(t, { opacity: 0 }, { opacity: 1, duration: 0.01, immediateRender: true }, at + h);
+      tl.to(bar, { scaleX: 0, transformOrigin: '100% 50%', duration: h * 1.15, ease: 'power3.inOut' }, at + h + 0.02);
+      tl.fromTo(t, { x: -N(30) }, { x: 0, duration: 0.7, ease: 'expo.out', immediateRender: false }, at + h);
+      sfx(at, 'swish', k ? 0.3 : 0.5);
+    });
+    idle(bi, b, 0.05);
+  };
+
+  // The camera flies through a 3D corridor of photos (or words) and lands on the line at the end.
+  SHOTS.tunnel = (b, bi) => {
+    const imgs = (b.imgs || []).slice(0, 6);
+    let pieces = imgs.length >= 2 ? imgs.map((u) => ({ img: u })) : (b.items || []).slice(0, 6).map((it) => ({ text: it.text || it.name }));
+    while (pieces.length && pieces.length < 6) pieces = pieces.concat(pieces).slice(0, 6);   // a full corridor even with 2-3 photos
+    const world = el('div', 'tn-world', bi);
+    const gap = N(760), n = pieces.length, zEnd = gap * (n + 1);
+    const rx = WIDE ? W * 0.22 : W * 0.24, ry = WIDE ? H * 0.2 : H * 0.15;
+    const els = [];
+    for (let k = 0; k <= n; k++) {   // frames that make the corridor
+      const f = el('i', 'tn-frame', world); const z = -gap * (k + 0.5);
+      gsap.set(f, { xPercent: -50, yPercent: -50, z }); els.push({ e: f, z });
+    }
+    pieces.forEach((p, k) => {
+      const e = el('div', 'tn-p' + (p.img ? ' photo' : ''), world, p.img ? '<img src="' + esc(p.img) + '" crossorigin="anonymous" alt="">' : '<span>' + esc(p.text) + '</span>');
+      const a = k * 2.3 + 0.6, x = Math.cos(a) * rx, y = Math.sin(a) * ry, z = -gap * (k + 1);
+      gsap.set(e, { xPercent: -50, yPercent: -50, x, y, z, rotationY: (-x / W) * 40, rotationZ: R(-6, 6) });
+      els.push({ e, z });
+    });
+    const hold = el('div', 'tn-hold', world);
+    gsap.set(hold, { xPercent: -50, yPercent: -50, z: -zEnd });
+    const fin = el('div', 'fitbox col center', hold);
+    const t = el('div', 'tx-line', fin, wordsHtml(b.text, null, TH.accentStyle === 'marker')); t.style.fontSize = FS(sizeFor(b.text, 2100, 66, 140));
+    if (b.sub) { const s = el('div', 'tx-sub', fin, esc(b.sub)); s.style.fontSize = FS(42); }
+    const L = b.t1 - b.in, travel = Math.max(0.8, Math.min(L - 0.9, 0.3 * n + 0.9)) / SP;
+    const p = { z: 0 };
+    const upd = () => {
+      world.style.transform = 'translate3d(0,0,' + p.z.toFixed(1) + 'px)';
+      els.forEach(({ e, z }) => { const ez = z + p.z; e.style.opacity = Math.max(0, Math.min(1, (ez + gap * 5) / (gap * 2), (N(900) - ez) / N(500))).toFixed(3); });
+    };
+    upd();
+    tl.fromTo(p, { z: 0 }, { z: zEnd, duration: travel, ease: 'power2.inOut', onUpdate: upd, immediateRender: false }, b.in);
+    tl.to(p, { z: zEnd + N(140), duration: Math.max(0.3, L - travel), ease: 'none', onUpdate: upd }, b.in + travel);
+    textEnter(t, b.in + travel - 0.3, textInOr('focus'));
+    if (b.sub) tl.from($('.tx-sub', fin), { opacity: 0, y: N(20), duration: 0.45 }, b.in + travel);
+    sfx(b.in, 'whoosh-low', 0.5);
+    for (let k = 0; k < n; k++) sfx(b.in + travel * (0.3 + 0.55 * (k + 1) / (n + 1)), 'whoosh', 0.28);
+    sfx(b.in + travel, 'impact', 0.45);
+  };
+
+  // Photo in 2.5D: blurred copy fills the back, the sharp photo card turns in 3D, shapes float at other depths.
+  SHOTS.parallax = (b, bi) => {
+    // the blurred background is painted ONCE into a small canvas (a live CSS blur would be redrawn every frame)
+    const back = el('div', 'px-back', bi, '<div class="px-bk"><canvas></canvas><img src="' + esc(b.img) + '" crossorigin="anonymous" alt=""></div>');
+    const bkImg = $('img', back), bkCv = $('canvas', back);
+    const paintBack = () => {
+      if (!bkImg.naturalWidth || bkCv.dataset.done) return;
+      const cw0 = Math.round(W * 0.28), ch0 = Math.round(H * 0.28); bkCv.width = cw0; bkCv.height = ch0;
+      const g = bkCv.getContext('2d'), r = Math.max(cw0 / bkImg.naturalWidth, ch0 / bkImg.naturalHeight);
+      const dw = bkImg.naturalWidth * r, dh = bkImg.naturalHeight * r;
+      g.filter = 'blur(' + Math.round(N(10)) + 'px) saturate(1.25) brightness(.5)';
+      g.drawImage(bkImg, (cw0 - dw) / 2, (ch0 - dh) / 2, dw, dh);
+      bkCv.dataset.done = '1';
+    };
+    if (bkImg.complete) paintBack(); else bkImg.addEventListener('load', paintBack);
+    const wrap = el('div', 'fitbox px-wrap' + (WIDE ? ' row' : ''), bi);
+    const scene = el('div', 'px-scene', wrap);
+    const ratio = Math.max(0.7, Math.min(1.3, b.imgRatio || 1)), cw = N(WIDE ? 560 : 600);
+    scene.style.width = cw + 'px'; scene.style.height = cw * ratio + 'px';
+    const card = el('div', 'px-card', scene, '<img src="' + esc(b.img) + '" crossorigin="anonymous" alt=""><i class="px-sheen"></i>');
+    const shapes = [0, 1, 2].map((k) => {
+      const s = el('i', 'px-s s' + k, scene);
+      gsap.set(s, { xPercent: -50, yPercent: -50, x: [-0.1, 1.04, 0.86][k] * cw, y: [0.04, 0.2, 0.96][k] * cw * ratio, z: [N(180), N(280), -N(140)][k] });
+      return s;
+    });
+    const txt = el('div', 'px-text col' + (WIDE ? '' : ' center'), wrap);
+    const t = el('div', 'tx-line', txt, wordsHtml(b.text, null, TH.accentStyle === 'marker')); t.style.fontSize = FS(sizeFor(b.text, 2400, 64, 132));
+    if (b.price != null) { const o = odometer(txt, b.price, '₦', b.in + 0.7, 'chip'); o.style.fontSize = FS(80); }
+    else if (b.sub) { const s = el('div', 'tx-sub', txt, esc(b.sub)); s.style.fontSize = FS(40); tl.from(s, { opacity: 0, y: N(20), duration: 0.5 }, b.in + 0.75); }
+    const L = Math.max(0.6, b.t1 - b.t0);
+    tl.fromTo($('.px-bk', back), { scale: 1.45, x: -N(40) }, { scale: 1.2, x: N(40), duration: L, ease: 'none', immediateRender: true }, b.t0);
+    tl.fromTo(scene, { rotationY: WIDE ? 34 : 28, rotationX: 16, z: -N(900) }, { rotationY: WIDE ? 12 : 9, rotationX: 4, z: 0, duration: 1.0 / SP, ease: 'expo.out', immediateRender: true }, b.in);
+    tl.to(scene, { rotationY: WIDE ? -10 : -8, rotationX: -3, duration: Math.max(0.4, b.t1 - b.in - 1.0), ease: 'sine.inOut' }, b.in + 1.0);
+    tl.fromTo($('.px-sheen', card), { xPercent: -130 }, { xPercent: 230, duration: 1.1, ease: 'power2.inOut', immediateRender: true }, b.in + 0.5);
+    tl.fromTo($('img', card), { scale: 1.22 }, { scale: 1.02, duration: L, ease: 'none', immediateRender: false }, b.t0);
+    tl.from(shapes, { scale: 0, duration: 0.6, stagger: 0.08, ease: 'back.out(2)' }, b.in + 0.45);
+    textEnter(t, b.in + 0.35, textInOr('rise'));
+    sfx(b.in, 'whoosh-low', 0.5); sfx(b.in + 0.5, 'pop', 0.3);
+  };
+
+  // A tilted 3D wall of the brand name scrolling in opposite directions behind the main line.
+  SHOTS.marquee3d = (b, bi) => {
+    const plane = el('div', 'mq-plane', bi);
+    const word = esc(String(b.word || DATA.brand || b.text).toUpperCase());
+    const rows = 9, rh = N(176), L = Math.max(0.5, b.t1 - b.t0), reps = Math.max(3, Math.ceil(52 / (String(b.word || DATA.brand || b.text).length + 3)));
+    for (let k = 0; k < rows; k++) {
+      const r = el('div', 'mq-row' + (k === 2 || k === 6 ? ' hot' : k % 2 ? ' out' : ''), plane, (word + ' &#10022; ').repeat(reps));
+      r.style.top = ((k - rows / 2) * rh) + 'px';
+      const dir = k % 2 ? 1 : -1;
+      tl.fromTo(r, { x: -N(1800) + dir * N(260) }, { x: -N(1800) - dir * N(520), duration: L, ease: 'none', immediateRender: true }, b.t0);
+    }
+    gsap.set(plane, { rotationX: 50, rotationZ: -22, scale: 1.35 });
+    tl.fromTo(plane, { opacity: 0 }, { opacity: 1, duration: 0.35, immediateRender: true }, b.t0);
+    const front = el('div', 'fitbox col center mq-front', bi);
+    const t = el('div', 'tx-line', front, wordsHtml(b.text, null, TH.accentStyle === 'marker')); t.style.fontSize = FS(sizeFor(b.text, 2700, 76, 170));
+    textEnter(t, b.in + 0.25, textInOr('rise'));
+    if (b.sub) { const s = el('div', 'tx-sub', front, esc(b.sub)); s.style.fontSize = FS(42); tl.from(s, { opacity: 0, y: N(20), duration: 0.45 }, b.in + 0.6); }
+    sfx(b.in, 'whoosh', 0.45);
+  };
+
   // ------------------------------------------------------------------ transitions between beats
   // Every cut: the outgoing beat LEAVES during [T-d, T], the incoming beat ARRIVES during [T, T+d2].
   function exitBeat(bt, type, T, d) {
@@ -896,6 +1084,11 @@
         tl.to(bx, { scale: 18, duration: d, ease: 'power4.in', transformOrigin: () => diveOrigin(bt) }, s);
         tl.to(bx, { opacity: 0, duration: d * 0.3, ease: 'none' }, T - d * 0.3); break;
       case 'focus': tl.to(bx, { opacity: 0, scale: 1.05, duration: d, ease: 'power2.in' }, s); tl.to(fe, { attr: { stdDeviation: N(30) + ' ' + N(30) }, duration: d, ease: 'power2.in' }, s); break;
+      case 'iris': tl.to(bx, { scale: 1.06, duration: d, ease: 'power2.in' }, s); break;   // stays under the opening circle
+      case 'cover': tl.to(bx, { scale: 0.9, duration: d, ease: 'power3.in' }, s); break;
+      case 'cube': tl.to(bx, { rotationY: -90, duration: d, ease: 'power3.in', transformOrigin: '50% 50% ' + Math.round(-W / 2) + 'px' }, s); break;
+      case 'glitch': tl.to(bx, { x: N(70), skewX: -14, opacity: 0, duration: d, ease: 'steps(3)' }, s); break;
+      case 'shutter': tl.to(bx, { scale: 0.96, duration: d, ease: 'power2.in' }, s); break;
       default: tl.to(bx, { scale: 1.3, opacity: 0, duration: d, ease: 'power2.in' }, s); // flash
     }
   }
@@ -927,6 +1120,13 @@
       case 'focus':
         tl.fromTo(bx, { opacity: 0, scale: 0.96 }, Object.assign({ opacity: 1, scale: 1, duration: d, ease: 'power2.out' }, o), T);
         tl.fromTo(fe, { attr: { stdDeviation: N(30) + ' ' + N(30) } }, Object.assign({ attr: { stdDeviation: '0 0' }, duration: d, ease: 'power2.out' }, o), T); break;
+      case 'iris':
+        tl.fromTo(bx, { clipPath: 'circle(0% at 50% 50%)', scale: 1.12 }, Object.assign({ clipPath: 'circle(75% at 50% 50%)', scale: 1, duration: d * 1.2, ease: 'power3.inOut' }, o), T);
+        tl.set(bx, { clipPath: 'none' }, FT(T + d * 1.2 + 0.01)); break;
+      case 'cover': tl.fromTo(bx, { scale: 1.14 }, Object.assign({ scale: 1, duration: d + 0.25, ease: 'expo.out' }, o), T); break;
+      case 'cube': tl.fromTo(bx, { rotationY: 90, transformOrigin: '50% 50% ' + Math.round(-W / 2) + 'px' }, Object.assign({ rotationY: 0, duration: d, ease: 'power3.out' }, o), T); break;
+      case 'glitch': tl.fromTo(bx, { x: -N(60), skewX: 12 }, Object.assign({ x: 0, skewX: 0, duration: d, ease: 'steps(4)' }, o), T); break;
+      case 'shutter': tl.fromTo(bx, { scale: 1.08 }, Object.assign({ scale: 1, duration: d + 0.2, ease: 'expo.out' }, o), T); break;
       default:
         tl.fromTo(bx, { scale: 0.85 }, Object.assign({ scale: 1, duration: d, ease: 'expo.out' }, o), T);
     }
@@ -939,7 +1139,7 @@
     if (!rb.width || !rb.height) return '50% 50%';
     return ((r.left + r.width * 0.5 - rb.left) / rb.width * 100).toFixed(2) + '% ' + ((r.top + r.height * 0.55 - rb.top) / rb.height * 100).toFixed(2) + '%';
   }
-  function cutFx(type, T, d, k) {
+  function cutFx(type, T, d, k, dIn) {
     if (type === 'swoosh') {
       const s = document.createElementNS(svgNS, 'svg'); s.setAttribute('class', 'fx-swoosh'); s.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
       const flip = k % 2 ? -1 : 1, y = (f) => H * (0.5 + (f - 0.5) * flip);
@@ -983,7 +1183,49 @@
       tl.fromTo(cam, { scale: 1.12 }, { scale: 1, duration: 0.5, ease: 'expo.out', immediateRender: false }, T);
     } else if (type === 'zoom' && ENERGY >= 2) {
       tl.fromTo(cam, { scale: 1.06 }, { scale: 1, duration: 0.6, ease: 'expo.out', immediateRender: false }, T);
+    } else if (type === 'iris') {
+      const r = el('i', 'fx-ring2', fx), D = Math.hypot(W, H) * 1.06;
+      r.style.width = r.style.height = D + 'px'; r.style.marginLeft = r.style.marginTop = -D / 2 + 'px';
+      tl.fromTo(r, { scale: 0, autoAlpha: 1 }, { scale: 1, duration: dIn * 1.2, ease: 'power3.inOut', immediateRender: true }, T);
+      tl.set(r, { autoAlpha: 0 }, FT(T + dIn * 1.2));
+    } else if (type === 'cover') {   // two liquid colour circles flood the frame, then drain to the other corner
+      const D = Math.hypot(W, H) * 2.1, flip = k % 2;
+      const mk = (cls, ox, oy) => { const c = el('i', 'fx-circ ' + cls, fx); c.style.width = c.style.height = D + 'px'; c.style.left = (ox * W - D / 2) + 'px'; c.style.top = (oy * H - D / 2) + 'px'; return c; };
+      const a1 = mk('c2', flip, 1), a2 = mk('c1', flip, 1);
+      tl.fromTo(a1, { scale: 0, autoAlpha: 1 }, { scale: 1, duration: d, ease: 'power3.in', immediateRender: true }, T - d);
+      tl.fromTo(a2, { scale: 0, autoAlpha: 1 }, { scale: 1, duration: d * 0.82, ease: 'power3.in', immediateRender: true }, T - d * 0.82);
+      tl.set([a1, a2], { autoAlpha: 0 }, T);
+      const b1 = mk('c1', 1 - flip, 0), b2 = mk('c2', 1 - flip, 0);
+      gsap.set([b1, b2], { autoAlpha: 0 });
+      tl.set([b1, b2], { autoAlpha: 1, scale: 1 }, T);
+      tl.to(b2, { scale: 0, duration: 0.4, ease: 'power3.inOut' }, T);
+      tl.to(b1, { scale: 0, duration: 0.52, ease: 'power3.inOut' }, T + 0.02);
+      tl.set([b1, b2], { autoAlpha: 0 }, FT(T + 0.56));
+    } else if (type === 'shutter') {
+      const nB = WIDE ? 8 : 6, bw = W / nB;
+      for (let j = 0; j < nB; j++) {
+        const bar = el('i', 'fx-bar ' + (j % 2 ? 'c2' : 'c1'), fx); bar.style.left = (j * bw - 1) + 'px'; bar.style.width = (bw + 2) + 'px';
+        tl.fromTo(bar, { scaleY: 0, transformOrigin: '50% 0%' }, { scaleY: 1, duration: d * 0.7, ease: 'power3.in', immediateRender: true }, T - d + (j * d * 0.3) / nB);
+        tl.to(bar, { scaleY: 0, transformOrigin: '50% 100%', duration: 0.38, ease: 'power3.out' }, T + j * 0.028);
+      }
+    } else if (type === 'glitch') {
+      for (let j = 0; j < 6; j++) {
+        const g = el('i', 'fx-gl c' + (j % 3), fx); g.style.top = R(0, H * 0.95) + 'px'; g.style.height = N(R(8, 70)) + 'px';
+        const at = T - 0.12 + j * 0.04;
+        tl.fromTo(g, { autoAlpha: 0, x: R(-W * 0.3, W * 0.3) }, { autoAlpha: 0.9, duration: 0.01, immediateRender: true }, at);
+        tl.to(g, { autoAlpha: 0, duration: 0.01 }, at + 0.05);
+      }
+      const f = el('div', 'fx-flash', fx);
+      tl.fromTo(f, { opacity: 0 }, { opacity: 0.35, duration: 0.03, ease: 'none', immediateRender: true }, T - 0.03);
+      tl.to(f, { opacity: 0, duration: 0.12 }, T);
     }
+    if (TH.leaks && ['focus', 'iris', 'dive', 'line', 'morph'].includes(type)) leak(T, k);
+  }
+  // warm light leak drifting across the frame (film look)
+  function leak(T, k) {
+    const l = el('div', 'fin-leak' + (k % 2 ? ' b' : ''), stage);
+    tl.fromTo(l, { autoAlpha: 0, xPercent: k % 2 ? 30 : -30 }, { autoAlpha: 0.75 * TH.leaks, xPercent: 0, duration: 0.3, ease: 'power2.out', immediateRender: true }, T - 0.15);
+    tl.to(l, { autoAlpha: 0, xPercent: k % 2 ? -30 : 30, duration: 0.6, ease: 'power2.in' }, T + 0.15);
   }
 
 
@@ -1016,9 +1258,92 @@
     }
   }
 
+  // ------------------------------------------------------------------ premium layer: styles + film finish
+  // The styles for the v4 shots live here (not in the page CSS), so older videos get them when their engine is upgraded.
+  function premiumCss() {
+    const probe = el('div', 'tx-line', stage, 'A'), cs = getComputedStyle(probe);
+    const HW = cs.fontWeight || '800', TT = cs.textTransform || 'none', FST = cs.fontStyle || 'normal';
+    probe.remove();
+    const n = (v) => N(v).toFixed(1) + 'px';
+    const type = 'font-weight:' + HW + ';text-transform:' + TT + ';font-style:' + FST + ';';
+    const css = [
+      '.cr{display:inline-block}',
+      '.slam{position:relative;display:flex;align-items:center;justify-content:center}',
+      '.slam-main,.slam-echo{' + type + 'line-height:.92;white-space:nowrap}',
+      '.slam-main{position:relative;z-index:2;color:var(--text)} .slam-main .sc{display:inline-block}',
+      '.slam-echo{position:absolute;left:50%;top:50%;z-index:1;color:transparent;-webkit-text-stroke:' + n(2.5) + ' color-mix(in srgb,var(--primary) 85%,transparent)}',
+      '.slam-bar{position:absolute;left:0;right:0;bottom:-.06em;height:.1em;background:var(--primary);border-radius:.05em;transform-origin:0 50%}',
+      '.slam-sub{position:absolute;top:100%;left:50%;margin-top:' + n(56) + ';white-space:nowrap;font-weight:600;color:var(--muted);letter-spacing:.04em}',
+      '.poster{display:flex;flex-direction:column;align-items:flex-start}',
+      '.pst-row{position:relative;overflow:hidden;line-height:.86;padding:.03em .02em .07em}',
+      '.pst-t{position:relative;z-index:1;display:inline-block;font-weight:' + HW + ';font-style:' + FST + ';text-transform:uppercase;letter-spacing:-.035em;white-space:nowrap}',
+      '.pst-t.out{color:transparent;-webkit-text-stroke:' + n(3) + ' var(--text)} .pst-t.acc{color:var(--primary);padding:0 .08em}',
+      '.pst-bar{position:absolute;left:0;top:.06em;bottom:.1em;width:100%;background:var(--primary);transform-origin:0 50%;z-index:0}',
+      '.rv-row{position:relative;display:inline-block} .rv>*+*{margin-top:' + n(26) + '}',
+      '.rv-t{' + type + 'line-height:1.04;letter-spacing:-.02em;white-space:nowrap;padding:0 .06em}',
+      '.rv-row.sub .rv-t{font-weight:600;text-transform:none;font-style:normal;color:var(--muted);letter-spacing:.03em}',
+      '.rv-bar{position:absolute;left:-.06em;right:-.06em;top:-.02em;bottom:-.02em;background:var(--primary);z-index:2;transform:scaleX(0)} .rv-bar.b2{background:var(--secondary)}',
+      '.tn-world{position:absolute;left:50%;top:50%;width:0;height:0;transform-style:preserve-3d}',
+      '.tn-p,.tn-hold,.tn-frame{position:absolute;left:0;top:0;transform-style:preserve-3d}',
+      '.tn-frame{width:' + (W * 0.92).toFixed(0) + 'px;height:' + (H * 0.88).toFixed(0) + 'px;border:' + n(3) + ' solid color-mix(in srgb,var(--primary) 55%,transparent);border-radius:' + n(40) + '}',
+      '.tn-p.photo{width:' + n(WIDE ? 460 : 500) + ';height:' + n(WIDE ? 560 : 620) + ';border-radius:' + n(36) + ';overflow:hidden;box-shadow:var(--shadow)} .tn-p.photo img{width:100%;height:100%;object-fit:cover;display:block}',
+      '.tn-p span{display:block;white-space:nowrap;' + type + 'font-size:' + n(150) + ';color:transparent;-webkit-text-stroke:' + n(3) + ' var(--primary)}',
+      '.tn-hold{white-space:nowrap}',
+      '.px-back{position:absolute;inset:-6%;overflow:hidden} .px-bk{position:absolute;inset:0}',
+      '.px-bk canvas{position:absolute;inset:0;width:100%;height:100%} .px-bk img{position:absolute;width:1px;height:1px;opacity:0}',
+      '.px-back::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,color-mix(in srgb,var(--bg) 30%,transparent),color-mix(in srgb,var(--bg) 88%,transparent))}',
+      '.px-wrap{display:flex;flex-direction:column;align-items:center} .px-wrap>*+*{margin-top:' + n(70) + '} .px-wrap.row{flex-direction:row} .px-wrap.row>*+*{margin-top:0;margin-left:' + n(90) + '}',
+      '.px-scene{position:relative;transform-style:preserve-3d;flex:none}',
+      '.px-card{position:absolute;inset:0;border-radius:' + n(44) + ';overflow:hidden;box-shadow:0 ' + n(60) + ' ' + n(120) + ' ' + n(-30) + ' rgba(0,0,0,.7)}',
+      '.px-card img{width:100%;height:100%;object-fit:cover;display:block}',
+      '.px-sheen{position:absolute;top:-20%;bottom:-20%;left:0;width:40%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.32),transparent);transform:skewX(-18deg)}',
+      '.px-s{position:absolute;left:0;top:0;border-radius:50%;display:block} .px-s.s0{width:' + n(130) + ';height:' + n(130) + ';border:' + n(12) + ' solid var(--primary)}',
+      '.px-s.s1{width:' + n(54) + ';height:' + n(54) + ';background:var(--secondary)} .px-s.s2{width:' + n(220) + ';height:' + n(220) + ';border:' + n(3) + ' solid color-mix(in srgb,var(--text) 45%,transparent)}',
+      '.px-text>.odo{align-self:flex-start} .px-text.center>.odo{align-self:center}',
+      '.px-text{max-width:' + (WIDE ? W * 0.4 : W * 0.86).toFixed(0) + 'px} .px-text>*+*{margin-top:' + n(26) + '}',
+      '.mq-plane{position:absolute;left:50%;top:50%;width:0;height:0;transform-style:preserve-3d}',
+      '.mq-row{position:absolute;left:0;white-space:nowrap;font-weight:' + HW + ';text-transform:uppercase;font-size:' + n(168) + ';line-height:1;color:color-mix(in srgb,var(--text) 14%,transparent)}',
+      '.mq-row.out{color:transparent;-webkit-text-stroke:' + n(2.5) + ' color-mix(in srgb,var(--primary) 60%,transparent)} .mq-row.hot{color:color-mix(in srgb,var(--primary) 70%,transparent)}',
+      '.mq-front{position:relative;z-index:3} .mq-front .tx-line{text-shadow:0 0 ' + n(50) + ' var(--bg),0 0 ' + n(24) + ' var(--bg)}',
+      '.fx-ring2{position:absolute;left:50%;top:50%;border-radius:50%;border:' + n(16) + ' solid var(--primary);visibility:hidden}',
+      '.fx-circ{position:absolute;border-radius:50%;visibility:hidden} .fx-circ.c1{background:var(--primary)} .fx-circ.c2{background:var(--secondary)}',
+      '.fx-bar{position:absolute;top:0;bottom:0} .fx-bar.c1{background:var(--primary)} .fx-bar.c2{background:color-mix(in srgb,var(--primary) 70%,var(--bg))}',
+      '.fx-gl{position:absolute;left:-10%;right:-10%;visibility:hidden} .fx-gl.c0{background:var(--primary)} .fx-gl.c1{background:var(--secondary)} .fx-gl.c2{background:var(--text)}',
+      '.fin-grain{position:absolute;inset:0;z-index:70;pointer-events:none;mix-blend-mode:overlay}',
+      '.fin-vig{position:absolute;inset:0;z-index:69;pointer-events:none}',
+      '.fin-leak{position:absolute;inset:-25%;z-index:68;pointer-events:none;mix-blend-mode:screen;visibility:hidden;background:radial-gradient(ellipse 45% 40% at 22% 30%,rgba(255,170,90,.75),rgba(255,90,60,.25) 45%,transparent 70%)}',
+      '.fin-leak.b{background:radial-gradient(ellipse 45% 40% at 78% 70%,rgba(255,200,120,.7),rgba(255,120,80,.22) 45%,transparent 70%)}',
+    ].join('\n');
+    const st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
+  }
+  // Film finish: fine moving grain and a soft vignette over everything (look.finish 0 = off, 1 = normal).
+  function finish() {
+    const F = TH.finish == null ? 0.8 : Number(TH.finish) || 0;
+    if (!(F > 0)) return;
+    const vig = () => {
+      const bgHex = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim().replace('#', '');
+      const dark = bgHex.length < 6 || (0.299 * parseInt(bgHex.slice(0, 2), 16) + 0.587 * parseInt(bgHex.slice(2, 4), 16) + 0.114 * parseInt(bgHex.slice(4, 6), 16)) < 128;
+      const v = el('div', 'fin-vig', stage);
+      v.style.background = 'radial-gradient(ellipse 75% 70% at 50% 50%, transparent 55%, rgba(0,0,0,' + (dark ? 0.42 : 0.12) * Math.min(1.3, F) + ') 100%)';
+    };
+    vig();
+    if (window.__ANIMORA_RENDER) { window.__finish = F; return; }   // the MP4 renderer adds the grain itself
+    const S = 160, c = document.createElement('canvas'); c.width = c.height = S;
+    const g = c.getContext('2d'), img = g.createImageData(S, S);
+    let z = 987654321;
+    for (let i = 0; i < img.data.length; i += 4) { z = (z * 1103515245 + 12345) & 0x7fffffff; const v = 128 + ((z >> 8) % 256 - 128) * 0.9; img.data[i] = img.data[i + 1] = img.data[i + 2] = v; img.data[i + 3] = 255; }
+    g.putImageData(img, 0, 0);
+    const gr = el('div', 'fin-grain', stage);
+    gr.style.backgroundImage = 'url(' + c.toDataURL() + ')'; gr.style.opacity = String(Math.min(0.22, 0.13 * F));
+    const steps = Math.max(1, Math.round(DURATION * 12));
+    tl.fromTo(gr, { backgroundPosition: '0px 0px' }, { backgroundPosition: (steps * 67) + 'px ' + (steps * 101) + 'px', duration: DURATION, ease: 'steps(' + steps + ')', immediateRender: true }, 0);
+  }
+
   // ------------------------------------------------------------------ build
-  const afterFonts = [];
+  const afterFonts = [], beforeFit = [];
+  premiumCss();
   ambient();
+  finish();
   const beats = DATA.beats;
   beats.forEach((b, i) => {
     const bt = el('div', 'bt', cam); bt.id = 'b' + (i + 1);
@@ -1030,10 +1355,16 @@
     (SHOTS[b.shot] || SHOTS.words)(b, bi);
     shotSfx(b);
     tl.set(bt, { autoAlpha: 1 }, b.t0);
-    if (i < beats.length - 1) tl.set(bt, { autoAlpha: 0 }, b.t1);
+    if (i < beats.length - 1) {
+      const over = b.cut && b.cut.type === 'iris' ? Math.min(0.55, (beats[i + 1].t1 - beats[i + 1].t0) * 0.4) * 1.2 + 0.03 : 0;   // iris: stays under the opening circle
+      tl.set(bt, { autoAlpha: 0 }, FT(b.t1 + over));
+    }
   });
   const BLURRY = ['whip', 'rise', 'zoom', 'line', 'swoosh', 'dive', 'focus'];
-  const blurWindow = (bt, from, to) => { tl.set(bt.bx, { filter: bt.fe._url }, Math.max(0, from)); tl.set(bt.bx, { filter: 'none' }, FT(to)); };
+  // fast cuts in the loud looks also split the colours a little (chromatic aberration)
+  const chroma = (a) => (a > 0 ? ' drop-shadow(' + N(7 * a).toFixed(1) + 'px 0 0 rgba(255,30,90,.55)) drop-shadow(' + (-N(7 * a)).toFixed(1) + 'px 0 0 rgba(0,210,255,.5))' : '');
+  const filterWindow = (bt, from, to, f) => { tl.set(bt.bx, { filter: f.trim() }, Math.max(0, from)); tl.set(bt.bx, { filter: 'none' }, FT(to)); };
+  const blurWindow = (bt, from, to) => filterWindow(bt, from, to, bt.fe._url + chroma(TH.chroma || 0));
   beats.forEach((b, i) => {
     if (i === beats.length - 1 || !b.cut) return;
     const c = b.cut, d = (c.d || 0.3) / SP, nx = beats[i + 1];
@@ -1041,9 +1372,11 @@
     exitBeat(b._el, c.type, b.t1, dOut);
     enterBeat(nx._el, c.type, b.t1, dIn);
     if (BLURRY.includes(c.type)) { blurWindow(b._el, b.t1 - dOut - 0.01, b.t1 + 0.01); blurWindow(nx._el, b.t1 - 0.01, b.t1 + dIn + 0.02); }
-    cutFx(c.type, b.t1, d, i);
-    const CUT_SND = { whip: ['whoosh', 0.6], swoosh: ['whoosh', 0.7], wipe: ['whoosh', 0.55], rise: ['whoosh-low', 0.6], line: ['whoosh-low', 0.5], zoom: ['zoom', 0.6], dive: ['zoom', 0.75], focus: ['swish', 0.7], morph: ['pop', 0.55], flash: ['swish', 0.6] }[c.type];
-    if (CUT_SND) sfx(b.t1 - (c.type === 'morph' ? 0.05 : c.type === 'flash' ? 0.03 : dOut * 0.9), CUT_SND[0], CUT_SND[1]);
+    else if (c.type === 'glitch') { filterWindow(b._el, b.t1 - dOut - 0.01, b.t1 + 0.01, chroma(1.4)); filterWindow(nx._el, b.t1 - 0.01, b.t1 + dIn + 0.02, chroma(1.4)); }
+    cutFx(c.type, b.t1, d, i, dIn);
+    const CUT_SND = { whip: ['whoosh', 0.6], swoosh: ['whoosh', 0.7], wipe: ['whoosh', 0.55], rise: ['whoosh-low', 0.6], line: ['whoosh-low', 0.5], zoom: ['zoom', 0.6], dive: ['zoom', 0.75], focus: ['swish', 0.7], morph: ['pop', 0.55], flash: ['swish', 0.6], iris: ['swish', 0.6], cover: ['whoosh', 0.65], cube: ['whoosh-low', 0.7], glitch: ['tick', 0.8], shutter: ['whoosh', 0.55] }[c.type];
+    if (CUT_SND) sfx(b.t1 - (c.type === 'morph' ? 0.05 : c.type === 'flash' || c.type === 'glitch' ? 0.03 : dOut * 0.9), CUT_SND[0], CUT_SND[1]);
+    if (c.type === 'glitch') sfx(b.t1 + 0.02, 'swish', 0.5);
   });
   // slow camera drift (premium styles): the whole frame breathes and tilts a touch
   if (TH.drift) tl.fromTo(cam, { rotation: -1.4 * TH.drift }, { rotation: 1.4 * TH.drift, duration: DURATION, ease: 'sine.inOut', immediateRender: true }, 0);
@@ -1059,6 +1392,7 @@
 
   // fit: shrink any layout box that is larger than the safe area (layout sizes only, transforms ignored)
   function fit() {
+    beforeFit.forEach((fn) => fn());
     const padX = Math.min(W, H) * 0.07, padY = Math.min(W, H) * 0.08 + (DATA.captions && DATA.captions.length ? Math.min(W, H) * 0.12 : 0);
     $$('.fitbox').forEach((f) => {
       f.style.transform = '';

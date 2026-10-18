@@ -54,6 +54,7 @@ const DEFAULTS = {
 
 // Runs before any page script: seeded Math.random so "random" values are repeatable.
 const DETERMINISM_SHIM = `
+window.__ANIMORA_RENDER = true;   // the page leaves film grain to the encoder (much faster)
 (() => {
   let s = 0x9e3779b9;
   Math.random = function () {
@@ -180,6 +181,7 @@ async function openPage(browser, htmlFile, { width, height }, opts, log) {
       cssAnimations,
       sfx,
       music,
+      finish: Number(window.__finish) || 0,
       failedImages: [...document.images].filter((i) => !i.naturalWidth).map((i) => i.src).slice(0, 5),
     };
   }, opts.assetTimeoutMs);
@@ -242,14 +244,16 @@ function run(cmd, args) {
   });
 }
 
-function startEncoder(outFile, { fps, frameFormat, crf, preset, outW, outH }) {
+function startEncoder(outFile, { fps, frameFormat, crf, preset, outW, outH, grain = 0 }) {
+  // film grain added here (temporal noise) instead of drawing a blended layer in the browser for every frame
+  const noise = grain > 0 ? `,noise=alls=${Math.max(1, Math.round(grain))}:allf=t` : '';
   const args = [
     '-y', '-loglevel', 'error',
     '-f', 'image2pipe', '-framerate', String(fps),
     '-c:v', frameFormat === 'png' ? 'png' : 'mjpeg', '-i', '-',
     '-c:v', 'libx264', '-preset', preset, '-crf', String(crf),
     // fast captures are upscaled back to full HD with a sharp filter (cheap compared with painting 1080p)
-    '-vf', outW ? `scale=${outW}:${outH}:flags=lanczos:in_range=full:out_range=tv` : 'scale=in_range=full:out_range=tv',
+    '-vf', (outW ? `scale=${outW}:${outH}:flags=lanczos:in_range=full:out_range=tv` : 'scale=in_range=full:out_range=tv') + noise,
     '-pix_fmt', 'yuv420p', '-r', String(fps), '-video_track_timescale', String(fps * 1000),
     outFile,
   ];
@@ -429,7 +433,7 @@ export async function renderVideo(job) {
     };
 
     const renderSegment = async (seg, ctx) => {
-      const enc = startEncoder(seg.file, { ...ropts, outW: ropts.scale < 1 ? canvas.width : 0, outH: canvas.height });
+      const enc = startEncoder(seg.file, { ...ropts, outW: ropts.scale < 1 ? canvas.width : 0, outH: canvas.height, grain: Math.min(14, info.finish * 7) });
       encoders.push(enc);
       for (let f = seg.from; f < seg.to; f++) {
         if (signal?.aborted) throw new Error('Render cancelled');
@@ -485,7 +489,7 @@ export async function snapshotFrames(html, times, { aspectRatio = '9:16', scale 
   await writeFile(htmlFile, html);
   const browser = await launchBrowser('screenshot');
   try {
-    const opts = { ...DEFAULTS, mode: 'screenshot', frameFormat: 'jpeg', jpegQuality: quality };
+    const opts = { ...DEFAULTS, scale: 1, mode: 'screenshot', frameFormat: 'jpeg', jpegQuality: quality };   // scale is applied below (device pixels), not as fast capture
     const { ctx } = await openPage(browser, htmlFile, canvas, opts, () => {});
     if (scale !== 1) await ctx.page.setViewport({ ...canvas, deviceScaleFactor: scale });
     const out = [];
