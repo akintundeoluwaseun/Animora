@@ -15,6 +15,9 @@ const BRIDGE = `<script>(function(){
     if(m.cmd==='play'){ if(tl.time()>=tl.duration()-0.02) tl.seek(0,false); playing=true; last=0; requestAnimationFrame(loop); }
     else if(m.cmd==='pause'){ playing=false; state(); }
     else if(m.cmd==='seek'){ tl.seek(m.t,false); state(); } });
+  // drawn at the size it is shown (not full HD shrunk down): far less work for phones
+  window.addEventListener('message', function(e){ var m=e.data||{}; if(m.__adflash&&m.cmd==='zoom'&&m.z>0) document.documentElement.style.zoom=m.z; });
+  try { var z0=parseFloat(window.name); if(z0>0) document.documentElement.style.zoom=z0; } catch(_){}
   window.addEventListener('error', function(e){ post('error',{message:String(e.message||'Script error')}); });
   window.addEventListener('load', function(){ var n=0; (function wait(){ tl=window.__timeline;
     if(tl){ tl.pause(); if(window.gsap&&gsap.globalTimeline){ gsap.globalTimeline.getChildren(false,true,true).forEach(function(c){ if(c!==tl) c.pause(); }); }
@@ -76,6 +79,8 @@ export function LivePreview({ html, aspect = '9:16', autoPlay = true, maxWidth =
   const frameRef = useRef(null);
   const boxRef = useRef(null);
   const srcDoc = useMemo(() => prepareHtml(html), [html]);
+  const scaleRef = useRef(scale);
+  useEffect(() => { scaleRef.current = scale; frameRef.current?.contentWindow?.postMessage({ __adflash: true, cmd: 'zoom', z: scale }, '*'); }, [scale]);
 
   useEffect(() => {
     const el = boxRef.current;
@@ -91,6 +96,7 @@ export function LivePreview({ html, aspect = '9:16', autoPlay = true, maxWidth =
       if (e.source !== frameRef.current?.contentWindow || !e.data?.__adflash) return;
       const m = e.data;
       if (m.type === 'ready') {
+        send({ cmd: 'zoom', z: scaleRef.current });
         setReady(true); setD(m.d); sfxRef.current = m.sfx || []; lastT.current = 0;
         // background music: an <audio> element kept in step with the timeline
         if (musicRef.current) { musicRef.current.pause(); musicRef.current = null; }
@@ -139,8 +145,8 @@ export function LivePreview({ html, aspect = '9:16', autoPlay = true, maxWidth =
       <PhoneFrame aspect={aspect} maxWidth={maxWidth}>
         <div ref={boxRef} className="absolute inset-0">
           {srcDoc && (
-            <iframe ref={frameRef} title="Video preview" sandbox="allow-scripts" srcDoc={srcDoc}
-              style={{ width: a.w, height: a.h, transform: `scale(${scale})`, transformOrigin: '0 0', border: 0, display: 'block' }} />
+            <iframe ref={frameRef} title="Video preview" sandbox="allow-scripts" srcDoc={srcDoc} name={String(scale)}
+              style={{ width: Math.ceil(a.w * scale), height: Math.ceil(a.h * scale), border: 0, display: 'block', overflow: 'hidden' }} scrolling="no" />
           )}
           {!ready && !error && <div className="absolute inset-0 grid place-items-center bg-ink text-sm text-white/70">Loading preview…</div>}
           {error && <div className="absolute inset-0 grid place-items-center bg-ink p-6 text-center text-sm text-white">This version has an error: {error}<br />Try "Undo" or "Regenerate".</div>}
