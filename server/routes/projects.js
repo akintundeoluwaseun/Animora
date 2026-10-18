@@ -17,7 +17,7 @@ import { makeFlyer } from '../ai/flyer.js';
 import { describeAssets } from '../ai/describe.js';
 import { loadImage } from '../ai/index.js';
 
-const MAX_IMAGES = 5;
+const MAX_IMAGES = 10;
 
 const r = Router();
 r.use(requireAuth);

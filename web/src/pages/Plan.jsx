@@ -1,6 +1,6 @@
 // Page 1: the guided question flow. One question at a time, like a chat with a director:
 // pick an option (or several), or type your own answer. Every answer is saved once, so nothing is asked twice.
-// Pictures can be uploaded or pasted (Ctrl+V) anywhere on the page, up to 5. Special instructions come last.
+// Pictures can be uploaded or pasted (Ctrl+V) anywhere on the page, up to 10. Special instructions come last.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api, ASPECTS, duration, shrinkImage, imageLook } from '../lib.jsx';
@@ -8,7 +8,7 @@ import { Alert, Button, PageLoader, Spinner, Steps } from '../components/ui.jsx'
 import MicButton from '../components/MicButton.jsx';
 import { StylePicker } from './Dashboard.jsx';
 
-const MAX_PICS = 5;
+const MAX_PICS = 10;
 
 const CATEGORIES = ['Food & drinks', 'Fashion & clothing', 'Beauty & salon', 'Tech & software', 'Finance & payments', 'Health & fitness', 'Real estate', 'Events & parties', 'School & training', 'Shop & retail', 'Services'];
 const GOALS = ['Promote a sale or offer', 'Launch something new', 'Get more orders or bookings', 'Make people know my brand', 'Announce an event'];
