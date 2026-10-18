@@ -62,7 +62,7 @@ function playSfx(e) {
   g.gain.value = Math.min(1.2, (e.v || 1) * 0.8); src.buffer = b; src.connect(g).connect(c.destination); src.start();
 }
 
-export function LivePreview({ html, aspect = '9:16', autoPlay = true, maxWidth = 340, onError, sound: soundOn = true, onSoundChange, still = false }) {
+export function LivePreview({ html, aspect = '9:16', autoPlay = true, maxWidth = 340, onError, sound: soundOn = true, onSoundChange, still = false, onEnded }) {
   const sfxRef = useRef([]);
   const musicRef = useRef(null);
   useEffect(() => () => { musicRef.current?.pause(); }, []);
@@ -80,6 +80,9 @@ export function LivePreview({ html, aspect = '9:16', autoPlay = true, maxWidth =
   const boxRef = useRef(null);
   const srcDoc = useMemo(() => prepareHtml(html), [html]);
   const scaleRef = useRef(scale);
+  const wasPlaying = useRef(false);
+  const onEndedRef = useRef(onEnded);
+  useEffect(() => { onEndedRef.current = onEnded; }, [onEnded]);
   useEffect(() => { scaleRef.current = scale; frameRef.current?.contentWindow?.postMessage({ __adflash: true, cmd: 'zoom', z: scale }, '*'); }, [scale]);
 
   useEffect(() => {
@@ -118,6 +121,8 @@ export function LivePreview({ html, aspect = '9:16', autoPlay = true, maxWidth =
           } else if (!mu.paused) mu.pause();
         }
         lastT.current = m.t;
+        if (wasPlaying.current && !m.playing && m.d > 0 && m.t >= m.d - 0.05) onEndedRef.current?.();   // played to the end
+        wasPlaying.current = m.playing;
         setT(m.t); setD(m.d); setPlaying(m.playing);
       }
       if (m.type === 'error') { setError(m.message); onError?.(m.message); }

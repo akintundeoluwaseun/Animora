@@ -148,7 +148,7 @@ export async function generateCode({ plan, style, assets, brief = null, previous
 }
 
 /** Plain-words edit. Returns { html, source, summary } */
-export async function editCode({ html, instruction, aspectRatio, duration, plan = null, assets = [], onStatus }) {
+export async function editCode({ html, instruction, aspectRatio, duration, plan = null, assets = [], brief = null, history = [], onStatus }) {
   if (config.useGemini) assets = await describeAssets(assets, loadImage);
   if (isFlyer(html)) {
     if (!config.useGemini) return { html, source: 'offline', unchanged: true, summary: 'Flyer changes need the AI, which is off right now.' };
@@ -161,7 +161,7 @@ export async function editCode({ html, instruction, aspectRatio, duration, plan 
     try {
       if (directed) {
         const planWithAssets = plan ? enrichPlan(plan, assets) : null;
-        const r = await directorEdit({ html, plan: planWithAssets, instruction, assets: planWithAssets?.assets || assets, images: await imageParts(assets) });
+        const r = await directorEdit({ html, plan: planWithAssets, instruction, assets: planWithAssets?.assets || assets, images: await imageParts(assets), brief, history });
         return { html: r.html, source: 'gemini', summary: r.summary };
       }
       const r = await editAnimation(html, instruction, { aspectRatio, duration, onStatus });

@@ -328,7 +328,7 @@ r.post('/:id/edit', async (req, res) => {
   const instruction = String(req.body?.instruction || '').trim().slice(0, 1000);
   if (!instruction) return res.status(400).json({ error: 'Describe the change you want.' });
   if (!p.code_html) return res.status(400).json({ error: 'Generate the code first.' });
-  const out = await editCode({ html: p.code_html, instruction, aspectRatio: p.aspect_ratio, duration: p.duration_seconds, plan: p.plan_json, assets: await projectAssets(p.id) });
+  const out = await editCode({ html: p.code_html, instruction, aspectRatio: p.aspect_ratio, duration: p.duration_seconds, plan: p.plan_json, assets: await projectAssets(p.id), brief: p.brief_json || null, history: p.edit_history || [] });
   const history = [...(p.edit_history || []), { role: 'user', text: instruction }, { role: 'model', text: out.summary }];
   if (out.unchanged) {
     const u = await one('UPDATE projects SET edit_history=$2 WHERE id=$1 RETURNING *', [p.id, JSON.stringify(history)]);

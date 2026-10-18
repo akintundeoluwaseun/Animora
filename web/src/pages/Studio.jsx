@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { api, ASPECTS, duration, shrinkImage } from '../lib.jsx';
-import { Alert, Button, PageLoader, Spinner, Steps } from '../components/ui.jsx';
+import { Alert, Button, Modal, PageLoader, Spinner, Steps } from '../components/ui.jsx';
 import MicButton from '../components/MicButton.jsx';
 import { LivePreview } from '../components/Preview.jsx';
 import VoicePanel from '../components/VoicePanel.jsx';
@@ -32,6 +32,47 @@ function Generating({ message, startedAt, pushOn, flyer }) {
         </p>
       </div>
     </div>
+  );
+}
+
+// After the person watches to the end (or the flyer is ready): happy with it, or tell the AI what to change.
+function Feedback({ open, project, onClose, onUpdate, onHappy }) {
+  const [text, setText] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const flyer = project.kind === 'flyer';
+  const chips = flyer ? ['Make the headline bigger', 'Try a different layout', 'Use my photos more'] : ['Make it slower and calmer', 'Make the text bigger', 'Show my logo more', 'Change the ending'];
+  const send = async () => {
+    const msg = text.trim(); if (!msg || busy) return;
+    setBusy(true); setError('');
+    try { const r = await api(`/projects/${project.id}/edit`, { method: 'POST', body: { instruction: msg } }); onUpdate(r.project); setText(''); onClose(); }
+    catch (e) { setError(e.message); } finally { setBusy(false); }
+  };
+  return (
+    <Modal open={open} onClose={() => !busy && onClose()} label="How is it?">
+      {busy ? (
+        <div className="py-8 text-center"><Spinner className="mx-auto size-8" /><p className="mt-3 font-semibold">Changing your {flyer ? 'flyer' : 'video'}…</p><p className="mt-1 text-sm text-ink-mute">The AI is reading your request carefully. This takes about 20 to 60 seconds.</p></div>
+      ) : (
+        <>
+          <h2 className="text-xl font-bold">How is it?</h2>
+          <p className="mt-1 text-sm text-ink-soft">Not quite right? Tell the AI what to change, in your own words. Say everything at once; it does all of it in one go.</p>
+          <div className="mt-4 flex items-start gap-2">
+            <textarea value={text} onChange={(e) => setText(e.target.value)} rows={3} autoFocus aria-label="What should change?"
+              placeholder={flyer ? 'e.g. "Put the prices in big circles and use my second photo"' : 'e.g. "Slow down the start, make the logo bigger, and end with my phone number"'}
+              className="min-w-0 flex-1 resize-none rounded-[12px] border border-ink/15 bg-white px-3 py-2.5 text-[15px] text-ink outline-none focus:border-ink/40" />
+            <MicButton onText={(t) => setText((x) => `${x ? `${x.trim()} ` : ''}${t}`)} />
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {chips.map((c) => <button key={c} type="button" className="chip press !px-3 !py-1.5 !text-xs" onClick={() => setText((x) => (x ? `${x.trim()}. ${c}` : c))}>{c}</button>)}
+          </div>
+          {error && <p className="mt-3 text-sm text-alert" role="alert">{error}</p>}
+          <div className="mt-5 flex gap-2">
+            <Button variant="ghost" className="flex-1" onClick={onHappy}>{flyer ? 'Looks good' : 'Looks good, make the MP4'}</Button>
+            <Button className="flex-1" onClick={send} disabled={!text.trim()}>Send to the AI</Button>
+          </div>
+        </>
+      )}
+    </Modal>
   );
 }
 
@@ -134,6 +175,9 @@ export default function Studio() {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const started = useRef(false);
+  const [askOpen, setAskOpen] = useState(false);
+  const asked = useRef(new Set());   // ask once per version
+  const ask = (code) => { if (code && !asked.current.has(code)) { asked.current.add(code); setAskOpen(true); } };
 
   const [pushOn, setPushOn] = useState(() => typeof Notification !== 'undefined' && Notification.permission === 'granted');
   const poll = useRef(null);
@@ -193,6 +237,12 @@ export default function Studio() {
     return () => clearTimeout(t);
   }, [project?.code, project?.thumbnailUrl, generating]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  useEffect(() => {
+    if (project?.kind !== 'flyer' || !project.code || generating) return undefined;
+    const t = setTimeout(() => ask(project.code), 4000);
+    return () => clearTimeout(t);
+  }, [project?.code, generating]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const undo = async () => { try { setProject((await api(`/projects/${id}/undo`, { method: 'POST' })).project); } catch (e) { setError(e.message); } };
 
   if (!project) return error ? <div className="mx-auto max-w-xl p-8"><Alert>{error}</Alert></div> : <PageLoader />;
@@ -219,6 +269,9 @@ export default function Studio() {
           {project.code && <span className="hidden lg:block">{flyer ? <FlyerDownload project={project} /> : canRender ? <Button onClick={() => navigate(`/p/${id}/render?new=1`)}>Generate Video</Button> : <DownloadVideo project={project} />}</span>}
         </div>
       </div>
+      <Feedback open={askOpen} project={project} onClose={() => setAskOpen(false)}
+        onUpdate={(p) => { setProject(p); setTab('edit'); setNotice('Done. Your change is in the preview. Watch it again, or keep editing below.'); }}
+        onHappy={() => { setAskOpen(false); if (!flyer && canRender) navigate(`/p/${id}/render?new=1`); }} />
       {error && <div className="mt-4"><Alert onClose={() => setError('')}>{error}</Alert></div>}
       {notice && <div className="mt-4"><Alert kind="warn" onClose={() => setNotice('')}>{notice}</Alert></div>}
 
@@ -226,6 +279,7 @@ export default function Studio() {
         <div className="mt-5 grid gap-6 lg:grid-cols-[minmax(0,1fr)_420px]">
           <section aria-label="Preview" className="stage flex flex-col justify-center px-4 py-8 sm:px-8">
             <LivePreview html={project.code} aspect={project.aspectRatio} maxWidth={project.aspectRatio === '16:9' ? 320 : flyer ? 340 : 290} still={flyer}
+              onEnded={() => ask(project.code)}
               sound={project.sfx !== false}
               onSoundChange={async (on) => { setProject((p) => ({ ...p, sfx: on })); try { const r = await api(`/projects/${id}`, { method: 'PATCH', body: { sfx: on } }); setProject((p) => ({ ...p, code: r.project.code, sfx: r.project.sfx })); } catch { /* keep the local choice */ } }} />
             {!flyer && <p className="mt-3 text-center text-xs text-white/55">{project.sfx !== false ? 'Sound is on. Tap play to hear it; the same music and effects go into your MP4.' : 'Sound is off for this video.'}</p>}

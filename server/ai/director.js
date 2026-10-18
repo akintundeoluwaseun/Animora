@@ -222,7 +222,11 @@ DIRECTION RULES
 - The video is ${duration} seconds, ${aspect}. Use about one beat per ${duration <= 20 ? '1.5-2.2' : '2-3'} seconds, so return AT LEAST ${Math.ceil(duration / 3)} beats; no beat longer than 3.5 seconds. If the answers run out, write new short lines from the business info (benefits, a question to the viewer, how it works, a promise) instead of repeating. The "seconds" values should add up to about ${duration}.
 - Every beat shows ONE idea. Never repeat the same shot twice in a row, and vary the shots across the video; it must not feel like a pattern.
 - Open with a strong hook in the first 2 seconds. End with a "lockup" beat (at least 2.5 s) with the phone/website in "button".
-- Keep on-screen text SHORT (headlines under 7 words). Use the business's exact names, prices, phone numbers and addresses; never invent them.
+- Keep on-screen text SHORT (headlines under 7 words, card and button text under 26 characters). Use the business's exact names, prices, phone numbers and addresses; never invent them.
+- TRUTH: never invent people's names, counts, numbers, percentages, reviews, testimonials, awards or claims (no "148 new inquiries", "Hundreds in hours", "from Sarah", "#1 in Lagos", "10,000 happy customers"). Only use numbers and facts that appear in the brief. In chat / notification shots write plain generic messages ("New message", "Can you make my video ad?").
+- PLAIN WORDS: write like the business owner talks to customers. No marketing jargon (omnichannel, seamless, leverage, synergy, cutting-edge, revolutionary, next-gen, game-changing, holistic, robust, elevate, unlock).
+- LOGO: if the logo's SHOWS line already contains the business name, do not repeat the name as text right under the logo in the "logo" / "brand" shots; use a short tagline or the main message there instead.
+- THINK before you answer: read the special instructions twice, plan the story beat by beat, then check every line against the rules above.
 - Use the uploaded images where they help: the logo (shot "logo", then cut "dive" to fly into it, or in the lockup), product photos in "hero" or "collage".
 - PICTURES AND WORDS MUST MATCH. Each image's "SHOWS:" line says what is really in it. A beat with an img must talk about what that picture shows (rice bags -> rice / foodstuff, never "chicken"). Never put a picture next to words about something else; if no uploaded picture shows a product you want to mention, mention it in a beat without an img.
 - The user's SPECIAL INSTRUCTIONS are the most important part of the brief. Follow every one of them literally.
@@ -230,6 +234,58 @@ DIRECTION RULES
   with the text swapped. Rewrite the copy into sharp ad lines (you may reword the plan's lines; keep facts exact).
 ${styleLines(style, themeKey)}
 Return only the JSON object.`;
+}
+
+// ---------------------------------------------------------------------------
+// Self-check: catch the mistakes people notice (made-up numbers and names, jargon, lines too long to fit,
+// the brand name repeated under a logo that already shows it) and have the director fix them once.
+// ---------------------------------------------------------------------------
+const JARGON = /\b(omnichannel|seamless(?:ly)?|leverag\w*|synerg\w*|cutting[- ]edge|revolutionar\w*|next[- ]gen|game[- ]chang\w*|holistic|robust|elevate[sd]?|unlock(?:s|ed)?)\b/i;
+const HYPE = /\b(hundreds|thousands|millions|#\s?1|no\.?\s?1|award[- ]winning|world[- ]class)\b/i;
+const beatStrings = (b) => [b.text, b.sub, b.title, b.button, b.number, ...(b.subs || []), ...(b.items || []).flatMap((i) => [i?.text, i?.name])].filter((x) => typeof x === 'string' && x.trim());
+export function lintBeats(beats, { brief = {}, plan = {}, assets = [] } = {}) {
+  const facts = JSON.stringify({ brief, plan: { business: plan.business, scenes: plan.scenes, cta: plan.cta, special: plan.special_instructions } }).toLowerCase();
+  const allowedNums = new Set((facts.match(/\d[\d,]*(?:\.\d+)?/g) || []).map((n) => n.replace(/,/g, '')));
+  const logo = assets.find((a) => a.role === 'logo');
+  const brand = String(brief?.name || plan?.business?.name || '').trim().toLowerCase();
+  const logoShowsName = !!(logo?.description && brand && logo.description.toLowerCase().includes(brand));
+  const issues = [];
+  (beats || []).forEach((b, i) => {
+    const n = i + 1;
+    for (const t of beatStrings(b)) {
+      for (const num of t.match(/\d[\d,]*(?:\.\d+)?%?/g) || []) {
+        const bare = num.replace(/[,%]/g, '');
+        if ((Number(bare) > 10 || num.endsWith('%')) && !allowedNums.has(bare)) issues.push(`beat ${n}: "${t}" uses the number ${num}, which is not in the brief. Remove it or use a fact from the brief.`);
+      }
+      if (HYPE.test(t) && !HYPE.test(facts)) issues.push(`beat ${n}: "${t}" makes a claim the business never gave. Say it without the made-up claim.`);
+      if (JARGON.test(t)) issues.push(`beat ${n}: "${t}" uses jargon (${t.match(JARGON)[0]}). Use plain words.`);
+      const name = t.match(/\bfrom ([A-Z][a-z]{2,})\b/);
+      if (name && !facts.includes(name[1].toLowerCase())) issues.push(`beat ${n}: "${t}" invents a person (${name[1]}). Use a generic message.`);
+    }
+    const head = String(b.text || '');
+    if (head.length > 60) issues.push(`beat ${n}: "${head}" is too long for one shot (${head.length} characters). Keep it under 50.`);
+    if (['iconmorph', 'card', 'widgets', 'notify', 'isocard'].includes(b.shot) && head.length > 30) issues.push(`beat ${n} (${b.shot}): "${head}" is too long for a card; keep it under 26 characters.`);
+    if (logoShowsName && ['logo', 'brand'].includes(b.shot) && head.trim().toLowerCase() === brand) issues.push(`beat ${n} (${b.shot}): the logo already shows "${brief?.name || plan?.business?.name}", so don't repeat the name under it. Use a short tagline or message.`);
+  });
+  return [...new Set(issues)].slice(0, 20);
+}
+
+async function selfCheck(out, { system, ctx }) {
+  const list = Array.isArray(out?.beats) ? out.beats : Array.isArray(out) ? out : null;
+  const issues = lintBeats(list, ctx);
+  if (!issues.length) return out;
+  console.log('[director] fixing', issues.length, 'problem(s)');
+  try {
+    const { text } = await geminiGenerate({
+      system,
+      messages: [{ role: 'user', text: `Here is your draft:\n${JSON.stringify(out)}\n\nFix ONLY these problems and keep everything else exactly as it is:\n- ${issues.join('\n- ')}\n\nReturn the full corrected JSON in the same format.` }],
+      model: DIRECTOR_MODEL, temperature: 0.3, maxOutputTokens: 24576, json: true, timeoutMs: 90000, thinking: 'low',
+    });
+    const fixed = parseJson(text);
+    const fl = Array.isArray(fixed?.beats) ? fixed.beats : Array.isArray(fixed) ? fixed : null;
+    if (fl?.length && lintBeats(fl, ctx).length < issues.length) return Array.isArray(out) ? fl : { ...out, ...fixed, beats: fl };
+  } catch (e) { console.warn('[director] self-check failed:', e.message); }
+  return out;
 }
 
 /** Ask Gemini to direct the whole video. Returns sanitized beats, or throws. */
@@ -253,7 +309,8 @@ Direct the ${duration}s video now.`;
     messages: [{ role: 'user', text: user, images }],
     model: DIRECTOR_MODEL, temperature: 0.9, maxOutputTokens: 24576, json: true, timeoutMs: 150000, thinking: 'low',
   });
-  const out = parseJson(text);
+  const system = directorSystem({ duration, aspect: plan.aspect_ratio, style, themeKey });
+  const out = await selfCheck(parseJson(text), { system, ctx: { brief: brief || {}, plan, assets } });
   const beats = sanitizeBeats(out, { duration, assets, plan, calm });
   if (!beats) throw new Error('The director returned no usable beats');
   return { beats, look: sanitizeLook(out.look), concept: str(out.concept, 160) };
@@ -281,7 +338,7 @@ const HEX = /^#[0-9a-f]{6}$/i;
  * Plain-words edit on a motion-engine video: Gemini gets the current beats and returns the new ones
  * (plus optional colour / text-size / speed changes). Returns { html, summary } or throws.
  */
-export async function directorEdit({ html, plan, instruction, assets = [], images = [] }) {
+export async function directorEdit({ html, plan, instruction, assets = [], images = [], brief = null, history = [] }) {
   const data = readData(html);
   if (!data?.beats) throw new Error('Not a motion-engine video');
   const duration = Number(data.duration) || Number(plan?.duration_seconds) || 20;
@@ -297,14 +354,18 @@ export async function directorEdit({ html, plan, instruction, assets = [], image
 YOU ARE EDITING AN EXISTING VIDEO. You get its current beats and the user's change request.
 Return { "beats": [...the FULL updated list...], "colors"?: { "primary"?, "secondary"?, "background"?, "text"? } (hex),
 "textScale"?: number (1 = current, 1.3 = bigger), "speed"?: number (1 = current, 1.4 = faster), "summary": "one short sentence of what you changed" }.
-Change only what the user asked for; keep every other beat as it is. If they ask for something no shot can do,
+Read the request carefully and do ALL of it in this one edit; the user should never have to ask twice.
+If the request lists several changes, make every one. Words like "it", "that part", "the ending" refer to the beats
+and the earlier requests shown to you. Change only what the user asked for; keep every other beat as it is. If they ask for something no shot can do,
 get as close as possible with the shots and cuts available and say so in the summary.`;
+  const past = (history || []).filter((h) => h.role === 'user').slice(-6).map((h) => `- ${h.text}`).join('\n');
+  const facts = brief ? `\nTHE BUSINESS (facts you may use): ${JSON.stringify({ name: brief.name, category: brief.category, messages: brief.headlines, strengths: brief.features, products: brief.products, actions: brief.ctas, contact: brief.contact })}` : '';
   const { text } = await geminiGenerate({
     system,
-    messages: [{ role: 'user', images, text: `CURRENT BEATS:\n${JSON.stringify(current)}\n\nIMAGES AVAILABLE:\n${assetLines(assets)}\n\nCHANGE REQUEST: ${instruction}` }],
-    model: DIRECTOR_MODEL, temperature: 0.5, maxOutputTokens: 24576, json: true, timeoutMs: 150000, thinking: 'low',
+    messages: [{ role: 'user', images, text: `CURRENT BEATS:\n${JSON.stringify(current)}\n\nIMAGES AVAILABLE:\n${assetLines(assets)}${facts}${past ? `\n\nEARLIER CHANGE REQUESTS (already done; keep them):\n${past}` : ''}\n\nCHANGE REQUEST: ${instruction}` }],
+    model: DIRECTOR_MODEL, temperature: 0.4, maxOutputTokens: 24576, json: true, timeoutMs: 150000, thinking: 'high',
   });
-  const out = parseJson(text);
+  const out = await selfCheck(parseJson(text), { system, ctx: { brief: brief || {}, plan: plan || {}, assets } });
   const beats = sanitizeBeats(out.beats || out, { duration, assets, plan: plan || {}, calm: !!THEMES[themeKey]?.calm });
   if (!beats) throw new Error('The edit returned no usable beats');
   let next = html.replace(/window\.ADFLASH_DATA = (.*);\n/, () => `window.ADFLASH_DATA = ${JSON.stringify({ ...data, beats }).replace(/</g, '\\u003c')};\n`);
