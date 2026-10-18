@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { api, ago, duration, naira, otherDeviceLink, useAuth, usePolling } from '../lib.jsx';
 import { Alert, Button, Empty, Modal, PageLoader, PlanBadge, Spinner } from '../components/ui.jsx';
+import BuyCredits, { creditsLeft } from '../components/BuyCredits.jsx';
 
 // A style card: shows the poster, plays the preview while hovered or focused.
 export function StyleCard({ s, selected, onPick }) {
@@ -86,26 +87,56 @@ function NewThing({ open, kind, onPick, onClose }) {
   );
 }
 
-// "Use on another device": the same private videos on a second phone or computer (no sign-in).
-function OtherDevice() {
+// "Link another device": the same private videos and bought videos on your phone and your computer (no sign-in).
+// One device shows a 6-digit code; the other types it in. The long private link still works as a backup.
+function OtherDevice({ onLinked }) {
   const [open, setOpen] = useState(false);
+  const [code, setCode] = useState(null);
+  const [left, setLeft] = useState(0);
+  const [typed, setTyped] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState('');
+  const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
-  const link = otherDeviceLink();
-  const share = async () => {
-    try { if (navigator.share) { await navigator.share({ title: 'My Animora', url: link }); return; } } catch { /* cancelled */ }
-    try { await navigator.clipboard.writeText(link); setCopied(true); setTimeout(() => setCopied(false), 2500); } catch { /* blocked */ }
+  useEffect(() => { if (!code) return undefined; const t = setInterval(() => setLeft((s) => { if (s <= 1) { setCode(null); return 0; } return s - 1; }), 1000); return () => clearInterval(t); }, [code]);
+  const make = async () => { setError(''); try { const r = await api('/devices/code', { method: 'POST' }); setCode(r.code); setLeft(r.minutes * 60); } catch (e) { setError(e.message); } };
+  const link = async () => {
+    setBusy(true); setError(''); setMsg('');
+    try { const r = await api('/devices/link', { method: 'POST', body: { code: typed } }); setMsg(r.same ? 'This device is already linked.' : 'Linked. Your videos are here now.'); setTyped(''); onLinked?.(); }
+    catch (e) { setError(e.message); } finally { setBusy(false); }
   };
+  const copyLink = async () => { try { await navigator.clipboard.writeText(otherDeviceLink()); setCopied(true); setTimeout(() => setCopied(false), 2500); } catch { /* blocked */ } };
   return (
     <>
-      <button onClick={() => setOpen(true)} className="text-sm font-semibold text-ink-soft hover:text-ink">Use on another device</button>
-      <Modal open={open} onClose={() => setOpen(false)} label="Use on another device">
-        <h2 className="text-xl font-bold">Open your videos on another device</h2>
-        <p className="mt-2 text-sm text-ink-soft">Your videos and flyers are private to this device. Open this link on your other phone or computer to see the same ones there. Keep it to yourself: anyone with the link can see and change them.</p>
-        <input readOnly value={link} onFocus={(e) => e.target.select()} className="mt-4 w-full rounded-[10px] border border-ink/15 bg-lilac px-3 py-2.5 font-mono text-xs text-ink" aria-label="Your private link" />
-        <div className="mt-4 flex gap-2">
-          <Button variant="ghost" className="flex-1" onClick={() => setOpen(false)}>Close</Button>
-          <Button className="flex-1" onClick={share}>{copied ? 'Copied' : 'Share or copy link'}</Button>
+      <button onClick={() => setOpen(true)} className="flex items-center gap-1.5 text-sm font-semibold text-ink-soft hover:text-ink">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="2" y="4" width="13" height="10" rx="1.5" /><rect x="16" y="8" width="6" height="12" rx="1.5" /><path d="M6 18h6" /></svg>
+        Sync my devices
+      </button>
+      <Modal open={open} onClose={() => setOpen(false)} label="Sync my devices">
+        <h2 className="text-xl font-bold">Sync your phone and computer</h2>
+        <p className="mt-1 text-sm text-ink-soft">No account needed. Link your devices once and they share the same videos, flyers and bought videos.</p>
+
+        <div className="mt-5 rounded-[16px] border border-ink/12 p-4">
+          <p className="font-semibold text-ink">1. On this device</p>
+          {code ? (
+            <div className="mt-3 text-center">
+              <p className="font-mono text-4xl font-bold tracking-[0.25em] text-ink tabular-nums" aria-live="polite">{code.slice(0, 3)} {code.slice(3)}</p>
+              <p className="mt-1 text-xs text-ink-mute">Type it on your other device · expires in {Math.floor(left / 60)}:{String(left % 60).padStart(2, '0')}</p>
+            </div>
+          ) : <Button className="mt-3 w-full" onClick={make}>Show a code</Button>}
         </div>
+
+        <div className="mt-3 rounded-[16px] border border-ink/12 p-4">
+          <p className="font-semibold text-ink">2. Or, if the other device showed you a code</p>
+          <div className="mt-3 flex gap-2">
+            <input value={typed} onChange={(e) => setTyped(e.target.value.replace(/\D/g, '').slice(0, 6))} inputMode="numeric" autoComplete="one-time-code" placeholder="6-digit code" aria-label="Code from your other device"
+              className="min-w-0 flex-1 rounded-[10px] border border-ink/15 bg-white px-3 py-2.5 font-mono text-lg tracking-[0.2em] text-ink outline-none focus:border-ink/40" />
+            <Button onClick={link} loading={busy} disabled={typed.length !== 6}>Link</Button>
+          </div>
+        </div>
+        {msg && <p className="mt-3 text-sm font-semibold text-money" role="status">{msg}</p>}
+        {error && <p className="mt-3 text-sm text-alert" role="alert">{error}</p>}
+        <button onClick={copyLink} className="mt-4 text-xs font-semibold text-ink-mute hover:text-ink">{copied ? 'Private link copied' : 'Or copy a private link instead'}</button>
       </Modal>
     </>
   );
@@ -132,6 +163,16 @@ export default function Dashboard() {
   const [projects, setProjects] = useState(null);
   const [pricing, setPricing] = useState(null);
   const [error, setError] = useState('');
+  const [buyOpen, setBuyOpen] = useState(false);
+  const [paidMsg, setPaidMsg] = useState('');
+  // back from Paystack: confirm the payment and add the videos
+  useEffect(() => {
+    const ref = params.get('paid'); if (!ref) return;
+    api(`/credits/verify?ref=${encodeURIComponent(ref)}`).then((r) => {
+      setPaidMsg(r.status === 'paid' ? `Payment received. ${r.user?.credits?.packSize || 5} videos were added.` : "We're still waiting for Paystack to confirm your payment. It will show here once it does.");
+      refresh();
+    }).catch((e) => setPaidMsg(e.message)).finally(() => setParams({}, { replace: true }));
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const newParam = params.get('new');
   const newOpen = !!newParam;
   const newKind = newParam === 'video' || newParam === 'flyer' ? newParam : null;
@@ -178,11 +219,21 @@ export default function Dashboard() {
       <NewThing open={newOpen} kind={newKind} onPick={(k) => setParams({ new: k })} onClose={() => setParams({})} />
       <div className="flex flex-wrap items-end justify-between gap-4">
         <h1 className="text-4xl font-bold tracking-[-0.045em]">My videos</h1>
-        <OtherDevice />
+        <div className="flex flex-wrap items-center gap-4">
+          {creditsLeft(user) !== null && (
+            <span className="flex items-center gap-2 rounded-full border border-ink/12 bg-white px-3 py-1.5 text-sm">
+              <b className="tabular-nums">{creditsLeft(user)}</b> {user.credits.free > 0 && !user.credits.paid ? 'free ' : ''}video{creditsLeft(user) === 1 ? '' : 's'} left
+              <button className="font-semibold text-danfo hover:underline" onClick={() => setBuyOpen(true)}>Buy {user.credits.packSize}</button>
+            </span>
+          )}
+          <OtherDevice onLinked={() => { load(); refresh(); }} />
+        </div>
         {!user.testMode && (user.plan === 'pro'
           ? <p className="text-sm text-ink-soft">{user.proVideosRemaining} of {limit} ad-free videos left this month</p>
           : <Link to="/checkout" className="text-sm font-semibold text-ink-soft hover:text-ink">Upgrade to Pro for {naira(pricing?.proPriceNgn || 5000)}/month</Link>)}
       </div>
+      <BuyCredits open={buyOpen} onClose={() => setBuyOpen(false)} />
+      {paidMsg && <div className="mt-6 rounded-[12px] border border-money/30 bg-money/10 px-4 py-3 text-sm font-semibold text-ink" role="status">{paidMsg}</div>}
       <div className="mt-8"><Alert>{error}</Alert></div>
       {!projects ? <PageLoader /> : (
         <ul className="grid grid-cols-2 gap-x-5 gap-y-8 sm:grid-cols-3 lg:grid-cols-4">

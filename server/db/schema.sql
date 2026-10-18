@@ -230,3 +230,31 @@ CREATE UNIQUE INDEX IF NOT EXISTS users_device_key_idx ON users(device_key_hash)
 -- ---- v8: flyers (still designs) next to videos ----
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS kind text NOT NULL DEFAULT 'video';   -- video | flyer
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS source_project_id uuid;              -- a flyer made from a video
+
+-- ---- v9: credits (2 free, then packs of 5 paid with Paystack) and devices linked to one owner ----
+ALTER TABLE users ADD COLUMN IF NOT EXISTS free_left integer NOT NULL DEFAULT 2;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS credits integer NOT NULL DEFAULT 0;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS unlimited boolean NOT NULL DEFAULT false;
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS paid_at timestamptz;          -- set when this video/flyer used a credit
+CREATE TABLE IF NOT EXISTS device_keys (
+  key_hash    text PRIMARY KEY,
+  user_id     uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at  timestamptz NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS device_codes (
+  code        text PRIMARY KEY,
+  user_id     uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  expires_at  timestamptz NOT NULL
+);
+CREATE TABLE IF NOT EXISTS credit_payments (
+  reference   text PRIMARY KEY,
+  user_id     uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  credits     integer NOT NULL,
+  amount_ngn  numeric(12,2) NOT NULL,
+  status      text NOT NULL DEFAULT 'pending',   -- pending | paid | failed
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  paid_at     timestamptz
+);
+ALTER TABLE device_keys ENABLE ROW LEVEL SECURITY;
+ALTER TABLE device_codes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE credit_payments ENABLE ROW LEVEL SECURITY;

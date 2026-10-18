@@ -19,6 +19,7 @@ import renderRoutes from './routes/renders.js';
 import moneyRoutes from './routes/money.js';
 import transcribeRoutes from './routes/transcribe.js';
 import renderJobRoutes from './routes/renderJobs.js';
+import creditRoutes from './routes/credits.js';
 
 const require = createRequire(import.meta.url);
 
@@ -65,6 +66,7 @@ export async function createApp() {
   app.use('/api', moneyRoutes);
   app.use('/api', transcribeRoutes);
   app.use('/api', renderJobRoutes);
+  app.use('/api', creditRoutes);
   app.use('/api', (req, res) => res.status(404).json({ error: 'Not found' }));
 
   // --- files ---

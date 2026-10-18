@@ -8,6 +8,7 @@ import { LivePreview } from '../components/Preview.jsx';
 import VoicePanel from '../components/VoicePanel.jsx';
 import DownloadVideo from '../components/DownloadVideo.jsx';
 import FlyerDownload from '../components/FlyerDownload.jsx';
+import BuyCredits from '../components/BuyCredits.jsx';
 import { enablePush } from '../lib/notify.js';
 
 const SUGGESTIONS = ['Start by zooming into my logo', 'Make the text bigger', 'Use calmer, premium transitions', 'Make the price stand out more'];
@@ -176,6 +177,7 @@ export default function Studio() {
   const [notice, setNotice] = useState('');
   const started = useRef(false);
   const [askOpen, setAskOpen] = useState(false);
+  const [needBuy, setNeedBuy] = useState(false);
   const asked = useRef(new Set());   // ask once per version
   const ask = (code) => { if (code && !asked.current.has(code)) { asked.current.add(code); setAskOpen(true); } };
 
@@ -207,7 +209,7 @@ export default function Studio() {
       const r = await api(`/projects/${id}/generate`, { method: 'POST' });
       setProject(r.project);
       watch();
-    } catch (e) { setError(e.message); setGenerating(false); }
+    } catch (e) { if (e.data?.code === 'NEED_CREDITS') setNeedBuy(true); else setError(e.message); setGenerating(false); }
   };
 
   useEffect(() => {
@@ -254,7 +256,7 @@ export default function Studio() {
   const makeFlyer = async () => {
     setError('');
     try { enablePush().then(setPushOn); const r = await api(`/projects/${id}/flyer`, { method: 'POST', body: {} }); navigate(`/p/${r.project.id}/studio`); }
-    catch (e) { setError(e.message); }
+    catch (e) { if (e.data?.code === 'NEED_CREDITS') setNeedBuy(true); else setError(e.message); }
   };
 
   return (
@@ -269,6 +271,7 @@ export default function Studio() {
           {project.code && <span className="hidden lg:block">{flyer ? <FlyerDownload project={project} /> : canRender ? <Button onClick={() => navigate(`/p/${id}/render?new=1`)}>Generate Video</Button> : <DownloadVideo project={project} />}</span>}
         </div>
       </div>
+      <BuyCredits open={needBuy} onClose={() => setNeedBuy(false)} reason="You've used your free videos" />
       <Feedback open={askOpen} project={project} onClose={() => setAskOpen(false)}
         onUpdate={(p) => { setProject(p); setTab('edit'); setNotice('Done. Your change is in the preview. Watch it again, or keep editing below.'); }}
         onHappy={() => { setAskOpen(false); if (!flyer && canRender) navigate(`/p/${id}/render?new=1`); }} />

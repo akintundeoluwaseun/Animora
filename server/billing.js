@@ -121,3 +121,21 @@ export function publicPricing() {
     adRevenuePerViewNgn: P.adRevenuePerViewNgn, proRevenuePerVideoNgn: round2(P.proPriceNgn / P.proVideosPerMonth),
   };
 }
+
+// ---------------------------------------------------------------------------
+// Credits (no sign-in): each new video or flyer uses one credit the first time it is made.
+// Free credits first, then paid ones. Regenerating and editing the same video is free.
+// ---------------------------------------------------------------------------
+export async function useCredit(user, projectId) {
+  if (!config.credits.enabled) return { ok: true };
+  const p = await one('SELECT paid_at FROM projects WHERE id=$1', [projectId]);
+  if (p?.paid_at) return { ok: true };
+  const u = await one(`UPDATE users SET
+      free_left = CASE WHEN unlimited THEN free_left WHEN free_left > 0 THEN free_left - 1 ELSE free_left END,
+      credits   = CASE WHEN unlimited OR free_left > 0 THEN credits ELSE credits - 1 END
+    WHERE id=$1 AND (unlimited OR free_left > 0 OR credits > 0) RETURNING free_left, credits`, [user.id]);
+  if (!u) return { ok: false };
+  await q('UPDATE projects SET paid_at=now() WHERE id=$1', [projectId]);
+  return { ok: true, left: u.free_left + u.credits };
+}
+export const NEED_CREDITS = () => Object.assign(new Error(`You've used your free videos. Buy ${config.credits.packSize} more videos for ₦${config.credits.packPriceNgn.toLocaleString('en-NG')} to keep going.`), { status: 402, code: 'NEED_CREDITS' });

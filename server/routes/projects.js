@@ -14,6 +14,7 @@ import { voiceoverFormats, generateVoiceTrack, VOICES, hasOfflineVoice } from '.
 import { config } from '../config.js';
 import { cleanBrief, briefToPlanRules, suggest, autoStyleSlug, parseBrief } from '../ai/brief.js';
 import { makeFlyer } from '../ai/flyer.js';
+import { useCredit, NEED_CREDITS } from '../billing.js';
 import { describeAssets } from '../ai/describe.js';
 import { loadImage } from '../ai/index.js';
 
@@ -105,6 +106,10 @@ r.post('/', async (req, res) => {
 r.post('/:id/flyer', async (req, res) => {
   const p = await loadProject(req, res); if (!p) return;
   if (!p.brief_json && !p.plan_json) return res.status(400).json({ error: 'Answer the questions for this video first.' });
+  if (req.user.unlimited !== true && config.credits.enabled) {
+    const u = await one('SELECT free_left, credits FROM users WHERE id=$1', [req.user.id]);
+    if (!u || (u.free_left + u.credits) <= 0) { const e = NEED_CREDITS(); return res.status(402).json({ error: e.message, code: e.code }); }
+  }
   const brief = { ...(p.brief_json || {}), aspect: ['4:5', '9:16', '1:1', 'A4'].includes(req.body?.aspect) ? req.body.aspect : '4:5' };
   const plan = { ...(p.plan_json || {}), aspect_ratio: brief.aspect };
   const f = await one(`INSERT INTO projects (user_id, title, style_id, brief_json, plan_json, aspect_ratio, duration_seconds, kind, source_project_id, status, gen_state, gen_message, gen_started_at)
@@ -112,6 +117,7 @@ r.post('/:id/flyer', async (req, res) => {
     [req.user.id, `${(p.brief_json?.name || p.title).slice(0, 80)} flyer`, p.style_id, JSON.stringify(brief), JSON.stringify(plan), brief.aspect, p.duration_seconds || 15, p.id]);
   await q(`INSERT INTO assets (user_id, project_id, name, kind, role, mime, url, width, height, has_alpha, duration_seconds, is_light, description)
     SELECT user_id, $2, name, kind, role, mime, url, width, height, has_alpha, duration_seconds, is_light, description FROM assets WHERE project_id=$1 AND kind='image'`, [p.id, f.id]);
+  await useCredit(req.user, f.id);
   res.status(202).json({ project: shape(f) });
   const job = runGenerate(f, req.user);
   if (config.serverless) waitUntil(job); else job.catch(() => {});
@@ -290,6 +296,7 @@ r.post('/:id/generate', async (req, res) => {
   if (problems.length) return res.status(400).json({ error: `The plan needs fixing: ${problems.join('; ')}` });
   const fresh = p.gen_state === 'working' && p.gen_started_at && Date.now() - new Date(p.gen_started_at).getTime() < 6 * 60e3;
   if (fresh) return res.status(202).json({ project: shape(p), started: false });
+  if (!(await useCredit(req.user, p.id)).ok) { const e = NEED_CREDITS(); return res.status(402).json({ error: e.message, code: e.code }); }
   const u = await one("UPDATE projects SET status='coding', gen_state='working', gen_message='Reading your answers', gen_error=NULL, gen_started_at=now() WHERE id=$1 RETURNING *", [p.id]);
   res.status(202).json({ project: shape(u), started: true });
   const job = runGenerate(p, req.user);

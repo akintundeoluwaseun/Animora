@@ -56,6 +56,15 @@ export const config = {
     sourceWalletName: env('ACCESSBANK_PAYOUT_WALLET_NAME', 'ADFLASH'),
   },
 
+  // Credits: every device gets FREE_VIDEOS, then buys packs (no sign-in). Switched on by the Paystack key.
+  credits: {
+    enabled: env('CREDITS', env('PAYSTACK_SECRET_KEY') ? 'on' : 'off') === 'on',
+    free: num('FREE_VIDEOS', 2),
+    packSize: num('CREDIT_PACK_SIZE', 5),
+    packPriceNgn: num('CREDIT_PACK_PRICE_NGN', 4000),
+  },
+  paystack: { secretKey: env('PAYSTACK_SECRET_KEY'), publicKey: env('PAYSTACK_PUBLIC_KEY') },
+
   // Business rules
   pricing: {
     proPriceNgn: num('PRO_PRICE_NGN', 5000),

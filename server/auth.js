@@ -77,6 +77,7 @@ export function publicUser(u) {
     needsAdForNextVideo: !config.noAuth && !(u.plan === 'pro' && u.videos_used_this_month < limit),
     maxSeconds: u.plan === 'pro' || config.noAuth ? pricing.proMaxSeconds : pricing.freeMaxSeconds,
     testMode: config.noAuth,
+    credits: { enabled: config.credits.enabled, unlimited: !!u.unlimited, free: u.free_left ?? 0, paid: u.credits ?? 0, left: u.unlimited ? null : (u.free_left ?? 0) + (u.credits ?? 0), packSize: config.credits.packSize, packPriceNgn: config.credits.packPriceNgn },
     bank: u.bank_account_number ? { bankName: u.bank_name, accountNumber: u.bank_account_number, accountName: u.bank_account_name } : null,
   };
 }
@@ -105,7 +106,8 @@ export async function deviceUser(key) {
   const h = keyHash(key);
   let id = deviceCache.get(h);
   if (!id) {
-    const u = await one('SELECT id FROM users WHERE device_key_hash=$1', [h])
+    const u = await one('SELECT user_id AS id FROM device_keys WHERE key_hash=$1', [h])
+      || await one('SELECT id FROM users WHERE device_key_hash=$1', [h])
       || await one(`INSERT INTO users (name, email, password_hash, role, plan, device_key_hash) VALUES ('Animora user', $1, 'none', 'creator', 'pro', $2)
           ON CONFLICT (email) DO UPDATE SET device_key_hash=EXCLUDED.device_key_hash RETURNING id`, [`device-${h.slice(0, 24)}@animora.app`, h]);
     id = u.id;
@@ -114,7 +116,9 @@ export async function deviceUser(key) {
   }
   return loadUser(id);
 }
-const validKey = (k) => typeof k === 'string' && /^[A-Za-z0-9_-]{24,128}$/.test(k);
+export const forgetDevice = (key) => deviceCache.delete(keyHash(key));
+export { keyHash };
+export const validKey = (k) => typeof k === 'string' && /^[A-Za-z0-9_-]{24,128}$/.test(k);
 
 // Express middleware
 export function requireAuth(req, res, next) {
