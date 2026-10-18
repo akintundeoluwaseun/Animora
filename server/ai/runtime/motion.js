@@ -1248,6 +1248,143 @@
     sfx(b.in, 'whoosh-low', 0.45); sfx(b.in + 0.4, 'chime', 0.3);
   };
 
+  // ------------------------------------------------------------------ reference looks, batch 2
+  // Lines stack up; each new one is bright and the earlier ones dim ("Free. / No ads. / No subscriptions.").
+  SHOTS.stepstack = (b, bi) => {
+    const lines = ((b.lines && b.lines.length) ? b.lines : (b.items || []).map((i) => i.text)).slice(0, 5);
+    const box = el('div', 'fitbox ss' + (WIDE ? '' : ' center'), bi);
+    const fs = Math.min(WIDE ? 120 : 110, (WIDE ? 1500 : 940) / Math.max(6, Math.max(...lines.map((l) => String(l).length)) * 0.56));
+    const rows = lines.map((ln) => { const r = el('div', 'ss-l', box, esc(ln)); r.style.fontSize = FS(fs); return r; });
+    const step = Math.min(0.75, (b.t1 - b.in - 0.6) / Math.max(1, rows.length)) / SP;
+    rows.forEach((r, k) => {
+      const at = b.in + k * step;
+      tl.fromTo(r, focusFrom(28), { opacity: 1, y: 0, filter: 'blur(0px)', duration: 0.55, ease: 'power3.out', immediateRender: true }, at);
+      if (k > 0) tl.to(rows.slice(0, k), { opacity: 0.32, duration: 0.4 }, at);
+      sfx(at, 'tick', 0.35);
+    });
+    idle(bi, b, 0.04);
+  };
+
+  // A huge number counting up, label beside it ("900 frames.").
+  SHOTS.bigcount = (b, bi) => {
+    const raw = String(b.number || (b.price != null ? '₦' + fmt(b.price) : '100'));
+    const m = raw.match(/^(\D*)([\d,.]+)(.*)$/) || ['', '', raw, ''];
+    const target = Number(m[2].replace(/,/g, '')) || 0, dec = (m[2].split('.')[1] || '').length;
+    const box = el('div', 'fitbox bc' + (WIDE ? ' row' : ''), bi);
+    const card = el('div', 'bc-card', box);
+    const num = el('div', 'bc-n', card, esc(raw)); num.style.fontSize = FS(Math.min(300, 1300 / Math.max(2, raw.length)));
+    const lab = el('div', 'bc-l col', box);
+    if (b.text) { const t = el('div', 'tx-line small', lab, wordsHtml(b.text, null, false)); t.style.fontSize = FS(sizeRaw(b.text, 1500, 48, 90)); textEnter(t, b.in + 0.5, textInOr('focus')); }
+    if (b.sub) { const s2 = el('div', 'tx-sub', lab, esc(b.sub)); s2.style.fontSize = FS(36); tl.from(s2, Object.assign(focusFrom(14), { duration: 0.5 }), b.in + 0.8); }
+    const p = { v: 0 };
+    const show = () => { const v = dec ? p.v.toFixed(dec) : fmt(p.v); num.textContent = m[1] + v + m[3]; };
+    tl.fromTo(card, { scale: 0.7, opacity: 0, filter: 'blur(' + N(16) + 'px)' }, { scale: 1, opacity: 1, filter: 'blur(0px)', duration: 0.6, ease: 'expo.out', immediateRender: true }, b.in);
+    tl.fromTo(p, { v: target * 0.08 }, { v: target, duration: Math.min(1.6, (b.t1 - b.in) * 0.55) / SP, ease: 'power3.out', onUpdate: show, immediateRender: false }, b.in + 0.1);
+    for (let j = 0; j < 6; j++) sfx(b.in + 0.15 + j * 0.16, 'tick', 0.3);
+    sfx(b.in + Math.min(1.6, (b.t1 - b.in) * 0.55) + 0.05, 'pop', 0.5);
+    idle(bi, b, 0.04);
+  };
+
+  // A switch flips on with a squash, the track fills with colour, a word rises under it ("Morph.").
+  SHOTS.toggle = (b, bi) => {
+    const box = el('div', 'fitbox col center tg', bi);
+    const tw = N(WIDE ? 300 : 340), th = tw * 0.56;
+    const track = el('div', 'tg-t', box); track.style.width = tw + 'px'; track.style.height = th + 'px'; track.style.borderRadius = th / 2 + 'px';
+    const knob = el('i', 'tg-k', track); const ks = th - N(24); knob.style.width = knob.style.height = ks + 'px';
+    const t = el('div', 'tx-line', box, wordsHtml(b.text, null, false)); t.style.fontSize = FS(sizeFor(b.text, 1700, 56, 110));
+    const flip = b.in + 0.55, travel = tw - ks - N(24);
+    const onC = cssVar('--primary') || '#2a7';
+    tl.fromTo(track, { scale: 0.6, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.5, ease: 'back.out(1.8)', immediateRender: true }, b.in);
+    tl.to(knob, { keyframes: [{ scaleX: 1.35, x: travel * 0.25, duration: 0.14, ease: 'power2.in' }, { scaleX: 1, x: travel, duration: 0.3, ease: 'back.out(2.4)' }] }, flip);
+    tl.to(track, { backgroundColor: onC, duration: 0.3 }, flip + 0.08);
+    sfx(flip + 0.1, 'click', 0.9);
+    textEnter(t, flip + 0.25, textInOr('rise'));
+  };
+
+  // Letters fly in from all over the frame as round blobs and assemble the word (Pinned logo style).
+  SHOTS.assemble = (b, bi) => {
+    const txt = String(b.text);
+    const box = el('div', 'fitbox asm', bi);
+    const size = Math.min(WIDE ? 280 : 260, (WIDE ? 1500 : 900) / Math.max(3, txt.length * 0.62));
+    const cs = Array.from(txt).map((c) => el('span', 'asm-c', box, c === ' ' ? '&nbsp;' : esc(c)));
+    box.style.fontSize = FS(size);
+    cs.forEach((c, k) => {
+      const at = b.in + R(0, 0.35) / SP;
+      tl.fromTo(c, { x: R(-W * 0.45, W * 0.45), y: R(-H * 0.4, H * 0.4), rotation: R(-160, 160), scale: 0.25, opacity: 0, borderRadius: '50%' },
+        { x: 0, y: 0, rotation: 0, scale: 1, opacity: 1, duration: 0.85 / SP, ease: 'back.out(1.4)', immediateRender: true }, at);
+    });
+    sfx(b.in + 0.3, 'whoosh', 0.45); sfx(b.in + 1.0, 'pop', 0.55);
+    if (b.sub) { const s2 = el('div', 'tx-sub asm-sub', box, esc(b.sub)); s2.style.fontSize = FS(42); gsap.set(s2, { xPercent: -50 }); tl.from(s2, Object.assign(focusFrom(16), { duration: 0.5 }), b.in + 1.1); }
+    idle(bi, b, 0.04);
+  };
+
+  // A row of overlapping round bubbles (photos or icons) popping in with a spring, title above ("Spark moments instantly.").
+  SHOTS.avatars = (b, bi) => {
+    const box = el('div', 'fitbox col center av', bi);
+    if (b.text) { const t = el('div', 'sent-line', box, wordsHtml(b.text, null, false)); t.style.fontSize = FS(sizeRaw(b.text, 1700, 52, 96)); textEnter(t, b.in + 0.45, textInOr('focus')); }
+    const row = el('div', 'av-row', box);
+    const list = (b.imgs && b.imgs.length ? b.imgs.map((u) => ({ img: u })) : (b.items || []).map((i) => ({ icon: i.icon }))).slice(0, 6);
+    const sz = N(WIDE ? 150 : 160);
+    list.forEach((it, k) => {
+      const c = el('div', 'av-c c' + (k % 3) + (it.img ? ' photo' : ''), row, it.img ? '<img src="' + esc(it.img) + '" crossorigin="anonymous" alt="">' : icon(it.icon || 'sparkle'));
+      c.style.width = c.style.height = sz + 'px'; if (k) c.style.marginLeft = -sz * 0.24 + 'px'; c.style.zIndex = String(k + 1);
+      tl.fromTo(c, { scale: 0, x: -N(60) }, { scale: 1, x: 0, duration: 0.6, ease: 'back.out(2.2)', immediateRender: true }, b.in + k * 0.09 / SP);
+      sfx(b.in + k * 0.09 / SP, 'pop', 0.3);
+    });
+    idle(bi, b, 0.04);
+  };
+
+  // A long diagonal 3D wall of cards sliding past the camera (creator-reel style).
+  SHOTS.cardstack = (b, bi) => {
+    let pics = (b.imgs || []).slice(0, 6);
+    const n = 9, cw = N(WIDE ? 380 : 340), chh = cw * 1.25;
+    const lane = el('div', 'ck-lane', bi);
+    const cards = [];
+    for (let k = 0; k < n; k++) {
+      const img = pics.length ? pics[k % pics.length] : null, it = (b.items || [])[k % Math.max(1, (b.items || []).length)];
+      const c = el('div', 'ck-c' + (img ? ' photo' : ''), lane, img ? '<img src="' + esc(img) + '" crossorigin="anonymous" alt="">' : icon((it && it.icon) || 'sparkle') + '<span>' + esc((it && it.text) || '') + '</span>');
+      c.style.width = cw + 'px'; c.style.height = chh + 'px';
+      gsap.set(c, { xPercent: -50, yPercent: -50, x: k * cw * 0.62, z: -k * N(150) });
+      cards.push(c);
+    }
+    const L = Math.max(0.5, b.t1 - b.t0);
+    tl.fromTo(lane, { rotationY: -38, rotationX: 8, x: W * 0.15 }, { rotationY: -30, rotationX: 4, x: -cw * 2.2, duration: L, ease: 'power1.inOut', immediateRender: true }, b.t0);
+    tl.fromTo(cards, { opacity: 0, y: N(120) }, { opacity: 1, y: 0, duration: 0.6, stagger: 0.05, ease: 'expo.out', immediateRender: true }, b.in);
+    if (b.text) {
+      const front = el('div', 'fitbox col center ck-front', bi);
+      const t = el('div', 'tx-line', front, wordsHtml(b.text, null, TH.accentStyle === 'marker')); t.style.fontSize = FS(sizeFor(b.text, 2100, 64, 130));
+      textEnter(t, b.in + 0.6, textInOr('rise'));
+    }
+    sfx(b.in, 'whoosh-low', 0.5);
+  };
+
+  // A numbered title card: big number, an icon tile beside it, a label pill below ("#3  Caveman").
+  SHOTS.numbered = (b, bi) => {
+    const box = el('div', 'fitbox col center nb', bi);
+    const top = el('div', 'nb-top', box);
+    const num = el('div', 'nb-n', top, esc(String(b.number || '#1'))); num.style.fontSize = FS(220);
+    const tile = el('div', 'nb-tile', top, icon(b.icon || 'sparkle')); tile.style.width = tile.style.height = N(190) + 'px';
+    const pill = el('div', 'nb-pill', box, esc(b.text)); pill.style.fontSize = FS(Math.min(80, 1500 / Math.max(8, String(b.text).length)));
+    tl.fromTo(num, { yPercent: 60, opacity: 0, filter: 'blur(' + N(14) + 'px)' }, { yPercent: 0, opacity: 1, filter: 'blur(0px)', duration: 0.55, ease: 'expo.out', immediateRender: true }, b.in);
+    tl.fromTo(tile, { scale: 0, rotation: -30 }, { scale: 1, rotation: 0, duration: 0.55, ease: 'back.out(2)', immediateRender: true }, b.in + 0.2);
+    tl.fromTo(pill, { clipPath: 'inset(0% 50% 0% 50% round 999px)' }, { clipPath: 'inset(0% 0% 0% 0% round 999px)', duration: 0.55, ease: 'expo.out', immediateRender: true }, b.in + 0.4);
+    sfx(b.in, 'swish', 0.4); sfx(b.in + 0.25, 'pop', 0.5);
+    idle(bi, b, 0.04);
+  };
+
+  // The line opens inside curly brackets that slide apart ("{ Ever find an }").
+  SHOTS.bracket = (b, bi) => {
+    const box = el('div', 'fitbox bk', bi);
+    const l = el('span', 'bk-b', box, '{'), t = el('span', 'bk-t', box, esc(b.text)), r = el('span', 'bk-b', box, '}');
+    box.style.fontSize = FS(sizeRaw(b.text, 1900, 54, 110));
+    tl.fromTo(t, { clipPath: 'inset(0% 50% 0% 50%)', opacity: 0 }, { clipPath: 'inset(0% 0% 0% 0%)', opacity: 1, duration: 0.6 / SP, ease: 'expo.inOut', immediateRender: true }, b.in + 0.15);
+    tl.fromTo(l, { x: () => t.offsetWidth / 2 + N(10) }, { x: 0, duration: 0.6 / SP, ease: 'expo.inOut', immediateRender: false }, b.in + 0.15);
+    tl.fromTo(r, { x: () => -t.offsetWidth / 2 - N(10) }, { x: 0, duration: 0.6 / SP, ease: 'expo.inOut', immediateRender: false }, b.in + 0.15);
+    tl.fromTo([l, r], { opacity: 0 }, { opacity: 1, duration: 0.2, immediateRender: true }, b.in);
+    sfx(b.in + 0.15, 'swish', 0.4);
+    idle(bi, b, 0.04);
+  };
+
   // ------------------------------------------------------------------ transitions between beats
   // Every cut: the outgoing beat LEAVES during [T-d, T], the incoming beat ARRIVES during [T, T+d2].
   function exitBeat(bt, type, T, d) {
@@ -1520,6 +1657,26 @@
       '.glowlook .flow-card,.glowlook .tile,.glowlook .ui-card,.glowlook .im-box,.glowlook .wg{box-shadow:0 0 0 ' + n(2) + ' color-mix(in srgb,var(--primary) 35%,transparent),0 0 ' + n(50) + ' color-mix(in srgb,var(--primary) 25%,transparent)}',
       '.halolook .sw.acc,.halolook .wd.acc,.halolook .flip-c.acc{position:relative;isolation:isolate}',
       '.halolook .sw.acc::before,.halolook .wd.acc::before,.halolook .flip-c.acc::before{content:"";position:absolute;left:-.5em;right:-.5em;top:-.45em;bottom:-.45em;z-index:-1;border-radius:50%;background:radial-gradient(closest-side,color-mix(in srgb,var(--primary) 32%,transparent),transparent)}',
+      '.ss{display:flex;flex-direction:column;align-items:flex-start} .ss.center{align-items:center;text-align:center} .ss-l{' + type + 'line-height:1.08;letter-spacing:-.02em;white-space:nowrap}',
+      '.bc{display:flex;flex-direction:column;align-items:center} .bc>*+*{margin-top:' + n(36) + '} .bc.row{flex-direction:row} .bc.row>*+*{margin-top:0;margin-left:' + n(60) + '}',
+      '.bc-card{padding:' + n(30) + ' ' + n(60) + ';border-radius:' + n(40) + ';background:var(--surface);border:' + n(2) + ' solid var(--line);box-shadow:var(--shadow)}',
+      '.bc-n{font-weight:800;line-height:1;letter-spacing:-.04em;white-space:nowrap;font-variant-numeric:tabular-nums;color:var(--text)} .bc-l{max-width:' + (WIDE ? W * 0.32 : W * 0.8).toFixed(0) + 'px}',
+      '.tg-t{position:relative;background:color-mix(in srgb,var(--text) 16%,transparent);box-shadow:inset 0 ' + n(4) + ' ' + n(14) + ' rgba(0,0,0,.18)} .tg>*+*{margin-top:' + n(50) + '}',
+      '.tg-k{position:absolute;left:' + n(12) + ';top:' + n(12) + ';border-radius:999px;background:#fff;box-shadow:0 ' + n(8) + ' ' + n(20) + ' rgba(0,0,0,.25);transform-origin:0 50%}',
+      '.asm{position:relative;display:flex;white-space:nowrap} .asm-c{display:inline-block;' + type + 'line-height:1;color:var(--text)} .asm-c:nth-child(3n+2){color:var(--primary)}',
+      '.asm-sub{position:absolute;top:100%;left:50%;margin-top:' + n(40) + ';white-space:nowrap}',
+      '.av-row{display:flex;align-items:center} .av>*+*{margin-top:' + n(50) + '}',
+      '.av-c{position:relative;flex:none;border-radius:50%;display:flex;align-items:center;justify-content:center;overflow:hidden;border:' + n(6) + ' solid var(--bg);box-shadow:0 ' + n(14) + ' ' + n(30) + ' rgba(0,0,0,.2)}',
+      '.av-c.c0{background:var(--primary);color:var(--on-primary)} .av-c.c1{background:var(--secondary);color:var(--on-secondary)} .av-c.c2{background:var(--text);color:var(--bg)} .av-c .ic{width:46%;height:46%} .av-c.photo img{width:100%;height:100%;object-fit:cover}',
+      '.ck-lane{position:absolute;left:50%;top:' + (WIDE ? 58 : 60) + '%;width:0;height:0;transform-style:preserve-3d}',
+      '.ck-c{position:absolute;left:0;top:0;border-radius:' + n(30) + ';overflow:hidden;background:var(--surface);border:' + n(2) + ' solid var(--line);box-shadow:0 ' + n(30) + ' ' + n(60) + ' ' + n(-20) + ' rgba(0,0,0,.5);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:' + n(20) + ';color:var(--text);font-weight:700;font-size:' + n(40) + '}',
+      '.ck-c .ic{width:' + n(110) + ';height:' + n(110) + ';color:var(--primary)} .ck-c.photo img{width:100%;height:100%;object-fit:cover}',
+      '.ck-front{position:absolute;z-index:3;top:' + (WIDE ? 12 : 18) + '%} .ck-front .tx-line{text-shadow:0 0 ' + n(40) + ' var(--bg),0 0 ' + n(20) + ' var(--bg)}',
+      '.nb-top{display:flex;align-items:center} .nb-top>*+*{margin-left:' + n(30) + '} .nb>*+*{margin-top:' + n(30) + '}',
+      '.nb-n{font-weight:900;line-height:.9;letter-spacing:-.04em;color:transparent;background:linear-gradient(180deg,var(--secondary),var(--primary));-webkit-background-clip:text;background-clip:text}',
+      '.nb-tile{border-radius:26%;background:var(--primary);color:var(--on-primary);display:flex;align-items:center;justify-content:center;box-shadow:var(--shadow)} .nb-tile .ic{width:52%;height:52%}',
+      '.nb-pill{padding:.25em .9em;border-radius:999px;border:' + n(4) + ' solid color-mix(in srgb,var(--text) 70%,transparent);background:color-mix(in srgb,var(--text) 12%,transparent);font-weight:800;white-space:nowrap}',
+      '.bk{display:flex;align-items:center;white-space:nowrap} .bk-b{font-weight:300;color:var(--primary);font-size:1.25em;line-height:1} .bk-t{' + type + 'padding:0 .5em;letter-spacing:-.01em}',
       '.fin-grain{position:absolute;inset:0;z-index:70;pointer-events:none;mix-blend-mode:overlay}',
       '.fin-vig{position:absolute;inset:0;z-index:69;pointer-events:none}',
       '.fin-leak{position:absolute;inset:-25%;z-index:68;pointer-events:none;mix-blend-mode:screen;visibility:hidden;background:radial-gradient(ellipse 45% 40% at 22% 30%,rgba(255,170,90,.75),rgba(255,90,60,.25) 45%,transparent 70%)}',

@@ -29,6 +29,14 @@ export const SHOTS = {
   ring3d: { f: 'text (row 2), items? (row 1 words) or word?', d: 'STUDIO 3D: words wrapped round a rotating 3D cylinder, two rows turning opposite ways.' },
   colorslide: { f: 'text (max 40), sub?, img?', d: 'STUDIO: the whole screen floods with a bold colour; big uppercase headline, italic line under it, an image card tilting in.' },
   dotsphere: { f: 'text, sub?', d: 'STUDIO 3D: a rotating sphere of glowing dots beside the line (AI / tech / future topics).' },
+  stepstack: { f: 'lines (2-5 short lines)', d: 'lines stack up one by one; the newest is bright and the earlier ones dim ("Free." / "No ads." / "No subscriptions.").' },
+  bigcount: { f: 'number (e.g. "900", "24/7" not allowed: digits only with optional prefix/suffix like "+", "%", "\u20a6") or price, text (label), sub?', d: 'a huge number counts up in a card, its label beside it. Only numbers from the brief.' },
+  toggle: { f: 'text (max 30)', d: 'APPLE-PLAYFUL: a switch flips on with a squash and fills with colour; the word rises under it ("Now open.").' },
+  assemble: { f: 'text (1-2 words, max 14 letters, often the brand), sub?', d: 'PLAYFUL: letters fly in from all over the frame as round blobs and assemble the word. Great logo-name reveal.' },
+  avatars: { f: 'text (title), imgs (2-6) or items (2-6 with icons)', d: 'a row of overlapping round bubbles (photos or icons) pops in with a spring under the title.' },
+  cardstack: { f: 'imgs (1-6) or items (2-6), text?', d: '3D: a long diagonal wall of cards slides past the camera, the line over it.' },
+  numbered: { f: 'number ("#1", "#2" ...), text (label, max 28), icon', d: 'a numbered title card: big gradient number, icon tile, label pill. Use for "top 3" lists, one beat per item.' },
+  bracket: { f: 'text (max 36)', d: 'the line opens inside curly brackets that slide apart ("{ Ever find an }"). Techy, creator style.' },
   logo: { f: 'text?, sub?', d: 'the business LOGO big in the centre, rings pulse out, name rises below. Needs an uploaded logo. Follow it with cut "dive" to zoom the camera INTO the logo.' },
   sentence: { f: 'text, sub?', d: 'premium: a short sentence builds word by word, the last word in the accent colour (letters drop in).' },
   flip: { f: 'text (2-6 words)', d: 'words replace each other one at a time in the centre ("Introducing" / "TechDesk" / "AI").' },
@@ -75,9 +83,11 @@ export const PRESETS = {
   editorial: { d: 'calm and elegant, one strong line at a time, lots of space', shots: ['reveal', 'sentence', 'flip', 'parallax', 'ticker', 'iconmorph'], cuts: ['focus', 'iris', 'line', 'cube'], look: { textIn: 'focus', energy: 1, drift: 0.4, finish: 0.7, leaks: 0.6, chroma: 0, ambient: ['frame'] } },
   hype: { d: 'loud pop energy for promos, sales and launches', shots: ['slam', 'poster', 'marquee3d', 'counter', 'parallax', 'zoomword', 'pills'], cuts: ['cover', 'glitch', 'whip', 'shutter', 'flash'], look: { textIn: 'chars', energy: 3, finish: 0.6, chroma: 1, leaks: 0, ambient: ['rays', 'particles'] } },
   luxury: { d: 'luxury: slow, golden, glossy 3D product shots', shots: ['reveal', 'parallax', 'sentence', 'tunnel', 'logo', 'isocard'], cuts: ['focus', 'cube', 'iris', 'line'], look: { textIn: 'focus', energy: 1, drift: 0.5, finish: 1, leaks: 1, chroma: 0, ambient: ['glow', 'sparkles'] } },
-  apple: { d: 'Apple ad style: calm, small clean type that builds word by word with a soft glow on the key word, widgets that open into cards, phones fanning, rule lines (best on light styles)', shots: ['sentence', 'rule', 'iconmorph', 'widgets', 'fan', 'flip', 'collage', 'reveal', 'stack'], cuts: ['focus', 'morph', 'iris'], look: { textIn: 'focus', energy: 1, halo: 1, drift: 0.3, finish: 0.4, leaks: 0, chroma: 0, ambient: [] } },
-  glow: { d: 'dark premium launch: glowing luminous text, light flares, glowing product shots, glass cards joined by light lines (best on dark styles)', shots: ['flare', 'glowproduct', 'ticker', 'flow', 'chipfield', 'sentence', 'reveal', 'logo'], cuts: ['focus', 'zoom', 'morph', 'dive'], look: { textIn: 'focus', energy: 1, glow: 1, drift: 0.3, finish: 0.8, leaks: 0, chroma: 0, ambient: ['glow'] } },
+  apple: { d: 'Apple ad style: calm, small clean type that builds word by word with a soft glow on the key word, widgets that open into cards, phones fanning, rule lines (best on light styles)', shots: ['sentence', 'rule', 'iconmorph', 'widgets', 'fan', 'flip', 'collage', 'reveal', 'stack', 'toggle', 'avatars', 'bigcount'], cuts: ['focus', 'morph', 'iris'], look: { textIn: 'focus', energy: 1, halo: 1, drift: 0.3, finish: 0.4, leaks: 0, chroma: 0, ambient: [] } },
+  glow: { d: 'dark premium launch: glowing luminous text, light flares, glowing product shots, glass cards joined by light lines (best on dark styles)', shots: ['flare', 'glowproduct', 'ticker', 'flow', 'chipfield', 'sentence', 'reveal', 'logo', 'stepstack', 'cardstack'], cuts: ['focus', 'zoom', 'morph', 'dive'], look: { textIn: 'focus', energy: 1, glow: 1, drift: 0.3, finish: 0.8, leaks: 0, chroma: 0, ambient: ['glow'] } },
   studio: { d: 'bold studio piece: full-screen colour slides, a rotating 3D word ring, a particle sphere, glitch cuts', shots: ['ring3d', 'colorslide', 'dotsphere', 'poster', 'slam', 'marquee3d'], cuts: ['glitch', 'cover', 'shutter', 'whip'], look: { textIn: 'chars', energy: 3, chroma: 0.8, finish: 0.7, leaks: 0, ambient: ['grid'] } },
+  creator: { d: 'creator / tech reel: dark, bracket text, numbered cards, 3D card walls, chip fields, glitch cuts', shots: ['bracket', 'cardstack', 'numbered', 'stepstack', 'chipfield', 'bigcount', 'flare'], cuts: ['glitch', 'zoom', 'whip', 'focus'], look: { textIn: 'focus', energy: 2, glow: 0.6, finish: 0.7, chroma: 0.5, leaks: 0, ambient: ['glow'] } },
+  playful: { d: 'friendly app launch: letters assembling, bubbles popping, a switch flipping on, big counting numbers (best on light styles)', shots: ['assemble', 'avatars', 'toggle', 'bigcount', 'sentence', 'stepstack', 'iconmorph'], cuts: ['morph', 'focus', 'iris', 'cover'], look: { textIn: 'focus', energy: 2, halo: 1, finish: 0.4, chroma: 0, leaks: 0, ambient: [] } },
   tech: { d: 'tech / app: UI pieces, 3D depth, glitch cuts', shots: ['iconmorph', 'widgets', 'tunnel', 'poster', 'notify', 'chat', 'reveal'], cuts: ['glitch', 'cube', 'morph', 'whip'], look: { textIn: 'chars', energy: 2, finish: 0.7, chroma: 0.7, leaks: 0, ambient: ['grid', 'dots'] } },
 };
 
@@ -147,7 +157,7 @@ export function sanitizeBeats(raw, { duration, assets = [], plan = {}, calm = fa
     const text = str(o.text || o.name || o.label, 40);
     const price = num(o.price);
     const icon = ICON_NAMES.includes(o.icon) ? o.icon : iconFor(text, 'check');
-    return text ? { text, name: text, ...(price != null ? { price } : {}), icon } : null;
+    return text || ICON_NAMES.includes(o.icon) ? { text, name: text, ...(price != null ? { price } : {}), icon } : null;   // icon-only items (avatar bubbles) are fine
   }).filter(Boolean);
 
   let beats = list.slice(0, maxBeats).map((b) => {
@@ -175,7 +185,7 @@ export function sanitizeBeats(raw, { duration, assets = [], plan = {}, calm = fa
     if (Array.isArray(b.imgs)) o.imgs = b.imgs.map((r) => findAsset(r, images)?.url).filter(Boolean).slice(0, 8);
     if (shot === 'lockup' && !o.text) o.text = brand;
     if (shot === 'brand' && !o.text) o.text = brand;
-    if (shot === 'poster' && !o.text && o.lines?.length) o.text = o.lines.join(' ');
+    if ((shot === 'poster' || shot === 'stepstack') && !o.text && o.lines?.length) o.text = o.lines.join(' ');
     if (o.img) { const a2 = images.find((x) => x.url === o.img); if (a2 && (a2.transparent || a2.has_alpha)) o.cutout = true; }
     if ((shot === 'parallax' || shot === 'glowproduct') && !o.img) { const a = images.find((x) => x.role !== 'logo'); if (a) { o.img = a.url; o.imgRatio = a.width && a.height ? a.height / a.width : 1; } }
     o.hasLogo = !!logo;

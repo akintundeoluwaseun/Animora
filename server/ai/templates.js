@@ -211,6 +211,14 @@ export const SHOT_VALID = {
   colorslide: (b) => !!b.text && String(b.text).length <= 40,
   fan: (b) => b.imgs && b.imgs.length >= 2,
   dotsphere: (b) => !!b.text && String(b.text).length <= 40,
+  stepstack: (b) => (b.lines && b.lines.length >= 2) || (b.items && b.items.length >= 2),
+  bigcount: (b) => /\d/.test(String(b.number || '')) || b.price != null,
+  toggle: (b) => !!b.text && String(b.text).length <= 30,
+  assemble: (b) => !!b.text && String(b.text).length <= 14,
+  avatars: (b) => (b.imgs && b.imgs.length >= 2) || (b.items && b.items.length >= 2),
+  cardstack: (b) => (b.imgs && b.imgs.length >= 1) || (b.items && b.items.length >= 2),
+  numbered: (b) => !!b.text && String(b.text).length <= 28,
+  bracket: (b) => !!b.text && String(b.text).length <= 36,
 };
 const VALID = SHOT_VALID;
 export const ICON_NAMES = ['phone','chat','pin','clock','cart','star','heart','check','bolt','gift','truck','leaf','cup','food','cake','calendar','shield','tag','home','sparkle','scissors','book','dumbbell','music','wifi','card','users','trophy','camera','globe','arrow','bed','car','school','fire','shirt','drop','sun'];
@@ -219,7 +227,7 @@ export { iconFor, priceOf };
 function makePlanner(theme, rnd) {
   const counters = {};
   const used = {};
-  const LIMIT = { flare: 2, ring3d: 1, chipfield: 1, rule: 2, glowproduct: 2, colorslide: 3, fan: 1, dotsphere: 1, slam: 2, poster: 2, reveal: 2, tunnel: 1, parallax: 2, marquee3d: 1, logo: 1, widgets: 1, iconmorph: 1, isocard: 1, ticker: 1, collage: 1, stack: 1, chat: 1, scatter: 2, flip: 2, split: 1, card: 1, counter: 1, notify: 1, orbit: 1, phone: 1, brand: 1, wheel: 1, pills: 1, grid: 1, flow: 1, stat: 1, type: 2, hero: 2, zoomword: 3, kinetic: 3 };
+  const LIMIT = { stepstack: 2, bigcount: 2, toggle: 1, assemble: 1, avatars: 1, cardstack: 1, numbered: 5, bracket: 2, flare: 2, ring3d: 1, chipfield: 1, rule: 2, glowproduct: 2, colorslide: 3, fan: 1, dotsphere: 1, slam: 2, poster: 2, reveal: 2, tunnel: 1, parallax: 2, marquee3d: 1, logo: 1, widgets: 1, iconmorph: 1, isocard: 1, ticker: 1, collage: 1, stack: 1, chat: 1, scatter: 2, flip: 2, split: 1, card: 1, counter: 1, notify: 1, orbit: 1, phone: 1, brand: 1, wheel: 1, pills: 1, grid: 1, flow: 1, stat: 1, type: 2, hero: 2, zoomword: 3, kinetic: 3 };
   let last = '';
   const ok = (shot, b) => VALID[shot] && VALID[shot](b) && (used[shot] || 0) < (LIMIT[shot] || 9);
   const take = (shot) => { used[shot] = (used[shot] || 0) + 1; last = shot; return shot; };
