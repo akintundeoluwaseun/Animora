@@ -1,8 +1,8 @@
 // Home: what Animora is, one real video, how it works. Nothing else.
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { api, naira, DEVELOPER } from '../lib.jsx';
-import { Button } from '../components/ui.jsx';
+import { api, naira } from '../lib.jsx';
+import { Button, DeveloperCard } from '../components/ui.jsx';
 
 const STEPS = [
   ['Answer a few questions', 'Your business name, what you sell, your message and your pictures. One question at a time.'],
@@ -99,14 +99,8 @@ export default function Home() {
           </div>
         </div>
       </section>
-      <section className="border-t border-ink/10">
-        <div className="mx-auto flex max-w-[1180px] flex-wrap items-center justify-between gap-4 px-6 py-8 sm:px-10">
-          <p className="text-ink-soft">Developed by <a href={DEVELOPER.website} target="_blank" rel="noopener" className="font-semibold text-ink hover:underline">{DEVELOPER.name}</a> · websites, software and apps.</p>
-          <div className="flex flex-wrap gap-3">
-            <Button as="a" href={DEVELOPER.whatsapp} target="_blank" rel="noopener" variant="outline">WhatsApp {DEVELOPER.phone}</Button>
-            <Button as="a" href={DEVELOPER.website} target="_blank" rel="noopener" variant="ghost">Visit website</Button>
-          </div>
-        </div>
+      <section className="mx-auto max-w-[1180px] px-6 pb-14 sm:px-10" aria-label="The developer">
+        <DeveloperCard wide />
       </section>
     </div>
   );
