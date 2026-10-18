@@ -219,7 +219,53 @@ export const SHOT_VALID = {
   cardstack: (b) => (b.imgs && b.imgs.length >= 1) || (b.items && b.items.length >= 2),
   numbered: (b) => !!b.text && String(b.text).length <= 28,
   bracket: (b) => !!b.text && String(b.text).length <= 36,
+  status: (b) => (b.items && b.items.length >= 2) || (!!b.text && !!b.sub),
+  stars: (b) => /^\d(\.\d)?$/.test(String(b.number || '').trim()) && Number(b.number) <= 5,
+  prompt: (b) => !!b.text && String(b.text).length <= 60,
+  wordswap: (b) => (b.items && b.items.length >= 2) || /[\/,|]/.test(String(b.text || '')),
+  rollword: (b) => !!b.text && String(b.text).length <= 20 && ((b.lines && b.lines.length >= 2) || (b.items && b.items.length >= 2)),
+  endcard: (b) => !!b.text && String(b.text).length <= 40,
 };
+
+// ---------------------------------------------------------------------------
+// Premium only: the first-generation shots (loud, template-looking) are swapped for their premium
+// equivalents, whoever planned the video (the AI director or the offline planner).
+// ---------------------------------------------------------------------------
+const LEGACY = {
+  words: (b) => (String(b.text).length <= 34 ? 'reveal' : 'sentence'),
+  kinetic: () => 'poster', zoomword: () => 'slam', split: () => 'reveal', type: () => 'prompt',
+  brand: (b) => (b.hasLogo ? 'logo' : String(b.text).length <= 14 ? 'assemble' : 'reveal'),
+  pills: (b) => ((b.items || []).length <= 4 ? 'stack' : 'ticker'),
+  wheel: (b) => ((b.items || []).length >= 3 ? 'ticker' : 'stack'),
+  grid: (b) => ((b.items || []).length <= 4 ? 'stack' : 'ticker'),
+  orbit: () => 'chipfield',
+  stat: (b) => (/\d/.test(String(b.number || '')) && /^\D*[\d,.]+\D*$/.test(String(b.number)) ? 'bigcount' : 'isocard'),
+  hero: (b) => (b.full ? 'hero' : 'parallax'),
+};
+export const LEGACY_SHOTS = Object.keys(LEGACY).filter((k) => k !== 'hero');
+export function premiumize(beats) {
+  const out = swapLegacy(beats);
+  // never the same shot twice in a row
+  for (let i = 1; i < out.length; i++) {
+    if (out[i].shot !== out[i - 1].shot || out[i].shot === 'numbered') continue;
+    for (const alt of ['sentence', 'flip', 'reveal', 'scatter']) { const o = { ...out[i], shot: alt }; if (alt !== out[i - 1].shot && SHOT_VALID[alt](o)) { out[i] = o; break; } }
+  }
+  return out;
+}
+function swapLegacy(beats) {
+  return (beats || []).map((b) => {
+    const to = LEGACY[b.shot] && LEGACY[b.shot](b);
+    if (!to || to === b.shot) return b;
+    const o = { ...b, shot: to };
+    if (to === 'stack' || to === 'ticker') o.title = o.title || '';
+    if (SHOT_VALID[to] && SHOT_VALID[to](o)) return o;
+    const alt = { ...b, shot: 'sentence' };
+    return SHOT_VALID.sentence(alt) ? alt : b;
+  });
+}
+// calm, uncluttered backgrounds only
+const PREMIUM_AMBIENT = ['glow', 'grid', 'dots', 'frame', 'beams', 'sparkles', 'particles'];
+const cleanAmbient = (list) => { const out = (list || []).filter((x) => PREMIUM_AMBIENT.includes(x)).slice(0, 2); return out.length ? out : ['glow']; };
 const VALID = SHOT_VALID;
 export const ICON_NAMES = ['phone','chat','pin','clock','cart','star','heart','check','bolt','gift','truck','leaf','cup','food','cake','calendar','shield','tag','home','sparkle','scissors','book','dumbbell','music','wifi','card','users','trophy','camera','globe','arrow','bed','car','school','fire','shirt','drop','sun'];
 export { iconFor, priceOf };
@@ -227,7 +273,7 @@ export { iconFor, priceOf };
 function makePlanner(theme, rnd) {
   const counters = {};
   const used = {};
-  const LIMIT = { stepstack: 2, bigcount: 2, toggle: 1, assemble: 1, avatars: 1, cardstack: 1, numbered: 5, bracket: 2, flare: 2, ring3d: 1, chipfield: 1, rule: 2, glowproduct: 2, colorslide: 3, fan: 1, dotsphere: 1, slam: 2, poster: 2, reveal: 2, tunnel: 1, parallax: 2, marquee3d: 1, logo: 1, widgets: 1, iconmorph: 1, isocard: 1, ticker: 1, collage: 1, stack: 1, chat: 1, scatter: 2, flip: 2, split: 1, card: 1, counter: 1, notify: 1, orbit: 1, phone: 1, brand: 1, wheel: 1, pills: 1, grid: 1, flow: 1, stat: 1, type: 2, hero: 2, zoomword: 3, kinetic: 3 };
+  const LIMIT = { status: 1, stars: 1, prompt: 1, wordswap: 1, rollword: 2, endcard: 1, stepstack: 2, bigcount: 2, toggle: 1, assemble: 1, avatars: 1, cardstack: 1, numbered: 5, bracket: 2, flare: 2, ring3d: 1, chipfield: 1, rule: 2, glowproduct: 2, colorslide: 3, fan: 1, dotsphere: 1, slam: 2, poster: 2, reveal: 2, tunnel: 1, parallax: 2, marquee3d: 1, logo: 1, widgets: 1, iconmorph: 1, isocard: 1, ticker: 1, collage: 1, stack: 1, chat: 1, scatter: 2, flip: 2, split: 1, card: 1, counter: 1, notify: 1, orbit: 1, phone: 1, brand: 1, wheel: 1, pills: 1, grid: 1, flow: 1, stat: 1, type: 2, hero: 2, zoomword: 3, kinetic: 3 };
   let last = '';
   const ok = (shot, b) => VALID[shot] && VALID[shot](b) && (used[shot] || 0) < (LIMIT[shot] || 9);
   const take = (shot) => { used[shot] = (used[shot] || 0) + 1; last = shot; return shot; };
@@ -801,6 +847,13 @@ function css(theme, c, W, H) {
 ${theme.css ? theme.css() : ''}`;
 }
 const WIDE = (W, H) => W > H;
+// The look a video gets when nobody chose one: matched to the style (light calm -> Apple, dark calm -> glow, loud -> kinetic).
+function defaultLook(theme, c) {
+  const light = luminance(c.background) > 0.45;
+  if (theme.calm) return light ? { halo: 1, finish: 0.4, leaks: 0, chroma: 0, textIn: 'focus' } : { glow: 1, finish: 0.8, leaks: 0, chroma: 0, textIn: 'focus' };
+  if (theme.energy >= 3) return { finish: 0.8, chroma: 0.8, leaks: 0, textIn: 'chars' };
+  return light ? { finish: 0.5, leaks: 0, chroma: 0, halo: 1, textIn: 'focus' } : { finish: 0.9, leaks: 0.8, chroma: 0, textIn: 'focus' };
+}
 
 /** Build a complete Animora HTML document from a plan. */
 export function templateFromPlan(plan, { themeKey = 'bold', assets = plan.assets || [], beats: directed = null, look = null, salt = '' } = {}) {
@@ -824,7 +877,7 @@ export function templateFromPlan(plan, { themeKey = 'bold', assets = plan.assets
   const mood = MUSIC[look?.music] ? look.music : MUSIC[plan.music_mood] ? plan.music_mood : MUSIC_FOR_THEME[key] || 'calm';
   // built-in background songs are off (people preferred effects only); only the owner's own music is used
   const music = sound === 'own' && plan.music_url ? { url: plan.music_url } : null;
-  const paced = fillPacing(beats, duration, plan, theme, rnd);
+  const paced = premiumize(fillPacing(beats, duration, plan, theme, rnd));
   const tempo = music?.bpm || Number(look?.tempo) || ({ 1: 96, 2: 112, 3: 124 }[look?.energy || theme.energy] || 112);
   let finalBeats = directed?.length ? snapToBeat(paced, tempo, duration) : paced;
   // "zoom into the logo" in the special instructions (no AI director): open on the logo and dive into it
@@ -845,7 +898,7 @@ export function templateFromPlan(plan, { themeKey = 'bold', assets = plan.assets
   const data = {
     W, H, duration, seed, brand,
     logo: logoAsset ? { url: logoAsset.url, transparent: !!(logoAsset.transparent ?? logoAsset.has_alpha), light: logoAsset.light ?? logoAsset.is_light ?? null, ratio: logoAsset.width && logoAsset.height ? Math.round((logoAsset.width / logoAsset.height) * 100) / 100 : null } : null,
-    theme: { key, energy: theme.energy, accentStyle: theme.accentStyle, textIn: theme.textIn, ambient: theme.ambient, textScale: theme.textScale || 1, drift: theme.drift || 0, calm: !!theme.calm, finish: theme.calm ? 0.9 : 0.8, leaks: theme.calm || theme.energy === 1 ? 0.8 : 0, chroma: theme.energy >= 3 ? 0.8 : 0, ...(look || {}), ...(sound === 'none' ? { sound: 'off' } : {}) },
+    theme: { key, energy: theme.energy, accentStyle: theme.accentStyle, textIn: theme.textIn, textScale: theme.textScale || 1, drift: theme.drift || 0, calm: !!theme.calm, ...defaultLook(theme, c), ...(look || {}), ambient: cleanAmbient((look && look.ambient) || theme.ambient), ...(sound === 'none' ? { sound: 'off' } : {}) },
     music,
     beats: finalBeats.map((b) => { const o = { ...b }; delete o.scene; return o; }),
     captions,

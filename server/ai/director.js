@@ -9,7 +9,7 @@
 
 import { geminiGenerate } from '../engine/gemini.js';
 import { THEMES } from './themes.js';
-import { SHOT_VALID, ICON_NAMES, iconFor, priceOf, templateFromPlan } from './templates.js';
+import { SHOT_VALID, ICON_NAMES, iconFor, priceOf, templateFromPlan, LEGACY_SHOTS } from './templates.js';
 
 const DIRECTOR_MODEL = process.env.GEMINI_DIRECTOR_MODEL || process.env.GEMINI_CHAT_MODEL || 'gemini-flash-latest';
 
@@ -37,6 +37,12 @@ export const SHOTS = {
   cardstack: { f: 'imgs (1-6) or items (2-6), text?', d: '3D: a long diagonal wall of cards slides past the camera, the line over it.' },
   numbered: { f: 'number ("#1", "#2" ...), text (label, max 28), icon', d: 'a numbered title card: big gradient number, icon tile, label pill. Use for "top 3" lists, one beat per item.' },
   bracket: { f: 'text (max 36)', d: 'the line opens inside curly brackets that slide apart ("{ Ever find an }"). Techy, creator style.' },
+  status: { f: 'items (2-4 stages, e.g. "Order received", "Cooking", "On the way"), title? (small line under)', d: 'APPLE UI: a status card steps through the stages with a filling bar and a final tick (Uber style).' },
+  stars: { f: 'number (rating like "4.8", ONLY if the brief gives a rating), text?', d: 'stars fill one by one in a pill, then the score.' },
+  prompt: { f: 'text (what gets typed, max 60), sub? (placeholder, default "Ask anything"), title?', d: 'APPLE UI: a prompt / search bar; the text types in and the send button is pressed (ChatGPT style).' },
+  wordswap: { f: 'items (2-5 single words, e.g. Write, Create, Solve), title?', d: 'APPLE UI: one pill whose word changes letter by letter through the list.' },
+  rollword: { f: 'text (the fixed start, max 20, e.g. "No"), lines (2-4 endings, e.g. ["cooking.","waiting.","hangry days."])', d: 'APPLE: a fixed start and a rolling accent word that cycles; the last one stays.' },
+  endcard: { f: 'text (short tagline, max 40), sub (phone / website)', d: 'APPLE: minimal ending: the logo, then the tagline words arrive one by one beside it, contact under it. Can replace the lockup as the final beat.' },
   logo: { f: 'text?, sub?', d: 'the business LOGO big in the centre, rings pulse out, name rises below. Needs an uploaded logo. Follow it with cut "dive" to zoom the camera INTO the logo.' },
   sentence: { f: 'text, sub?', d: 'premium: a short sentence builds word by word, the last word in the accent colour (letters drop in).' },
   flip: { f: 'text (2-6 words)', d: 'words replace each other one at a time in the centre ("Introducing" / "TechDesk" / "AI").' },
@@ -83,11 +89,11 @@ export const PRESETS = {
   editorial: { d: 'calm and elegant, one strong line at a time, lots of space', shots: ['reveal', 'sentence', 'flip', 'parallax', 'ticker', 'iconmorph'], cuts: ['focus', 'iris', 'line', 'cube'], look: { textIn: 'focus', energy: 1, drift: 0.4, finish: 0.7, leaks: 0.6, chroma: 0, ambient: ['frame'] } },
   hype: { d: 'loud pop energy for promos, sales and launches', shots: ['slam', 'poster', 'marquee3d', 'counter', 'parallax', 'zoomword', 'pills'], cuts: ['cover', 'glitch', 'whip', 'shutter', 'flash'], look: { textIn: 'chars', energy: 3, finish: 0.6, chroma: 1, leaks: 0, ambient: ['rays', 'particles'] } },
   luxury: { d: 'luxury: slow, golden, glossy 3D product shots', shots: ['reveal', 'parallax', 'sentence', 'tunnel', 'logo', 'isocard'], cuts: ['focus', 'cube', 'iris', 'line'], look: { textIn: 'focus', energy: 1, drift: 0.5, finish: 1, leaks: 1, chroma: 0, ambient: ['glow', 'sparkles'] } },
-  apple: { d: 'Apple ad style: calm, small clean type that builds word by word with a soft glow on the key word, widgets that open into cards, phones fanning, rule lines (best on light styles)', shots: ['sentence', 'rule', 'iconmorph', 'widgets', 'fan', 'flip', 'collage', 'reveal', 'stack', 'toggle', 'avatars', 'bigcount'], cuts: ['focus', 'morph', 'iris'], look: { textIn: 'focus', energy: 1, halo: 1, drift: 0.3, finish: 0.4, leaks: 0, chroma: 0, ambient: [] } },
-  glow: { d: 'dark premium launch: glowing luminous text, light flares, glowing product shots, glass cards joined by light lines (best on dark styles)', shots: ['flare', 'glowproduct', 'ticker', 'flow', 'chipfield', 'sentence', 'reveal', 'logo', 'stepstack', 'cardstack'], cuts: ['focus', 'zoom', 'morph', 'dive'], look: { textIn: 'focus', energy: 1, glow: 1, drift: 0.3, finish: 0.8, leaks: 0, chroma: 0, ambient: ['glow'] } },
+  apple: { d: 'Apple ad style: calm, small clean type that builds word by word with a soft glow on the key word, widgets that open into cards, phones fanning, rule lines (best on light styles)', shots: ['sentence', 'rule', 'rollword', 'iconmorph', 'status', 'prompt', 'wordswap', 'widgets', 'fan', 'flip', 'reveal', 'stack', 'toggle', 'avatars', 'bigcount', 'endcard'], cuts: ['focus', 'morph', 'iris'], look: { textIn: 'focus', energy: 1, halo: 1, drift: 0.3, finish: 0.4, leaks: 0, chroma: 0, ambient: [] } },
+  glow: { d: 'dark premium launch: glowing luminous text, light flares, glowing product shots, glass cards joined by light lines (best on dark styles)', shots: ['flare', 'glowproduct', 'ticker', 'flow', 'chipfield', 'sentence', 'reveal', 'logo', 'stepstack', 'cardstack', 'prompt', 'endcard'], cuts: ['focus', 'zoom', 'morph', 'dive'], look: { textIn: 'focus', energy: 1, glow: 1, drift: 0.3, finish: 0.8, leaks: 0, chroma: 0, ambient: ['glow'] } },
   studio: { d: 'bold studio piece: full-screen colour slides, a rotating 3D word ring, a particle sphere, glitch cuts', shots: ['ring3d', 'colorslide', 'dotsphere', 'poster', 'slam', 'marquee3d'], cuts: ['glitch', 'cover', 'shutter', 'whip'], look: { textIn: 'chars', energy: 3, chroma: 0.8, finish: 0.7, leaks: 0, ambient: ['grid'] } },
   creator: { d: 'creator / tech reel: dark, bracket text, numbered cards, 3D card walls, chip fields, glitch cuts', shots: ['bracket', 'cardstack', 'numbered', 'stepstack', 'chipfield', 'bigcount', 'flare'], cuts: ['glitch', 'zoom', 'whip', 'focus'], look: { textIn: 'focus', energy: 2, glow: 0.6, finish: 0.7, chroma: 0.5, leaks: 0, ambient: ['glow'] } },
-  playful: { d: 'friendly app launch: letters assembling, bubbles popping, a switch flipping on, big counting numbers (best on light styles)', shots: ['assemble', 'avatars', 'toggle', 'bigcount', 'sentence', 'stepstack', 'iconmorph'], cuts: ['morph', 'focus', 'iris', 'cover'], look: { textIn: 'focus', energy: 2, halo: 1, finish: 0.4, chroma: 0, leaks: 0, ambient: [] } },
+  playful: { d: 'friendly app launch: letters assembling, bubbles popping, a switch flipping on, big counting numbers (best on light styles)', shots: ['assemble', 'avatars', 'toggle', 'bigcount', 'wordswap', 'status', 'stepstack', 'iconmorph', 'endcard'], cuts: ['morph', 'focus', 'iris', 'cover'], look: { textIn: 'focus', energy: 2, halo: 1, finish: 0.4, chroma: 0, leaks: 0, ambient: [] } },
   tech: { d: 'tech / app: UI pieces, 3D depth, glitch cuts', shots: ['iconmorph', 'widgets', 'tunnel', 'poster', 'notify', 'chat', 'reveal'], cuts: ['glitch', 'cube', 'morph', 'whip'], look: { textIn: 'chars', energy: 2, finish: 0.7, chroma: 0.7, leaks: 0, ambient: ['grid', 'dots'] } },
 };
 
@@ -102,7 +108,7 @@ export const CONCEPTS = [
   'Pop energy: loud colours, punch words zooming, whips, flashes, fast rhythm',
   'Brand reveal: the logo and name are built up piece by piece, then the offer, then the call to action',
 ];
-const AMBIENT = ['glow', 'grid', 'dots', 'streaks', 'beams', 'rays', 'halftone', 'waves', 'particles', 'confetti', 'sparkles', 'bubbles', 'frame', 'marquee'];
+const AMBIENT = ['glow', 'grid', 'dots', 'beams', 'particles', 'sparkles', 'frame'];   // calm, premium backgrounds only
 
 /** The per-video look chosen by the director (background layers, text entrance, accent, energy, camera drift). */
 export function sanitizeLook(look) {
@@ -209,7 +215,8 @@ export function sanitizeBeats(raw, { duration, assets = [], plan = {}, calm = fa
 
   // the video must end on the call to action
   const last = beats[beats.length - 1];
-  if (last.shot !== 'lockup') {
+  if (last.shot === 'endcard' && !last.sub) last.sub = str(plan.business?.phone, 30) || str(plan.cta, 44);
+  if (last.shot !== 'lockup' && last.shot !== 'endcard') {
     const cta = str(plan.cta, 44) || str(plan.business?.phone, 30);
     beats.push({ shot: 'lockup', seconds: 2.6, text: brand || last.text || 'Contact us', subs: [str(plan.business?.location, 50)].filter(Boolean), button: cta || 'Contact us', icon: 'phone', hasLogo: !!logo });
   }
@@ -246,7 +253,7 @@ This style's favourite shots: hook ${t.prefer.hook.join('/')}; text ${t.prefer.t
 Favourite cuts: ${t.transitions.join(', ')}.`;
 }
 
-const SHOT_MENU = () => Object.entries(SHOTS).map(([k, v]) => `- ${k}: ${v.d} Fields: ${v.f}.`).join('\n');
+const SHOT_MENU = () => Object.entries(SHOTS).filter(([k]) => !LEGACY_SHOTS.includes(k)).map(([k, v]) => `- ${k}: ${v.d} Fields: ${v.f}.`).join('\n');
 const CUT_MENU = () => Object.entries(CUTS).map(([k, v]) => `${k} (${v})`).join(', ');
 
 function directorSystem({ duration, aspect, style, themeKey }) {
@@ -272,6 +279,7 @@ Return { "concept": "one line describing your idea", "look": {...}, "beats": [..
 DIRECTION RULES
 - The video is ${duration} seconds, ${aspect}. Use about one beat per ${duration <= 20 ? '1.5-2.2' : '2-3'} seconds, so return AT LEAST ${Math.ceil(duration / 3)} beats; no beat longer than 3.5 seconds. If the answers run out, write new short lines from the business info (benefits, a question to the viewer, how it works, a promise) instead of repeating. The "seconds" values should add up to about ${duration}.
 - Every beat shows ONE idea. Never repeat the same shot twice in a row, and vary the shots across the video; it must not feel like a pattern.
+- PREMIUM ONLY: this must look like a top agency ad on TikTok, never like a template. Generous empty space, one idea per shot, short words, smooth camera.
 - PREMIUM DIRECTION (this is what separates a top motion designer from a template):
   * At least half of the beats use the chosen preset's signature shots. Use only 2-3 cut types from the preset in the whole video, so it feels like one film.
   * Contrast scale: follow a giant-type beat (slam / poster / zoomword) with a calmer detail beat, then a 3D beat (tunnel / parallax / marquee3d / isocard). Never three similar beats in a row.
@@ -279,7 +287,7 @@ DIRECTION RULES
   * Rhythm: beats of 1.5-2.5 s, a few faster ones (about 1 s) right before the reveal of the offer or the brand.
   * Every uploaded product photo should appear at least once, ideally in parallax, glowproduct, fan or tunnel.
   * Match the preset to the style: light / white styles suit "apple"; dark styles suit "glow", "cinematic" or "luxury"; loud colourful styles suit "studio", "kinetic" or "hype".
-- Open with a strong hook in the first 2 seconds. End with a "lockup" beat (at least 2.5 s) with the phone/website in "button".
+- Open with a strong hook in the first 2 seconds. End with a "lockup" beat (phone/website in "button") or an "endcard" beat (tagline + phone/website in "sub"), at least 2.5 s.
 - Keep on-screen text SHORT (headlines under 7 words, card and button text under 26 characters). Use the business's exact names, prices, phone numbers and addresses; never invent them.
 - TRUTH: never invent people's names, counts, numbers, percentages, reviews, testimonials, awards or claims (no "148 new inquiries", "Hundreds in hours", "from Sarah", "#1 in Lagos", "10,000 happy customers"). Only use numbers and facts that appear in the brief. In chat / notification shots write plain generic messages ("New message", "Can you make my video ad?").
 - PLAIN WORDS: write like the business owner talks to customers. No marketing jargon (omnichannel, seamless, leverage, synergy, cutting-edge, revolutionary, next-gen, game-changing, holistic, robust, elevate, unlock).

@@ -1385,6 +1385,128 @@
     idle(bi, b, 0.04);
   };
 
+  // ------------------------------------------------------------------ reference looks, batch 3 (Uber, ChatGPT, Notion, Uber Eats)
+  // A status card stepping through stages with a filling bar ("Requesting driver" -> "Approved" -> "On the way").
+  SHOTS.status = (b, bi) => {
+    const steps = ((b.items || []).length >= 2 ? b.items.map((i) => i.text) : [b.text, b.sub].filter(Boolean)).slice(0, 4);
+    const box = el('div', 'fitbox st', bi);
+    const card = el('div', 'st-card', box); card.style.width = (WIDE ? Math.min(W * 0.5, N(980)) : W * 0.8) + 'px';
+    const head = el('div', 'st-head', card);
+    const labels = steps.map((x) => { const l = el('div', 'st-l', head, esc(x)); l.style.fontSize = FS(Math.min(60, 1300 / Math.max(12, String(x).length))); return l; });
+    if (b.title) { const t2 = el('div', 'st-sub', card, esc(b.title)); t2.style.fontSize = FS(32); }
+    const track = el('div', 'st-track', card), fill = el('i', 'st-fill', track);
+    const ok = el('div', 'st-ok', card, icon('check'));
+    const n = steps.length, step = Math.max(0.55, (b.t1 - b.in - 0.9) / n) / SP;
+    tl.fromTo(card, { y: N(80), scale: 0.92, opacity: 0 }, { y: 0, scale: 1, opacity: 1, duration: 0.6, ease: 'expo.out', immediateRender: true }, b.in);
+    labels.forEach((l, k) => {
+      const at = b.in + 0.2 + k * step;
+      tl.fromTo(l, { opacity: 0, y: N(26), filter: 'blur(' + N(8) + 'px)' }, { opacity: 1, y: 0, filter: 'blur(0px)', duration: 0.4, ease: 'power3.out', immediateRender: true }, at);
+      if (k < n - 1) tl.to(l, { opacity: 0, y: -N(26), filter: 'blur(' + N(8) + 'px)', duration: 0.3, ease: 'power2.in' }, at + step - 0.3);
+      tl.to(fill, { scaleX: (k + 1) / n, duration: Math.min(0.8, step * 0.9), ease: 'power2.inOut' }, at);
+      sfx(at, k === n - 1 ? 'ding' : 'tick', k === n - 1 ? 0.6 : 0.35);
+    });
+    tl.fromTo(ok, { scale: 0, rotation: -40 }, { scale: 1, rotation: 0, duration: 0.45, ease: 'back.out(2.2)', immediateRender: true }, b.in + 0.2 + (n - 1) * step + 0.3);
+  };
+
+  // Stars filling one by one in a pill, then the score ("4.9 / 5"). Only real ratings from the brief.
+  SHOTS.stars = (b, bi) => {
+    const box = el('div', 'fitbox col center sr', bi);
+    if (b.text) { const t = el('div', 'sent-line', box, wordsHtml(b.text, null, false)); t.style.fontSize = FS(sizeRaw(b.text, 1700, 50, 96)); textEnter(t, b.in, textInOr('focus')); }
+    const pill = el('div', 'sr-pill', box);
+    const val = Math.max(0, Math.min(5, parseFloat(b.number) || 5));
+    const stars = [0, 1, 2, 3, 4].map(() => el('span', 'sr-s', pill, '<svg viewBox="0 0 24 24"><path d="M12 2.8l2.8 5.8 6.3.9-4.6 4.4 1.1 6.3L12 17.2l-5.6 3 1.1-6.3L2.9 9.5l6.3-.9z"/></svg><i></i>'));
+    const sc = el('b', 'sr-n', pill, esc(String(b.number || '5') + '/5'));
+    pill.style.fontSize = FS(WIDE ? 64 : 70);
+    tl.fromTo(pill, { scale: 0.7, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.5, ease: 'back.out(1.8)', immediateRender: true }, b.in + 0.3);
+    stars.forEach((st, k) => {
+      const f = Math.max(0, Math.min(1, val - k)), at = b.in + 0.6 + k * 0.14 / SP;
+      if (f > 0) { tl.fromTo($('i', st), { scaleX: 0 }, { scaleX: f, duration: 0.25, ease: 'power2.out', immediateRender: true }, at); tl.fromTo(st, { scale: 1 }, { scale: 1.3, duration: 0.12, yoyo: true, repeat: 1, ease: 'power2.out', immediateRender: false }, at); sfx(at, 'pop', 0.3); }
+    });
+    tl.from(sc, { opacity: 0, x: -N(20), duration: 0.4 }, b.in + 0.6 + 5 * 0.14 / SP);
+  };
+
+  // A prompt bar: the text types into it, the send button gets pressed ("Ask anything").
+  SHOTS.prompt = (b, bi) => {
+    const box = el('div', 'fitbox col center pr', bi);
+    if (b.title) { const t = el('div', 'sent-line small', box, wordsHtml(b.title, -1, false)); t.style.fontSize = FS(54); textEnter(t, b.in, textInOr('focus')); }
+    const bar = el('div', 'pr-bar', box); bar.style.width = (WIDE ? Math.min(W * 0.56, N(1100)) : W * 0.84) + 'px';
+    el('i', 'pr-plus', bar, '+');
+    const field = el('div', 'pr-field', bar);
+    const ph = el('span', 'pr-ph', field, esc(b.sub || 'Ask anything'));
+    const chars = Array.from(String(b.text));
+    const typed = el('span', 'pr-typed', field, chars.map((c) => '<span class="ch">' + (c === ' ' ? '&nbsp;' : esc(c)) + '</span>').join('') + '<i class="pr-caret"></i>');
+    field.style.fontSize = FS(Math.min(46, 1500 / Math.max(20, chars.length)));
+    const send = el('div', 'pr-send', bar, '<svg viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg>');
+    tl.fromTo(bar, { width: N(130), opacity: 0 }, { width: bar.style.width, opacity: 1, duration: 0.7, ease: 'expo.out', immediateRender: true }, b.in + 0.15);
+    const t0 = b.in + 0.8, each = Math.min(0.055, (b.t1 - t0 - 0.8) / Math.max(1, chars.length)) / SP;
+    tl.to(ph, { opacity: 0, duration: 0.15 }, t0);
+    tl.from($$('.ch', typed), { opacity: 0, duration: 0.01, stagger: each, ease: 'none' }, t0);
+    for (let k = 0; k < chars.length; k += 3) sfx(t0 + each * k, 'tick', 0.22);
+    const done = t0 + each * chars.length + 0.2;
+    tl.fromTo(send, { scale: 0.6, opacity: 0.4 }, { scale: 1, opacity: 1, duration: 0.3, ease: 'back.out(2)', immediateRender: true }, t0);
+    tl.to(send, { scale: 0.82, duration: 0.1, yoyo: true, repeat: 1, ease: 'power2.inOut' }, done);
+    sfx(done, 'send', 0.7);
+  };
+
+  // One pill whose word changes letter by letter through the list ("Write" / "Create" / "Solve").
+  SHOTS.wordswap = (b, bi) => {
+    const list = ((b.items || []).length ? b.items.map((i) => i.text) : String(b.text).split(/\s*[\/,|]\s*/)).filter(Boolean).slice(0, 5);
+    const box = el('div', 'fitbox col center wsw', bi);
+    if (b.title) { const t = el('div', 'sent-line small', box, wordsHtml(b.title, -1, false)); t.style.fontSize = FS(50); textEnter(t, b.in, textInOr('focus')); }
+    const stack = el('div', 'wsw-stack', box);
+    el('i', 'wsw-sh a', stack); el('i', 'wsw-sh b', stack);
+    const pill = el('div', 'wsw-pill', stack);
+    const fs = Math.min(110, 1200 / Math.max(5, Math.max(...list.map((w) => w.length)) * 0.62));
+    pill.style.fontSize = FS(fs);
+    const words = list.map((w) => el('span', 'wsw-w', pill, Array.from(w).map((c) => '<span class="cr">' + esc(c) + '</span>').join('')));
+    beforeFit.push(() => { const mw = Math.max(...words.map((w) => w.offsetWidth)); pill.style.width = (mw + parseFloat(getComputedStyle(pill).fontSize) * 1.4) + 'px'; });
+    tl.fromTo(stack, { scale: 0.6, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.55, ease: 'back.out(1.8)', immediateRender: true }, b.in + 0.1);
+    const step = Math.max(0.6, (b.t1 - b.in - 0.5) / list.length) / SP;
+    words.forEach((w, k) => {
+      const at = b.in + 0.2 + k * step, cs = $$('.cr', w);
+      tl.fromTo(cs, { yPercent: 110, opacity: 0 }, { yPercent: 0, opacity: 1, duration: 0.4, stagger: 0.03, ease: 'back.out(1.6)', immediateRender: true }, at);
+      if (k < words.length - 1) tl.to(cs, { yPercent: -110, opacity: 0, duration: 0.3, stagger: 0.025, ease: 'power2.in' }, at + step - 0.32);
+      sfx(at, 'swish', 0.3);
+    });
+  };
+
+  // A fixed start and a rolling accent word that cycles, the last one stays ("No | cooking. waiting. hangry decisions.").
+  SHOTS.rollword = (b, bi) => {
+    const list = ((b.lines && b.lines.length) ? b.lines : (b.items || []).map((i) => i.text)).slice(0, 5);
+    const box = el('div', 'fitbox rw', bi);
+    const lead = el('span', 'rw-lead', box, esc(b.text));
+    const slot = el('span', 'rw-slot', box);
+    const fs = sizeRaw(b.text + ' ' + list.reduce((a, c) => (c.length > a.length ? c : a), ''), 2000, 54, 120);
+    box.style.fontSize = FS(fs);
+    const ws = list.map((w) => el('span', 'rw-w', slot, esc(w)));
+    beforeFit.push(() => { slot.style.width = Math.max(...ws.map((w) => w.offsetWidth)) + 'px'; });
+    tl.from(lead, Object.assign(focusFrom(20), { duration: 0.55 }), b.in);
+    const step = Math.max(0.5, (b.t1 - b.in - 0.9) / list.length) / SP;
+    ws.forEach((w, k) => {
+      const at = b.in + 0.35 + k * step;
+      tl.fromTo(w, { yPercent: 100, opacity: 0, filter: 'blur(' + N(6) + 'px)' }, { yPercent: 0, opacity: 1, filter: 'blur(0px)', duration: 0.45, ease: 'expo.out', immediateRender: true }, at);
+      if (k < ws.length - 1) tl.to(w, { yPercent: -100, opacity: 0, filter: 'blur(' + N(6) + 'px)', duration: 0.35, ease: 'power2.in' }, at + step - 0.3);
+      tl.to(slot, { width: () => w.offsetWidth, duration: 0.4, ease: 'expo.inOut' }, at - 0.05);   // the line stays centred: the slot fits each word
+      sfx(at, 'tick', 0.3);
+    });
+  };
+
+  // Minimal end card: the logo, then the tagline words arrive one by one beside it ("Eating. Done your way.").
+  SHOTS.endcard = (b, bi) => {
+    const box = el('div', 'fitbox col center ec', bi);
+    const row = el('div', 'ec-row', box);
+    const m = mark(row, WIDE ? 150 : 140);
+    const words = String(b.text).split(/\s+/).filter(Boolean);
+    const line = el('div', 'ec-line', row); line.style.fontSize = FS(sizeRaw(b.text, 1600, 48, 90));
+    const ai = words.length >= 3 ? words.length - 2 : -1;
+    const ws = words.map((w, k) => { const e = el('span', 'sw' + (k === ai ? ' acc' : ''), line, '<span class="wi">' + esc(w) + '</span>'); if (k < words.length - 1) line.appendChild(document.createTextNode(' ')); return e; });
+    tl.fromTo(m, { scale: 0, rotation: -20 }, { scale: 1, rotation: 0, duration: 0.6, ease: 'back.out(1.8)', immediateRender: true }, b.in);
+    const gap = Math.min(0.28, (b.t1 - b.in - 1.2) / Math.max(1, words.length));
+    ws.forEach((e, k) => tl.from(e, Object.assign(focusFrom(18), { duration: 0.5, ease: 'power3.out' }), b.in + 0.5 + k * gap));
+    if (b.sub) { const s2 = el('div', 'tx-sub', box, esc(b.sub)); s2.style.fontSize = FS(38); tl.from(s2, Object.assign(focusFrom(14), { duration: 0.6 }), b.in + 0.7 + words.length * gap); }
+    sfx(b.in, 'pop', 0.5); sfx(b.in + 0.5 + words.length * gap, 'chime', 0.4);
+  };
+
   // ------------------------------------------------------------------ transitions between beats
   // Every cut: the outgoing beat LEAVES during [T-d, T], the incoming beat ARRIVES during [T, T+d2].
   function exitBeat(bt, type, T, d) {
@@ -1677,6 +1799,26 @@
       '.nb-tile{border-radius:26%;background:var(--primary);color:var(--on-primary);display:flex;align-items:center;justify-content:center;box-shadow:var(--shadow)} .nb-tile .ic{width:52%;height:52%}',
       '.nb-pill{padding:.25em .9em;border-radius:999px;border:' + n(4) + ' solid color-mix(in srgb,var(--text) 70%,transparent);background:color-mix(in srgb,var(--text) 12%,transparent);font-weight:800;white-space:nowrap}',
       '.bk{display:flex;align-items:center;white-space:nowrap} .bk-b{font-weight:300;color:var(--primary);font-size:1.25em;line-height:1} .bk-t{' + type + 'padding:0 .5em;letter-spacing:-.01em}',
+      '.st-card{position:relative;padding:' + n(44) + ' ' + n(52) + ';border-radius:' + n(40) + ';background:var(--surface);border:' + n(2) + ' solid var(--line);box-shadow:var(--shadow)}',
+      '.st-head{position:relative;height:1.3em;font-size:' + n(56) + '} .st-l{position:absolute;left:0;top:0;white-space:nowrap;' + type + 'line-height:1.25;letter-spacing:-.01em;opacity:0}',
+      '.st-sub{margin-top:' + n(8) + ';color:var(--muted);font-weight:600} .st-track{margin-top:' + n(34) + ';height:' + n(12) + ';border-radius:99px;background:color-mix(in srgb,var(--text) 10%,transparent);overflow:hidden}',
+      '.st-fill{display:block;height:100%;border-radius:99px;background:var(--primary);transform-origin:0 50%;transform:scaleX(0)}',
+      '.st-ok{position:absolute;right:' + n(40) + ';top:' + n(38) + ';width:' + n(70) + ';height:' + n(70) + ';border-radius:50%;background:var(--primary);color:var(--on-primary);display:flex;align-items:center;justify-content:center;transform:scale(0)} .st-ok .ic{width:70%;height:70%}',
+      '.sr>*+*{margin-top:' + n(40) + '} .sr-pill{display:flex;align-items:center;gap:.25em;padding:.35em .7em;border-radius:999px;background:var(--surface);border:' + n(2) + ' solid var(--line);box-shadow:var(--shadow)}',
+      '.sr-s{position:relative;width:1em;height:1em;display:inline-block} .sr-s svg{position:absolute;inset:0;width:100%;height:100%;fill:color-mix(in srgb,var(--text) 14%,transparent)}',
+      '.sr-s i{position:absolute;inset:0;background:#FFC531;-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27%3E%3Cpath d=%27M12 2.8l2.8 5.8 6.3.9-4.6 4.4 1.1 6.3L12 17.2l-5.6 3 1.1-6.3L2.9 9.5l6.3-.9z%27/%3E%3C/svg%3E") center/100% 100%;mask:url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27%3E%3Cpath d=%27M12 2.8l2.8 5.8 6.3.9-4.6 4.4 1.1 6.3L12 17.2l-5.6 3 1.1-6.3L2.9 9.5l6.3-.9z%27/%3E%3C/svg%3E") center/100% 100%;transform-origin:0 50%;transform:scaleX(0)}',
+      '.sr-n{margin-left:.3em;font-size:.62em;font-weight:800;color:var(--text);white-space:nowrap}',
+      '.pr>*+*{margin-top:' + n(44) + '} .pr-bar{display:flex;align-items:center;gap:' + n(20) + ';padding:' + n(18) + ' ' + n(18) + ' ' + n(18) + ' ' + n(24) + ';border-radius:999px;background:var(--surface);border:' + n(2) + ' solid var(--line);box-shadow:var(--shadow);overflow:hidden}',
+      '.pr-plus{flex:none;width:' + n(76) + ';height:' + n(76) + ';border-radius:50%;display:flex;align-items:center;justify-content:center;font-style:normal;font-size:' + n(48) + ';color:var(--muted);background:color-mix(in srgb,var(--text) 6%,transparent)}',
+      '.pr-field{position:relative;flex:1;min-width:0;white-space:nowrap;overflow:hidden;font-weight:600;color:var(--text)} .pr-ph{position:absolute;left:0;top:0;color:var(--muted)}',
+      '.pr-caret{display:inline-block;width:.08em;height:1em;margin-left:.05em;vertical-align:-.12em;background:var(--primary)}',
+      '.pr-send{flex:none;width:' + n(84) + ';height:' + n(84) + ';border-radius:50%;background:var(--primary);display:flex;align-items:center;justify-content:center} .pr-send svg{width:50%;height:50%;fill:none;stroke:var(--on-primary);stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}',
+      '.wsw>*+*{margin-top:' + n(40) + '} .wsw-stack{position:relative} .wsw-pill{position:relative;z-index:3;display:flex;justify-content:center;padding:.32em .7em;border-radius:999px;background:var(--surface);border:' + n(2) + ' solid var(--line);box-shadow:var(--shadow);height:1.75em}',
+      '.wsw-w{position:absolute;left:50%;transform:translateX(-50%);top:.32em;text-align:center;white-space:nowrap;' + type + 'line-height:1.1;overflow:hidden} .wsw-w .cr{display:inline-block}',
+      '.wsw-sh{position:absolute;left:4%;right:4%;height:100%;border-radius:999px;background:var(--surface);border:' + n(2) + ' solid var(--line);box-shadow:var(--shadow)} .wsw-sh.a{top:' + n(16) + ';z-index:2;opacity:.8} .wsw-sh.b{top:' + n(32) + ';left:8%;right:8%;z-index:1;opacity:.55}',
+      '.rw{display:flex;align-items:center;white-space:nowrap} .rw-lead{' + type + 'margin-right:.28em;line-height:1.2} .rw-slot{position:relative;display:inline-block;height:1.2em;overflow:hidden;vertical-align:bottom}',
+      '.rw-w{position:absolute;left:0;top:0;' + type + 'color:var(--primary);white-space:nowrap;line-height:1.2;opacity:0}',
+      '.ec-row{display:flex;align-items:center} .ec-row>*+*{margin-left:' + n(30) + '} .ec>*+*{margin-top:' + n(36) + '} .ec-line{' + type + 'white-space:nowrap;letter-spacing:-.01em}',
       '.fin-grain{position:absolute;inset:0;z-index:70;pointer-events:none;mix-blend-mode:overlay}',
       '.fin-vig{position:absolute;inset:0;z-index:69;pointer-events:none}',
       '.fin-leak{position:absolute;inset:-25%;z-index:68;pointer-events:none;mix-blend-mode:screen;visibility:hidden;background:radial-gradient(ellipse 45% 40% at 22% 30%,rgba(255,170,90,.75),rgba(255,90,60,.25) 45%,transparent 70%)}',

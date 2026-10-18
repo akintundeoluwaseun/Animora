@@ -90,7 +90,10 @@ try {
   ok('every image placed in a scene', ['logo', 'cake', 'cupcakes'].every((n) => placed.includes(n)), placed.join(', '));
 
   const gen = await api('POST', `/projects/${P}/generate`);
-  const code = gen.project.code;
+  // generation runs in the background: wait for the code
+  let proj = gen.project;
+  for (let i = 0; i < 120 && !proj.code && proj.status === 'coding'; i++) { await new Promise((r) => setTimeout(r, 500)); proj = (await api('GET', `/projects/${P}`)).project || proj; }
+  const code = proj.code || '';
   ok('code uses the uploaded images', [logo, cake, cup].every((a) => code.includes(a.asset.url)));
   ok('code has captions', /"captions":\[\{/.test(code) && code.includes("'cap'"));
   ok('code uses the motion engine v4 (beats with cuts, one at a time)', code.includes('engine=motion-v4') && code.includes('window.ADFLASH_DATA') && code.includes('"cut":'));
