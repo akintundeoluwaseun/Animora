@@ -44,8 +44,14 @@ export async function describeAssets(assets, loadImage) {
 const RUNTIME = (() => { try { return readFileSync(new URL('./runtime/motion.js', import.meta.url), 'utf8'); } catch { return ''; } })();
 const block = (src) => { const a = src.indexOf('function mark(parent, size) {'), b = src.indexOf('\n  function idle(', a); return a >= 0 && b > a ? [a, b] : null; };
 
+const shotBlock = (src, name) => { const a = src.indexOf(`SHOTS.${name} = (b, bi) => {`); const b = a >= 0 ? src.indexOf('\n  };\n', a) : -1; return a >= 0 && b > a ? [a, b] : null; };
+
 export function upgradeRuntime(html, assets = []) {
   let out = String(html || '');
+  for (const name of ['iconmorph']) {   // shots fixed since (text that could be cut off)
+    const f = shotBlock(out, name), t = shotBlock(RUNTIME, name);
+    if (f && t && out.indexOf('afterFonts') > 0) out = out.slice(0, f[0]) + RUNTIME.slice(t[0], t[1]) + out.slice(f[1]);
+  }
   const from = block(out), to = block(RUNTIME);
   if (from && to) out = out.slice(0, from[0]) + RUNTIME.slice(to[0], to[1]) + out.slice(from[1]);
   out = out.replace('.mark.logo.card { background: #fff; padding: 12%; box-shadow: var(--shadow); }',

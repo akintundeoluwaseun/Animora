@@ -746,6 +746,8 @@
     tx.style.width = (cw - N(sq)) + 'px';
     const t = el('div', 'im-title', tx, esc(b.text)); t.style.fontSize = FS(Math.min(56, 1400 / Math.max(10, String(b.text).length)));
     if (b.sub) { const sb = el('div', 'im-sub', tx, esc(b.sub)); sb.style.fontSize = FS(38); }
+    // never cut the title off ("AI plans every s…"): shrink it until it fits the card
+    afterFonts.push(() => { [t, tx.querySelector('.im-sub')].forEach((x) => { if (!x) return; let s = parseFloat(x.style.fontSize) || 40; for (let i = 0; i < 30 && x.scrollWidth > x.clientWidth + 1 && s > 14; i++) { s *= 0.94; x.style.fontSize = s + 'px'; } }); });
     const bar = el('div', 'im-bar', tx, '<i></i>');
     const L = b.t1 - b.in;
     tl.fromTo(card, { scale: 0, rotation: -12 }, { scale: 1, rotation: 0, duration: 0.5 / SP, ease: 'back.out(2)', immediateRender: true }, b.in);
