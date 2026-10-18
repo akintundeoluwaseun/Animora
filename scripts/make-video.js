@@ -15,6 +15,16 @@ const api = async (path, { method = 'GET', body, form } = {}) => {
 };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// edit mode: { edit: <project id>, instructions: [...] } -> plain-words edits, then a new MP4
+if (spec.edit) {
+  for (const instruction of spec.instructions || []) {
+    const r = await api(`/projects/${spec.edit}/edit`, { method: 'POST', body: { instruction } });
+    console.log('edit:', r.changed ? 'changed' : 'unchanged', '-', r.summary);
+  }
+  const { render } = await api(`/projects/${spec.edit}/renders`, { method: 'POST', body: {} });
+  console.log('render started', render.id);
+  process.exit(0);
+}
 const { project } = await api('/projects', { method: 'POST', body: { title: spec.brief.name, kind: spec.kind || 'video' } });
 console.log('project', project.id);
 if (spec.logo) {
