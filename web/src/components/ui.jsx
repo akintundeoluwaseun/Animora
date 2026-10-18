@@ -1,6 +1,6 @@
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
-import { useAuth, api } from '../lib.jsx';
+import { useAuth, api, DEVELOPER } from '../lib.jsx';
 import { useInstall } from './InstallApp.jsx';
 
 export function Logo({ light = false }) {
@@ -117,6 +117,11 @@ export function Nav() {
           {links.map(([to, l, k]) => <NavLink key={l} to={to} end={to === '/'} className={railLink(to)}><Icon k={k} />{l}</NavLink>)}
         </nav>
         <div className="mt-auto space-y-3 p-5 text-sm">
+          <a href={DEVELOPER.whatsapp} target="_blank" rel="noopener" className="block rounded-[10px] border border-white/12 px-3 py-2.5 text-white/80 hover:text-white">
+            <span className="block text-xs text-white/50">Developer</span>
+            <span className="block font-semibold leading-snug">{DEVELOPER.name}</span>
+            <span className="mt-1 flex items-center gap-1.5 font-semibold text-[#25D366]"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2Zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8s-.4-.1-.6.1-.7.8-.8 1-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.3-.4.7-1.3a.5.5 0 0 0 0-.5l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2 5.2 5.2 0 0 0 1.1 2.7 11.8 11.8 0 0 0 4.5 4c1.7.7 2.3.8 3.2.6a2.7 2.7 0 0 0 1.8-1.2 2.2 2.2 0 0 0 .2-1.3c-.1-.1-.3-.2-.5-.3Z"/></svg>WhatsApp {DEVELOPER.phone}</span>
+          </a>
           {inst.can && <button onClick={inst.install} className="flex w-full items-center gap-2 rounded-[10px] border border-white/12 px-3 py-2.5 font-semibold text-white/80 hover:text-white"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 21h14" /></svg>Install the app</button>}
           {status && status.ai === 'offline' && <p className="rounded-lg border border-white/10 p-3 text-xs leading-relaxed text-white/55">Practice mode: add a Gemini API key for the full AI director.</p>}
           {user && !user.testMode && (

@@ -20,6 +20,12 @@ export function deviceKey() {
 }
 export const otherDeviceLink = () => `${location.origin}/#k=${deviceKey()}`;
 
+// The developer, shown in the menu and on the home page (help, custom videos, feedback).
+export const DEVELOPER = {
+  name: 'Akintunde Oluwaseun Joshua', phone: '0807 691 1614',
+  whatsapp: `https://wa.me/2348076911614?text=${encodeURIComponent("Hi Oluwaseun, I'm messaging from Animora.")}`,
+};
+
 export class ApiError extends Error {
   constructor(message, status, data) { super(message); this.status = status; this.data = data; }
 }

@@ -1,7 +1,7 @@
 // Home: what Animora is, one real video, how it works. Nothing else.
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { api, naira } from '../lib.jsx';
+import { api, naira, DEVELOPER } from '../lib.jsx';
 import { Button } from '../components/ui.jsx';
 
 const STEPS = [
@@ -97,6 +97,12 @@ export default function Home() {
             <Button as={Link} to="/pricing" variant="outline">See pricing</Button>
             <Button as={Link} to="/videos?new=1" variant="dark">Make a video</Button>
           </div>
+        </div>
+      </section>
+      <section className="border-t border-ink/10">
+        <div className="mx-auto flex max-w-[1180px] flex-wrap items-center justify-between gap-4 px-6 py-8 sm:px-10">
+          <p className="text-ink-soft">Built by <b className="text-ink">{DEVELOPER.name}</b>. Questions, a custom video, or feedback? Chat with me.</p>
+          <Button as="a" href={DEVELOPER.whatsapp} target="_blank" rel="noopener" variant="outline">WhatsApp {DEVELOPER.phone}</Button>
         </div>
       </section>
     </div>
