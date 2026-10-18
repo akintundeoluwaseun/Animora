@@ -207,7 +207,7 @@ export default function Studio() {
         </div>
         <div className="flex items-center gap-3">
           <Steps current="studio" projectId={id} hasPlan hasCode={!!project.code} />
-          {project.code && <span className="hidden lg:block">{canRender ? <Button onClick={() => navigate(`/p/${id}/render`)}>Generate Video</Button> : <DownloadVideo project={project} />}</span>}
+          {project.code && <span className="hidden lg:block">{canRender ? <Button onClick={() => navigate(`/p/${id}/render?new=1`)}>Generate Video</Button> : <DownloadVideo project={project} />}</span>}
         </div>
       </div>
       {error && <div className="mt-4"><Alert onClose={() => setError('')}>{error}</Alert></div>}
@@ -223,7 +223,7 @@ export default function Studio() {
             <div className="mt-6 flex flex-wrap justify-center gap-2">
               <Button variant="glass" size="sm" onClick={undo} disabled={!project.versions}>Undo</Button>
               <Button variant="glass" size="sm" onClick={() => { if (confirm('Write the animation again from the plan? Your edits will be replaced (you can undo).')) generate(); }}>Regenerate</Button>
-              {canRender ? <Button size="lg" className="w-full sm:ml-2 sm:w-auto lg:hidden" onClick={() => navigate(`/p/${id}/render`)}>Generate Video</Button> : <span className="w-full sm:ml-2 sm:w-auto lg:hidden"><DownloadVideo project={project} size="lg" className="w-full" /></span>}
+              {canRender ? <Button size="lg" className="w-full sm:ml-2 sm:w-auto lg:hidden" onClick={() => navigate(`/p/${id}/render?new=1`)}>Generate Video</Button> : <span className="w-full sm:ml-2 sm:w-auto lg:hidden"><DownloadVideo project={project} size="lg" className="w-full" /></span>}
             </div>
           </section>
 

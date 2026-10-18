@@ -154,13 +154,18 @@ export default function Render() {
       try {
         const [p, c, list] = await Promise.all([api(`/projects/${id}`), api(`/projects/${id}/render-check`), api('/renders')]);
         setProject(p.project); setCheck(c);
-        const rid = params.get('r') || list.renders.find((x) => x.projectId === id)?.id;
+        // the last MP4 of this video, unless the video was edited after it was made (then make a new one)
+        const last = list.renders.find((x) => x.projectId === id);
+        const rid = params.get('r') || (last && (!last.stale || ['queued', 'rendering'].includes(last.status)) ? last.id : null);
         if (rid) await loadRender(rid);
+        else if (params.get('new') && c.ok !== false && !c.needsAd) autoStart.current = true;
       } catch (e) { setError(e.message); }
     })();
   }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const active = render && ['queued', 'rendering'].includes(render.status);
+  const autoStart = useRef(false);
+  useEffect(() => { if (autoStart.current && check && !render && !busy) { autoStart.current = false; start(); } });   // "Generate Video" in the editor starts straight away
   usePolling(async () => {
     const r = await loadRender(render.id).catch(() => null);
     if (r?.status === 'done') refresh();
@@ -212,7 +217,7 @@ export default function Render() {
             <div className="md:pt-6">
               <p className="text-sm font-semibold text-money">Your video is ready</p>
               <h2 className="mt-1 text-3xl font-extrabold">Download and post it</h2>
-              <p className="mt-2 text-ink-soft">{duration(render.durationSeconds)} · {ASPECTS[render.aspectRatio]?.w}×{ASPECTS[render.aspectRatio]?.h} silent MP4 · {(render.fileSize / 1e6).toFixed(1)} MB · plays on every phone.</p>
+              <p className="mt-2 text-ink-soft">{duration(render.durationSeconds)} · {ASPECTS[render.aspectRatio]?.w}×{ASPECTS[render.aspectRatio]?.h} MP4 · {(render.fileSize / 1e6).toFixed(1)} MB · plays on every phone.</p>
               <div className="mt-6 flex flex-wrap gap-3">
                 <DownloadButton render={render} title={project.title} />
                 {project.plan?.voiceover?.enabled && (script
@@ -237,14 +242,13 @@ export default function Render() {
               <h2 className="text-2xl font-extrabold">Make your MP4</h2>
               <dl className="mt-5 space-y-3 text-[15px]">
                 <div className="flex justify-between"><dt className="text-ink-soft">Length</dt><dd className="font-semibold">{duration(project.durationSeconds)}</dd></div>
-                <div className="flex justify-between gap-3"><dt className="text-ink-soft">Audio</dt><dd className="text-right font-semibold">None · silent video</dd></div>
+                <div className="flex justify-between gap-3"><dt className="text-ink-soft">Audio</dt><dd className="text-right font-semibold">{project.sfx === false ? 'None (sound is off)' : 'Included, as in the preview'}</dd></div>
                 {project.plan?.voiceover?.enabled && <div className="flex justify-between gap-3"><dt className="text-ink-soft">Narration</dt><dd className="text-right font-semibold"><Link to={`/p/${id}/studio`} className="underline">Script for ElevenLabs or another generator</Link></dd></div>}
                 <div className="flex justify-between"><dt className="text-ink-soft">Format</dt><dd className="font-semibold">{ASPECTS[project.aspectRatio]?.label} · {project.aspectRatio}</dd></div>
                 <div className="flex justify-between"><dt className="text-ink-soft">Frames</dt><dd className="font-semibold tabular-nums">{(project.durationSeconds * 30).toLocaleString()} at 30 fps</dd></div>
               </dl>
 
               <div className="mt-6 rounded-2xl bg-lilac p-4 text-sm">
-                <p className="mb-2">This MP4 has no audio track. If you requested narration, copy or download its script from the Studio’s Script tab and use it in your preferred audio generator.</p>
                 {tooLong ? <p className="text-alert">{check.error}</p>
                   : check.needsAd
                     ? <p>{user.plan === 'pro' ? `You've used all your Pro videos this month. ` : ''}Watch a 15-second ad to unlock this video. <Link to="/checkout" className="font-semibold underline">Go Pro</Link> to skip ads.</p>
