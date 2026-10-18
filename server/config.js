@@ -58,12 +58,15 @@ export const config = {
 
   // Credits: every device gets FREE_VIDEOS, then buys packs (no sign-in). Switched on by the Paystack key.
   credits: {
-    enabled: env('CREDITS', env('PAYSTACK_SECRET_KEY') ? 'on' : 'off') === 'on',
+    enabled: env('CREDITS', env('FLW_SECRET_KEY') || env('PAYSTACK_SECRET_KEY') ? 'on' : 'off') === 'on',
     free: num('FREE_VIDEOS', 2),
     packSize: num('CREDIT_PACK_SIZE', 5),
     packPriceNgn: num('CREDIT_PACK_PRICE_NGN', 4000),
   },
   paystack: { secretKey: env('PAYSTACK_SECRET_KEY'), publicKey: env('PAYSTACK_PUBLIC_KEY') },
+  flutterwave: { secretKey: env('FLW_SECRET_KEY') },
+  // which checkout to use: Flutterwave when its key is set, otherwise Paystack
+  get payProvider() { return this.flutterwave.secretKey ? 'flutterwave' : this.paystack.secretKey ? 'paystack' : null; },
 
   // Business rules
   pricing: {

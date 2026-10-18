@@ -21,17 +21,36 @@ const psFetch = async (path, opts = {}) => {
   return j.data;
 };
 
+const FLW = 'https://api.flutterwave.com/v3';
+const flwFetch = async (path, opts = {}) => {
+  const res = await fetch(`${FLW}${path}`, { ...opts, headers: { Authorization: `Bearer ${config.flutterwave.secretKey}`, 'Content-Type': 'application/json', ...(opts.headers || {}) }, signal: AbortSignal.timeout(20000) });
+  const j = await res.json().catch(() => ({}));
+  if (!res.ok || j.status !== 'success') throw Object.assign(new Error(j.message || `Flutterwave error (${res.status})`), { status: res.status === 404 ? 404 : 502 });
+  return j.data;
+};
+
+// What the payment provider says about a reference: { state: 'paid'|'failed'|'pending', amountNgn, currency }
+async function checkPayment(reference) {
+  if (config.payProvider === 'flutterwave') {
+    const d = await flwFetch(`/transactions/verify_by_reference?tx_ref=${encodeURIComponent(reference)}`).catch((e) => { if (e.status === 404) return null; throw e; });
+    if (!d) return { state: 'pending' };
+    return { state: d.status === 'successful' ? 'paid' : d.status === 'failed' ? 'failed' : 'pending', amountNgn: Number(d.amount), currency: d.currency };
+  }
+  const d = await psFetch(`/transaction/verify/${encodeURIComponent(reference)}`);
+  return { state: d.status === 'success' ? 'paid' : ['failed', 'abandoned', 'reversed'].includes(d.status) ? 'failed' : 'pending', amountNgn: Number(d.amount) / 100, currency: d.currency };
+}
+
 // Add a paid pack exactly once (safe to call many times for the same reference).
 async function settle(reference, userId) {
   const pay = await one('SELECT * FROM credit_payments WHERE reference=$1 AND user_id=$2', [reference, userId]);
   if (!pay) throw Object.assign(new Error('Payment not found.'), { status: 404 });
   if (pay.status === 'paid') return { status: 'paid', already: true };
-  const d = await psFetch(`/transaction/verify/${encodeURIComponent(reference)}`);
-  if (d.status !== 'success') {
-    if (['failed', 'abandoned', 'reversed'].includes(d.status)) await q("UPDATE credit_payments SET status='failed' WHERE reference=$1 AND status='pending'", [reference]);
-    return { status: d.status || 'pending' };
+  const d = await checkPayment(reference);
+  if (d.state !== 'paid') {
+    if (d.state === 'failed') await q("UPDATE credit_payments SET status='failed' WHERE reference=$1 AND status='pending'", [reference]);
+    return { status: d.state };
   }
-  if (Number(d.amount) < Math.round(Number(pay.amount_ngn) * 100) || d.currency !== 'NGN') throw Object.assign(new Error('The amount paid does not match.'), { status: 400 });
+  if (d.amountNgn < Number(pay.amount_ngn) || d.currency !== 'NGN') throw Object.assign(new Error('The amount paid does not match.'), { status: 400 });
   await tx(async (t) => {
     const done = await t.one("UPDATE credit_payments SET status='paid', paid_at=now() WHERE reference=$1 AND status <> 'paid' RETURNING credits", [reference]);
     if (done) await t.q('UPDATE users SET credits = credits + $2 WHERE id=$1', [userId, done.credits]);
@@ -41,7 +60,7 @@ async function settle(reference, userId) {
 
 r.get('/credits', requireAuth, async (req, res) => {
   // a payment that was made but not confirmed (closed tab): check it now
-  if (config.credits.enabled && config.paystack.secretKey) {
+  if (config.credits.enabled && config.payProvider) {
     const open = await q("SELECT reference FROM credit_payments WHERE user_id=$1 AND status='pending' AND created_at > now() - interval '2 days' ORDER BY created_at DESC LIMIT 3", [req.user.id]);
     for (const p of open) await settle(p.reference, req.user.id).catch(() => {});
   }
@@ -49,12 +68,26 @@ r.get('/credits', requireAuth, async (req, res) => {
 });
 
 r.post('/credits/checkout', requireAuth, async (req, res) => {
-  if (!config.credits.enabled || !config.paystack.secretKey) return res.status(503).json({ error: 'Payments are not switched on yet. Message the developer on WhatsApp to buy videos.' });
+  if (!config.credits.enabled || !config.payProvider) return res.status(503).json({ error: 'Payments are not switched on yet. Message the developer on WhatsApp to buy videos.' });
   const { packSize, packPriceNgn } = config.credits;
   const email = String(req.body?.email || '').trim().toLowerCase();
   const reference = newReference('ANM');
   await q('INSERT INTO credit_payments (reference, user_id, credits, amount_ngn) VALUES ($1,$2,$3,$4)', [reference, req.user.id, packSize, packPriceNgn]);
   const back = `${config.publicBaseUrl}/videos?paid=${reference}`;
+  const buyer = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email : `buyer-${req.user.id.slice(0, 8)}@animora.app`;
+  if (config.payProvider === 'flutterwave') {
+    const d = await flwFetch('/payments', {
+      method: 'POST',
+      body: JSON.stringify({
+        tx_ref: reference, amount: packPriceNgn, currency: 'NGN', redirect_url: back,
+        payment_options: 'card, banktransfer, ussd',
+        customer: { email: buyer, name: 'Animora customer' },
+        meta: { user_id: req.user.id, credits: packSize },
+        customizations: { title: 'Animora', description: `${packSize} videos`, logo: `${config.publicBaseUrl}/icon-192.png` },
+      }),
+    });
+    return res.json({ url: d.link, reference });
+  }
   const d = await psFetch('/transaction/initialize', {
     method: 'POST',
     body: JSON.stringify({

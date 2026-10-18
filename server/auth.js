@@ -77,7 +77,7 @@ export function publicUser(u) {
     needsAdForNextVideo: !config.noAuth && !(u.plan === 'pro' && u.videos_used_this_month < limit),
     maxSeconds: u.plan === 'pro' || config.noAuth ? pricing.proMaxSeconds : pricing.freeMaxSeconds,
     testMode: config.noAuth,
-    credits: { enabled: config.credits.enabled, unlimited: !!u.unlimited, free: u.free_left ?? 0, paid: u.credits ?? 0, left: u.unlimited ? null : (u.free_left ?? 0) + (u.credits ?? 0), packSize: config.credits.packSize, packPriceNgn: config.credits.packPriceNgn },
+    credits: { enabled: config.credits.enabled, unlimited: !!u.unlimited, free: u.free_left ?? 0, paid: u.credits ?? 0, left: u.unlimited ? null : (u.free_left ?? 0) + (u.credits ?? 0), packSize: config.credits.packSize, packPriceNgn: config.credits.packPriceNgn, provider: config.payProvider === 'flutterwave' ? 'Flutterwave' : config.payProvider === 'paystack' ? 'Paystack' : null },
     bank: u.bank_account_number ? { bankName: u.bank_name, accountNumber: u.bank_account_number, accountName: u.bank_account_name } : null,
   };
 }

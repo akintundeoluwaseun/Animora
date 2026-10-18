@@ -1,5 +1,5 @@
-// Buy a pack of videos with Paystack (card, bank transfer, USSD). No sign-in: the videos go to this device's
-// account (and every device linked to it). Paystack sends the buyer back to /videos?paid=<reference>.
+// Buy a pack of videos with Flutterwave or Paystack (card, bank transfer, USSD). No sign-in: the videos go to this device's
+// account (and every device linked to it). The payment page sends the buyer back to /videos?paid=<reference>.
 import { useState } from 'react';
 import { api, useAuth, naira } from '../lib.jsx';
 import { Button, Modal } from './ui.jsx';
@@ -49,7 +49,7 @@ export default function BuyCredits({ open, onClose, reason }) {
         <Button variant="ghost" className="flex-1" onClick={onClose} disabled={busy}>Not now</Button>
         <Button className="flex-1" onClick={pay} loading={busy}>Pay {naira(c.packPriceNgn || 4000)}</Button>
       </div>
-      <p className="mt-3 text-center text-xs text-ink-mute">Secure payment by Paystack: card, bank transfer or USSD.</p>
+      <p className="mt-3 text-center text-xs text-ink-mute">Secure payment{c.provider ? ` by ${c.provider}` : ''}: card, bank transfer or USSD.</p>
     </Modal>
   );
 }
