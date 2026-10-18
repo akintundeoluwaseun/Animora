@@ -22,8 +22,9 @@ export const otherDeviceLink = () => `${location.origin}/#k=${deviceKey()}`;
 
 // The developer, shown in the menu and on the home page (help, custom videos, feedback).
 export const DEVELOPER = {
-  name: 'Akintunde Oluwaseun Joshua', phone: '0807 691 1614',
-  whatsapp: `https://wa.me/2348076911614?text=${encodeURIComponent("Hi Oluwaseun, I'm messaging from Animora.")}`,
+  name: 'Oluwaseun Joshua.', phone: '0807 691 1614',
+  website: 'https://oluwaseun-joshua-site.vercel.app', websiteLabel: 'oluwaseun-joshua-site.vercel.app',
+  whatsapp: `https://wa.me/2348076911614?text=${encodeURIComponent("Hi, I'm messaging from Animora.")}`,
 };
 
 export class ApiError extends Error {

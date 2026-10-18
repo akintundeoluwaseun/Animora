@@ -101,8 +101,11 @@ export default function Home() {
       </section>
       <section className="border-t border-ink/10">
         <div className="mx-auto flex max-w-[1180px] flex-wrap items-center justify-between gap-4 px-6 py-8 sm:px-10">
-          <p className="text-ink-soft">Built by <b className="text-ink">{DEVELOPER.name}</b>. Questions, a custom video, or feedback? Chat with me.</p>
-          <Button as="a" href={DEVELOPER.whatsapp} target="_blank" rel="noopener" variant="outline">WhatsApp {DEVELOPER.phone}</Button>
+          <p className="text-ink-soft">Developed by <a href={DEVELOPER.website} target="_blank" rel="noopener" className="font-semibold text-ink hover:underline">{DEVELOPER.name}</a> · websites, software and apps.</p>
+          <div className="flex flex-wrap gap-3">
+            <Button as="a" href={DEVELOPER.whatsapp} target="_blank" rel="noopener" variant="outline">WhatsApp {DEVELOPER.phone}</Button>
+            <Button as="a" href={DEVELOPER.website} target="_blank" rel="noopener" variant="ghost">Visit website</Button>
+          </div>
         </div>
       </section>
     </div>
