@@ -1,0 +1,21 @@
+# Makes a video through the live Animora website (used to make Animora's own promo videos).
+name: Make video
+on:
+  workflow_dispatch:
+    inputs:
+      spec:
+        description: base64 JSON spec (see scripts/make-video.js)
+        required: true
+        type: string
+jobs:
+  make:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node scripts/make-video.js "$SPEC"
+        env:
+          SPEC: ${{ inputs.spec }}
