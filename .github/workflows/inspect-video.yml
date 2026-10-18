@@ -1,0 +1,41 @@
+# Contact sheet of a finished MP4 (frames every few seconds), saved to the "inspect" branch for review.
+name: Inspect video
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: MP4 URL (the site's /api/render-file/... link)
+        required: true
+        type: string
+      name:
+        description: file name for the sheet
+        required: true
+        type: string
+permissions:
+  contents: write
+jobs:
+  sheet:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Make the sheet
+        env:
+          URL: ${{ inputs.url }}
+          NAME: ${{ inputs.name }}
+        run: |
+          command -v ffmpeg || (sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg > /dev/null)
+          size=$(curl -sI "$URL" | grep -i content-range | sed 's/.*\///' | tr -d '\r')
+          : > v.mp4; start=0; chunk=4194304
+          while [ "$start" -lt "${size:-0}" ]; do end=$((start+chunk-1)); curl -s -r $start-$end "$URL" >> v.mp4; start=$((end+1)); done
+          [ -s v.mp4 ] || curl -s "$URL" -o v.mp4
+          ffprobe -v error -show_entries stream=codec_type,codec_name,width,height -show_entries format=duration -of compact v.mp4 > info.txt
+          ffmpeg -v error -y -i v.mp4 -vf "fps=1/3,scale=480:-1,tile=4x4" -frames:v 1 sheet.jpg
+          ffmpeg -v error -y -i v.mp4 -ss 30 -vf "fps=1/3,scale=480:-1,tile=4x4" -frames:v 1 sheet2.jpg || true
+          git config user.name animora-bot; git config user.email bot@animora.app
+          git fetch origin inspect || true
+          git checkout -B inspect
+          mkdir -p sheets; mv sheet.jpg "sheets/$NAME.jpg"; [ -f sheet2.jpg ] && mv sheet2.jpg "sheets/$NAME-b.jpg"; mv info.txt "sheets/$NAME.txt"
+          git add sheets && git commit -qm "sheet $NAME" && git push -f origin inspect
