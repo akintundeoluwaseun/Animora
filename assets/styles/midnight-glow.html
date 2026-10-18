@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="adflash" content="width=1080,height=1920,duration=20,fps=30,engine=motion-v3">
+<meta name="adflash" content="width=1080,height=1920,duration=20,fps=30,engine=motion-v4">
 <title>LedgerPro - Accounting software</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700&display=block" rel="stylesheet">
 <style>
@@ -51,7 +51,10 @@
   .mark.mono { background: linear-gradient(135deg, var(--primary), color-mix(in srgb, var(--primary) 55%, var(--secondary))); color: var(--on-primary);
     font-weight: 800; font-family: 'Inter','Inter','Poppins','DejaVu Sans',Arial,sans-serif; box-shadow: var(--shadow); }
   .mark.logo img { width: 100%; height: 100%; object-fit: contain; }
-  .mark.logo.card { background: #fff; padding: 12%; box-shadow: var(--shadow); }
+  .mark.logo.card { background: #fff; box-shadow: var(--shadow); }
+  .mark.logo.card img { width: 80%; height: 80%; }   /* inner space as a share of the mark (padding % would follow the page width) */
+  .mark.logo.photo { overflow: hidden; } .mark.logo.photo img { width: 100%; height: 100%; object-fit: cover; }
+  .mark.logo.card.ink { background: #0B0A12; }   /* light logos sit on a dark card */
   .chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 16px; max-width: 928.8px; }
   .chip { font-family: 'Inter','Inter','Poppins','DejaVu Sans',Arial,sans-serif; font-weight: 600; font-size: 40px; padding: 14px 30px; border-radius: 999px; background: var(--surface); border: 2px solid var(--line); }
   .burst-dot { position: absolute; left: 50%; top: 50%; margin: -6px 0 0 -6px; border-radius: 50%; background: var(--primary); z-index: 0; }
@@ -196,6 +199,11 @@
   .fx-flash { position: absolute; inset: 0; background: #fff; opacity: 0; }
 
 
+  /* ---------- logo shot ---------- */
+  .lg-rings { position: relative; display: flex; align-items: center; justify-content: center; }
+  .lg-ring { position: absolute; inset: 0; border-radius: 50%; border: 6px solid var(--primary); opacity: 0; }
+  .lg-mark { position: relative; z-index: 2; box-shadow: 0 30px 90px color-mix(in srgb, var(--primary) 45%, transparent); }
+  .lg-mark.logo:not(.card) { box-shadow: none; } .lg-mark.logo:not(.card) img { filter: drop-shadow(0 24px 50px color-mix(in srgb, var(--primary) 40%, transparent)); }
   /* ---------- premium shots ---------- */
   .sent { max-width: 907.2px; }
   .sent-line { font-weight: 600; line-height: 1.18; letter-spacing: -0.02em; text-align: center; max-width: 907.2px; }
@@ -274,6 +282,8 @@
   .fx-swoosh path { fill: none; stroke: var(--primary); stroke-width: 34px; stroke-linecap: round; filter: drop-shadow(0 10px 24px color-mix(in srgb, var(--primary) 45%, transparent)); }
 
   /* ---------- background ---------- */
+  /* moving background layers get their own compositor layer: painted once, then only moved (2x faster renders) */
+  .bg-glow, .bg-streak, .bg-beam, .bg-rays, .bg-grid, .bg-dots, .bg-halftone, .bg-kente, .bg-wave, .bg-marq, .bg-p, .bg-frame { will-change: transform, opacity; }
   .bg-base { position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 30%, color-mix(in srgb, var(--primary) 18%, var(--bg)) 0%, var(--bg) 70%); }
   .bg-grid { position: absolute; inset: -200px; background-image: linear-gradient(var(--line) 2px, transparent 2px), linear-gradient(90deg, var(--line) 2px, transparent 2px); background-size: 90px 90px;
     -webkit-mask: radial-gradient(ellipse at 50% 50%, #000 20%, transparent 70%); mask: radial-gradient(ellipse at 50% 50%, #000 20%, transparent 70%); }
@@ -327,7 +337,7 @@
 <script>
   const DURATION = 20;
   const SPEED = 1;               // edit: >1 = faster animations, <1 = slower
-  window.ADFLASH_DATA = {"W":1080,"H":1920,"duration":20,"seed":1654229219,"brand":"LedgerPro","logo":null,"theme":{"key":"midnight","energy":1,"accentStyle":"color","textIn":"focus","ambient":["glow","streaks"],"textScale":0.62,"drift":0.5,"calm":true},"beats":[{"shot":"scatter","text":"Accounting at machine speed","sub":"","icon":"sparkle","t0":0,"t1":3.5,"cut":{"type":"morph","d":0.28}},{"shot":"isocard","number":"LedgerPro","text":"Built for Nigerian businesses","t0":3.5,"t1":7,"cut":{"type":"focus","d":0.28},"icon":"car"},{"shot":"grid","items":[{"text":"Invoices","icon":"check"},{"text":"Payroll","icon":"card"},{"text":"Inventory","icon":"check"},{"text":"Tax reports","icon":"check"}],"text":"","title":"","t0":7,"t1":11.5,"cut":{"type":"line","d":0.28},"icon":"sparkle"},{"shot":"flow","items":[{"text":"Record","icon":"check"},{"text":"Review","icon":"check"},{"text":"Export","icon":"check"}],"text":"","title":"","t0":11.5,"t1":15,"cut":{"type":"dive","d":0.42},"icon":"sparkle"},{"shot":"sentence","text":"Start your free trial","t0":15,"t1":16.82,"cut":{"type":"morph","d":0.28},"icon":"gift"},{"shot":"lockup","text":"LedgerPro","subs":["Start your free trial","ledgerpro.ng"],"button":"0809 555 0101","t0":16.82,"t1":20,"icon":"sparkle"}],"captions":[]};
+  window.ADFLASH_DATA = {"W":1080,"H":1920,"duration":20,"seed":1437733053,"brand":"LedgerPro","logo":null,"theme":{"key":"midnight","energy":1,"accentStyle":"color","textIn":"focus","textScale":0.62,"drift":0.5,"calm":true,"glow":1,"finish":0.8,"leaks":0,"chroma":0,"ambient":["glow"]},"music":null,"beats":[{"shot":"sentence","text":"Accounting at machine speed","sub":"","icon":"sparkle","t0":0,"t1":3.5,"cut":{"type":"line","d":0.28}},{"shot":"assemble","text":"LedgerPro","subs":[],"t0":3.5,"t1":5.33,"cut":{"type":"morph","d":0.28},"icon":"sparkle"},{"shot":"scatter","text":"Built for Nigerian businesses","icon":"car","useMark":false,"t0":5.33,"t1":7,"cut":{"type":"focus","d":0.28}},{"shot":"stack","items":[{"text":"Invoices","icon":"check"},{"text":"Payroll","icon":"card"},{"text":"Inventory","icon":"check"},{"text":"Tax reports","icon":"check"}],"text":"","title":"","t0":7,"t1":9.8,"cut":{"type":"line","d":0.28},"icon":"sparkle"},{"shot":"prompt","text":"Invoices","cut":{"type":"line","d":0.28},"t0":9.8,"t1":11.5},{"shot":"flow","items":[{"text":"Record","icon":"check"},{"text":"Review","icon":"check"},{"text":"Export","icon":"check"}],"text":"","title":"","t0":11.5,"t1":15,"cut":{"type":"dive","d":0.42},"icon":"sparkle"},{"shot":"flip","text":"Start your free trial","t0":15,"t1":16.82,"cut":{"type":"morph","d":0.28},"icon":"gift"},{"shot":"lockup","text":"LedgerPro","subs":["Start your free trial","ledgerpro.ng"],"button":"0809 555 0101","t0":16.82,"t1":20,"icon":"sparkle"}],"captions":[]};
 </script>
 <script>
 /* AdFlash motion runtime v3 (inlined into every built-in video).
@@ -343,11 +353,20 @@
  */
 (function () {
   const DATA = window.ADFLASH_DATA;
-  const W = DATA.W, H = DATA.H, DURATION = DATA.duration, U = Math.min(W, H) / 1080, WIDE = W > H, SQUARE = W === H;
+  const W = DATA.W, H = DATA.H, DURATION = DATA.duration, WIDE = W > H, SQUARE = W === H, U = Math.min(W, H) / 1080 * (WIDE ? 1.18 : 1);   // landscape: bigger pieces so the width is used
   const TH = DATA.theme;
   const SP = (typeof SPEED === 'number' && SPEED > 0) ? SPEED : 1;
   const ENERGY = TH.energy || 2;
   const tl = gsap.timeline({ paused: true, defaults: { ease: 'power3.out' } });
+  // Sound effects: every movement that deserves a sound records a cue { t, k (sound name), v (volume) }.
+  // The preview plays them live; the renderer mixes them into the MP4. look.sound: 'off' | 'soft' | 'punchy'.
+  const SFX = [];
+  const SND = TH.sound === 'off' ? 'off' : 'soft';   // sounds are always soft; 'off' adds none at all
+  const sfx = (t, k, v) => {
+    if (SND === 'off' || !(t >= 0) || t > DURATION - 0.08) return;
+    const vol = (v == null ? 1 : v) * 0.8;
+    SFX.push({ t: Math.round(t * 1000) / 1000, k, v: Math.round(vol * 100) / 100 });
+  };
   let __s = DATA.seed || 12345; const rnd = () => ((__s = (__s * 16807) % 2147483647) / 2147483647);
   const R = (a, b) => a + rnd() * (b - a);
   const N = (n) => n * U;                                                       // design px (1080 base) -> canvas px
@@ -495,7 +514,7 @@
       return '<span class="wd' + (acc ? ' acc' + (marker ? ' mkd' : '') : '') + '">' + (acc && marker ? '<span class="mk"></span>' : '') + '<span class="wi">' + esc(w) + '</span></span>';
     }).join(' ');
   }
-  const TS = TH.textScale || 1;
+  const TS = Math.min(1, (TH.textScale || 1) * (WIDE ? 1.3 : 1));
   function sizeFor(text, base, min, max) { return sizeRaw(text, base, min, max) * TS; }
   function sizeRaw(text, base, min, max) {
     const len = String(text).length;
@@ -513,6 +532,13 @@
       tl.from(wis, { opacity: 0, y: N(24), filter: 'blur(' + N(14) + 'px)', duration: 0.7 / SP, stagger: 0.09 / SP, ease: 'power3.out' }, at);
     } else if (variant === 'slide') {
       tl.from(wis, { xPercent: -60, opacity: 0, duration: 0.55 / SP, stagger: 0.06 / SP, ease: 'expo.out' }, at);
+    } else if (variant === 'chars') {   // every letter rises out of its word's mask with a small turn
+      const cs = [];
+      wis.forEach((w) => {
+        if (!w.dataset.split) { w.dataset.split = '1'; w.innerHTML = Array.from(w.textContent).map((c) => '<span class="cr">' + esc(c) + '</span>').join(''); }
+        cs.push(...$$('.cr', w));
+      });
+      tl.from(cs, { yPercent: 118, rotation: 14, duration: 0.62 / SP, stagger: Math.min(0.028, 0.55 / Math.max(1, cs.length)) / SP, ease: 'expo.out' }, at);
     } else {
       tl.from(wis, { yPercent: 115, duration: 0.65 / SP, stagger: 0.075 / SP, ease: 'expo.out' }, at);
     }
@@ -520,10 +546,24 @@
   }
   function mark(parent, size) {   // the brand mark: uploaded logo, or a monogram tile
     const m = el('div', 'mark', parent);
-    m.style.width = N(size) + 'px'; m.style.height = N(size) + 'px';
-    if (DATA.logo) {
-      m.classList.add('logo'); if (!DATA.logo.transparent) m.classList.add('card');
-      m.innerHTML = '<img src="' + esc(DATA.logo.url) + '" crossorigin="anonymous" alt="">';
+    const L = DATA.logo;
+    // a logo that comes with its own background (a JPEG) is shown as it is, in its own shape, so it stays big
+    const boxed = L && !L.transparent;
+    const ratio = boxed && L.ratio ? Math.max(1, Math.min(1.9, L.ratio)) : 1;
+    const side = ratio > 1 ? size * 0.86 : size;
+    m.style.width = N(side * ratio) + 'px'; m.style.height = N(side) + 'px';
+    if (L) {
+      m.classList.add('logo');
+      if (boxed) {
+        m.classList.add('card', 'photo'); m.style.borderRadius = N(side * 0.16) + 'px';
+      } else {
+        // a card behind a see-through logo only when its colours would vanish on this background
+        const bgHex = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim().replace('#', '');
+        const darkBg = bgHex.length >= 6 && (0.299 * parseInt(bgHex.slice(0, 2), 16) + 0.587 * parseInt(bgHex.slice(2, 4), 16) + 0.114 * parseInt(bgHex.slice(4, 6), 16)) < 110;
+        if ((L.light === true && !darkBg) || (L.light === false && darkBg)) m.classList.add('card');
+        if (L.light === true && !darkBg) m.classList.add('ink');
+      }
+      m.innerHTML = '<img src="' + esc(L.url) + '" crossorigin="anonymous" alt=""' + (boxed && (!L.ratio || Math.abs(L.ratio - ratio) > 0.06) ? ' style="object-fit:contain"' : '') + '>';
     } else {
       m.classList.add('mono'); m.style.fontSize = N(size * 0.52) + 'px';
       m.innerHTML = '<span>' + esc((String(DATA.brand || 'A').trim()[0] || 'A').toUpperCase()) + '</span>';
@@ -629,6 +669,7 @@
     tl.from(sel, { scaleX: 0.2, opacity: 0, duration: 0.35, ease: 'expo.out' }, b.in);
     tl.from($$('.ch', t), { opacity: 0, duration: 0.01, stagger: each, ease: 'none' }, b.in + 0.25);
     const typed = b.in + 0.25 + each * chars.length;
+    for (let k = 0; k < chars.length; k += 4) sfx(b.in + 0.25 + each * k, 'tick', 0.3);
     const blinks = Math.max(1, Math.floor((b.t1 - b.in) / 0.5));
     tl.fromTo(cur, { opacity: 1 }, { opacity: 0, duration: 0.01, repeat: blinks, yoyo: true, repeatDelay: 0.24, ease: 'none', immediateRender: false }, b.in + 0.2);
     tl.from(fill, { scaleX: 0, duration: 0.45, ease: 'expo.inOut' }, typed + 0.1);
@@ -915,6 +956,7 @@
       const tap = b.in + 1.35 * q, room = DURATION - tap;
       tl.fromTo(cur, { x: W * 0.45, y: H * 0.45, opacity: 0 }, { x: N(60), y: N(30), opacity: 1, duration: 0.6 * q, ease: 'expo.inOut', immediateRender: true }, b.in + 0.75 * q);
       tl.to(btn, { scale: 0.9, duration: 0.1, yoyo: true, repeat: 1, ease: 'power2.inOut' }, tap);
+      sfx(b.in + 0.6 * q, 'pop', 0.6); sfx(tap, 'click', 0.9);
       tl.fromTo(ring, { scale: 0.6, opacity: 0.9 }, { scale: 2.2, opacity: 0, duration: Math.max(0.2, Math.min(0.7, room - 0.05)), ease: 'power2.out', immediateRender: false }, tap);
       if (room > 1.0) tl.to(cur, { opacity: 0, y: '+=' + N(40), duration: 0.4 }, tap + 0.5);
       const n = Math.floor((b.t1 - tap - 0.8) / 0.9);
@@ -925,6 +967,29 @@
     }
   };
 
+
+
+  // The brand logo, big and centred: rings pulse out behind it while it lands. A "dive" cut after this beat
+  // flies the camera straight into the logo.
+  SHOTS.logo = (b, bi) => {
+    const box = el('div', 'fitbox col center lg-wrap', bi);
+    const size = Math.min(WIDE ? 520 : 560, (Math.min(W, H) / U) * (WIDE ? 0.5 : 0.52));
+    const ringBox = el('div', 'lg-rings', box); ringBox.style.width = N(size) + 'px'; ringBox.style.height = N(size) + 'px';
+    for (let k = 0; k < 3; k++) {
+      const r = el('i', 'lg-ring', ringBox);
+      tl.fromTo(r, { scale: 0.6, opacity: 0.7 }, { scale: 1.9 + k * 0.35, opacity: 0, duration: 1.3, ease: 'power2.out', immediateRender: false }, b.in + 0.25 + k * 0.18);
+    }
+    const m = mark(ringBox, size * 0.78); m.classList.add('lg-mark');
+    tl.fromTo(m, { scale: 0, rotation: -25, filter: 'blur(' + N(20) + 'px)' }, { scale: 1, rotation: 0, filter: 'blur(0px)', duration: 0.8 / SP, ease: 'back.out(1.6)', immediateRender: true }, b.in);
+    tl.fromTo(m, { scale: 1 }, { scale: 1.08, duration: Math.max(0.4, b.t1 - b.in - 0.8), ease: 'none', immediateRender: false }, b.in + 0.8);
+    if (b.text) {
+      const t = el('div', 'tx-line lg-name', box, wordsHtml(b.text, null, TH.accentStyle === 'marker'));
+      t.style.fontSize = FS(Math.min(110, sizeFor(b.text, 2000, 60, 120)));
+      textEnter(t, b.in + 0.55, TH.textIn === 'focus' ? 'focus' : 'rise');
+    }
+    if (b.sub) { const sb = el('div', 'tx-sub', box, esc(b.sub)); sb.style.fontSize = FS(40); tl.from(sb, { opacity: 0, y: N(20), duration: 0.5 }, b.in + 0.85); }
+    burstDots(ringBox, b.in + 0.5, 14, size * 0.75);
+  };
 
   // ------------------------------------------------------------------ premium (Apple-style) shots
   // Small clean type, lots of space, UI pieces that morph. Sizes here are absolute (not textScale'd).
@@ -1030,6 +1095,8 @@
     tx.style.width = (cw - N(sq)) + 'px';
     const t = el('div', 'im-title', tx, esc(b.text)); t.style.fontSize = FS(Math.min(56, 1400 / Math.max(10, String(b.text).length)));
     if (b.sub) { const sb = el('div', 'im-sub', tx, esc(b.sub)); sb.style.fontSize = FS(38); }
+    // never cut the title off ("AI plans every s…"): shrink it until it fits the card
+    afterFonts.push(() => { [t, tx.querySelector('.im-sub')].forEach((x) => { if (!x) return; let s = parseFloat(x.style.fontSize) || 40; for (let i = 0; i < 30 && x.scrollWidth > x.clientWidth + 1 && s > 14; i++) { s *= 0.94; x.style.fontSize = s + 'px'; } }); });
     const bar = el('div', 'im-bar', tx, '<i></i>');
     const L = b.t1 - b.in;
     tl.fromTo(card, { scale: 0, rotation: -12 }, { scale: 1, rotation: 0, duration: 0.5 / SP, ease: 'back.out(2)', immediateRender: true }, b.in);
@@ -1146,18 +1213,640 @@
     let dots = null, them = null;
     if (b.sub) { dots = el('div', 'bub them dots', area, '<i></i><i></i><i></i>'); them = el('div', 'bub them', area, esc(b.sub)); them.style.fontSize = FS(50); }
     tl.from(bar, { y: N(80), opacity: 0, duration: 0.5, ease: 'expo.out' }, b.in);
-    const each = Math.min(0.05, (b.t1 - b.in) * 0.3 / chars.length) / SP;
+    const each = Math.min(0.04, (b.t1 - b.in) * (b.sub ? 0.18 : 0.3) / chars.length) / SP;
     tl.from($$('.ch', field), { opacity: 0, duration: 0.01, stagger: each, ease: 'none' }, b.in + 0.35);
     const sent = b.in + 0.45 + each * chars.length;
+    for (let k = 0; k < chars.length; k += 4) sfx(b.in + 0.35 + each * k, 'tick', 0.25);
+    sfx(sent, 'send', 0.8); if (b.sub) sfx(sent + 0.85, 'ding', 0.6);
     tl.to(send, { scale: 0.8, duration: 0.1, yoyo: true, repeat: 1 }, sent);
     tl.to(field, { opacity: 0, duration: 0.12 }, sent + 0.1);
     tl.fromTo(me, { y: N(150), scale: 0.6, opacity: 0 }, { y: 0, scale: 1, opacity: 1, duration: 0.5, ease: 'back.out(1.6)', immediateRender: true }, sent + 0.1);
     if (b.sub) {
-      tl.fromTo(dots, { scale: 0, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.3, ease: 'back.out(2)', immediateRender: true }, sent + 0.5);
-      tl.to($$('i', dots), { y: -N(8), duration: 0.18, stagger: 0.08, yoyo: true, repeat: 3, ease: 'sine.inOut' }, sent + 0.6);
-      tl.to(dots, { scale: 0, opacity: 0, height: 0, padding: 0, margin: 0, duration: 0.2 }, sent + 1.15);
-      tl.fromTo(them, { scale: 0.6, opacity: 0, x: -N(40) }, { scale: 1, opacity: 1, x: 0, duration: 0.5, ease: 'back.out(1.6)', immediateRender: true }, sent + 1.2);
+      tl.fromTo(dots, { scale: 0, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.25, ease: 'back.out(2)', immediateRender: true }, sent + 0.4);
+      tl.to($$('i', dots), { y: -N(8), duration: 0.15, stagger: 0.06, yoyo: true, repeat: 1, ease: 'sine.inOut' }, sent + 0.45);
+      tl.to(dots, { scale: 0, opacity: 0, height: 0, padding: 0, margin: 0, duration: 0.15 }, sent + 0.8);
+      tl.fromTo(them, { scale: 0.6, opacity: 0, x: -N(40) }, { scale: 1, opacity: 1, x: 0, duration: 0.45, ease: 'back.out(1.6)', immediateRender: true }, sent + 0.85);
     }
+  };
+
+  // ------------------------------------------------------------------ premium shots (v4)
+  // Big type that fills the frame, real 3D depth, photo parallax. Built like After Effects motion design:
+  // one strong move per shot, hard landings on an impact, everything keeps drifting until the cut.
+  const textInOr = (v) => (TH.textIn === 'chars' ? 'chars' : v);
+
+  // A giant word slams into the screen letter by letter; outline copies stack above and below and drift apart.
+  SHOTS.slam = (b, bi) => {
+    const txt = String(b.text);
+    const box = el('div', 'fitbox slam', bi);
+    box.dataset.maxw = String(W * (WIDE ? 0.74 : 0.86));   // big, but never touching the edges
+    const size = Math.min(WIDE ? 340 : 320, (WIDE ? 1700 : 980) / Math.max(3, txt.length * 0.6));
+    const echoes = [-2, -1, 1, 2].map((k) => {
+      const e = el('div', 'slam-echo', box, esc(txt)); e.style.fontSize = FS(size); e.style.marginTop = (k * 0.9) + 'em';
+      gsap.set(e, { xPercent: -50, yPercent: -50 });
+      return { e, k };
+    });
+    const main = el('div', 'slam-main', box, Array.from(txt).map((c) => '<span class="sc">' + (c === ' ' ? '&nbsp;' : esc(c)) + '</span>').join(''));
+    main.style.fontSize = FS(size); main.style.letterSpacing = '0.04em';   // widest it gets, so the fit is measured at full width
+    const bar = el('i', 'slam-bar', main);
+    const cs = $$('.sc', main);
+    const st = Math.min(0.045, 0.34 / cs.length) / SP, land = b.in + 0.3 / SP + st * Math.ceil(cs.length / 2);
+    tl.fromTo(cs, { opacity: 0, scale: 2.8, yPercent: -24, filter: 'blur(' + N(12) + 'px)' },
+      { opacity: 1, scale: 1, yPercent: 0, filter: 'blur(0px)', duration: 0.3 / SP, ease: 'power4.in', stagger: { each: st, from: 'center' }, immediateRender: true }, b.in);
+    sfx(b.in, 'whoosh', 0.35); sfx(land, 'impact', 0.75); shake(land, 16);
+    tl.fromTo(echoes.map((x) => x.e), { opacity: 0, scale: 0.92 }, { opacity: (i) => 0.6 / Math.abs(echoes[i].k), scale: 1, duration: 0.5, ease: 'expo.out', immediateRender: true }, land);
+    echoes.forEach(({ e, k }) => tl.to(e, { y: k * N(70), duration: Math.max(0.4, b.t1 - land), ease: 'none' }, land));
+    tl.fromTo(bar, { scaleX: 0 }, { scaleX: 1, duration: 0.45, ease: 'expo.inOut', immediateRender: true }, land + 0.08);
+    tl.fromTo(main, { letterSpacing: '-0.02em' }, { letterSpacing: '0.04em', duration: Math.max(0.4, b.t1 - land), ease: 'power1.out', immediateRender: true }, land);
+    tl.fromTo(main, { scale: 1.06 }, { scale: 1, duration: 0.5, ease: 'expo.out', immediateRender: false }, land);
+    if (b.sub) { const s = el('div', 'slam-sub', box, esc(b.sub)); s.style.fontSize = FS(44); gsap.set(s, { xPercent: -50 }); tl.from(s, { opacity: 0, y: N(24), duration: 0.45 }, land + 0.25); }
+  };
+
+  // A type poster: 2-5 short lines, each sized to fill the width, solid / outline / highlighted.
+  SHOTS.poster = (b, bi) => {
+    let lines = (b.lines || []).map(String).filter(Boolean);
+    if (lines.length < 2) {
+      const w = String(b.text).split(/\s+/).filter(Boolean); lines = [];
+      for (let k = 0; k < w.length;) { const two = w[k + 1] && w[k].length + w[k + 1].length <= 8; lines.push(w.slice(k, k + (two ? 2 : 1)).join(' ')); k += two ? 2 : 1; }
+    }
+    lines = lines.slice(0, 5);
+    const box = el('div', 'fitbox poster', bi);
+    const maxW = WIDE ? W * 0.58 : W * 0.84, acc = lines.length - 1;
+    const onP = getComputedStyle(document.documentElement).getPropertyValue('--on-primary').trim() || '#fff';
+    const rows = lines.map((ln, k) => {
+      const r = el('div', 'pst-row', box);
+      const bar = k === acc ? el('i', 'pst-bar', r) : null;
+      const t = el('span', 'pst-t' + (k === acc ? ' acc' : k % 2 ? ' out' : ''), r, esc(ln));
+      t.style.fontSize = N(Math.min(300, (maxW / U) / Math.max(2, ln.length * 0.62))) + 'px';
+      return { r, t, bar };
+    });
+    // every line exactly as wide as the widest allowed (measured once the font is in)
+    beforeFit.push(() => rows.forEach(({ t }) => { const w = t.offsetWidth, s = parseFloat(t.style.fontSize); if (w > 0 && s > 0) t.style.fontSize = Math.min(N(330), s * maxW / w) + 'px'; }));
+    rows.forEach(({ r, t }, k) => {
+      const at = b.in + k * 0.085 / SP;
+      tl.fromTo(t, { yPercent: 112, rotation: 4 }, { yPercent: 0, rotation: 0, duration: 0.62 / SP, ease: 'expo.out', immediateRender: true }, at);
+      tl.to(r, { x: (k % 2 ? -1 : 1) * N(34), duration: Math.max(0.5, b.t1 - at - 0.45), ease: 'none' }, at + 0.45);
+    });
+    const hot = rows[acc], barAt = b.in + rows.length * 0.085 / SP + 0.35;
+    tl.fromTo(hot.bar, { scaleX: 0 }, { scaleX: 1, duration: 0.42 / SP, ease: 'expo.inOut', immediateRender: true }, barAt);
+    tl.set(hot.t, { color: onP }, barAt + 0.18);
+    sfx(b.in, 'whoosh', 0.45); sfx(barAt + 0.1, 'impact', 0.35);
+    tl.fromTo(box, { scale: 1 }, { scale: 1.05, duration: Math.max(0.5, b.t1 - b.t0), ease: 'none', immediateRender: false }, b.t0);
+  };
+
+  // Box reveal: a colour bar sweeps across and leaves the words behind it.
+  SHOTS.reveal = (b, bi) => {
+    const box = el('div', 'fitbox col center rv', bi);
+    [b.text, b.sub].filter(Boolean).forEach((ln, k) => {
+      const row = el('div', 'rv-row' + (k ? ' sub' : ''), box);
+      const t = el('div', 'rv-t', row, esc(ln)); t.style.fontSize = FS(k ? 44 : sizeRaw(ln, 2300, 66, 156));
+      const bar = el('i', 'rv-bar' + (k ? ' b2' : ''), row);
+      const at = b.in + k * 0.3 / SP, h = 0.3 / SP;
+      tl.fromTo(bar, { scaleX: 0, transformOrigin: '0% 50%' }, { scaleX: 1, duration: h, ease: 'power3.inOut', immediateRender: true }, at);
+      tl.fromTo(t, { opacity: 0 }, { opacity: 1, duration: 0.01, immediateRender: true }, at + h);
+      tl.to(bar, { scaleX: 0, transformOrigin: '100% 50%', duration: h * 1.15, ease: 'power3.inOut' }, at + h + 0.02);
+      tl.fromTo(t, { x: -N(30) }, { x: 0, duration: 0.7, ease: 'expo.out', immediateRender: false }, at + h);
+      sfx(at, 'swish', k ? 0.3 : 0.5);
+    });
+    idle(bi, b, 0.05);
+  };
+
+  // The camera flies through a 3D corridor of photos (or words) and lands on the line at the end.
+  SHOTS.tunnel = (b, bi) => {
+    const imgs = (b.imgs || []).slice(0, 6);
+    let pieces = imgs.length >= 2 ? imgs.map((u) => ({ img: u })) : (b.items || []).slice(0, 6).map((it) => ({ text: it.text || it.name }));
+    while (pieces.length && pieces.length < 6) pieces = pieces.concat(pieces).slice(0, 6);   // a full corridor even with 2-3 photos
+    const world = el('div', 'tn-world', bi);
+    const gap = N(760), n = pieces.length, zEnd = gap * (n + 1);
+    const rx = WIDE ? W * 0.22 : W * 0.24, ry = WIDE ? H * 0.2 : H * 0.15;
+    const els = [];
+    for (let k = 0; k <= n; k++) {   // frames that make the corridor
+      const f = el('i', 'tn-frame', world); const z = -gap * (k + 0.5);
+      gsap.set(f, { xPercent: -50, yPercent: -50, z }); els.push({ e: f, z });
+    }
+    pieces.forEach((p, k) => {
+      const e = el('div', 'tn-p' + (p.img ? ' photo' : ''), world, p.img ? '<img src="' + esc(p.img) + '" crossorigin="anonymous" alt="">' : '<span>' + esc(p.text) + '</span>');
+      const a = k * 2.3 + 0.6, x = Math.cos(a) * rx, y = Math.sin(a) * ry, z = -gap * (k + 1);
+      gsap.set(e, { xPercent: -50, yPercent: -50, x, y, z, rotationY: (-x / W) * 40, rotationZ: R(-6, 6) });
+      els.push({ e, z });
+    });
+    const hold = el('div', 'tn-hold', world);
+    gsap.set(hold, { xPercent: -50, yPercent: -50, z: -zEnd });
+    const fin = el('div', 'fitbox col center', hold);
+    const t = el('div', 'tx-line', fin, wordsHtml(b.text, null, TH.accentStyle === 'marker')); t.style.fontSize = FS(sizeFor(b.text, 2100, 66, 140));
+    if (b.sub) { const s = el('div', 'tx-sub', fin, esc(b.sub)); s.style.fontSize = FS(42); }
+    const L = b.t1 - b.in, travel = Math.max(0.8, Math.min(L - 0.9, 0.3 * n + 0.9)) / SP;
+    const p = { z: 0 };
+    const upd = () => {
+      world.style.transform = 'translate3d(0,0,' + p.z.toFixed(1) + 'px)';
+      els.forEach(({ e, z }) => { const ez = z + p.z; e.style.opacity = Math.max(0, Math.min(1, (ez + gap * 5) / (gap * 2), (N(900) - ez) / N(500))).toFixed(3); });
+    };
+    upd();
+    tl.fromTo(p, { z: 0 }, { z: zEnd, duration: travel, ease: 'power2.inOut', onUpdate: upd, immediateRender: false }, b.in);
+    tl.to(p, { z: zEnd + N(140), duration: Math.max(0.3, L - travel), ease: 'none', onUpdate: upd }, b.in + travel);
+    textEnter(t, b.in + travel - 0.3, textInOr('focus'));
+    if (b.sub) tl.from($('.tx-sub', fin), { opacity: 0, y: N(20), duration: 0.45 }, b.in + travel);
+    sfx(b.in, 'whoosh-low', 0.5);
+    for (let k = 0; k < n; k++) sfx(b.in + travel * (0.3 + 0.55 * (k + 1) / (n + 1)), 'whoosh', 0.28);
+    sfx(b.in + travel, 'impact', 0.45);
+  };
+
+  // Photo in 2.5D: blurred copy fills the back, the sharp photo card turns in 3D, shapes float at other depths.
+  SHOTS.parallax = (b, bi) => {
+    // the blurred background is painted ONCE into a small canvas (a live CSS blur would be redrawn every frame)
+    const back = el('div', 'px-back', bi, '<div class="px-bk"><canvas></canvas><img src="' + esc(b.img) + '" crossorigin="anonymous" alt=""></div>');
+    const bkImg = $('img', back), bkCv = $('canvas', back);
+    const paintBack = () => {
+      if (!bkImg.naturalWidth || bkCv.dataset.done) return;
+      const cw0 = Math.round(W * 0.28), ch0 = Math.round(H * 0.28); bkCv.width = cw0; bkCv.height = ch0;
+      const g = bkCv.getContext('2d'), r = Math.max(cw0 / bkImg.naturalWidth, ch0 / bkImg.naturalHeight);
+      const dw = bkImg.naturalWidth * r, dh = bkImg.naturalHeight * r;
+      g.filter = 'blur(' + Math.round(N(10)) + 'px) saturate(1.25) brightness(.5)';
+      g.drawImage(bkImg, (cw0 - dw) / 2, (ch0 - dh) / 2, dw, dh);
+      bkCv.dataset.done = '1';
+    };
+    if (bkImg.complete) paintBack(); else bkImg.addEventListener('load', paintBack);
+    const wrap = el('div', 'fitbox px-wrap' + (WIDE ? ' row' : ''), bi);
+    const scene = el('div', 'px-scene', wrap);
+    const ratio = Math.max(0.7, Math.min(1.3, b.imgRatio || 1)), cw = N(WIDE ? 560 : 600);
+    scene.style.width = cw + 'px'; scene.style.height = cw * ratio + 'px';
+    const card = el('div', 'px-card', scene, '<img src="' + esc(b.img) + '" crossorigin="anonymous" alt=""><i class="px-sheen"></i>');
+    const shapes = [0, 1, 2].map((k) => {
+      const s = el('i', 'px-s s' + k, scene);
+      gsap.set(s, { xPercent: -50, yPercent: -50, x: [-0.1, 1.04, 0.86][k] * cw, y: [0.04, 0.2, 0.96][k] * cw * ratio, z: [N(180), N(280), -N(140)][k] });
+      return s;
+    });
+    const txt = el('div', 'px-text col' + (WIDE ? '' : ' center'), wrap);
+    const t = el('div', 'tx-line', txt, wordsHtml(b.text, null, TH.accentStyle === 'marker')); t.style.fontSize = FS(sizeFor(b.text, 2400, 64, 132));
+    if (b.price != null) { const o = odometer(txt, b.price, '₦', b.in + 0.7, 'chip'); o.style.fontSize = FS(80); }
+    else if (b.sub) { const s = el('div', 'tx-sub', txt, esc(b.sub)); s.style.fontSize = FS(40); tl.from(s, { opacity: 0, y: N(20), duration: 0.5 }, b.in + 0.75); }
+    const L = Math.max(0.6, b.t1 - b.t0);
+    tl.fromTo($('.px-bk', back), { scale: 1.45, x: -N(40) }, { scale: 1.2, x: N(40), duration: L, ease: 'none', immediateRender: true }, b.t0);
+    tl.fromTo(scene, { rotationY: WIDE ? 34 : 28, rotationX: 16, z: -N(900) }, { rotationY: WIDE ? 12 : 9, rotationX: 4, z: 0, duration: 1.0 / SP, ease: 'expo.out', immediateRender: true }, b.in);
+    tl.to(scene, { rotationY: WIDE ? -10 : -8, rotationX: -3, duration: Math.max(0.4, b.t1 - b.in - 1.0), ease: 'sine.inOut' }, b.in + 1.0);
+    tl.fromTo($('.px-sheen', card), { xPercent: -130 }, { xPercent: 230, duration: 1.1, ease: 'power2.inOut', immediateRender: true }, b.in + 0.5);
+    tl.fromTo($('img', card), { scale: 1.22 }, { scale: 1.02, duration: L, ease: 'none', immediateRender: false }, b.t0);
+    tl.from(shapes, { scale: 0, duration: 0.6, stagger: 0.08, ease: 'back.out(2)' }, b.in + 0.45);
+    textEnter(t, b.in + 0.35, textInOr('rise'));
+    sfx(b.in, 'whoosh-low', 0.5); sfx(b.in + 0.5, 'pop', 0.3);
+  };
+
+  // A tilted 3D wall of the brand name scrolling in opposite directions behind the main line.
+  SHOTS.marquee3d = (b, bi) => {
+    const plane = el('div', 'mq-plane', bi);
+    const word = esc(String(b.word || DATA.brand || b.text).toUpperCase());
+    const rows = 9, rh = N(176), L = Math.max(0.5, b.t1 - b.t0), reps = Math.max(3, Math.ceil(52 / (String(b.word || DATA.brand || b.text).length + 3)));
+    for (let k = 0; k < rows; k++) {
+      const r = el('div', 'mq-row' + (k === 2 || k === 6 ? ' hot' : k % 2 ? ' out' : ''), plane, (word + ' &#10022; ').repeat(reps));
+      r.style.top = ((k - rows / 2) * rh) + 'px';
+      const dir = k % 2 ? 1 : -1;
+      tl.fromTo(r, { x: -N(1800) + dir * N(260) }, { x: -N(1800) - dir * N(520), duration: L, ease: 'none', immediateRender: true }, b.t0);
+    }
+    gsap.set(plane, { rotationX: 50, rotationZ: -22, scale: 1.35 });
+    tl.fromTo(plane, { opacity: 0 }, { opacity: 1, duration: 0.35, immediateRender: true }, b.t0);
+    const front = el('div', 'fitbox col center mq-front', bi);
+    const t = el('div', 'tx-line', front, wordsHtml(b.text, null, TH.accentStyle === 'marker')); t.style.fontSize = FS(sizeFor(b.text, 2700, 76, 170));
+    textEnter(t, b.in + 0.25, textInOr('rise'));
+    if (b.sub) { const s = el('div', 'tx-sub', front, esc(b.sub)); s.style.fontSize = FS(42); tl.from(s, { opacity: 0, y: N(20), duration: 0.45 }, b.in + 0.6); }
+    sfx(b.in, 'whoosh', 0.45);
+  };
+
+  // ------------------------------------------------------------------ reference looks (v4.1)
+  // Studied from top TikTok motion-design ads: Apple-style light ads, dark glowing tech launches, bold "studio" pieces.
+  const cssVar = (k) => getComputedStyle(document.documentElement).getPropertyValue(k).trim();
+  let csCount = 0;
+
+  // A horizontal light flare streaks out from the centre and reveals the line (Huel / QikBIM style).
+  SHOTS.flare = (b, bi) => {
+    const box = el('div', 'fitbox col center fl', bi);
+    const row = el('div', 'fl-row', box);
+    const t = el('div', 'fl-t', row, esc(b.text)); t.style.fontSize = FS(sizeRaw(b.text, 2200, 60, 130));
+    const streak = el('i', 'fl-streak', row), core = el('i', 'fl-core', row);
+    gsap.set(core, { xPercent: -50, yPercent: -50 });
+    tl.fromTo(core, { scale: 0, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.25, ease: 'power2.out', immediateRender: true }, b.in);
+    tl.fromTo(streak, { scaleX: 0, opacity: 1 }, { scaleX: 1, duration: 0.6 / SP, ease: 'expo.out', immediateRender: true }, b.in + 0.05);
+    tl.fromTo(t, { clipPath: 'inset(0% 50% 0% 50%)', filter: 'blur(' + N(10) + 'px)' }, { clipPath: 'inset(0% 0% 0% 0%)', filter: 'blur(0px)', duration: 0.7 / SP, ease: 'expo.out', immediateRender: true }, b.in + 0.15);
+    tl.to(core, { opacity: 0, scale: 1.6, duration: 0.5, ease: 'power2.in' }, b.in + 0.55);
+    tl.to(streak, { scaleX: 0.35, opacity: 0.4, y: '0.62em', duration: 0.8, ease: 'expo.inOut' }, b.in + 0.7);
+    if (b.sub) { const s2 = el('div', 'tx-sub', box, esc(b.sub)); s2.style.fontSize = FS(40); tl.from(s2, Object.assign(focusFrom(16), { duration: 0.6 }), b.in + 0.8); }
+    sfx(b.in, 'swish', 0.5); sfx(b.in + 0.2, 'chime', 0.35);
+    idle(bi, b, 0.04);
+  };
+
+  // Words wrapped round a rotating 3D cylinder, two rows turning opposite ways (Hyperframes style).
+  SHOTS.ring3d = (b, bi) => {
+    const wrap = el('div', 'rg3-wrap', bi);
+    const R = N(WIDE ? 560 : 440), fs = N(WIDE ? 112 : 92);
+    const first = (b.items && b.items.length ? b.items.map((i) => i.text).join(' + ') : String(b.word || DATA.brand || b.text)).toUpperCase();
+    const rows = [first, String(b.sub || b.text)].map((txt, r) => {
+      const ring = el('div', 'rg3-ring' + (r ? ' b' : ''), wrap);
+      ring.style.top = ((r - 0.5) * fs * 1.7) + 'px';
+      const unit = txt + '  •  ', adv = fs * 0.6, need = 2 * Math.PI * R;
+      let str2 = unit; while (str2.length * adv < need) str2 += unit;
+      const chars = Array.from(str2), step = 360 / chars.length;
+      const els = chars.map((c, i) => { const e = el('span', 'rg3-c', ring, c === ' ' ? '&nbsp;' : esc(c)); e.style.fontSize = fs + 'px'; return { e, a: i * step }; });
+      return { els, dir: r ? 1 : -1 };
+    });
+    const p = { r: 0, f: 0 };
+    const upd = () => rows.forEach(({ els, dir }) => els.forEach(({ e, a }) => {
+      const ang = a + p.r * dir, c = Math.cos(ang * Math.PI / 180);
+      e.style.transform = 'translate(-50%,-50%) rotateY(' + ang.toFixed(2) + 'deg) translateZ(' + R.toFixed(0) + 'px)';
+      e.style.opacity = ((c > 0 ? 0.25 + 0.75 * c : 0.1 * (1 + c)) * p.f).toFixed(3);   // the back of the ring stays faint
+    }));
+    upd();
+    const L = Math.max(0.5, b.t1 - b.t0);
+    tl.fromTo(p, { r: -30 }, { r: 70, duration: L, ease: 'none', onUpdate: upd, immediateRender: false }, b.t0);
+    tl.fromTo(p, { f: 0 }, { f: 1, duration: 0.6, ease: 'power2.out', onUpdate: upd, immediateRender: false }, b.in);
+    tl.fromTo(wrap, { rotationX: 28, rotationZ: -8, scale: 0.7 }, { rotationX: 14, rotationZ: -4, scale: 1, duration: 1.0 / SP, ease: 'expo.out', immediateRender: true }, b.in);
+    sfx(b.in, 'whoosh', 0.45);
+  };
+
+  // A field of option chips; the camera pushes in on the one that matters (Raycast style).
+  SHOTS.chipfield = (b, bi) => {
+    const cols = WIDE ? 5 : 3, rows = WIDE ? 5 : 7, n = cols * rows, mid = Math.floor(rows / 2) * cols + Math.floor(cols / 2);
+    const pool = (b.items || []).length ? b.items : [{ text: b.sub || 'Ask' }, { text: DATA.brand || 'Open' }];
+    const field = el('div', 'cf-field', bi);
+    field.style.gridTemplateColumns = 'repeat(' + cols + ', auto)';
+    const chips = [];
+    for (let k = 0; k < n; k++) {
+      const it = k === mid ? { text: b.text, icon: b.icon } : pool[(k + (k > mid ? 1 : 0)) % pool.length];
+      const c = el('div', 'cf-chip' + (k === mid ? ' hot' : ''), field, icon(it.icon || 'sparkle') + '<span>' + esc(it.text || it.name || '') + '</span>');
+      c.style.fontSize = N(WIDE ? 30 : 34) + 'px';
+      chips.push({ c, d: Math.hypot((k % cols) - (mid % cols), Math.floor(k / cols) - Math.floor(mid / cols)) });
+    }
+    gsap.set(field, { xPercent: -50, yPercent: -50 });
+    const hot = chips[mid].c, others = chips.filter((x, k) => k !== mid).map((x) => x.c);
+    tl.fromTo(chips.map((x) => x.c), { opacity: 0, scale: 0.7 }, { opacity: 1, scale: 1, duration: 0.5, ease: 'back.out(1.6)', stagger: (i) => chips[i].d * 0.06, immediateRender: true }, b.in);
+    tl.fromTo(field, { scale: 0.82, rotationX: 22 }, { scale: 1, rotationX: 10, duration: 0.9, ease: 'expo.out', immediateRender: true }, b.in);
+    const push = b.in + Math.min(1.0, (b.t1 - b.in) * 0.35);
+    tl.to(field, { scale: WIDE ? 1.9 : 1.7, rotationX: 0, duration: Math.max(0.5, b.t1 - push - 0.15), ease: 'power2.inOut' }, push);
+    tl.to(others, { opacity: 0.22, duration: 0.6 }, push);
+    tl.fromTo(hot, { boxShadow: '0 0 0 0 transparent' }, { boxShadow: '0 0 ' + N(60) + 'px ' + N(8) + 'px color-mix(in srgb, var(--primary) 55%, transparent)', duration: 0.6, immediateRender: false }, push + 0.2);
+    sfx(b.in, 'swish', 0.4); sfx(push + 0.25, 'pop', 0.55);
+  };
+
+  // Two words pushed to the ends of a thin line drawing outward ("tells a ———— story", Apple style).
+  SHOTS.rule = (b, bi) => {
+    let a = '', c = '';
+    if (String(b.text).includes('|')) [a, c] = String(b.text).split('|').map((x) => x.trim());
+    else if (b.sub) { a = b.text; c = b.sub; }
+    else { const w = String(b.text).split(/\s+/); const h = Math.ceil(w.length / 2); a = w.slice(0, h).join(' '); c = w.slice(h).join(' '); }
+    const box = el('div', 'fitbox rl', bi); box.style.width = (WIDE ? W * 0.72 : W * 0.84) + 'px';
+    const lw = el('span', 'rl-w', box, esc(a)), line = el('i', 'rl-line', box), rw = el('span', 'rl-w', box, esc(c));
+    [lw, rw].forEach((x) => { x.style.fontSize = FS(WIDE ? 62 : 58); });
+    tl.from(lw, Object.assign(focusFrom(0), { x: N(140), duration: 0.8 / SP, ease: 'expo.out' }), b.in);
+    tl.fromTo(line, { scaleX: 0 }, { scaleX: 1, duration: 0.9 / SP, ease: 'expo.inOut', immediateRender: true }, b.in + 0.25);
+    tl.from(rw, Object.assign(focusFrom(0), { x: -N(140), duration: 0.8 / SP, ease: 'expo.out' }), b.in + 0.55);
+    sfx(b.in + 0.25, 'swish', 0.35);
+  };
+
+  // The product glowing: soft halo, slow light rays, the photo floating (Huel bottle style).
+  SHOTS.glowproduct = (b, bi) => {
+    const box = el('div', 'fitbox gp-wrap' + (WIDE ? ' row' : ''), bi);
+    const st2 = el('div', 'gp-stage', box); const sw = N(WIDE ? 560 : 620); st2.style.width = st2.style.height = sw + 'px';
+    const halo = el('i', 'gp-halo', st2), rays = el('i', 'gp-rays', st2);
+    const ratio = Math.max(0.6, Math.min(1.6, b.imgRatio || 1));
+    const ph = el('div', 'gp-img' + (b.cutout ? ' cut' : ''), st2, '<img src="' + esc(b.img) + '" crossorigin="anonymous" alt="">');
+    const ih = sw * (ratio >= 1 ? 0.78 : 0.62 * ratio + 0.1), iw = ih / ratio;
+    ph.style.width = iw + 'px'; ph.style.height = ih + 'px';
+    const txt = el('div', 'col' + (WIDE ? '' : ' center') + ' gp-text', box);
+    if (b.text) { const t = el('div', 'tx-line', txt, wordsHtml(b.text, null, false)); t.style.fontSize = FS(sizeFor(b.text, 2000, 58, 120)); textEnter(t, b.in + 0.6, textInOr('focus')); }
+    if (b.price != null) { const o = odometer(txt, b.price, '₦', b.in + 0.9, 'chip'); o.style.fontSize = FS(76); }
+    else if (b.sub) { const s2 = el('div', 'tx-sub', txt, esc(b.sub)); s2.style.fontSize = FS(40); tl.from(s2, Object.assign(focusFrom(16), { duration: 0.6 }), b.in + 0.9); }
+    const L = Math.max(0.5, b.t1 - b.t0);
+    tl.fromTo(halo, { scale: 0.3, opacity: 0 }, { scale: 1, opacity: 1, duration: 1.0, ease: 'expo.out', immediateRender: true }, b.in);
+    tl.fromTo(rays, { rotation: -10, opacity: 0 }, { rotation: 30, opacity: 0.7, duration: L, ease: 'none', immediateRender: true }, b.t0);
+    tl.fromTo(ph, { y: N(90), scale: 0.82, opacity: 0, filter: 'blur(' + N(14) + 'px)' }, { y: 0, scale: 1, opacity: 1, filter: 'blur(0px)', duration: 0.9 / SP, ease: 'expo.out', immediateRender: true }, b.in + 0.1);
+    floaty(ph, b, 16, 2);
+    sfx(b.in, 'whoosh-low', 0.4); sfx(b.in + 0.35, 'chime', 0.4);
+  };
+
+  // A bold full-screen colour slide: big headline, italic line under it, an image card tilting in (Hyperframes style).
+  SHOTS.colorslide = (b, bi) => {
+    const k = csCount++ % 3;
+    const panel = el('div', 'cs-panel c' + k, bi);
+    const box = el('div', 'fitbox cs-box' + (WIDE ? ' row' : ''), panel);
+    const txt = el('div', 'cs-text', box);
+    const h = el('div', 'cs-h', txt, wordsHtml(b.text, -1));
+    const longest = Math.max(3, ...String(b.text).split(/\s+/).map((w) => w.length)), boxW = (WIDE ? W * 0.44 : W * 0.84) / U;
+    h.style.fontSize = FS(Math.min(b.img ? 140 : 180, sizeRaw(b.text, b.img ? 2000 : 2600, 70, 200), boxW / (longest * 0.8)));   // heavy capitals: a whole word must fit one line
+    if (b.sub) { const s2 = el('div', 'cs-sub', txt, esc(b.sub)); s2.style.fontSize = FS(52); tl.from(s2, { opacity: 0, x: -N(30), duration: 0.5 }, b.in + 0.55); }
+    let card = null;
+    if (b.img) { card = el('div', 'cs-card', box, '<img src="' + esc(b.img) + '" crossorigin="anonymous" alt="">'); const cw = N(WIDE ? 520 : 560); card.style.width = cw + 'px'; card.style.height = cw * Math.max(0.65, Math.min(1.3, b.imgRatio || 1)) + 'px'; }
+    tl.fromTo(panel, { clipPath: 'inset(100% 0% 0% 0%)' }, { clipPath: 'inset(0% 0% 0% 0%)', duration: 0.45 / SP, ease: 'expo.inOut', immediateRender: true }, b.t0);
+    textEnter(h, b.in + 0.2, textInOr('rise'));
+    if (card) { tl.fromTo(card, { rotationY: -40, rotationZ: 6, x: N(220), opacity: 0 }, { rotationY: -12, rotationZ: 2, x: 0, opacity: 1, duration: 0.9 / SP, ease: 'expo.out', immediateRender: true }, b.in + 0.35); floaty(card, b, 10, 1); }
+    sfx(b.t0 + 0.05, 'whoosh', 0.5);
+    idle(box, b, 0.04);
+  };
+
+  // Photos as phone-shaped cards fanning out in 3D from one stack ("3 colours" iPhone style).
+  SHOTS.fan = (b, bi) => {
+    let imgs = (b.imgs || []).slice(0, 5); while (imgs.length && imgs.length < 3) imgs = imgs.concat(imgs).slice(0, 3);
+    const box = el('div', 'fitbox col center fan-wrap', bi);
+    if (b.text) { const t = el('div', 'sent-line small', box, wordsHtml(b.text, null, false)); t.style.fontSize = FS(sizeRaw(b.text, 1500, 48, 86)); textEnter(t, b.in + 0.5, textInOr('focus')); }
+    const cw = N(WIDE ? 280 : 300), ch = cw * 2;
+    const deck = el('div', 'fan-deck', box); deck.style.width = cw * (1 + (imgs.length - 1) * 0.8) + 'px'; deck.style.height = ch + 'px';
+    const mid = (imgs.length - 1) / 2;
+    const cards = imgs.map((u, k) => { const c = el('div', 'fan-c', deck, '<img src="' + esc(u) + '" crossorigin="anonymous" alt="">'); c.style.width = cw + 'px'; c.style.height = ch + 'px'; c.style.marginLeft = -cw / 2 + 'px'; return c; });
+    cards.forEach((c, k) => {
+      const o = k - mid;
+      tl.fromTo(c, { x: 0, y: N(260), z: 0, rotationY: 0, rotationZ: 0, rotationX: 30, opacity: 0 },
+        { x: o * cw * 0.8, y: 0, z: -Math.abs(o) * N(140), rotationY: -o * 20, rotationZ: o * 3, rotationX: 0, opacity: 1, duration: 1.0 / SP, ease: 'expo.out', immediateRender: true }, b.in + Math.abs(o) * 0.07);
+    });
+    tl.fromTo(deck, { rotationY: -8 }, { rotationY: 8, duration: Math.max(0.5, b.t1 - b.in), ease: 'sine.inOut', immediateRender: false }, b.in);
+    sfx(b.in, 'whoosh', 0.5);
+  };
+
+  // A rotating 3D sphere of glowing dots beside the line (drawn on a canvas, so it stays cheap to render).
+  SHOTS.dotsphere = (b, bi) => {
+    const box = el('div', 'fitbox ds-wrap' + (WIDE ? ' row' : ''), bi);
+    const txt = el('div', 'col' + (WIDE ? '' : ' center') + ' ds-text', box);
+    const t = el('div', 'tx-line', txt, wordsHtml(b.text, null, TH.accentStyle === 'marker')); t.style.fontSize = FS(sizeFor(b.text, 2000, 60, 130));
+    if (b.sub) { const s2 = el('div', 'tx-sub', txt, esc(b.sub)); s2.style.fontSize = FS(40); tl.from(s2, Object.assign(focusFrom(16), { duration: 0.5 }), b.in + 0.7); }
+    const size = Math.round(N(WIDE ? 560 : 620)), cv = el('canvas', 'ds-cv', box);
+    cv.width = cv.height = size; cv.style.width = cv.style.height = size + 'px';
+    const g = cv.getContext('2d'), P = [], NP = 700, c1 = cssVar('--primary') || '#7c5cff', c2 = cssVar('--secondary') || '#ffffff';
+    for (let i = 0; i < NP; i++) { const y = 1 - (i / (NP - 1)) * 2, r = Math.sqrt(1 - y * y), th = i * 2.39996; P.push([Math.cos(th) * r, y, Math.sin(th) * r]); }
+    const p = { r: 0, s: 0, e: 0 };
+    const draw = () => {
+      g.clearRect(0, 0, size, size);
+      const cr = Math.cos(p.r), sr = Math.sin(p.r), tilt = 0.35, ct = Math.cos(tilt), st3 = Math.sin(tilt), Rr = size * 0.4 * p.s;
+      for (let i = 0; i < NP; i++) {
+        let [x, y, z] = P[i];
+        const x1 = x * cr + z * sr, z1 = -x * sr + z * cr;
+        const y2 = y * ct - z1 * st3, z2 = y * st3 + z1 * ct;
+        const k = 1 + p.e * (0.5 + (i % 7) * 0.12), d = (z2 + 1.4) / 2.4;
+        g.globalAlpha = Math.max(0.18, Math.min(1, d * 1.15)) * (1 - p.e * 0.8);
+        g.fillStyle = i % 3 ? c1 : c2;
+        g.beginPath(); g.arc(size / 2 + x1 * Rr * k, size / 2 + y2 * Rr * k, Math.max(1, N(5.2) * (0.45 + d * 0.7)), 0, 6.283); g.fill();
+      }
+      g.globalAlpha = 1;
+    };
+    draw();
+    const L = Math.max(0.5, b.t1 - b.t0);
+    tl.fromTo(p, { r: 0 }, { r: 2.4, duration: L, ease: 'none', onUpdate: draw, immediateRender: false }, b.t0);
+    tl.fromTo(p, { s: 0 }, { s: 1, duration: 1.0 / SP, ease: 'expo.out', onUpdate: draw, immediateRender: false }, b.in);
+    textEnter(t, b.in + 0.3, textInOr('rise'));
+    sfx(b.in, 'whoosh-low', 0.45); sfx(b.in + 0.4, 'chime', 0.3);
+  };
+
+  // ------------------------------------------------------------------ reference looks, batch 2
+  // Lines stack up; each new one is bright and the earlier ones dim ("Free. / No ads. / No subscriptions.").
+  SHOTS.stepstack = (b, bi) => {
+    const lines = ((b.lines && b.lines.length) ? b.lines : (b.items || []).map((i) => i.text)).slice(0, 5);
+    const box = el('div', 'fitbox ss' + (WIDE ? '' : ' center'), bi);
+    const fs = Math.min(WIDE ? 120 : 110, (WIDE ? 1500 : 940) / Math.max(6, Math.max(...lines.map((l) => String(l).length)) * 0.56));
+    const rows = lines.map((ln) => { const r = el('div', 'ss-l', box, esc(ln)); r.style.fontSize = FS(fs); return r; });
+    const step = Math.min(0.75, (b.t1 - b.in - 0.6) / Math.max(1, rows.length)) / SP;
+    rows.forEach((r, k) => {
+      const at = b.in + k * step;
+      tl.fromTo(r, focusFrom(28), { opacity: 1, y: 0, filter: 'blur(0px)', duration: 0.55, ease: 'power3.out', immediateRender: true }, at);
+      if (k > 0) tl.to(rows.slice(0, k), { opacity: 0.32, duration: 0.4 }, at);
+      sfx(at, 'tick', 0.35);
+    });
+    idle(bi, b, 0.04);
+  };
+
+  // A huge number counting up, label beside it ("900 frames.").
+  SHOTS.bigcount = (b, bi) => {
+    const raw = String(b.number || (b.price != null ? '₦' + fmt(b.price) : '100'));
+    const m = raw.match(/^(\D*)([\d,.]+)(.*)$/) || ['', '', raw, ''];
+    const target = Number(m[2].replace(/,/g, '')) || 0, dec = (m[2].split('.')[1] || '').length;
+    const box = el('div', 'fitbox bc' + (WIDE ? ' row' : ''), bi);
+    const card = el('div', 'bc-card', box);
+    const num = el('div', 'bc-n', card, esc(raw)); num.style.fontSize = FS(Math.min(300, 1300 / Math.max(2, raw.length)));
+    const lab = el('div', 'bc-l col', box);
+    if (b.text) { const t = el('div', 'tx-line small', lab, wordsHtml(b.text, null, false)); t.style.fontSize = FS(sizeRaw(b.text, 1500, 48, 90)); textEnter(t, b.in + 0.5, textInOr('focus')); }
+    if (b.sub) { const s2 = el('div', 'tx-sub', lab, esc(b.sub)); s2.style.fontSize = FS(36); tl.from(s2, Object.assign(focusFrom(14), { duration: 0.5 }), b.in + 0.8); }
+    const p = { v: 0 };
+    const show = () => { const v = dec ? p.v.toFixed(dec) : fmt(p.v); num.textContent = m[1] + v + m[3]; };
+    tl.fromTo(card, { scale: 0.7, opacity: 0, filter: 'blur(' + N(16) + 'px)' }, { scale: 1, opacity: 1, filter: 'blur(0px)', duration: 0.6, ease: 'expo.out', immediateRender: true }, b.in);
+    tl.fromTo(p, { v: target * 0.08 }, { v: target, duration: Math.min(1.6, (b.t1 - b.in) * 0.55) / SP, ease: 'power3.out', onUpdate: show, immediateRender: false }, b.in + 0.1);
+    for (let j = 0; j < 6; j++) sfx(b.in + 0.15 + j * 0.16, 'tick', 0.3);
+    sfx(b.in + Math.min(1.6, (b.t1 - b.in) * 0.55) + 0.05, 'pop', 0.5);
+    idle(bi, b, 0.04);
+  };
+
+  // A switch flips on with a squash, the track fills with colour, a word rises under it ("Morph.").
+  SHOTS.toggle = (b, bi) => {
+    const box = el('div', 'fitbox col center tg', bi);
+    const tw = N(WIDE ? 300 : 340), th = tw * 0.56;
+    const track = el('div', 'tg-t', box); track.style.width = tw + 'px'; track.style.height = th + 'px'; track.style.borderRadius = th / 2 + 'px';
+    const knob = el('i', 'tg-k', track); const ks = th - N(24); knob.style.width = knob.style.height = ks + 'px';
+    const t = el('div', 'tx-line', box, wordsHtml(b.text, null, false)); t.style.fontSize = FS(sizeFor(b.text, 1700, 56, 110));
+    const flip = b.in + 0.55, travel = tw - ks - N(24);
+    const onC = cssVar('--primary') || '#2a7';
+    tl.fromTo(track, { scale: 0.6, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.5, ease: 'back.out(1.8)', immediateRender: true }, b.in);
+    tl.to(knob, { keyframes: [{ scaleX: 1.35, x: travel * 0.25, duration: 0.14, ease: 'power2.in' }, { scaleX: 1, x: travel, duration: 0.3, ease: 'back.out(2.4)' }] }, flip);
+    tl.to(track, { backgroundColor: onC, duration: 0.3 }, flip + 0.08);
+    sfx(flip + 0.1, 'click', 0.9);
+    textEnter(t, flip + 0.25, textInOr('rise'));
+  };
+
+  // Letters fly in from all over the frame as round blobs and assemble the word (Pinned logo style).
+  SHOTS.assemble = (b, bi) => {
+    const txt = String(b.text);
+    const box = el('div', 'fitbox asm', bi);
+    const size = Math.min(WIDE ? 280 : 260, (WIDE ? 1500 : 900) / Math.max(3, txt.length * 0.62));
+    const cs = Array.from(txt).map((c) => el('span', 'asm-c', box, c === ' ' ? '&nbsp;' : esc(c)));
+    box.style.fontSize = FS(size);
+    cs.forEach((c, k) => {
+      const at = b.in + R(0, 0.35) / SP;
+      tl.fromTo(c, { x: R(-W * 0.45, W * 0.45), y: R(-H * 0.4, H * 0.4), rotation: R(-160, 160), scale: 0.25, opacity: 0, borderRadius: '50%' },
+        { x: 0, y: 0, rotation: 0, scale: 1, opacity: 1, duration: 0.85 / SP, ease: 'back.out(1.4)', immediateRender: true }, at);
+    });
+    sfx(b.in + 0.3, 'whoosh', 0.45); sfx(b.in + 1.0, 'pop', 0.55);
+    if (b.sub) { const s2 = el('div', 'tx-sub asm-sub', box, esc(b.sub)); s2.style.fontSize = FS(42); gsap.set(s2, { xPercent: -50 }); tl.from(s2, Object.assign(focusFrom(16), { duration: 0.5 }), b.in + 1.1); }
+    idle(bi, b, 0.04);
+  };
+
+  // A row of overlapping round bubbles (photos or icons) popping in with a spring, title above ("Spark moments instantly.").
+  SHOTS.avatars = (b, bi) => {
+    const box = el('div', 'fitbox col center av', bi);
+    if (b.text) { const t = el('div', 'sent-line', box, wordsHtml(b.text, null, false)); t.style.fontSize = FS(sizeRaw(b.text, 1700, 52, 96)); textEnter(t, b.in + 0.45, textInOr('focus')); }
+    const row = el('div', 'av-row', box);
+    const list = (b.imgs && b.imgs.length ? b.imgs.map((u) => ({ img: u })) : (b.items || []).map((i) => ({ icon: i.icon }))).slice(0, 6);
+    const sz = N(WIDE ? 150 : 160);
+    list.forEach((it, k) => {
+      const c = el('div', 'av-c c' + (k % 3) + (it.img ? ' photo' : ''), row, it.img ? '<img src="' + esc(it.img) + '" crossorigin="anonymous" alt="">' : icon(it.icon || 'sparkle'));
+      c.style.width = c.style.height = sz + 'px'; if (k) c.style.marginLeft = -sz * 0.24 + 'px'; c.style.zIndex = String(k + 1);
+      tl.fromTo(c, { scale: 0, x: -N(60) }, { scale: 1, x: 0, duration: 0.6, ease: 'back.out(2.2)', immediateRender: true }, b.in + k * 0.09 / SP);
+      sfx(b.in + k * 0.09 / SP, 'pop', 0.3);
+    });
+    idle(bi, b, 0.04);
+  };
+
+  // A long diagonal 3D wall of cards sliding past the camera (creator-reel style).
+  SHOTS.cardstack = (b, bi) => {
+    let pics = (b.imgs || []).slice(0, 6);
+    const n = 9, cw = N(WIDE ? 380 : 340), chh = cw * 1.25;
+    const lane = el('div', 'ck-lane', bi);
+    const cards = [];
+    for (let k = 0; k < n; k++) {
+      const img = pics.length ? pics[k % pics.length] : null, it = (b.items || [])[k % Math.max(1, (b.items || []).length)];
+      const c = el('div', 'ck-c' + (img ? ' photo' : ''), lane, img ? '<img src="' + esc(img) + '" crossorigin="anonymous" alt="">' : icon((it && it.icon) || 'sparkle') + '<span>' + esc((it && it.text) || '') + '</span>');
+      c.style.width = cw + 'px'; c.style.height = chh + 'px';
+      gsap.set(c, { xPercent: -50, yPercent: -50, x: k * cw * 0.62, z: -k * N(150) });
+      cards.push(c);
+    }
+    const L = Math.max(0.5, b.t1 - b.t0);
+    tl.fromTo(lane, { rotationY: -38, rotationX: 8, x: W * 0.15 }, { rotationY: -30, rotationX: 4, x: -cw * 2.2, duration: L, ease: 'power1.inOut', immediateRender: true }, b.t0);
+    tl.fromTo(cards, { opacity: 0, y: N(120) }, { opacity: 1, y: 0, duration: 0.6, stagger: 0.05, ease: 'expo.out', immediateRender: true }, b.in);
+    if (b.text) {
+      const front = el('div', 'fitbox col center ck-front', bi);
+      const t = el('div', 'tx-line', front, wordsHtml(b.text, null, TH.accentStyle === 'marker')); t.style.fontSize = FS(sizeFor(b.text, 2100, 64, 130));
+      textEnter(t, b.in + 0.6, textInOr('rise'));
+    }
+    sfx(b.in, 'whoosh-low', 0.5);
+  };
+
+  // A numbered title card: big number, an icon tile beside it, a label pill below ("#3  Caveman").
+  SHOTS.numbered = (b, bi) => {
+    const box = el('div', 'fitbox col center nb', bi);
+    const top = el('div', 'nb-top', box);
+    const num = el('div', 'nb-n', top, esc(String(b.number || '#1'))); num.style.fontSize = FS(220);
+    const tile = el('div', 'nb-tile', top, icon(b.icon || 'sparkle')); tile.style.width = tile.style.height = N(190) + 'px';
+    const pill = el('div', 'nb-pill', box, esc(b.text)); pill.style.fontSize = FS(Math.min(80, 1500 / Math.max(8, String(b.text).length)));
+    tl.fromTo(num, { yPercent: 60, opacity: 0, filter: 'blur(' + N(14) + 'px)' }, { yPercent: 0, opacity: 1, filter: 'blur(0px)', duration: 0.55, ease: 'expo.out', immediateRender: true }, b.in);
+    tl.fromTo(tile, { scale: 0, rotation: -30 }, { scale: 1, rotation: 0, duration: 0.55, ease: 'back.out(2)', immediateRender: true }, b.in + 0.2);
+    tl.fromTo(pill, { clipPath: 'inset(0% 50% 0% 50% round 999px)' }, { clipPath: 'inset(0% 0% 0% 0% round 999px)', duration: 0.55, ease: 'expo.out', immediateRender: true }, b.in + 0.4);
+    sfx(b.in, 'swish', 0.4); sfx(b.in + 0.25, 'pop', 0.5);
+    idle(bi, b, 0.04);
+  };
+
+  // The line opens inside curly brackets that slide apart ("{ Ever find an }").
+  SHOTS.bracket = (b, bi) => {
+    const box = el('div', 'fitbox bk', bi);
+    const l = el('span', 'bk-b', box, '{'), t = el('span', 'bk-t', box, esc(b.text)), r = el('span', 'bk-b', box, '}');
+    box.style.fontSize = FS(sizeRaw(b.text, 1900, 54, 110));
+    tl.fromTo(t, { clipPath: 'inset(0% 50% 0% 50%)', opacity: 0 }, { clipPath: 'inset(0% 0% 0% 0%)', opacity: 1, duration: 0.6 / SP, ease: 'expo.inOut', immediateRender: true }, b.in + 0.15);
+    tl.fromTo(l, { x: () => t.offsetWidth / 2 + N(10) }, { x: 0, duration: 0.6 / SP, ease: 'expo.inOut', immediateRender: false }, b.in + 0.15);
+    tl.fromTo(r, { x: () => -t.offsetWidth / 2 - N(10) }, { x: 0, duration: 0.6 / SP, ease: 'expo.inOut', immediateRender: false }, b.in + 0.15);
+    tl.fromTo([l, r], { opacity: 0 }, { opacity: 1, duration: 0.2, immediateRender: true }, b.in);
+    sfx(b.in + 0.15, 'swish', 0.4);
+    idle(bi, b, 0.04);
+  };
+
+  // ------------------------------------------------------------------ reference looks, batch 3 (Uber, ChatGPT, Notion, Uber Eats)
+  // A status card stepping through stages with a filling bar ("Requesting driver" -> "Approved" -> "On the way").
+  SHOTS.status = (b, bi) => {
+    const steps = ((b.items || []).length >= 2 ? b.items.map((i) => i.text) : [b.text, b.sub].filter(Boolean)).slice(0, 4);
+    const box = el('div', 'fitbox st', bi);
+    const card = el('div', 'st-card', box); card.style.width = (WIDE ? Math.min(W * 0.5, N(980)) : W * 0.8) + 'px';
+    const head = el('div', 'st-head', card);
+    const labels = steps.map((x) => { const l = el('div', 'st-l', head, esc(x)); l.style.fontSize = FS(Math.min(60, 1300 / Math.max(12, String(x).length))); return l; });
+    if (b.title) { const t2 = el('div', 'st-sub', card, esc(b.title)); t2.style.fontSize = FS(32); }
+    const track = el('div', 'st-track', card), fill = el('i', 'st-fill', track);
+    const ok = el('div', 'st-ok', card, icon('check'));
+    const n = steps.length, step = Math.max(0.55, (b.t1 - b.in - 0.9) / n) / SP;
+    tl.fromTo(card, { y: N(80), scale: 0.92, opacity: 0 }, { y: 0, scale: 1, opacity: 1, duration: 0.6, ease: 'expo.out', immediateRender: true }, b.in);
+    labels.forEach((l, k) => {
+      const at = b.in + 0.2 + k * step;
+      tl.fromTo(l, { opacity: 0, y: N(26), filter: 'blur(' + N(8) + 'px)' }, { opacity: 1, y: 0, filter: 'blur(0px)', duration: 0.4, ease: 'power3.out', immediateRender: true }, at);
+      if (k < n - 1) tl.to(l, { opacity: 0, y: -N(26), filter: 'blur(' + N(8) + 'px)', duration: 0.3, ease: 'power2.in' }, at + step - 0.3);
+      tl.to(fill, { scaleX: (k + 1) / n, duration: Math.min(0.8, step * 0.9), ease: 'power2.inOut' }, at);
+      sfx(at, k === n - 1 ? 'ding' : 'tick', k === n - 1 ? 0.6 : 0.35);
+    });
+    tl.fromTo(ok, { scale: 0, rotation: -40 }, { scale: 1, rotation: 0, duration: 0.45, ease: 'back.out(2.2)', immediateRender: true }, b.in + 0.2 + (n - 1) * step + 0.3);
+  };
+
+  // Stars filling one by one in a pill, then the score ("4.9 / 5"). Only real ratings from the brief.
+  SHOTS.stars = (b, bi) => {
+    const box = el('div', 'fitbox col center sr', bi);
+    if (b.text) { const t = el('div', 'sent-line', box, wordsHtml(b.text, null, false)); t.style.fontSize = FS(sizeRaw(b.text, 1700, 50, 96)); textEnter(t, b.in, textInOr('focus')); }
+    const pill = el('div', 'sr-pill', box);
+    const val = Math.max(0, Math.min(5, parseFloat(b.number) || 5));
+    const stars = [0, 1, 2, 3, 4].map(() => el('span', 'sr-s', pill, '<svg viewBox="0 0 24 24"><path d="M12 2.8l2.8 5.8 6.3.9-4.6 4.4 1.1 6.3L12 17.2l-5.6 3 1.1-6.3L2.9 9.5l6.3-.9z"/></svg><i></i>'));
+    const sc = el('b', 'sr-n', pill, esc(String(b.number || '5') + '/5'));
+    pill.style.fontSize = FS(WIDE ? 64 : 70);
+    tl.fromTo(pill, { scale: 0.7, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.5, ease: 'back.out(1.8)', immediateRender: true }, b.in + 0.3);
+    stars.forEach((st, k) => {
+      const f = Math.max(0, Math.min(1, val - k)), at = b.in + 0.6 + k * 0.14 / SP;
+      if (f > 0) { tl.fromTo($('i', st), { scaleX: 0 }, { scaleX: f, duration: 0.25, ease: 'power2.out', immediateRender: true }, at); tl.fromTo(st, { scale: 1 }, { scale: 1.3, duration: 0.12, yoyo: true, repeat: 1, ease: 'power2.out', immediateRender: false }, at); sfx(at, 'pop', 0.3); }
+    });
+    tl.from(sc, { opacity: 0, x: -N(20), duration: 0.4 }, b.in + 0.6 + 5 * 0.14 / SP);
+  };
+
+  // A prompt bar: the text types into it, the send button gets pressed ("Ask anything").
+  SHOTS.prompt = (b, bi) => {
+    const box = el('div', 'fitbox col center pr', bi);
+    if (b.title) { const t = el('div', 'sent-line small', box, wordsHtml(b.title, -1, false)); t.style.fontSize = FS(54); textEnter(t, b.in, textInOr('focus')); }
+    const bar = el('div', 'pr-bar', box); bar.style.width = (WIDE ? Math.min(W * 0.56, N(1100)) : W * 0.84) + 'px';
+    el('i', 'pr-plus', bar, '+');
+    const field = el('div', 'pr-field', bar);
+    const ph = el('span', 'pr-ph', field, esc(b.sub || 'Ask anything'));
+    const chars = Array.from(String(b.text));
+    const typed = el('span', 'pr-typed', field, chars.map((c) => '<span class="ch">' + (c === ' ' ? '&nbsp;' : esc(c)) + '</span>').join('') + '<i class="pr-caret"></i>');
+    field.style.fontSize = FS(Math.min(46, 1500 / Math.max(20, chars.length)));
+    const send = el('div', 'pr-send', bar, '<svg viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg>');
+    tl.fromTo(bar, { width: N(130), opacity: 0 }, { width: bar.style.width, opacity: 1, duration: 0.7, ease: 'expo.out', immediateRender: true }, b.in + 0.15);
+    const t0 = b.in + 0.8, each = Math.min(0.055, (b.t1 - t0 - 0.8) / Math.max(1, chars.length)) / SP;
+    tl.to(ph, { opacity: 0, duration: 0.15 }, t0);
+    tl.from($$('.ch', typed), { opacity: 0, duration: 0.01, stagger: each, ease: 'none' }, t0);
+    for (let k = 0; k < chars.length; k += 3) sfx(t0 + each * k, 'tick', 0.22);
+    const done = t0 + each * chars.length + 0.2;
+    tl.fromTo(send, { scale: 0.6, opacity: 0.4 }, { scale: 1, opacity: 1, duration: 0.3, ease: 'back.out(2)', immediateRender: true }, t0);
+    tl.to(send, { scale: 0.82, duration: 0.1, yoyo: true, repeat: 1, ease: 'power2.inOut' }, done);
+    sfx(done, 'send', 0.7);
+  };
+
+  // One pill whose word changes letter by letter through the list ("Write" / "Create" / "Solve").
+  SHOTS.wordswap = (b, bi) => {
+    const list = ((b.items || []).length ? b.items.map((i) => i.text) : String(b.text).split(/\s*[\/,|]\s*/)).filter(Boolean).slice(0, 5);
+    const box = el('div', 'fitbox col center wsw', bi);
+    if (b.title) { const t = el('div', 'sent-line small', box, wordsHtml(b.title, -1, false)); t.style.fontSize = FS(50); textEnter(t, b.in, textInOr('focus')); }
+    const stack = el('div', 'wsw-stack', box);
+    el('i', 'wsw-sh a', stack); el('i', 'wsw-sh b', stack);
+    const pill = el('div', 'wsw-pill', stack);
+    const fs = Math.min(110, 1200 / Math.max(5, Math.max(...list.map((w) => w.length)) * 0.62));
+    pill.style.fontSize = FS(fs);
+    const words = list.map((w) => el('span', 'wsw-w', pill, Array.from(w).map((c) => '<span class="cr">' + esc(c) + '</span>').join('')));
+    beforeFit.push(() => { const mw = Math.max(...words.map((w) => w.offsetWidth)); pill.style.width = (mw + parseFloat(getComputedStyle(pill).fontSize) * 1.4) + 'px'; });
+    tl.fromTo(stack, { scale: 0.6, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.55, ease: 'back.out(1.8)', immediateRender: true }, b.in + 0.1);
+    const step = Math.max(0.6, (b.t1 - b.in - 0.5) / list.length) / SP;
+    words.forEach((w, k) => {
+      const at = b.in + 0.2 + k * step, cs = $$('.cr', w);
+      tl.fromTo(cs, { yPercent: 110, opacity: 0 }, { yPercent: 0, opacity: 1, duration: 0.4, stagger: 0.03, ease: 'back.out(1.6)', immediateRender: true }, at);
+      if (k < words.length - 1) tl.to(cs, { yPercent: -110, opacity: 0, duration: 0.3, stagger: 0.025, ease: 'power2.in' }, at + step - 0.32);
+      sfx(at, 'swish', 0.3);
+    });
+  };
+
+  // A fixed start and a rolling accent word that cycles, the last one stays ("No | cooking. waiting. hangry decisions.").
+  SHOTS.rollword = (b, bi) => {
+    const list = ((b.lines && b.lines.length) ? b.lines : (b.items || []).map((i) => i.text)).slice(0, 5);
+    const box = el('div', 'fitbox rw', bi);
+    const lead = el('span', 'rw-lead', box, esc(b.text));
+    const slot = el('span', 'rw-slot', box);
+    const fs = sizeRaw(b.text + ' ' + list.reduce((a, c) => (c.length > a.length ? c : a), ''), 2000, 54, 120);
+    box.style.fontSize = FS(fs);
+    const ws = list.map((w) => el('span', 'rw-w', slot, esc(w)));
+    beforeFit.push(() => { slot.style.width = Math.max(...ws.map((w) => w.offsetWidth)) + 'px'; });
+    tl.from(lead, Object.assign(focusFrom(20), { duration: 0.55 }), b.in);
+    const step = Math.max(0.5, (b.t1 - b.in - 0.9) / list.length) / SP;
+    ws.forEach((w, k) => {
+      const at = b.in + 0.35 + k * step;
+      tl.fromTo(w, { yPercent: 100, opacity: 0, filter: 'blur(' + N(6) + 'px)' }, { yPercent: 0, opacity: 1, filter: 'blur(0px)', duration: 0.45, ease: 'expo.out', immediateRender: true }, at);
+      if (k < ws.length - 1) tl.to(w, { yPercent: -100, opacity: 0, filter: 'blur(' + N(6) + 'px)', duration: 0.35, ease: 'power2.in' }, at + step - 0.3);
+      tl.to(slot, { width: () => w.offsetWidth, duration: 0.4, ease: 'expo.inOut' }, at - 0.05);   // the line stays centred: the slot fits each word
+      sfx(at, 'tick', 0.3);
+    });
+  };
+
+  // Minimal end card: the logo, then the tagline words arrive one by one beside it ("Eating. Done your way.").
+  SHOTS.endcard = (b, bi) => {
+    const box = el('div', 'fitbox col center ec', bi);
+    const row = el('div', 'ec-row', box);
+    const m = mark(row, WIDE ? 150 : 140);
+    const words = String(b.text).split(/\s+/).filter(Boolean);
+    const line = el('div', 'ec-line', row); line.style.fontSize = FS(sizeRaw(b.text, 1600, 48, 90));
+    const ai = words.length >= 3 ? words.length - 2 : -1;
+    const ws = words.map((w, k) => { const e = el('span', 'sw' + (k === ai ? ' acc' : ''), line, '<span class="wi">' + esc(w) + '</span>'); if (k < words.length - 1) line.appendChild(document.createTextNode(' ')); return e; });
+    tl.fromTo(m, { scale: 0, rotation: -20 }, { scale: 1, rotation: 0, duration: 0.6, ease: 'back.out(1.8)', immediateRender: true }, b.in);
+    const gap = Math.min(0.28, (b.t1 - b.in - 1.2) / Math.max(1, words.length));
+    ws.forEach((e, k) => tl.from(e, Object.assign(focusFrom(18), { duration: 0.5, ease: 'power3.out' }), b.in + 0.5 + k * gap));
+    if (b.sub) { const s2 = el('div', 'tx-sub', box, esc(b.sub)); s2.style.fontSize = FS(38); tl.from(s2, Object.assign(focusFrom(14), { duration: 0.6 }), b.in + 0.7 + words.length * gap); }
+    sfx(b.in, 'pop', 0.5); sfx(b.in + 0.5 + words.length * gap, 'chime', 0.4);
   };
 
   // ------------------------------------------------------------------ transitions between beats
@@ -1176,6 +1865,11 @@
         tl.to(bx, { scale: 18, duration: d, ease: 'power4.in', transformOrigin: () => diveOrigin(bt) }, s);
         tl.to(bx, { opacity: 0, duration: d * 0.3, ease: 'none' }, T - d * 0.3); break;
       case 'focus': tl.to(bx, { opacity: 0, scale: 1.05, duration: d, ease: 'power2.in' }, s); tl.to(fe, { attr: { stdDeviation: N(30) + ' ' + N(30) }, duration: d, ease: 'power2.in' }, s); break;
+      case 'iris': tl.to(bx, { scale: 1.06, duration: d, ease: 'power2.in' }, s); break;   // stays under the opening circle
+      case 'cover': tl.to(bx, { scale: 0.9, duration: d, ease: 'power3.in' }, s); break;
+      case 'cube': tl.to(bx, { rotationY: -90, duration: d, ease: 'power3.in', transformOrigin: '50% 50% ' + Math.round(-W / 2) + 'px' }, s); break;
+      case 'glitch': tl.to(bx, { x: N(70), skewX: -14, opacity: 0, duration: d, ease: 'steps(3)' }, s); break;
+      case 'shutter': tl.to(bx, { scale: 0.96, duration: d, ease: 'power2.in' }, s); break;
       default: tl.to(bx, { scale: 1.3, opacity: 0, duration: d, ease: 'power2.in' }, s); // flash
     }
   }
@@ -1207,19 +1901,26 @@
       case 'focus':
         tl.fromTo(bx, { opacity: 0, scale: 0.96 }, Object.assign({ opacity: 1, scale: 1, duration: d, ease: 'power2.out' }, o), T);
         tl.fromTo(fe, { attr: { stdDeviation: N(30) + ' ' + N(30) } }, Object.assign({ attr: { stdDeviation: '0 0' }, duration: d, ease: 'power2.out' }, o), T); break;
+      case 'iris':
+        tl.fromTo(bx, { clipPath: 'circle(0% at 50% 50%)', scale: 1.12 }, Object.assign({ clipPath: 'circle(75% at 50% 50%)', scale: 1, duration: d * 1.2, ease: 'power3.inOut' }, o), T);
+        tl.set(bx, { clipPath: 'none' }, FT(T + d * 1.2 + 0.01)); break;
+      case 'cover': tl.fromTo(bx, { scale: 1.14 }, Object.assign({ scale: 1, duration: d + 0.25, ease: 'expo.out' }, o), T); break;
+      case 'cube': tl.fromTo(bx, { rotationY: 90, transformOrigin: '50% 50% ' + Math.round(-W / 2) + 'px' }, Object.assign({ rotationY: 0, duration: d, ease: 'power3.out' }, o), T); break;
+      case 'glitch': tl.fromTo(bx, { x: -N(60), skewX: 12 }, Object.assign({ x: 0, skewX: 0, duration: d, ease: 'steps(4)' }, o), T); break;
+      case 'shutter': tl.fromTo(bx, { scale: 1.08 }, Object.assign({ scale: 1, duration: d + 0.2, ease: 'expo.out' }, o), T); break;
       default:
         tl.fromTo(bx, { scale: 0.85 }, Object.assign({ scale: 1, duration: d, ease: 'expo.out' }, o), T);
     }
   }
   // zoom-into-a-word: the camera dives into the key word of the outgoing beat
   function diveOrigin(bt) {
-    const t = bt.bi.querySelector('.acc .wi, .acc, .flip-c.acc, .wi, .tx-line, .fitbox');
+    const t = bt.bi.querySelector('.lg-mark') || bt.bi.querySelector('.mark.logo') || bt.bi.querySelector('.acc .wi, .acc, .flip-c.acc, .wi, .tx-line, .fitbox');
     if (!t) return '50% 50%';
     const r = t.getBoundingClientRect(), rb = bt.bx.getBoundingClientRect();
     if (!rb.width || !rb.height) return '50% 50%';
     return ((r.left + r.width * 0.5 - rb.left) / rb.width * 100).toFixed(2) + '% ' + ((r.top + r.height * 0.55 - rb.top) / rb.height * 100).toFixed(2) + '%';
   }
-  function cutFx(type, T, d, k) {
+  function cutFx(type, T, d, k, dIn) {
     if (type === 'swoosh') {
       const s = document.createElementNS(svgNS, 'svg'); s.setAttribute('class', 'fx-swoosh'); s.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
       const flip = k % 2 ? -1 : 1, y = (f) => H * (0.5 + (f - 0.5) * flip);
@@ -1263,30 +1964,273 @@
       tl.fromTo(cam, { scale: 1.12 }, { scale: 1, duration: 0.5, ease: 'expo.out', immediateRender: false }, T);
     } else if (type === 'zoom' && ENERGY >= 2) {
       tl.fromTo(cam, { scale: 1.06 }, { scale: 1, duration: 0.6, ease: 'expo.out', immediateRender: false }, T);
+    } else if (type === 'iris') {
+      const r = el('i', 'fx-ring2', fx), D = Math.hypot(W, H) * 1.06;
+      r.style.width = r.style.height = D + 'px'; r.style.marginLeft = r.style.marginTop = -D / 2 + 'px';
+      tl.fromTo(r, { scale: 0, autoAlpha: 1 }, { scale: 1, duration: dIn * 1.2, ease: 'power3.inOut', immediateRender: true }, T);
+      tl.set(r, { autoAlpha: 0 }, FT(T + dIn * 1.2));
+    } else if (type === 'cover') {   // two liquid colour circles flood the frame, then drain to the other corner
+      const D = Math.hypot(W, H) * 2.1, flip = k % 2;
+      const mk = (cls, ox, oy) => { const c = el('i', 'fx-circ ' + cls, fx); c.style.width = c.style.height = D + 'px'; c.style.left = (ox * W - D / 2) + 'px'; c.style.top = (oy * H - D / 2) + 'px'; return c; };
+      const a1 = mk('c2', flip, 1), a2 = mk('c1', flip, 1);
+      tl.fromTo(a1, { scale: 0, autoAlpha: 1 }, { scale: 1, duration: d, ease: 'power3.in', immediateRender: true }, T - d);
+      tl.fromTo(a2, { scale: 0, autoAlpha: 1 }, { scale: 1, duration: d * 0.82, ease: 'power3.in', immediateRender: true }, T - d * 0.82);
+      tl.set([a1, a2], { autoAlpha: 0 }, T);
+      const b1 = mk('c1', 1 - flip, 0), b2 = mk('c2', 1 - flip, 0);
+      gsap.set([b1, b2], { autoAlpha: 0 });
+      tl.set([b1, b2], { autoAlpha: 1, scale: 1 }, T);
+      tl.to(b2, { scale: 0, duration: 0.4, ease: 'power3.inOut' }, T);
+      tl.to(b1, { scale: 0, duration: 0.52, ease: 'power3.inOut' }, T + 0.02);
+      tl.set([b1, b2], { autoAlpha: 0 }, FT(T + 0.56));
+    } else if (type === 'shutter') {
+      const nB = WIDE ? 8 : 6, bw = W / nB;
+      for (let j = 0; j < nB; j++) {
+        const bar = el('i', 'fx-bar ' + (j % 2 ? 'c2' : 'c1'), fx); bar.style.left = (j * bw - 1) + 'px'; bar.style.width = (bw + 2) + 'px';
+        tl.fromTo(bar, { scaleY: 0, transformOrigin: '50% 0%' }, { scaleY: 1, duration: d * 0.7, ease: 'power3.in', immediateRender: true }, T - d + (j * d * 0.3) / nB);
+        tl.to(bar, { scaleY: 0, transformOrigin: '50% 100%', duration: 0.38, ease: 'power3.out' }, T + j * 0.028);
+      }
+    } else if (type === 'glitch') {
+      for (let j = 0; j < 6; j++) {
+        const g = el('i', 'fx-gl c' + (j % 3), fx); g.style.top = R(0, H * 0.95) + 'px'; g.style.height = N(R(8, 70)) + 'px';
+        const at = T - 0.12 + j * 0.04;
+        tl.fromTo(g, { autoAlpha: 0, x: R(-W * 0.3, W * 0.3) }, { autoAlpha: 0.9, duration: 0.01, immediateRender: true }, at);
+        tl.to(g, { autoAlpha: 0, duration: 0.01 }, at + 0.05);
+      }
+      const f = el('div', 'fx-flash', fx);
+      tl.fromTo(f, { opacity: 0 }, { opacity: 0.35, duration: 0.03, ease: 'none', immediateRender: true }, T - 0.03);
+      tl.to(f, { opacity: 0, duration: 0.12 }, T);
+    }
+    if (TH.leaks && ['focus', 'iris', 'dive', 'line', 'morph'].includes(type)) leak(T, k);
+  }
+  // warm light leak drifting across the frame (film look)
+  function leak(T, k) {
+    const l = el('div', 'fin-leak' + (k % 2 ? ' b' : ''), stage);
+    tl.fromTo(l, { autoAlpha: 0, xPercent: k % 2 ? 30 : -30 }, { autoAlpha: 0.75 * TH.leaks, xPercent: 0, duration: 0.3, ease: 'power2.out', immediateRender: true }, T - 0.15);
+    tl.to(l, { autoAlpha: 0, xPercent: k % 2 ? -30 : 30, duration: 0.6, ease: 'power2.in' }, T + 0.15);
+  }
+
+
+  // Sounds for each kind of shot, at the moment its main movement lands.
+  function shotSfx(b) {
+    const at = b.in, n = (b.items || []).length;
+    const each = (k, from, gap, vol) => { for (let j = 0; j < Math.min(n, 6); j++) sfx(from + j * gap, k, vol); };
+    switch (b.shot) {
+      case 'logo': sfx(at, 'impact', 0.7); sfx(at + 0.45, 'chime', 0.5); break;
+      case 'brand': sfx(at, 'pop', 0.7); sfx(at + 0.7, 'chime', 0.45); break;
+      case 'zoomword': sfx(at, 'zoom', 0.5); break;
+      case 'kinetic': sfx(at, 'whoosh', 0.45); break;
+      case 'flip': { const w = String(b.text || '').split(/\s+/).filter(Boolean); const c = w.length <= 4 ? w.length : Math.ceil(w.length / 2); const step = Math.min(0.6, ((b.t1 - at) * 0.62) / Math.max(1, c)); for (let j = 0; j < c; j++) sfx(at + j * step, 'tick', 0.5); break; }
+      case 'sentence': sfx(at, 'swish', 0.35); break;
+      case 'scatter': sfx(at + Math.min(0.9, 0.18 * String(b.text || '').split(/\s+/).length + 0.35), 'whoosh', 0.45); break;
+      case 'words': sfx(at, 'swish', 0.3); break;
+      case 'card': case 'iconmorph': sfx(at, 'pop', 0.65); sfx(at + 0.6, 'swish', 0.4); break;
+      case 'notify': sfx(at + 0.45, 'ding', 0.65); for (let j = 1; j < Math.min(3, 1 + (b.subs || []).length); j++) sfx(at + j * 0.45 + 0.6, 'pop', 0.45); break;
+      case 'counter': for (let j = 0; j < 4; j++) sfx(at + 0.4 + j * 0.18, 'tick', 0.25); sfx(at + 1.25, 'pop', 0.5); break;
+      case 'isocard': sfx(at + 0.1, 'whoosh-low', 0.4); sfx(at + Math.min(1.4, (b.t1 - at) * 0.45) + 0.5, 'pop', 0.6); break;
+      case 'stat': sfx(at + 0.3, 'pop', 0.5); break;
+      case 'hero': sfx(at, 'whoosh', 0.55); break;
+      case 'split': sfx(at, 'whoosh', 0.5); sfx(at + 0.4, 'pop', 0.5); break;
+      case 'phone': sfx(at, 'whoosh-low', 0.5); each('tick', at + 0.55, 0.1, 0.3); break;
+      case 'orbit': sfx(at, 'swish', 0.5); break;
+      case 'collage': for (let j = 0; j < 6; j++) sfx(at + j * 0.05 * 2, 'pop', 0.3); break;
+      case 'pills': case 'stack': case 'grid': case 'flow': case 'widgets': case 'wheel': case 'ticker':
+        each('pop', at + 0.15, b.shot === 'ticker' ? Math.max(0.35, (b.t1 - at - 1.3) / Math.max(1, n)) : 0.12, 0.42); break;
+      default: break;
     }
   }
 
+  // ------------------------------------------------------------------ premium layer: styles + film finish
+  // The styles for the v4 shots live here (not in the page CSS), so older videos get them when their engine is upgraded.
+  function premiumCss() {
+    const probe = el('div', 'tx-line', stage, 'A'), cs = getComputedStyle(probe);
+    const HW = cs.fontWeight || '800', TT = cs.textTransform || 'none', FST = cs.fontStyle || 'normal';
+    probe.remove();
+    const n = (v) => N(v).toFixed(1) + 'px';
+    const type = 'font-weight:' + HW + ';text-transform:' + TT + ';font-style:' + FST + ';';
+    const css = [
+      '.cr{display:inline-block}',
+      '.slam{position:relative;display:flex;align-items:center;justify-content:center}',
+      '.slam-main,.slam-echo{' + type + 'line-height:.92;white-space:nowrap}',
+      '.slam-main{position:relative;z-index:2;color:var(--text)} .slam-main .sc{display:inline-block}',
+      '.slam-echo{position:absolute;left:50%;top:50%;z-index:1;color:transparent;-webkit-text-stroke:' + n(2.5) + ' color-mix(in srgb,var(--primary) 85%,transparent)}',
+      '.slam-bar{position:absolute;left:0;right:0;bottom:-.06em;height:.1em;background:var(--primary);border-radius:.05em;transform-origin:0 50%}',
+      '.slam-sub{position:absolute;top:100%;left:50%;margin-top:' + n(56) + ';white-space:nowrap;font-weight:600;color:var(--muted);letter-spacing:.04em}',
+      '.poster{display:flex;flex-direction:column;align-items:flex-start}',
+      '.pst-row{position:relative;overflow:hidden;line-height:.86;padding:.03em .02em .07em}',
+      '.pst-t{position:relative;z-index:1;display:inline-block;font-weight:' + HW + ';font-style:' + FST + ';text-transform:uppercase;letter-spacing:-.035em;white-space:nowrap}',
+      '.pst-t.out{color:transparent;-webkit-text-stroke:' + n(3) + ' var(--text)} .pst-t.acc{color:var(--primary);padding:0 .08em}',
+      '.pst-bar{position:absolute;left:0;top:.06em;bottom:.1em;width:100%;background:var(--primary);transform-origin:0 50%;z-index:0}',
+      '.rv-row{position:relative;display:inline-block} .rv>*+*{margin-top:' + n(26) + '}',
+      '.rv-t{' + type + 'line-height:1.04;letter-spacing:-.02em;white-space:nowrap;padding:0 .06em}',
+      '.rv-row.sub .rv-t{font-weight:600;text-transform:none;font-style:normal;color:var(--muted);letter-spacing:.03em}',
+      '.rv-bar{position:absolute;left:-.06em;right:-.06em;top:-.02em;bottom:-.02em;background:var(--primary);z-index:2;transform:scaleX(0)} .rv-bar.b2{background:var(--secondary)}',
+      '.tn-world{position:absolute;left:50%;top:50%;width:0;height:0;transform-style:preserve-3d}',
+      '.tn-p,.tn-hold,.tn-frame{position:absolute;left:0;top:0;transform-style:preserve-3d}',
+      '.tn-frame{width:' + (W * 0.92).toFixed(0) + 'px;height:' + (H * 0.88).toFixed(0) + 'px;border:' + n(3) + ' solid color-mix(in srgb,var(--primary) 55%,transparent);border-radius:' + n(40) + '}',
+      '.tn-p.photo{width:' + n(WIDE ? 460 : 500) + ';height:' + n(WIDE ? 560 : 620) + ';border-radius:' + n(36) + ';overflow:hidden;box-shadow:var(--shadow)} .tn-p.photo img{width:100%;height:100%;object-fit:cover;display:block}',
+      '.tn-p span{display:block;white-space:nowrap;' + type + 'font-size:' + n(150) + ';color:transparent;-webkit-text-stroke:' + n(3) + ' var(--primary)}',
+      '.tn-hold{white-space:nowrap}',
+      '.px-back{position:absolute;inset:-6%;overflow:hidden} .px-bk{position:absolute;inset:0}',
+      '.px-bk canvas{position:absolute;inset:0;width:100%;height:100%} .px-bk img{position:absolute;width:1px;height:1px;opacity:0}',
+      '.px-back::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,color-mix(in srgb,var(--bg) 30%,transparent),color-mix(in srgb,var(--bg) 88%,transparent))}',
+      '.px-wrap{display:flex;flex-direction:column;align-items:center} .px-wrap>*+*{margin-top:' + n(70) + '} .px-wrap.row{flex-direction:row} .px-wrap.row>*+*{margin-top:0;margin-left:' + n(90) + '}',
+      '.px-scene{position:relative;transform-style:preserve-3d;flex:none}',
+      '.px-card{position:absolute;inset:0;border-radius:' + n(44) + ';overflow:hidden;box-shadow:0 ' + n(60) + ' ' + n(120) + ' ' + n(-30) + ' rgba(0,0,0,.7)}',
+      '.px-card img{width:100%;height:100%;object-fit:cover;display:block}',
+      '.px-sheen{position:absolute;top:-20%;bottom:-20%;left:0;width:40%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.32),transparent);transform:skewX(-18deg)}',
+      '.px-s{position:absolute;left:0;top:0;border-radius:50%;display:block} .px-s.s0{width:' + n(130) + ';height:' + n(130) + ';border:' + n(12) + ' solid var(--primary)}',
+      '.px-s.s1{width:' + n(54) + ';height:' + n(54) + ';background:var(--secondary)} .px-s.s2{width:' + n(220) + ';height:' + n(220) + ';border:' + n(3) + ' solid color-mix(in srgb,var(--text) 45%,transparent)}',
+      '.px-text>.odo{align-self:flex-start} .px-text.center>.odo{align-self:center}',
+      '.px-text{max-width:' + (WIDE ? W * 0.4 : W * 0.86).toFixed(0) + 'px} .px-text>*+*{margin-top:' + n(26) + '}',
+      '.mq-plane{position:absolute;left:50%;top:50%;width:0;height:0;transform-style:preserve-3d}',
+      '.mq-row{position:absolute;left:0;white-space:nowrap;font-weight:' + HW + ';text-transform:uppercase;font-size:' + n(168) + ';line-height:1;color:color-mix(in srgb,var(--text) 14%,transparent)}',
+      '.mq-row.out{color:transparent;-webkit-text-stroke:' + n(2.5) + ' color-mix(in srgb,var(--primary) 60%,transparent)} .mq-row.hot{color:color-mix(in srgb,var(--primary) 70%,transparent)}',
+      '.mq-front{position:relative;z-index:3} .mq-front .tx-line{text-shadow:0 0 ' + n(50) + ' var(--bg),0 0 ' + n(24) + ' var(--bg)}',
+      '.fx-ring2{position:absolute;left:50%;top:50%;border-radius:50%;border:' + n(16) + ' solid var(--primary);visibility:hidden}',
+      '.fx-circ{position:absolute;border-radius:50%;visibility:hidden} .fx-circ.c1{background:var(--primary)} .fx-circ.c2{background:var(--secondary)}',
+      '.fx-bar{position:absolute;top:0;bottom:0} .fx-bar.c1{background:var(--primary)} .fx-bar.c2{background:color-mix(in srgb,var(--primary) 70%,var(--bg))}',
+      '.fx-gl{position:absolute;left:-10%;right:-10%;visibility:hidden} .fx-gl.c0{background:var(--primary)} .fx-gl.c1{background:var(--secondary)} .fx-gl.c2{background:var(--text)}',
+      '.fl{position:relative} .fl-row{position:relative;display:inline-block} .fl-t{' + type + 'white-space:nowrap;line-height:1.1;letter-spacing:-.01em;text-shadow:0 0 ' + n(24) + ' color-mix(in srgb,var(--primary) 55%,transparent)}',
+      '.fl-streak{position:absolute;left:-45%;right:-45%;top:50%;height:' + n(5) + ';margin-top:' + n(-2.5) + ';border-radius:50%;background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--primary) 70%,#fff) 30%,#fff 50%,color-mix(in srgb,var(--primary) 70%,#fff) 70%,transparent);box-shadow:0 0 ' + n(24) + ' color-mix(in srgb,var(--primary) 70%,transparent)}',
+      '.fl-core{position:absolute;left:50%;top:50%;width:' + n(320) + ';height:' + n(90) + ';border-radius:50%;background:radial-gradient(closest-side,#fff,color-mix(in srgb,var(--primary) 60%,transparent) 45%,transparent);mix-blend-mode:screen}',
+      '.rg3-wrap{position:absolute;left:50%;top:50%;width:0;height:0;transform-style:preserve-3d} .rg3-ring{position:absolute;left:0;transform-style:preserve-3d}',
+      '.rg3-c{position:absolute;left:0;top:0;' + type + 'line-height:1;color:var(--text);white-space:pre} .rg3-ring.b .rg3-c{color:var(--primary);font-style:italic;font-weight:600}',
+      '.cf-field{position:absolute;left:50%;top:50%;display:grid;gap:' + n(26) + ' ' + n(30) + ';transform-style:preserve-3d}',
+      '.cf-chip{display:flex;align-items:center;gap:.5em;white-space:nowrap;padding:.62em 1em;border-radius:999px;background:color-mix(in srgb,var(--text) 7%,transparent);border:' + n(2) + ' solid color-mix(in srgb,var(--text) 10%,transparent);color:color-mix(in srgb,var(--text) 70%,transparent);font-weight:600}',
+      '.cf-chip .ic{width:1.1em;height:1.1em;color:var(--primary)} .cf-chip.hot{background:var(--primary);color:var(--on-primary);border-color:transparent} .cf-chip.hot .ic{color:var(--on-primary)}',
+      '.rl{display:flex;align-items:center;justify-content:space-between} .rl-w{' + type + 'white-space:nowrap;letter-spacing:-.01em;flex:none}',
+      '.rl-line{flex:1;height:' + n(3) + ';margin:0 ' + n(30) + ';background:color-mix(in srgb,var(--text) 45%,transparent);transform-origin:50% 50%}',
+      '.gp-wrap{display:flex;flex-direction:column;align-items:center} .gp-wrap>*+*{margin-top:' + n(40) + '} .gp-wrap.row{flex-direction:row} .gp-wrap.row>*+*{margin-top:0;margin-left:' + n(70) + '}',
+      '.gp-stage{position:relative;flex:none;display:flex;align-items:center;justify-content:center}',
+      '.gp-halo{position:absolute;inset:-25%;border-radius:50%;background:radial-gradient(closest-side,color-mix(in srgb,#fff 70%,var(--primary)),color-mix(in srgb,var(--primary) 45%,transparent) 40%,transparent 72%);mix-blend-mode:screen}',
+      '.gp-rays{position:absolute;inset:-40%;border-radius:50%;background:repeating-conic-gradient(from 0deg,color-mix(in srgb,var(--primary) 30%,transparent) 0deg 4deg,transparent 4deg 18deg);-webkit-mask:radial-gradient(closest-side,#000 20%,transparent 70%);mask:radial-gradient(closest-side,#000 20%,transparent 70%)}',
+      '.gp-img{position:relative;border-radius:' + n(28) + ';overflow:hidden;box-shadow:0 ' + n(40) + ' ' + n(90) + ' ' + n(-20) + ' rgba(0,0,0,.6)} .gp-img img{width:100%;height:100%;object-fit:cover;display:block}',
+      '.gp-img.cut{border-radius:0;overflow:visible;box-shadow:none} .gp-img.cut img{object-fit:contain;filter:drop-shadow(0 ' + n(30) + ' ' + n(40) + ' rgba(0,0,0,.5))}',
+      '.gp-text{max-width:' + (WIDE ? W * 0.38 : W * 0.86).toFixed(0) + 'px} .gp-text>*+*{margin-top:' + n(24) + '} .gp-text>.odo{align-self:flex-start} .gp-text.center>.odo{align-self:center}',
+      '.cs-panel{position:absolute;inset:0;display:flex;align-items:center;justify-content:center} .cs-panel.c0{background:var(--primary);color:var(--on-primary)} .cs-panel.c1{background:var(--secondary);color:var(--on-secondary)} .cs-panel.c2{background:var(--text);color:var(--bg)}',
+      '.cs-box{display:flex;flex-direction:column;align-items:flex-start} .cs-box>*+*{margin-top:' + n(60) + '} .cs-box.row{flex-direction:row;align-items:center} .cs-box.row>*+*{margin-top:0;margin-left:' + n(80) + '}',
+      '.cs-h .wd{white-space:nowrap} .cs-text{max-width:' + (WIDE ? W * 0.44 : W * 0.84).toFixed(0) + 'px} .cs-h{font-weight:' + HW + ';text-transform:uppercase;line-height:.95;letter-spacing:-.03em}',
+      '.cs-sub{margin-top:' + n(18) + ';font-family:Georgia,"Playfair Display",serif;font-style:italic;opacity:.85}',
+      '.cs-card{border-radius:' + n(30) + ';overflow:hidden;box-shadow:0 ' + n(40) + ' ' + n(80) + ' ' + n(-20) + ' rgba(0,0,0,.45);flex:none} .cs-card img{width:100%;height:100%;object-fit:cover;display:block}',
+      '.fan-deck{position:relative;transform-style:preserve-3d} .fan-c{position:absolute;left:50%;top:0;border-radius:' + n(48) + ';overflow:hidden;border:' + n(9) + ' solid #0d0d10;box-shadow:0 ' + n(40) + ' ' + n(80) + ' ' + n(-24) + ' rgba(0,0,0,.55);background:#0d0d10}',
+      '.fan-c img{width:100%;height:100%;object-fit:cover;display:block;border-radius:' + n(38) + '}',
+      '.ds-wrap{display:flex;flex-direction:column-reverse;align-items:center} .ds-wrap>*+*{margin-bottom:' + n(30) + '} .ds-wrap.row{flex-direction:row} .ds-wrap.row>*+*{margin-bottom:0;margin-left:' + n(60) + '}',
+      '.ds-cv{flex:none} .ds-text{max-width:' + (WIDE ? W * 0.4 : W * 0.86).toFixed(0) + 'px} .ds-text>*+*{margin-top:' + n(22) + '}',
+      '.glowlook .tx-line,.glowlook .sent-line,.glowlook .flip-c,.glowlook .rv-t,.glowlook .slam-main,.glowlook .im-title,.glowlook .tk-on,.glowlook .lk-text .tx-line{text-shadow:0 0 ' + n(14) + ' color-mix(in srgb,var(--primary) 60%,transparent),0 0 ' + n(46) + ' color-mix(in srgb,var(--primary) 40%,transparent)}',
+      '.glowlook .acc .wi,.glowlook .sw.acc{text-shadow:0 0 ' + n(10) + ' var(--primary),0 0 ' + n(40) + ' var(--primary)}',
+      '.glowlook .flow-card,.glowlook .tile,.glowlook .ui-card,.glowlook .im-box,.glowlook .wg{box-shadow:0 0 0 ' + n(2) + ' color-mix(in srgb,var(--primary) 35%,transparent),0 0 ' + n(50) + ' color-mix(in srgb,var(--primary) 25%,transparent)}',
+      '.halolook .sw.acc,.halolook .wd.acc,.halolook .flip-c.acc{position:relative;isolation:isolate}',
+      '.halolook .sw.acc::before,.halolook .wd.acc::before,.halolook .flip-c.acc::before{content:"";position:absolute;left:-.5em;right:-.5em;top:-.45em;bottom:-.45em;z-index:-1;border-radius:50%;background:radial-gradient(closest-side,color-mix(in srgb,var(--primary) 32%,transparent),transparent)}',
+      '.ss{display:flex;flex-direction:column;align-items:flex-start} .ss.center{align-items:center;text-align:center} .ss-l{' + type + 'line-height:1.08;letter-spacing:-.02em;white-space:nowrap}',
+      '.bc{display:flex;flex-direction:column;align-items:center} .bc>*+*{margin-top:' + n(36) + '} .bc.row{flex-direction:row} .bc.row>*+*{margin-top:0;margin-left:' + n(60) + '}',
+      '.bc-card{padding:' + n(30) + ' ' + n(60) + ';border-radius:' + n(40) + ';background:var(--surface);border:' + n(2) + ' solid var(--line);box-shadow:var(--shadow)}',
+      '.bc-n{font-weight:800;line-height:1;letter-spacing:-.04em;white-space:nowrap;font-variant-numeric:tabular-nums;color:var(--text)} .bc-l{max-width:' + (WIDE ? W * 0.32 : W * 0.8).toFixed(0) + 'px}',
+      '.tg-t{position:relative;background:color-mix(in srgb,var(--text) 16%,transparent);box-shadow:inset 0 ' + n(4) + ' ' + n(14) + ' rgba(0,0,0,.18)} .tg>*+*{margin-top:' + n(50) + '}',
+      '.tg-k{position:absolute;left:' + n(12) + ';top:' + n(12) + ';border-radius:999px;background:#fff;box-shadow:0 ' + n(8) + ' ' + n(20) + ' rgba(0,0,0,.25);transform-origin:0 50%}',
+      '.asm{position:relative;display:flex;white-space:nowrap} .asm-c{display:inline-block;' + type + 'line-height:1;color:var(--text)} .asm-c:nth-child(3n+2){color:var(--primary)}',
+      '.asm-sub{position:absolute;top:100%;left:50%;margin-top:' + n(40) + ';white-space:nowrap}',
+      '.av-row{display:flex;align-items:center} .av>*+*{margin-top:' + n(50) + '}',
+      '.av-c{position:relative;flex:none;border-radius:50%;display:flex;align-items:center;justify-content:center;overflow:hidden;border:' + n(6) + ' solid var(--bg);box-shadow:0 ' + n(14) + ' ' + n(30) + ' rgba(0,0,0,.2)}',
+      '.av-c.c0{background:var(--primary);color:var(--on-primary)} .av-c.c1{background:var(--secondary);color:var(--on-secondary)} .av-c.c2{background:var(--text);color:var(--bg)} .av-c .ic{width:46%;height:46%} .av-c.photo img{width:100%;height:100%;object-fit:cover}',
+      '.ck-lane{position:absolute;left:50%;top:' + (WIDE ? 58 : 60) + '%;width:0;height:0;transform-style:preserve-3d}',
+      '.ck-c{position:absolute;left:0;top:0;border-radius:' + n(30) + ';overflow:hidden;background:var(--surface);border:' + n(2) + ' solid var(--line);box-shadow:0 ' + n(30) + ' ' + n(60) + ' ' + n(-20) + ' rgba(0,0,0,.5);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:' + n(20) + ';color:var(--text);font-weight:700;font-size:' + n(40) + '}',
+      '.ck-c .ic{width:' + n(110) + ';height:' + n(110) + ';color:var(--primary)} .ck-c.photo img{width:100%;height:100%;object-fit:cover}',
+      '.ck-front{position:absolute;z-index:3;top:' + (WIDE ? 12 : 18) + '%} .ck-front .tx-line{text-shadow:0 0 ' + n(40) + ' var(--bg),0 0 ' + n(20) + ' var(--bg)}',
+      '.nb-top{display:flex;align-items:center} .nb-top>*+*{margin-left:' + n(30) + '} .nb>*+*{margin-top:' + n(30) + '}',
+      '.nb-n{font-weight:900;line-height:.9;letter-spacing:-.04em;color:transparent;background:linear-gradient(180deg,var(--secondary),var(--primary));-webkit-background-clip:text;background-clip:text}',
+      '.nb-tile{border-radius:26%;background:var(--primary);color:var(--on-primary);display:flex;align-items:center;justify-content:center;box-shadow:var(--shadow)} .nb-tile .ic{width:52%;height:52%}',
+      '.nb-pill{padding:.25em .9em;border-radius:999px;border:' + n(4) + ' solid color-mix(in srgb,var(--text) 70%,transparent);background:color-mix(in srgb,var(--text) 12%,transparent);font-weight:800;white-space:nowrap}',
+      '.bk{display:flex;align-items:center;white-space:nowrap} .bk-b{font-weight:300;color:var(--primary);font-size:1.25em;line-height:1} .bk-t{' + type + 'padding:0 .5em;letter-spacing:-.01em}',
+      '.st-card{position:relative;padding:' + n(44) + ' ' + n(52) + ';border-radius:' + n(40) + ';background:var(--surface);border:' + n(2) + ' solid var(--line);box-shadow:var(--shadow)}',
+      '.st-head{position:relative;height:1.3em;font-size:' + n(56) + '} .st-l{position:absolute;left:0;top:0;white-space:nowrap;' + type + 'line-height:1.25;letter-spacing:-.01em;opacity:0}',
+      '.st-sub{margin-top:' + n(8) + ';color:var(--muted);font-weight:600} .st-track{margin-top:' + n(34) + ';height:' + n(12) + ';border-radius:99px;background:color-mix(in srgb,var(--text) 10%,transparent);overflow:hidden}',
+      '.st-fill{display:block;height:100%;border-radius:99px;background:var(--primary);transform-origin:0 50%;transform:scaleX(0)}',
+      '.st-ok{position:absolute;right:' + n(40) + ';top:' + n(38) + ';width:' + n(70) + ';height:' + n(70) + ';border-radius:50%;background:var(--primary);color:var(--on-primary);display:flex;align-items:center;justify-content:center;transform:scale(0)} .st-ok .ic{width:70%;height:70%}',
+      '.sr>*+*{margin-top:' + n(40) + '} .sr-pill{display:flex;align-items:center;gap:.25em;padding:.35em .7em;border-radius:999px;background:var(--surface);border:' + n(2) + ' solid var(--line);box-shadow:var(--shadow)}',
+      '.sr-s{position:relative;width:1em;height:1em;display:inline-block} .sr-s svg{position:absolute;inset:0;width:100%;height:100%;fill:color-mix(in srgb,var(--text) 14%,transparent)}',
+      '.sr-s i{position:absolute;inset:0;background:#FFC531;-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27%3E%3Cpath d=%27M12 2.8l2.8 5.8 6.3.9-4.6 4.4 1.1 6.3L12 17.2l-5.6 3 1.1-6.3L2.9 9.5l6.3-.9z%27/%3E%3C/svg%3E") center/100% 100%;mask:url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27%3E%3Cpath d=%27M12 2.8l2.8 5.8 6.3.9-4.6 4.4 1.1 6.3L12 17.2l-5.6 3 1.1-6.3L2.9 9.5l6.3-.9z%27/%3E%3C/svg%3E") center/100% 100%;transform-origin:0 50%;transform:scaleX(0)}',
+      '.sr-n{margin-left:.3em;font-size:.62em;font-weight:800;color:var(--text);white-space:nowrap}',
+      '.pr>*+*{margin-top:' + n(44) + '} .pr-bar{display:flex;align-items:center;gap:' + n(20) + ';padding:' + n(18) + ' ' + n(18) + ' ' + n(18) + ' ' + n(24) + ';border-radius:999px;background:var(--surface);border:' + n(2) + ' solid var(--line);box-shadow:var(--shadow);overflow:hidden}',
+      '.pr-plus{flex:none;width:' + n(76) + ';height:' + n(76) + ';border-radius:50%;display:flex;align-items:center;justify-content:center;font-style:normal;font-size:' + n(48) + ';color:var(--muted);background:color-mix(in srgb,var(--text) 6%,transparent)}',
+      '.pr-field{position:relative;flex:1;min-width:0;white-space:nowrap;overflow:hidden;font-weight:600;color:var(--text)} .pr-ph{position:absolute;left:0;top:0;color:var(--muted)}',
+      '.pr-caret{display:inline-block;width:.08em;height:1em;margin-left:.05em;vertical-align:-.12em;background:var(--primary)}',
+      '.pr-send{flex:none;width:' + n(84) + ';height:' + n(84) + ';border-radius:50%;background:var(--primary);display:flex;align-items:center;justify-content:center} .pr-send svg{width:50%;height:50%;fill:none;stroke:var(--on-primary);stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}',
+      '.wsw>*+*{margin-top:' + n(40) + '} .wsw-stack{position:relative} .wsw-pill{position:relative;z-index:3;display:flex;justify-content:center;padding:.32em .7em;border-radius:999px;background:var(--surface);border:' + n(2) + ' solid var(--line);box-shadow:var(--shadow);height:1.75em}',
+      '.wsw-w{position:absolute;left:50%;transform:translateX(-50%);top:.32em;text-align:center;white-space:nowrap;' + type + 'line-height:1.1;overflow:hidden} .wsw-w .cr{display:inline-block}',
+      '.wsw-sh{position:absolute;left:4%;right:4%;height:100%;border-radius:999px;background:var(--surface);border:' + n(2) + ' solid var(--line);box-shadow:var(--shadow)} .wsw-sh.a{top:' + n(16) + ';z-index:2;opacity:.8} .wsw-sh.b{top:' + n(32) + ';left:8%;right:8%;z-index:1;opacity:.55}',
+      '.rw{display:flex;align-items:center;white-space:nowrap} .rw-lead{' + type + 'margin-right:.28em;line-height:1.2} .rw-slot{position:relative;display:inline-block;height:1.2em;overflow:hidden;vertical-align:bottom}',
+      '.rw-w{position:absolute;left:0;top:0;' + type + 'color:var(--primary);white-space:nowrap;line-height:1.2;opacity:0}',
+      '.ec-row{display:flex;align-items:center} .ec-row>*+*{margin-left:' + n(30) + '} .ec>*+*{margin-top:' + n(36) + '} .ec-line{' + type + 'white-space:nowrap;letter-spacing:-.01em}',
+      '.fin-grain{position:absolute;inset:0;z-index:70;pointer-events:none;mix-blend-mode:overlay}',
+      '.fin-vig{position:absolute;inset:0;z-index:69;pointer-events:none}',
+      '.fin-leak{position:absolute;inset:-25%;z-index:68;pointer-events:none;mix-blend-mode:screen;visibility:hidden;background:radial-gradient(ellipse 45% 40% at 22% 30%,rgba(255,170,90,.75),rgba(255,90,60,.25) 45%,transparent 70%)}',
+      '.fin-leak.b{background:radial-gradient(ellipse 45% 40% at 78% 70%,rgba(255,200,120,.7),rgba(255,120,80,.22) 45%,transparent 70%)}',
+    ].join('\n');
+    const st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
+    if (TH.glow) stage.classList.add('glowlook');
+    if (TH.halo) stage.classList.add('halolook');
+  }
+  // Film finish: fine moving grain and a soft vignette over everything (look.finish 0 = off, 1 = normal).
+  function finish() {
+    const F = TH.finish == null ? 0.8 : Number(TH.finish) || 0;
+    if (!(F > 0)) return;
+    const vig = () => {
+      const bgHex = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim().replace('#', '');
+      const dark = bgHex.length < 6 || (0.299 * parseInt(bgHex.slice(0, 2), 16) + 0.587 * parseInt(bgHex.slice(2, 4), 16) + 0.114 * parseInt(bgHex.slice(4, 6), 16)) < 128;
+      const v = el('div', 'fin-vig', stage);
+      v.style.background = 'radial-gradient(ellipse 75% 70% at 50% 50%, transparent 55%, rgba(0,0,0,' + (dark ? 0.42 : 0.12) * Math.min(1.3, F) + ') 100%)';
+    };
+    vig();
+    if (window.__ANIMORA_RENDER) { window.__finish = F; return; }   // the MP4 renderer adds the grain itself
+    const S = 160, c = document.createElement('canvas'); c.width = c.height = S;
+    const g = c.getContext('2d'), img = g.createImageData(S, S);
+    let z = 987654321;
+    for (let i = 0; i < img.data.length; i += 4) { z = (z * 1103515245 + 12345) & 0x7fffffff; const v = 128 + ((z >> 8) % 256 - 128) * 0.9; img.data[i] = img.data[i + 1] = img.data[i + 2] = v; img.data[i + 3] = 255; }
+    g.putImageData(img, 0, 0);
+    const gr = el('div', 'fin-grain', stage);
+    gr.style.backgroundImage = 'url(' + c.toDataURL() + ')'; gr.style.opacity = String(Math.min(0.22, 0.13 * F));
+    const steps = Math.max(1, Math.round(DURATION * 12));
+    tl.fromTo(gr, { backgroundPosition: '0px 0px' }, { backgroundPosition: (steps * 67) + 'px ' + (steps * 101) + 'px', duration: DURATION, ease: 'steps(' + steps + ')', immediateRender: true }, 0);
+  }
+
   // ------------------------------------------------------------------ build
-  const afterFonts = [];
+  const afterFonts = [], beforeFit = [];
+  premiumCss();
   ambient();
+  finish();
   const beats = DATA.beats;
   beats.forEach((b, i) => {
     const bt = el('div', 'bt', cam); bt.id = 'b' + (i + 1);
     const bx = el('div', 'bx', bt); const bi = el('div', 'bi', bx);
-    const fe = blurFilter('mb' + (i + 1)); bx.style.filter = 'url(#mb' + (i + 1) + ')';
+    const fe = blurFilter('mb' + (i + 1)); fe._url = 'url(#mb' + (i + 1) + ')';   // the blur filter is switched on only while a cut moves the beat (much faster to render)
     b._el = { bt, bx, bi, fe };
     const cutIn = i > 0 ? beats[i - 1].cut : null;
     b.in = b.t0 + (cutIn ? (cutIn.type === 'morph' ? 0.12 : 0.04) : 0.08);
     (SHOTS[b.shot] || SHOTS.words)(b, bi);
+    shotSfx(b);
     tl.set(bt, { autoAlpha: 1 }, b.t0);
-    if (i < beats.length - 1) tl.set(bt, { autoAlpha: 0 }, b.t1);
+    if (i < beats.length - 1) {
+      const over = b.cut && b.cut.type === 'iris' ? Math.min(0.55, (beats[i + 1].t1 - beats[i + 1].t0) * 0.4) * 1.2 + 0.03 : 0;   // iris: stays under the opening circle
+      tl.set(bt, { autoAlpha: 0 }, FT(b.t1 + over));
+    }
   });
+  const BLURRY = ['whip', 'rise', 'zoom', 'line', 'swoosh', 'dive', 'focus'];
+  // fast cuts in the loud looks also split the colours a little (chromatic aberration)
+  const chroma = (a) => (a > 0 ? ' drop-shadow(' + N(7 * a).toFixed(1) + 'px 0 0 rgba(255,30,90,.55)) drop-shadow(' + (-N(7 * a)).toFixed(1) + 'px 0 0 rgba(0,210,255,.5))' : '');
+  const filterWindow = (bt, from, to, f) => { tl.set(bt.bx, { filter: f.trim() }, Math.max(0, from)); tl.set(bt.bx, { filter: 'none' }, FT(to)); };
+  const blurWindow = (bt, from, to) => filterWindow(bt, from, to, bt.fe._url + chroma(TH.chroma || 0));
   beats.forEach((b, i) => {
     if (i === beats.length - 1 || !b.cut) return;
     const c = b.cut, d = (c.d || 0.3) / SP, nx = beats[i + 1];
-    exitBeat(b._el, c.type, b.t1, Math.min(d, (b.t1 - b.t0) * 0.35));
-    enterBeat(nx._el, c.type, b.t1, Math.min(0.55, (nx.t1 - nx.t0) * 0.4));
-    cutFx(c.type, b.t1, d, i);
+    const dOut = Math.min(d, (b.t1 - b.t0) * 0.35), dIn = Math.min(0.55, (nx.t1 - nx.t0) * 0.4);
+    exitBeat(b._el, c.type, b.t1, dOut);
+    enterBeat(nx._el, c.type, b.t1, dIn);
+    if (BLURRY.includes(c.type)) { blurWindow(b._el, b.t1 - dOut - 0.01, b.t1 + 0.01); blurWindow(nx._el, b.t1 - 0.01, b.t1 + dIn + 0.02); }
+    else if (c.type === 'glitch') { filterWindow(b._el, b.t1 - dOut - 0.01, b.t1 + 0.01, chroma(1.4)); filterWindow(nx._el, b.t1 - 0.01, b.t1 + dIn + 0.02, chroma(1.4)); }
+    cutFx(c.type, b.t1, d, i, dIn);
+    const CUT_SND = { whip: ['whoosh', 0.6], swoosh: ['whoosh', 0.7], wipe: ['whoosh', 0.55], rise: ['whoosh-low', 0.6], line: ['whoosh-low', 0.5], zoom: ['zoom', 0.6], dive: ['zoom', 0.75], focus: ['swish', 0.7], morph: ['pop', 0.55], flash: ['swish', 0.6], iris: ['swish', 0.6], cover: ['whoosh', 0.65], cube: ['whoosh-low', 0.7], glitch: ['tick', 0.8], shutter: ['whoosh', 0.55] }[c.type];
+    if (CUT_SND) sfx(b.t1 - (c.type === 'morph' ? 0.05 : c.type === 'flash' || c.type === 'glitch' ? 0.03 : dOut * 0.9), CUT_SND[0], CUT_SND[1]);
+    if (c.type === 'glitch') sfx(b.t1 + 0.02, 'swish', 0.5);
   });
   // slow camera drift (premium styles): the whole frame breathes and tilts a touch
   if (TH.drift) tl.fromTo(cam, { rotation: -1.4 * TH.drift }, { rotation: 1.4 * TH.drift, duration: DURATION, ease: 'sine.inOut', immediateRender: true }, 0);
@@ -1302,6 +2246,7 @@
 
   // fit: shrink any layout box that is larger than the safe area (layout sizes only, transforms ignored)
   function fit() {
+    beforeFit.forEach((fn) => fn());
     const padX = Math.min(W, H) * 0.07, padY = Math.min(W, H) * 0.08 + (DATA.captions && DATA.captions.length ? Math.min(W, H) * 0.12 : 0);
     $$('.fitbox').forEach((f) => {
       f.style.transform = '';
@@ -1310,14 +2255,20 @@
       if (f.classList.contains('split-text')) { maxH = WIDE ? H - padY * 2 : H * 0.5 - padY; maxW = WIDE ? W * 0.5 - padX * 1.5 : maxW; }
       let wide = f.offsetWidth;
       $$('.wd, .kin-line span, .pill, .wheel-row, .flow-card, .tile, .chip, .cta-btn, .sel, .odo, .slab, .flip-c, .tk-row, .stk-b, .wg-row, .sw', f).forEach((x) => { wide = Math.max(wide, x.offsetWidth); });
-      const k = Math.min(1, maxW / Math.max(1, wide), maxH / Math.max(1, f.offsetHeight));
+      let k = Math.min(1, maxW / Math.max(1, wide), maxH / Math.max(1, f.offsetHeight));
+      // landscape: pieces designed for a phone screen are grown so they fill the wide frame
+      if (k >= 1 && WIDE && !f.closest('.split-text')) k = Math.max(1, Math.min(1.5, (maxW * 0.62) / Math.max(1, wide), (maxH * 0.64) / Math.max(1, f.offsetHeight)));
       if (k < 1) f.style.transform = 'scale(' + (k * 0.97).toFixed(4) + ')';
+      else if (k > 1.03) f.style.transform = 'scale(' + k.toFixed(4) + ')';
     });
     afterFonts.forEach((fn) => fn());
   }
   fit();
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(fit);
 
+  // expose the sound cues (sorted; the same sound twice within 60ms plays once)
+  SFX.sort((x, y) => x.t - y.t);
+  window.__sfx = SFX.filter((e, i, arr) => !arr.slice(Math.max(0, i - 4), i).some((p) => p.k === e.k && e.t - p.t < 0.06));
   tl.set({}, {}, DURATION);
   window.__timeline = tl;
 })();

@@ -433,7 +433,7 @@ export async function renderVideo(job) {
     };
 
     const renderSegment = async (seg, ctx) => {
-      const enc = startEncoder(seg.file, { ...ropts, outW: ropts.scale < 1 ? canvas.width : 0, outH: canvas.height, grain: Math.min(14, info.finish * 7) });
+      const enc = startEncoder(seg.file, { ...ropts, outW: ropts.scale < 1 ? canvas.width : 0, outH: canvas.height, grain: 0 });   // moving grain makes every frame unique noise (MP4s 15x bigger), so the MP4 has none
       encoders.push(enc);
       for (let f = seg.from; f < seg.to; f++) {
         if (signal?.aborted) throw new Error('Render cancelled');
