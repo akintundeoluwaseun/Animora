@@ -222,3 +222,11 @@ ALTER TABLE settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE renders ADD COLUMN IF NOT EXISTS job_token text;
 ALTER TABLE renders ADD COLUMN IF NOT EXISTS chunk_count integer;
 ALTER TABLE renders ADD COLUMN IF NOT EXISTS chunk_size integer;
+
+-- ---- v7: no sign-in, but each phone/browser has its own private videos (a secret key kept on the device) ----
+ALTER TABLE users ADD COLUMN IF NOT EXISTS device_key_hash text;
+CREATE UNIQUE INDEX IF NOT EXISTS users_device_key_idx ON users(device_key_hash) WHERE device_key_hash IS NOT NULL;
+
+-- ---- v8: flyers (still designs) next to videos ----
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS kind text NOT NULL DEFAULT 'video';   -- video | flyer
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS source_project_id uuid;              -- a flyer made from a video

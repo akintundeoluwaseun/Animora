@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { api, ago, duration, naira, useAuth, usePolling } from '../lib.jsx';
+import { api, ago, duration, naira, otherDeviceLink, useAuth, usePolling } from '../lib.jsx';
 import { Alert, Button, Empty, Modal, PageLoader, PlanBadge, Spinner } from '../components/ui.jsx';
 
 // A style card: shows the poster, plays the preview while hovered or focused.
@@ -48,23 +48,66 @@ export function StylePicker({ value, onPick }) {
   );
 }
 
-// New video: no style picker first. The guided questions start with the business name; the style comes later.
-function NewVideo({ open, onClose }) {
+// New: pick a video or a flyer, then the guided questions start (the style comes later).
+function NewThing({ open, kind, onPick, onClose }) {
   const navigate = useNavigate();
   const [error, setError] = useState('');
   useEffect(() => {
-    if (!open) return;
+    if (!open || !kind) return;
     setError('');
-    api('/projects', { method: 'POST', body: { title: 'New video' } })
+    api('/projects', { method: 'POST', body: { title: kind === 'flyer' ? 'New flyer' : 'New video', kind } })
       .then(({ project }) => navigate(`/p/${project.id}/plan`, { replace: true }))
       .catch((e) => setError(e.message));
-  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [open, kind]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!open) return null;
   return (
-    <Modal open={open} onClose={onClose} label="Starting a new video">
-      <Alert>{error}</Alert>
-      {!error && <div className="py-10 text-center"><Spinner className="mx-auto size-8" /><p className="mt-3 text-ink-soft">Starting your video…</p></div>}
+    <Modal open={open} onClose={onClose} label="What do you want to make?">
+      {error ? <Alert>{error}</Alert> : kind ? (
+        <div className="py-10 text-center"><Spinner className="mx-auto size-8" /><p className="mt-3 text-ink-soft">Starting your {kind}…</p></div>
+      ) : (
+        <>
+          <h2 className="text-xl font-bold">What do you want to make?</h2>
+          <div className="mt-4 grid grid-cols-2 gap-3">
+            {[['video', 'Video ad', 'Motion graphics with music, as an MP4'], ['flyer', 'Flyer', 'A still design: picture to post, or PDF to print']].map(([k, l, d]) => (
+              <button key={k} type="button" onClick={() => onPick(k)} className="press rounded-[14px] border border-ink/12 bg-white p-4 text-left hover:border-ink/40">
+                <span className="grid size-10 place-items-center rounded-full bg-danfo text-white" aria-hidden="true">
+                  {k === 'video'
+                    ? <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M5 3v10l8-5z" /></svg>
+                    : <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="3" y="2" width="10" height="12" rx="1.5" /><path d="M5.5 6h5M5.5 9h3" /></svg>}
+                </span>
+                <span className="mt-3 block font-semibold text-ink">{l}</span>
+                <span className="mt-0.5 block text-sm leading-snug text-ink-mute">{d}</span>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
     </Modal>
+  );
+}
+
+// "Use on another device": the same private videos on a second phone or computer (no sign-in).
+function OtherDevice() {
+  const [open, setOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const link = otherDeviceLink();
+  const share = async () => {
+    try { if (navigator.share) { await navigator.share({ title: 'My Animora', url: link }); return; } } catch { /* cancelled */ }
+    try { await navigator.clipboard.writeText(link); setCopied(true); setTimeout(() => setCopied(false), 2500); } catch { /* blocked */ }
+  };
+  return (
+    <>
+      <button onClick={() => setOpen(true)} className="text-sm font-semibold text-ink-soft hover:text-ink">Use on another device</button>
+      <Modal open={open} onClose={() => setOpen(false)} label="Use on another device">
+        <h2 className="text-xl font-bold">Open your videos on another device</h2>
+        <p className="mt-2 text-sm text-ink-soft">Your videos and flyers are private to this device. Open this link on your other phone or computer to see the same ones there. Keep it to yourself: anyone with the link can see and change them.</p>
+        <input readOnly value={link} onFocus={(e) => e.target.select()} className="mt-4 w-full rounded-[10px] border border-ink/15 bg-lilac px-3 py-2.5 font-mono text-xs text-ink" aria-label="Your private link" />
+        <div className="mt-4 flex gap-2">
+          <Button variant="ghost" className="flex-1" onClick={() => setOpen(false)}>Close</Button>
+          <Button className="flex-1" onClick={share}>{copied ? 'Copied' : 'Share or copy link'}</Button>
+        </div>
+      </Modal>
+    </>
   );
 }
 
@@ -74,10 +117,11 @@ function statusLabel(p) {
   if (r?.status === 'queued') return { t: 'In the queue', c: 'bg-danfo text-white' };
   if (r?.status === 'done') return { t: 'Video ready', c: 'bg-money text-white' };
   if (r?.status === 'failed') return { t: 'Render failed', c: 'bg-alert text-white' };
-  return { planning: { t: 'Planning', c: 'bg-white text-ink' }, coding: { t: 'Making video', c: 'bg-white text-ink' }, ready: { t: 'Ready', c: 'bg-ink text-white' }, rendered: { t: 'Video ready', c: 'bg-money text-white' } }[p.status];
+  return { planning: { t: 'Planning', c: 'bg-white text-ink' }, coding: { t: p.kind === 'flyer' ? 'Designing' : 'Making video', c: 'bg-white text-ink' }, ready: { t: 'Ready', c: 'bg-ink text-white' }, rendered: { t: 'Video ready', c: 'bg-money text-white' } }[p.status];
 }
 
 function nextStep(p) {
+  if (p.kind === 'flyer') return p.status === 'planning' ? `/p/${p.id}/plan` : `/p/${p.id}/studio`;
   if (p.last_render && ['queued', 'rendering', 'done'].includes(p.last_render.status)) return `/p/${p.id}/render`;
   return p.status === 'planning' ? `/p/${p.id}/plan` : `/p/${p.id}/studio`;
 }
@@ -88,7 +132,9 @@ export default function Dashboard() {
   const [projects, setProjects] = useState(null);
   const [pricing, setPricing] = useState(null);
   const [error, setError] = useState('');
-  const newOpen = params.get('new') === '1';
+  const newParam = params.get('new');
+  const newOpen = !!newParam;
+  const newKind = newParam === 'video' || newParam === 'flyer' ? newParam : null;
 
   const load = async () => { try { setProjects((await api('/projects')).projects); } catch (e) { setError(e.message); } };
   useEffect(() => { load(); refresh(); api('/pricing').then((r) => setPricing(r.pricing)).catch(() => {}); }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -129,9 +175,10 @@ export default function Dashboard() {
 
   return (
     <div className="mx-auto max-w-[1180px] px-6 py-10 sm:px-10">
-      <NewVideo open={newOpen} onClose={() => setParams({})} />
+      <NewThing open={newOpen} kind={newKind} onPick={(k) => setParams({ new: k })} onClose={() => setParams({})} />
       <div className="flex flex-wrap items-end justify-between gap-4">
         <h1 className="text-4xl font-bold tracking-[-0.045em]">My videos</h1>
+        <OtherDevice />
         {!user.testMode && (user.plan === 'pro'
           ? <p className="text-sm text-ink-soft">{user.proVideosRemaining} of {limit} ad-free videos left this month</p>
           : <Link to="/checkout" className="text-sm font-semibold text-ink-soft hover:text-ink">Upgrade to Pro for {naira(pricing?.proPriceNgn || 5000)}/month</Link>)}
@@ -143,13 +190,13 @@ export default function Dashboard() {
             <button onClick={() => setParams({ new: '1' })} className="press group grid aspect-[4/5] w-full place-items-center rounded-xl border border-dashed border-ink/20 bg-white text-ink-soft hover:border-ink/40 hover:text-ink">
               <span className="flex flex-col items-center gap-3">
                 <span className="grid size-12 place-items-center rounded-full bg-danfo text-white"><svg width="16" height="16" viewBox="0 0 14 14" aria-hidden="true"><path d="M7 1v12M1 7h12" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" /></svg></span>
-                <span className="font-semibold">New video</span>
+                <span className="font-semibold">New video or flyer</span>
               </span>
             </button>
           </li>
           {projects.map((p) => {
             const st = statusLabel(p);
-            const ratio = p.aspect_ratio === '16:9' ? 'aspect-video w-full' : p.aspect_ratio === '1:1' ? 'aspect-square w-full' : 'aspect-[9/16] h-full';
+            const ratio = p.aspect_ratio === '16:9' ? 'aspect-video w-full' : p.aspect_ratio === '1:1' ? 'aspect-square w-full' : p.aspect_ratio === '4:5' ? 'aspect-[4/5] h-full' : p.aspect_ratio === 'A4' ? 'aspect-[1240/1754] h-full' : 'aspect-[9/16] h-full';
             return (
               <li key={p.id} className="group">
                 <Link to={nextStep(p)} className="block">
@@ -163,7 +210,7 @@ export default function Dashboard() {
                   <p className="mt-3 line-clamp-2 font-semibold leading-snug tracking-[-0.01em]">{p.title}</p>
                 </Link>
                 <div className="mt-1 flex items-center gap-3 text-sm text-ink-mute">
-                  <span>{duration(p.duration_seconds)}, {p.aspect_ratio}, {ago(p.updated_at)}</span>
+                  <span>{p.kind === 'flyer' ? 'Flyer' : duration(p.duration_seconds)}, {p.aspect_ratio}, {ago(p.updated_at)}</span>
                   {p.last_render?.status === 'done' && <a href={`/download/${p.last_render.id}`} className="font-semibold text-money hover:underline">Download</a>}
                   <button onClick={() => remove(p)} className="ml-auto opacity-0 hover:text-alert focus:opacity-100 group-hover:opacity-100" aria-label={`Delete ${p.title}`}>Delete</button>
                 </div>

@@ -5,12 +5,27 @@ const TOKEN_KEY = 'adflash_token';
 const getToken = () => { try { return localStorage.getItem(TOKEN_KEY); } catch { return null; } };
 const setToken = (t) => { try { t ? localStorage.setItem(TOKEN_KEY, t) : localStorage.removeItem(TOKEN_KEY); } catch { /* private mode */ } };
 
+// No sign-in: this device's own secret key keeps its videos private. "Use on another device" shares it by link.
+const DEVICE_KEY = 'animora-key';
+const newKey = () => { const a = new Uint8Array(24); crypto.getRandomValues(a); return btoa(String.fromCharCode(...a)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); };
+(() => {   // opened from a "use on another device" link: #k=<key>
+  try {
+    const m = location.hash.match(/^#k=([A-Za-z0-9_-]{24,128})$/);
+    if (m) { localStorage.setItem(DEVICE_KEY, m[1]); history.replaceState(null, '', '/videos'); }
+  } catch { /* storage blocked */ }
+})();
+let memKey = null;
+export function deviceKey() {
+  try { let k = localStorage.getItem(DEVICE_KEY); if (!k) { k = newKey(); localStorage.setItem(DEVICE_KEY, k); } return k; } catch { return memKey || (memKey = newKey()); }
+}
+export const otherDeviceLink = () => `${location.origin}/#k=${deviceKey()}`;
+
 export class ApiError extends Error {
   constructor(message, status, data) { super(message); this.status = status; this.data = data; }
 }
 
 export async function api(path, { method = 'GET', body, form } = {}) {
-  const headers = {};
+  const headers = { 'X-Animora-Key': deviceKey() };
   const token = getToken();
   if (token) headers.Authorization = `Bearer ${token}`;
   if (body !== undefined) headers['Content-Type'] = 'application/json';
@@ -90,6 +105,8 @@ export const ASPECTS = {
   '9:16': { w: 1080, h: 1920, label: 'WhatsApp Status · TikTok' },
   '1:1': { w: 1080, h: 1080, label: 'Instagram feed' },
   '16:9': { w: 1920, h: 1080, label: 'YouTube' },
+  '4:5': { w: 1080, h: 1350, label: 'Instagram & Facebook post' },
+  'A4': { w: 1240, h: 1754, label: 'Print (A4)' },
 };
 
 export function usePolling(fn, ms, active) {

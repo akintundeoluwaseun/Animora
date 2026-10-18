@@ -13,6 +13,9 @@ import { probeBuffer, toMp3 } from '../media.js';
 import { voiceoverFormats, generateVoiceTrack, VOICES, hasOfflineVoice } from '../ai/voice.js';
 import { config } from '../config.js';
 import { cleanBrief, briefToPlanRules, suggest, autoStyleSlug, parseBrief } from '../ai/brief.js';
+import { makeFlyer } from '../ai/flyer.js';
+import { describeAssets } from '../ai/describe.js';
+import { loadImage } from '../ai/index.js';
 
 const MAX_IMAGES = 5;
 
@@ -51,7 +54,7 @@ function normalizePlan(plan) {
 
 function shape(p, extra = {}) {
   return {
-    id: p.id, title: p.title, status: p.status, aspectRatio: p.aspect_ratio, durationSeconds: p.duration_seconds,
+    id: p.id, kind: p.kind || 'video', sourceProjectId: p.source_project_id || null, title: p.title, status: p.status, aspectRatio: p.aspect_ratio, durationSeconds: p.duration_seconds,
     styleId: p.style_id, plan: p.plan_json, planSummary: p.plan_summary, chat: p.chat_history,
     code: p.code_html, versions: (p.code_versions || []).length, editHistory: p.edit_history,
     brief: p.brief_json || null, sfx: p.sfx_on !== false, aiSource: p.ai_source, thumbnailUrl: p.thumbnail_url, createdAt: p.created_at, updatedAt: p.updated_at,
@@ -80,7 +83,7 @@ async function thumbnail(projectId, html, aspect) {
 
 // ---------------- list / create / read / update / delete ----------------
 r.get('/', async (req, res) => {
-  const rows = await q(`SELECT p.id, p.title, p.status, p.aspect_ratio, p.duration_seconds, p.thumbnail_url, p.updated_at, p.created_at,
+  const rows = await q(`SELECT p.id, p.kind, p.title, p.status, p.aspect_ratio, p.duration_seconds, p.thumbnail_url, p.updated_at, p.created_at,
       s.name AS style_name,
       (SELECT row_to_json(x) FROM (SELECT id, status, progress, video_url, created_at FROM renders WHERE project_id=p.id ORDER BY created_at DESC LIMIT 1) x) AS last_render
     FROM projects p LEFT JOIN styles s ON s.id=p.style_id WHERE p.user_id=$1 ORDER BY p.updated_at DESC`, [req.user.id]);
@@ -89,12 +92,29 @@ r.get('/', async (req, res) => {
 
 r.post('/', async (req, res) => {
   const { title, styleId } = req.body || {};
+  const kind = req.body?.kind === 'flyer' ? 'flyer' : 'video';
   const style = styleId ? await one("SELECT id FROM styles WHERE id=$1 AND status='live'", [styleId]) : null;
   const def = style || await one("SELECT id FROM styles WHERE slug='naija-bold'");
   // a style picked before starting (e.g. "use this style" on a style card) counts as the style answer
-  const p = await one(`INSERT INTO projects (user_id, title, style_id, brief_json) VALUES ($1,$2,$3,$4) RETURNING *`,
-    [req.user.id, title?.trim() || 'New video', def?.id || null, JSON.stringify(style ? { styleId: style.id } : {})]);
+  const p = await one(`INSERT INTO projects (user_id, title, style_id, brief_json, kind) VALUES ($1,$2,$3,$4,$5) RETURNING *`,
+    [req.user.id, title?.trim() || (kind === 'flyer' ? 'New flyer' : 'New video'), def?.id || null, JSON.stringify(style ? { styleId: style.id } : {}), kind]);
   res.json({ project: shape(p, { assets: [] }) });
+});
+
+// A flyer made from a video: same answers, pictures and style, then the AI designs it straight away.
+r.post('/:id/flyer', async (req, res) => {
+  const p = await loadProject(req, res); if (!p) return;
+  if (!p.brief_json && !p.plan_json) return res.status(400).json({ error: 'Answer the questions for this video first.' });
+  const brief = { ...(p.brief_json || {}), aspect: ['4:5', '9:16', '1:1', 'A4'].includes(req.body?.aspect) ? req.body.aspect : '4:5' };
+  const plan = { ...(p.plan_json || {}), aspect_ratio: brief.aspect };
+  const f = await one(`INSERT INTO projects (user_id, title, style_id, brief_json, plan_json, aspect_ratio, duration_seconds, kind, source_project_id, status, gen_state, gen_message, gen_started_at)
+    VALUES ($1,$2,$3,$4,$5,$6,$7,'flyer',$8,'coding','working','Designing your flyer',now()) RETURNING *`,
+    [req.user.id, `${(p.brief_json?.name || p.title).slice(0, 80)} flyer`, p.style_id, JSON.stringify(brief), JSON.stringify(plan), brief.aspect, p.duration_seconds || 15, p.id]);
+  await q(`INSERT INTO assets (user_id, project_id, name, kind, role, mime, url, width, height, has_alpha, duration_seconds, is_light, description)
+    SELECT user_id, $2, name, kind, role, mime, url, width, height, has_alpha, duration_seconds, is_light, description FROM assets WHERE project_id=$1 AND kind='image'`, [p.id, f.id]);
+  res.status(202).json({ project: shape(f) });
+  const job = runGenerate(f, req.user);
+  if (config.serverless) waitUntil(job); else job.catch(() => {});
 });
 
 r.get('/:id', async (req, res) => {
@@ -215,6 +235,7 @@ r.post('/:id/build', async (req, res) => {
   // Instant plan from the answers; the AI director writes the creative (copy, shots, look) in one call afterwards.
   const plan = briefToPlanRules(brief, { assets, limits: limitsFor(req.user), palette: pal }), source = 'rules';
   normalizePlan(plan);
+  if (p.kind === 'flyer') plan.aspect_ratio = ['4:5', '9:16', '1:1', 'A4'].includes(brief.aspect) ? brief.aspect : '4:5';
   const u = await one(`UPDATE projects SET brief_json=$2, plan_json=$3, aspect_ratio=$4, duration_seconds=$5, title=$6, style_id=$7, sfx_on=$8, updated_at=now() WHERE id=$1 RETURNING *`,
     [p.id, JSON.stringify(brief), JSON.stringify(plan), plan.aspect_ratio, Math.round(plan.duration_seconds), (plan.title || p.title).slice(0, 120), styleId, brief.sound !== 'none']);
   res.json({ project: shape(u, { assets }), source });
@@ -279,12 +300,21 @@ async function runGenerate(p, user) {
   const setMsg = (m) => q('UPDATE projects SET gen_message=$2 WHERE id=$1', [p.id, String(m).slice(0, 120)]).catch(() => {});
   const name = p.brief_json?.name || p.title;
   try {
-    const out = await generateCode({ plan: p.plan_json, style: await loadStyle(p.style_id), assets: await projectAssets(p.id), brief: p.brief_json || null, previous: p.code_html || null, onStatus: setMsg });
+    let out;
+    if (p.kind === 'flyer') {
+      setMsg('Looking at your pictures');
+      const style = await loadStyle(p.style_id);
+      const assets = config.useGemini ? await describeAssets(await projectAssets(p.id), loadImage) : await projectAssets(p.id);
+      setMsg('Designing your flyer');
+      out = { html: await makeFlyer({ brief: p.brief_json || {}, plan: p.plan_json, style, assets, previous: p.code_html || null, useAI: config.useGemini }), source: config.useGemini ? 'gemini' : 'template' };
+    } else out = await generateCode({ plan: p.plan_json, style: await loadStyle(p.style_id), assets: await projectAssets(p.id), brief: p.brief_json || null, previous: p.code_html || null, onStatus: setMsg });
     const versions = [...(p.code_versions || []), ...(p.code_html ? [p.code_html] : [])].slice(-MAX_VERSIONS);
     const u = await one(`UPDATE projects SET code_html=$2, code_versions=$3, status='ready', ai_source=$4, edit_history='[]'::jsonb, updated_at=now(),
       gen_state='done', gen_message=$5, gen_error=NULL WHERE id=$1 RETURNING *`, [p.id, out.html, JSON.stringify(versions), out.source, out.notice || '']);
     thumbnail(p.id, out.html, u.aspect_ratio);
-    await notifyUser(user.id, { title: 'Your video is ready', body: `${name}: tap to watch it and download the MP4.`, url: `/p/${p.id}/studio`, tag: `gen-${p.id}` });
+    await notifyUser(user.id, p.kind === 'flyer'
+      ? { title: 'Your flyer is ready', body: `${name}: tap to see it and download it.`, url: `/p/${p.id}/studio`, tag: `gen-${p.id}` }
+      : { title: 'Your video is ready', body: `${name}: tap to watch it and download the MP4.`, url: `/p/${p.id}/studio`, tag: `gen-${p.id}` });
   } catch (e) {
     console.error('[generate]', e);
     await q(`UPDATE projects SET status=CASE WHEN code_html IS NULL THEN 'planning' ELSE 'ready' END, gen_state='failed', gen_error=$2 WHERE id=$1`,

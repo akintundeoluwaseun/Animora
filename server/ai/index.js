@@ -10,6 +10,7 @@ import { offlinePlannerTurn } from './offline.js';
 import { templateFromPlan, offlineEdit } from './templates.js';
 import { directedHtml, directorEdit, readData } from './director.js';
 import { describeAssets, upgradeRuntime } from './describe.js';
+import { isFlyer, editFlyer } from './flyer.js';
 
 // 'director' (default): Gemini directs the shots, our motion engine animates them (fast, always renders).
 // 'html': Gemini writes the whole HTML/GSAP file itself (slower, experimental).
@@ -149,6 +150,11 @@ export async function generateCode({ plan, style, assets, brief = null, previous
 /** Plain-words edit. Returns { html, source, summary } */
 export async function editCode({ html, instruction, aspectRatio, duration, plan = null, assets = [], onStatus }) {
   if (config.useGemini) assets = await describeAssets(assets, loadImage);
+  if (isFlyer(html)) {
+    if (!config.useGemini) return { html, source: 'offline', unchanged: true, summary: 'Flyer changes need the AI, which is off right now.' };
+    try { const r = await editFlyer({ html, instruction, assets }); return { html: r.html, source: 'gemini', summary: r.summary }; }
+    catch (e) { console.warn('[ai] flyer edit failed:', e.message); return { html, source: 'offline', unchanged: true, summary: `I couldn't change the flyer (${aiReason(e)}). Try again.` }; }
+  }
   html = upgradeRuntime(html, assets);
   const directed = !!readData(html)?.beats;
   if (config.useGemini) {

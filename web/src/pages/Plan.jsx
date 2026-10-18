@@ -45,6 +45,33 @@ const QUESTIONS = [
   { id: 'sound', type: 'sound', ask: () => 'What sound should the video have?' },
   { id: 'extra', type: 'long', optional: true, chips: EXTRA_CHIPS, ask: () => 'Last one: any other special instructions? Anything goes. You can paste pictures here too.', placeholder: 'e.g. "Start by zooming into the logo of the chatbot, then show the app screen"', done: true },
 ];
+// Flyers: the same questions minus length, narration and sound, with flyer wording and print sizes.
+const FLYER_ASPECTS = [
+  { v: '4:5', l: 'Post 4:5', d: 'Instagram & Facebook feed' },
+  { v: '9:16', l: 'Story 9:16', d: 'WhatsApp Status · Instagram Story' },
+  { v: '1:1', l: 'Square 1:1', d: 'Any feed, WhatsApp chats' },
+  { v: 'A4', l: 'A4 print', d: 'Printed flyers and posters (PDF)' },
+];
+const FLYER_TEXT = {
+  paste: () => 'Paste or type everything about your business and the flyer: name, what you sell, your message, prices, contact, anything special.',
+  goal: () => "What's the goal of this flyer?",
+  headline: () => "What's the main message of your flyer?",
+  cta: () => 'What should people do after seeing the flyer?',
+  contact: () => 'Your phone number, website or address for the flyer?',
+  aspect: () => 'Where will you use it?',
+  pictures: () => `Add your logo and product photos if you have them (up to ${MAX_PICS}). Photos make flyers look much better.`,
+  colors: () => 'Which colours should the flyer use?',
+  style: () => 'Pick a look for your flyer, or let me choose one that fits.',
+  extra: () => 'Last one: anything special for the flyer? Anything goes.',
+};
+const FLYER_QUESTIONS = QUESTIONS.filter((x) => !['duration', 'voiceover', 'sound'].includes(x.id)).map((x) => ({
+  ...x,
+  ...(FLYER_TEXT[x.id] ? { ask: FLYER_TEXT[x.id] } : {}),
+  ...(x.id === 'aspect' ? { options: FLYER_ASPECTS } : {}),
+  ...(x.id === 'headline' ? { hint: 'One to three messages work best on a flyer.' } : {}),
+  ...(x.id === 'extra' ? { placeholder: 'e.g. "Put the prices in big circles" or "Make it look like a Christmas sale"' } : {}),
+}));
+
 
 const label = (q, v, b, styles) => {
   if (v == null || v === '' || (Array.isArray(v) && !v.length)) return 'Skipped';
@@ -150,7 +177,9 @@ export default function Plan() {
 
   const pics = (project?.assets || []).filter((a) => a.kind === 'image');
   const logo = pics.find((a) => a.role === 'logo');
-  const visible = useMemo(() => QUESTIONS, []);
+  const QS = project?.kind === 'flyer' ? FLYER_QUESTIONS : QUESTIONS;
+  const visible = QS;
+  const what = project?.kind === 'flyer' ? 'flyer' : 'video';
   const q = visible[step];
 
   // load project + styles, resume at the first unanswered question
@@ -163,8 +192,9 @@ export default function Plan() {
         bRef.current = brief; setB(brief);
         const { styles: st } = await api('/styles'); setStyles(st);
         const imgs = (r.project.assets || []).filter((a) => a.kind === 'image').length;
-        const first = QUESTIONS.findIndex((qq) => { const v = valueOf(qq, brief, imgs); return v === undefined && !(qq.optional && brief[`${qq.id}Skipped`]); });
-        setStep(brief.done && r.project.plan ? QUESTIONS.length : first < 0 ? QUESTIONS.length : first);
+        const LIST = r.project.kind === 'flyer' ? FLYER_QUESTIONS : QUESTIONS;
+        const first = LIST.findIndex((qq) => { const v = valueOf(qq, brief, imgs); return v === undefined && !(qq.optional && brief[`${qq.id}Skipped`]); });
+        setStep(brief.done && r.project.plan ? LIST.length : first < 0 ? LIST.length : first);
       } catch (e) { setError(e.message); }
     })();
   }, [id]);
@@ -208,9 +238,9 @@ export default function Plan() {
   const saved = () => saving.current;
 
   const advance = (next) => {
-    if (editing) { setEditing(false); const brief = next; const f = QUESTIONS.findIndex((qq) => valueOf(qq, brief, pics.length) === undefined && !(qq.optional && brief[`${qq.id}Skipped`])); setStep(f < 0 ? QUESTIONS.length : f); return; }
-    const f = QUESTIONS.findIndex((qq) => valueOf(qq, next, pics.length) === undefined && !(qq.optional && next[`${qq.id}Skipped`]));
-    setStep(f < 0 ? QUESTIONS.length : f);
+    if (editing) { setEditing(false); const brief = next; const f = QS.findIndex((qq) => valueOf(qq, brief, pics.length) === undefined && !(qq.optional && brief[`${qq.id}Skipped`])); setStep(f < 0 ? QS.length : f); return; }
+    const f = QS.findIndex((qq) => valueOf(qq, next, pics.length) === undefined && !(qq.optional && next[`${qq.id}Skipped`]));
+    setStep(f < 0 ? QS.length : f);
   };
 
   const answer = async (value, extra = {}) => {
@@ -291,7 +321,7 @@ export default function Plan() {
     <div className="mx-auto max-w-6xl px-0 sm:px-4 sm:py-5">
       <div className="hidden flex-wrap items-center justify-between gap-3 sm:flex">
         <h1 className="truncate text-xl font-bold tracking-[-0.03em] sm:text-2xl">{b.name || project.title}</h1>
-        <Steps current="plan" projectId={id} hasPlan={!!project.plan} hasCode={!!project.code} />
+        {project.kind !== 'flyer' && <Steps current="plan" projectId={id} hasPlan={!!project.plan} hasCode={!!project.code} />}
       </div>
 
       <div className="grid gap-6 sm:mt-5 lg:grid-cols-[1fr_320px]">
@@ -398,7 +428,7 @@ export default function Plan() {
 
             {finished && (
               <div className="space-y-3">
-                <Bubble who="ai" current>{building ? "Great, I have everything. I'm planning your scenes now…" : project.plan ? 'Your answers are saved. Change any answer above, or make the video.' : 'All set!'}</Bubble>
+                <Bubble who="ai" current>{building ? (what === 'flyer' ? "Great, I have everything. Designing your flyer now…" : "Great, I have everything. I'm planning your scenes now…") : project.plan ? `Your answers are saved. Change any answer above, or make the ${what}.` : 'All set!'}</Bubble>
                 {building && <div className="flex"><div className="bubble-ai typing px-4 py-3.5"><span /><span /><span /></div></div>}
               </div>
             )}
@@ -434,7 +464,7 @@ export default function Plan() {
                   <MicButton onText={(t) => setText((x) => (x.trim() ? `${x.trim()} ${t}` : t))} onError={setError} className="!size-10 !rounded-full !border-0 !bg-transparent hover:!bg-ink/5" />
                   <Button type="submit" className="!h-10 !rounded-full !px-4" loading={reading}
                     disabled={reading || (q.done ? false : q.type === 'multi' ? !multi.length && !text.trim() : !text.trim())}>
-                    {q.done ? (text.trim() ? 'Make my video' : "No, that's all") : q.type === 'multi' ? (multi.length ? `Continue · ${multi.length + (text.trim() && !multi.includes(text.trim()) ? 1 : 0)}` : 'Continue') : q.id === 'paste' ? 'Read it' : (
+                    {q.done ? (text.trim() ? `Make my ${what}` : "No, that's all") : q.type === 'multi' ? (multi.length ? `Continue · ${multi.length + (text.trim() && !multi.includes(text.trim()) ? 1 : 0)}` : 'Continue') : q.id === 'paste' ? 'Read it' : (
                       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-label="Send"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
                     )}
                   </Button>
@@ -444,7 +474,7 @@ export default function Plan() {
             {finished && (
               <>
                 <Button size="lg" className="w-full" loading={building} onClick={() => (project.plan && b.done ? navigate(`/p/${id}/studio${project.code ? '' : '?generate=1'}`) : build(b))}>
-                  {project.plan ? (project.code ? 'Open my video' : 'Make my video') : 'Make my video'}
+                  {project.plan && project.code ? `Open my ${what}` : `Make my ${what}`}
                 </Button>
                 {project.plan && <button onClick={() => build(b)} disabled={building} className="mt-2 w-full text-sm font-semibold text-ink-mute hover:text-ink">Plan again from my answers</button>}
               </>
@@ -466,7 +496,7 @@ export default function Plan() {
                 {pics.map((a) => <li key={a.id}><img src={a.url} alt={a.name} className={`aspect-square w-full rounded-lg bg-white ${a.role === 'logo' ? 'object-contain p-0.5' : 'object-cover'}`} /></li>)}
               </ul>
             )}
-            {!b.name && <p className="mt-2 text-sm text-ink-soft">Answer the questions and I'll build the plan and the video for you. Paste pictures any time (up to {MAX_PICS}).</p>}
+            {!b.name && <p className="mt-2 text-sm text-ink-soft">Answer the questions and I'll make the {what} for you. Paste pictures any time (up to {MAX_PICS}).</p>}
           </div>
           {project.plan && (
             <div className="surface p-5">

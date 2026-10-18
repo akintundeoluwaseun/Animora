@@ -24,7 +24,7 @@ export function cleanBrief(b = {}) {
     products: list(b.products).slice(0, 8), features: list(b.features).slice(0, 8),
     // what to do after watching: one or more; `cta` is the first, `ctas` all of them
     ctas: list(Array.isArray(b.ctas) ? b.ctas : Array.isArray(b.cta) ? b.cta : b.cta ? [b.cta] : []).slice(0, 5),
-    contact: str(b.contact, 120), aspect: ['9:16', '16:9', '1:1'].includes(b.aspect) ? b.aspect : undefined,
+    contact: str(b.contact, 120), aspect: ['9:16', '16:9', '1:1', '4:5', 'A4'].includes(b.aspect) ? b.aspect : undefined,
     duration: Number(b.duration) || undefined, styleId: b.styleId ? String(b.styleId) : undefined, styleAuto: !!b.styleAuto,
     colors: b.colors && typeof b.colors === 'object' ? Object.fromEntries(Object.entries(b.colors).filter(([k, v]) => ['primary', 'secondary', 'background', 'text'].includes(k) && /^#[0-9a-f]{6}$/i.test(v))) : undefined,
     voiceover: b.voiceover === undefined || b.voiceover === null ? undefined : b.voiceover === true || b.voiceover === 'yes',

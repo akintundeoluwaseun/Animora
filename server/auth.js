@@ -1,5 +1,5 @@
 // Email + password auth with signed, stateless tokens (no third-party auth service needed).
-import { scrypt, randomBytes, timingSafeEqual, createHmac } from 'node:crypto';
+import { scrypt, randomBytes, timingSafeEqual, createHmac, createHash } from 'node:crypto';
 import { promisify } from 'node:util';
 import { config } from './config.js';
 import { one, q } from './db/index.js';
@@ -96,10 +96,33 @@ export async function localUser() {
   return loadUser(localUserId);
 }
 
+// No-sign-in mode with private devices: each phone/browser sends its own secret key (made on the device,
+// kept in its storage). Only a hash of it is stored here. Opening a "use on another device" link copies
+// the key to a second device, so both see the same videos.
+const keyHash = (k) => createHash('sha256').update(String(k)).digest('hex');
+const deviceCache = new Map();
+export async function deviceUser(key) {
+  const h = keyHash(key);
+  let id = deviceCache.get(h);
+  if (!id) {
+    const u = await one('SELECT id FROM users WHERE device_key_hash=$1', [h])
+      || await one(`INSERT INTO users (name, email, password_hash, role, plan, device_key_hash) VALUES ('Animora user', $1, 'none', 'creator', 'pro', $2)
+          ON CONFLICT (email) DO UPDATE SET device_key_hash=EXCLUDED.device_key_hash RETURNING id`, [`device-${h.slice(0, 24)}@animora.app`, h]);
+    id = u.id;
+    if (deviceCache.size > 5000) deviceCache.clear();
+    deviceCache.set(h, id);
+  }
+  return loadUser(id);
+}
+const validKey = (k) => typeof k === 'string' && /^[A-Za-z0-9_-]{24,128}$/.test(k);
+
 // Express middleware
 export function requireAuth(req, res, next) {
   if (config.noAuth) {
-    return localUser().then((user) => { req.user = user; next(); }).catch(next);
+    const key = req.get('x-animora-key');
+    if (validKey(key)) return deviceUser(key).then((user) => { req.user = user; next(); }).catch(next);
+    if (!config.serverless && !config.privateDevices) return localUser().then((user) => { req.user = user; next(); }).catch(next);
+    return res.status(401).json({ error: 'Please reload Animora.' });
   }
   const header = req.get('authorization') || '';
   const token = header.startsWith('Bearer ') ? header.slice(7) : req.query.token;

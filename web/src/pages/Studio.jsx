@@ -7,11 +7,14 @@ import MicButton from '../components/MicButton.jsx';
 import { LivePreview } from '../components/Preview.jsx';
 import VoicePanel from '../components/VoicePanel.jsx';
 import DownloadVideo from '../components/DownloadVideo.jsx';
+import FlyerDownload from '../components/FlyerDownload.jsx';
 import { enablePush } from '../lib/notify.js';
 
 const SUGGESTIONS = ['Start by zooming into my logo', 'Make the text bigger', 'Use calmer, premium transitions', 'Make the price stand out more'];
+const FLYER_SUGGESTIONS = ['Try a different layout', 'Make the headline shorter', 'Show the prices bigger', 'Use darker colours'];
 // While the server makes the video: what it's doing now, and that it's safe to leave.
-function Generating({ message, startedAt, pushOn }) {
+function Generating({ message, startedAt, pushOn, flyer }) {
+  const what = flyer ? 'flyer' : 'video';
   const [now, setNow] = useState(Date.now());
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
   const secs = startedAt ? Math.max(0, Math.round((now - new Date(startedAt).getTime()) / 1000)) : 0;
@@ -21,11 +24,11 @@ function Generating({ message, startedAt, pushOn }) {
         <div className="stage mx-auto grid size-28 place-items-center !rounded-[2rem]">
           <img src="/animora-mark.png" width="56" height="56" alt="" className="animate-pulse" />
         </div>
-        <p className="mt-6 text-2xl font-bold tracking-[-0.03em]" aria-live="polite">{message || 'Making your video'}…</p>
+        <p className="mt-6 text-2xl font-bold tracking-[-0.03em]" aria-live="polite">{message || `Making your ${what}`}…</p>
         <p className="mt-2 tabular-nums text-ink-mute">{secs >= 60 ? `${Math.floor(secs / 60)} min ${secs % 60} s` : `${secs} s`}</p>
         <div className="mx-auto mt-5 h-1 w-48 overflow-hidden rounded-full bg-lilac"><div className="gen-sweep h-full w-1/3 rounded-full bg-danfo" /></div>
         <p className="mt-6 text-sm leading-relaxed text-ink-soft">
-          {pushOn ? "You can close Animora. We'll send a notification to this device when your video is ready." : 'You can leave this page; your video keeps being made. Allow notifications to get told when it is ready.'}
+          {pushOn ? `You can close Animora. We'll send a notification to this device when your ${what} is ready.` : `You can leave this page; your ${what} keeps being made. Allow notifications to get told when it is ready.`}
         </p>
       </div>
     </div>
@@ -68,7 +71,7 @@ function EditPanel({ project, onUpdate }) {
   return (
     <div className="flex h-full flex-col">
       <div className="flex-1 space-y-3 overflow-y-auto p-4" aria-live="polite">
-        {history.length === 0 && <p className="text-ink-soft">Tell me what to change, in your own words. I'll update the video and you'll see it straight away.</p>}
+        {history.length === 0 && <p className="text-ink-soft">Tell me what to change, in your own words. {project.kind === 'flyer' ? "I'll update the flyer" : "I'll update the video"} and you'll see it straight away.</p>}
         {history.map((m, i) => (
           <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : ''}`}>
             <div className={`max-w-[88%] px-4 py-2.5 text-[15px] ${m.role === 'user' ? 'bubble-user' : 'bubble-ai'}`}>{m.text}</div>
@@ -80,7 +83,7 @@ function EditPanel({ project, onUpdate }) {
       <div className="border-t border-ink/8 bg-lilac/40 p-3">
         {error && <div className="mb-2"><Alert onClose={() => setError('')}>{error}</Alert></div>}
         <div className="mb-2 flex flex-wrap gap-1.5">
-          {SUGGESTIONS.map((s) => <button key={s} disabled={busy} onClick={() => send(s)} className="chip press !px-3 !py-1.5 !text-xs">{s}</button>)}
+          {(project.kind === 'flyer' ? FLYER_SUGGESTIONS : SUGGESTIONS).map((s) => <button key={s} disabled={busy} onClick={() => send(s)} className="chip press !px-3 !py-1.5 !text-xs">{s}</button>)}
         </div>
         <form onSubmit={(e) => { e.preventDefault(); send(); }} className="flex gap-2">
           <input value={text} onChange={(e) => setText(e.target.value)} onPaste={onPaste} placeholder={pasting ? 'Adding your picture…' : 'e.g. "Zoom into the logo first" (you can paste a picture)'} aria-label="Describe a change"
@@ -196,18 +199,24 @@ export default function Studio() {
   if (!project.plan) {
     return <div className="mx-auto max-w-xl p-8 text-center"><p className="text-ink-soft">Plan your video first.</p><Button as={Link} to={`/p/${id}/plan`} className="mt-4">Answer the questions</Button></div>;
   }
-  if (generating) return <Generating message={project.gen?.message} startedAt={project.gen?.startedAt} pushOn={pushOn} />;
+  const flyer = project.kind === 'flyer';
+  if (generating) return <Generating message={project.gen?.message} startedAt={project.gen?.startedAt} pushOn={pushOn} flyer={flyer} />;
+  const makeFlyer = async () => {
+    setError('');
+    try { enablePush().then(setPushOn); const r = await api(`/projects/${id}/flyer`, { method: 'POST', body: {} }); navigate(`/p/${r.project.id}/studio`); }
+    catch (e) { setError(e.message); }
+  };
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
           <h1 className="truncate text-xl font-extrabold sm:text-2xl">{project.title}</h1>
-          <p className="text-sm text-ink-mute">{duration(project.durationSeconds)} · {ASPECTS[project.aspectRatio]?.label}</p>
+          <p className="text-sm text-ink-mute">{flyer ? 'Flyer' : duration(project.durationSeconds)} · {ASPECTS[project.aspectRatio]?.label}</p>
         </div>
         <div className="flex items-center gap-3">
-          <Steps current="studio" projectId={id} hasPlan hasCode={!!project.code} />
-          {project.code && <span className="hidden lg:block">{canRender ? <Button onClick={() => navigate(`/p/${id}/render?new=1`)}>Generate Video</Button> : <DownloadVideo project={project} />}</span>}
+          {!flyer && <Steps current="studio" projectId={id} hasPlan hasCode={!!project.code} />}
+          {project.code && <span className="hidden lg:block">{flyer ? <FlyerDownload project={project} /> : canRender ? <Button onClick={() => navigate(`/p/${id}/render?new=1`)}>Generate Video</Button> : <DownloadVideo project={project} />}</span>}
         </div>
       </div>
       {error && <div className="mt-4"><Alert onClose={() => setError('')}>{error}</Alert></div>}
@@ -216,20 +225,21 @@ export default function Studio() {
       {project.code ? (
         <div className="mt-5 grid gap-6 lg:grid-cols-[minmax(0,1fr)_420px]">
           <section aria-label="Preview" className="stage flex flex-col justify-center px-4 py-8 sm:px-8">
-            <LivePreview html={project.code} aspect={project.aspectRatio} maxWidth={project.aspectRatio === '16:9' ? 320 : 290}
+            <LivePreview html={project.code} aspect={project.aspectRatio} maxWidth={project.aspectRatio === '16:9' ? 320 : flyer ? 340 : 290} still={flyer}
               sound={project.sfx !== false}
               onSoundChange={async (on) => { setProject((p) => ({ ...p, sfx: on })); try { const r = await api(`/projects/${id}`, { method: 'PATCH', body: { sfx: on } }); setProject((p) => ({ ...p, code: r.project.code, sfx: r.project.sfx })); } catch { /* keep the local choice */ } }} />
-            <p className="mt-3 text-center text-xs text-white/55">{project.sfx !== false ? 'Sound is on. Tap play to hear it; the same music and effects go into your MP4.' : 'Sound is off for this video.'}</p>
+            {!flyer && <p className="mt-3 text-center text-xs text-white/55">{project.sfx !== false ? 'Sound is on. Tap play to hear it; the same music and effects go into your MP4.' : 'Sound is off for this video.'}</p>}
             <div className="mt-6 flex flex-wrap justify-center gap-2">
               <Button variant="glass" size="sm" onClick={undo} disabled={!project.versions}>Undo</Button>
-              <Button variant="glass" size="sm" onClick={() => { if (confirm('Write the animation again from the plan? Your edits will be replaced (you can undo).')) generate(); }}>Regenerate</Button>
-              {canRender ? <Button size="lg" className="w-full sm:ml-2 sm:w-auto lg:hidden" onClick={() => navigate(`/p/${id}/render?new=1`)}>Generate Video</Button> : <span className="w-full sm:ml-2 sm:w-auto lg:hidden"><DownloadVideo project={project} size="lg" className="w-full" /></span>}
+              <Button variant="glass" size="sm" onClick={() => { if (confirm(flyer ? 'Design the flyer again? You get a new layout and words (you can undo).' : 'Write the animation again from the plan? Your edits will be replaced (you can undo).')) generate(); }}>Regenerate</Button>
+              {!flyer && <Button variant="glass" size="sm" onClick={makeFlyer}>Make a flyer from this</Button>}
+              {flyer ? <FlyerDownload project={project} size="lg" alt="glass" className="w-full sm:ml-2 sm:w-auto lg:hidden" /> : canRender ? <Button size="lg" className="w-full sm:ml-2 sm:w-auto lg:hidden" onClick={() => navigate(`/p/${id}/render?new=1`)}>Generate Video</Button> : <span className="w-full sm:ml-2 sm:w-auto lg:hidden"><DownloadVideo project={project} size="lg" className="w-full" /></span>}
             </div>
           </section>
 
           <section className="flex h-[calc(100vh-12rem)] min-h-[520px] flex-col overflow-hidden surface">
             <div className="segmented m-2" role="tablist">
-              {[['edit', 'Edit'], ['voice', 'Script'], ['plan', 'Scenes']].map(([k, l]) => (
+              {(flyer ? [['edit', 'Edit']] : [['edit', 'Edit'], ['voice', 'Script'], ['plan', 'Scenes']]).map(([k, l]) => (
                 <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)}
                   className="press">{l}</button>
               ))}
@@ -256,7 +266,7 @@ export default function Studio() {
           </section>
         </div>
       ) : (
-        <div className="mt-10 text-center"><Button onClick={generate}>Make my video</Button></div>
+        <div className="mt-10 text-center"><Button onClick={generate}>{flyer ? 'Make my flyer' : 'Make my video'}</Button></div>
       )}
     </div>
   );

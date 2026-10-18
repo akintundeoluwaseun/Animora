@@ -62,7 +62,7 @@ function playSfx(e) {
   g.gain.value = Math.min(1.2, (e.v || 1) * 0.8); src.buffer = b; src.connect(g).connect(c.destination); src.start();
 }
 
-export function LivePreview({ html, aspect = '9:16', autoPlay = true, maxWidth = 340, onError, sound: soundOn = true, onSoundChange }) {
+export function LivePreview({ html, aspect = '9:16', autoPlay = true, maxWidth = 340, onError, sound: soundOn = true, onSoundChange, still = false }) {
   const sfxRef = useRef([]);
   const musicRef = useRef(null);
   useEffect(() => () => { musicRef.current?.pause(); }, []);
@@ -150,10 +150,10 @@ export function LivePreview({ html, aspect = '9:16', autoPlay = true, maxWidth =
           )}
           {!ready && !error && <div className="absolute inset-0 grid place-items-center bg-ink text-sm text-white/70">Loading preview…</div>}
           {error && <div className="absolute inset-0 grid place-items-center bg-ink p-6 text-center text-sm text-white">This version has an error: {error}<br />Try "Undo" or "Regenerate".</div>}
-          <button onClick={toggle} className="absolute inset-0 cursor-pointer" aria-label={playing ? 'Pause' : 'Play'} disabled={!ready} />
+          {!still && <button onClick={toggle} className="absolute inset-0 cursor-pointer" aria-label={playing ? 'Pause' : 'Play'} disabled={!ready} />}
         </div>
       </PhoneFrame>
-      <div className="mx-auto mt-4 flex items-center gap-3" style={{ maxWidth: Math.max(maxWidth, 320) * (a.w > a.h ? 1.9 : 1) }}>
+      {!still && <div className="mx-auto mt-4 flex items-center gap-3" style={{ maxWidth: Math.max(maxWidth, 320) * (a.w > a.h ? 1.9 : 1) }}>
         <button onClick={toggle} disabled={!ready} className="press grid size-12 shrink-0 place-items-center rounded-full bg-danfo text-white disabled:opacity-40" aria-label={playing ? 'Pause' : 'Play'}>
           {playing
             ? <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><rect x="3" y="2" width="3.5" height="12" rx="1" /><rect x="9.5" y="2" width="3.5" height="12" rx="1" /></svg>
@@ -168,7 +168,7 @@ export function LivePreview({ html, aspect = '9:16', autoPlay = true, maxWidth =
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 9v6h4l5 4V5L8 9z" />{soundOn && audioReady ? <path d="M16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11" /> : <path d="M17 9l5 6M22 9l-5 6" />}</svg>
           </button>
         )}
-      </div>
+      </div>}
     </div>
   );
 }
