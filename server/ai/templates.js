@@ -203,6 +203,14 @@ export const SHOT_VALID = {
   tunnel: (b) => !!b.text && String(b.text).length <= 40 && ((b.imgs && b.imgs.length >= 2) || (b.items && b.items.length >= 2)),
   parallax: (b) => !!b.img && !!b.text && String(b.text).length <= 50,
   marquee3d: (b) => !!b.text && String(b.text).length <= 40,
+  flare: (b) => !!b.text && String(b.text).length <= 34,
+  ring3d: (b) => !!b.text && String(b.text).length <= 40,
+  chipfield: (b) => !!b.text && String(b.text).length <= 24 && b.items && b.items.length >= 2,
+  rule: (b) => !!b.text && String(b.text).length <= 40 && (String(b.text).includes('|') || !!b.sub || words(b.text).length >= 2),
+  glowproduct: (b) => !!b.img,
+  colorslide: (b) => !!b.text && String(b.text).length <= 40,
+  fan: (b) => b.imgs && b.imgs.length >= 2,
+  dotsphere: (b) => !!b.text && String(b.text).length <= 40,
 };
 const VALID = SHOT_VALID;
 export const ICON_NAMES = ['phone','chat','pin','clock','cart','star','heart','check','bolt','gift','truck','leaf','cup','food','cake','calendar','shield','tag','home','sparkle','scissors','book','dumbbell','music','wifi','card','users','trophy','camera','globe','arrow','bed','car','school','fire','shirt','drop','sun'];
@@ -211,7 +219,7 @@ export { iconFor, priceOf };
 function makePlanner(theme, rnd) {
   const counters = {};
   const used = {};
-  const LIMIT = { slam: 2, poster: 2, reveal: 2, tunnel: 1, parallax: 2, marquee3d: 1, logo: 1, widgets: 1, iconmorph: 1, isocard: 1, ticker: 1, collage: 1, stack: 1, chat: 1, scatter: 2, flip: 2, split: 1, card: 1, counter: 1, notify: 1, orbit: 1, phone: 1, brand: 1, wheel: 1, pills: 1, grid: 1, flow: 1, stat: 1, type: 2, hero: 2, zoomword: 3, kinetic: 3 };
+  const LIMIT = { flare: 2, ring3d: 1, chipfield: 1, rule: 2, glowproduct: 2, colorslide: 3, fan: 1, dotsphere: 1, slam: 2, poster: 2, reveal: 2, tunnel: 1, parallax: 2, marquee3d: 1, logo: 1, widgets: 1, iconmorph: 1, isocard: 1, ticker: 1, collage: 1, stack: 1, chat: 1, scatter: 2, flip: 2, split: 1, card: 1, counter: 1, notify: 1, orbit: 1, phone: 1, brand: 1, wheel: 1, pills: 1, grid: 1, flow: 1, stat: 1, type: 2, hero: 2, zoomword: 3, kinetic: 3 };
   let last = '';
   const ok = (shot, b) => VALID[shot] && VALID[shot](b) && (used[shot] || 0) < (LIMIT[shot] || 9);
   const take = (shot) => { used[shot] = (used[shot] || 0) + 1; last = shot; return shot; };

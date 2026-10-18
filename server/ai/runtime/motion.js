@@ -1068,6 +1068,186 @@
     sfx(b.in, 'whoosh', 0.45);
   };
 
+  // ------------------------------------------------------------------ reference looks (v4.1)
+  // Studied from top TikTok motion-design ads: Apple-style light ads, dark glowing tech launches, bold "studio" pieces.
+  const cssVar = (k) => getComputedStyle(document.documentElement).getPropertyValue(k).trim();
+  let csCount = 0;
+
+  // A horizontal light flare streaks out from the centre and reveals the line (Huel / QikBIM style).
+  SHOTS.flare = (b, bi) => {
+    const box = el('div', 'fitbox col center fl', bi);
+    const row = el('div', 'fl-row', box);
+    const t = el('div', 'fl-t', row, esc(b.text)); t.style.fontSize = FS(sizeRaw(b.text, 2200, 60, 130));
+    const streak = el('i', 'fl-streak', row), core = el('i', 'fl-core', row);
+    gsap.set(core, { xPercent: -50, yPercent: -50 });
+    tl.fromTo(core, { scale: 0, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.25, ease: 'power2.out', immediateRender: true }, b.in);
+    tl.fromTo(streak, { scaleX: 0, opacity: 1 }, { scaleX: 1, duration: 0.6 / SP, ease: 'expo.out', immediateRender: true }, b.in + 0.05);
+    tl.fromTo(t, { clipPath: 'inset(0% 50% 0% 50%)', filter: 'blur(' + N(10) + 'px)' }, { clipPath: 'inset(0% 0% 0% 0%)', filter: 'blur(0px)', duration: 0.7 / SP, ease: 'expo.out', immediateRender: true }, b.in + 0.15);
+    tl.to(core, { opacity: 0, scale: 1.6, duration: 0.5, ease: 'power2.in' }, b.in + 0.55);
+    tl.to(streak, { scaleX: 0.35, opacity: 0.4, y: '0.62em', duration: 0.8, ease: 'expo.inOut' }, b.in + 0.7);
+    if (b.sub) { const s2 = el('div', 'tx-sub', box, esc(b.sub)); s2.style.fontSize = FS(40); tl.from(s2, Object.assign(focusFrom(16), { duration: 0.6 }), b.in + 0.8); }
+    sfx(b.in, 'swish', 0.5); sfx(b.in + 0.2, 'chime', 0.35);
+    idle(bi, b, 0.04);
+  };
+
+  // Words wrapped round a rotating 3D cylinder, two rows turning opposite ways (Hyperframes style).
+  SHOTS.ring3d = (b, bi) => {
+    const wrap = el('div', 'rg3-wrap', bi);
+    const R = N(WIDE ? 560 : 440), fs = N(WIDE ? 112 : 92);
+    const first = (b.items && b.items.length ? b.items.map((i) => i.text).join(' + ') : String(b.word || DATA.brand || b.text)).toUpperCase();
+    const rows = [first, String(b.sub || b.text)].map((txt, r) => {
+      const ring = el('div', 'rg3-ring' + (r ? ' b' : ''), wrap);
+      ring.style.top = ((r - 0.5) * fs * 1.7) + 'px';
+      const unit = txt + '  •  ', adv = fs * 0.6, need = 2 * Math.PI * R;
+      let str2 = unit; while (str2.length * adv < need) str2 += unit;
+      const chars = Array.from(str2), step = 360 / chars.length;
+      const els = chars.map((c, i) => { const e = el('span', 'rg3-c', ring, c === ' ' ? '&nbsp;' : esc(c)); e.style.fontSize = fs + 'px'; return { e, a: i * step }; });
+      return { els, dir: r ? 1 : -1 };
+    });
+    const p = { r: 0, f: 0 };
+    const upd = () => rows.forEach(({ els, dir }) => els.forEach(({ e, a }) => {
+      const ang = a + p.r * dir, c = Math.cos(ang * Math.PI / 180);
+      e.style.transform = 'translate(-50%,-50%) rotateY(' + ang.toFixed(2) + 'deg) translateZ(' + R.toFixed(0) + 'px)';
+      e.style.opacity = ((c > 0 ? 0.25 + 0.75 * c : 0.1 * (1 + c)) * p.f).toFixed(3);   // the back of the ring stays faint
+    }));
+    upd();
+    const L = Math.max(0.5, b.t1 - b.t0);
+    tl.fromTo(p, { r: -30 }, { r: 70, duration: L, ease: 'none', onUpdate: upd, immediateRender: false }, b.t0);
+    tl.fromTo(p, { f: 0 }, { f: 1, duration: 0.6, ease: 'power2.out', onUpdate: upd, immediateRender: false }, b.in);
+    tl.fromTo(wrap, { rotationX: 28, rotationZ: -8, scale: 0.7 }, { rotationX: 14, rotationZ: -4, scale: 1, duration: 1.0 / SP, ease: 'expo.out', immediateRender: true }, b.in);
+    sfx(b.in, 'whoosh', 0.45);
+  };
+
+  // A field of option chips; the camera pushes in on the one that matters (Raycast style).
+  SHOTS.chipfield = (b, bi) => {
+    const cols = WIDE ? 5 : 3, rows = WIDE ? 5 : 7, n = cols * rows, mid = Math.floor(rows / 2) * cols + Math.floor(cols / 2);
+    const pool = (b.items || []).length ? b.items : [{ text: b.sub || 'Ask' }, { text: DATA.brand || 'Open' }];
+    const field = el('div', 'cf-field', bi);
+    field.style.gridTemplateColumns = 'repeat(' + cols + ', auto)';
+    const chips = [];
+    for (let k = 0; k < n; k++) {
+      const it = k === mid ? { text: b.text, icon: b.icon } : pool[(k + (k > mid ? 1 : 0)) % pool.length];
+      const c = el('div', 'cf-chip' + (k === mid ? ' hot' : ''), field, icon(it.icon || 'sparkle') + '<span>' + esc(it.text || it.name || '') + '</span>');
+      c.style.fontSize = N(WIDE ? 30 : 34) + 'px';
+      chips.push({ c, d: Math.hypot((k % cols) - (mid % cols), Math.floor(k / cols) - Math.floor(mid / cols)) });
+    }
+    gsap.set(field, { xPercent: -50, yPercent: -50 });
+    const hot = chips[mid].c, others = chips.filter((x, k) => k !== mid).map((x) => x.c);
+    tl.fromTo(chips.map((x) => x.c), { opacity: 0, scale: 0.7 }, { opacity: 1, scale: 1, duration: 0.5, ease: 'back.out(1.6)', stagger: (i) => chips[i].d * 0.06, immediateRender: true }, b.in);
+    tl.fromTo(field, { scale: 0.82, rotationX: 22 }, { scale: 1, rotationX: 10, duration: 0.9, ease: 'expo.out', immediateRender: true }, b.in);
+    const push = b.in + Math.min(1.0, (b.t1 - b.in) * 0.35);
+    tl.to(field, { scale: WIDE ? 1.9 : 1.7, rotationX: 0, duration: Math.max(0.5, b.t1 - push - 0.15), ease: 'power2.inOut' }, push);
+    tl.to(others, { opacity: 0.22, duration: 0.6 }, push);
+    tl.fromTo(hot, { boxShadow: '0 0 0 0 transparent' }, { boxShadow: '0 0 ' + N(60) + 'px ' + N(8) + 'px color-mix(in srgb, var(--primary) 55%, transparent)', duration: 0.6, immediateRender: false }, push + 0.2);
+    sfx(b.in, 'swish', 0.4); sfx(push + 0.25, 'pop', 0.55);
+  };
+
+  // Two words pushed to the ends of a thin line drawing outward ("tells a ———— story", Apple style).
+  SHOTS.rule = (b, bi) => {
+    let a = '', c = '';
+    if (String(b.text).includes('|')) [a, c] = String(b.text).split('|').map((x) => x.trim());
+    else if (b.sub) { a = b.text; c = b.sub; }
+    else { const w = String(b.text).split(/\s+/); const h = Math.ceil(w.length / 2); a = w.slice(0, h).join(' '); c = w.slice(h).join(' '); }
+    const box = el('div', 'fitbox rl', bi); box.style.width = (WIDE ? W * 0.72 : W * 0.84) + 'px';
+    const lw = el('span', 'rl-w', box, esc(a)), line = el('i', 'rl-line', box), rw = el('span', 'rl-w', box, esc(c));
+    [lw, rw].forEach((x) => { x.style.fontSize = FS(WIDE ? 62 : 58); });
+    tl.from(lw, Object.assign(focusFrom(0), { x: N(140), duration: 0.8 / SP, ease: 'expo.out' }), b.in);
+    tl.fromTo(line, { scaleX: 0 }, { scaleX: 1, duration: 0.9 / SP, ease: 'expo.inOut', immediateRender: true }, b.in + 0.25);
+    tl.from(rw, Object.assign(focusFrom(0), { x: -N(140), duration: 0.8 / SP, ease: 'expo.out' }), b.in + 0.55);
+    sfx(b.in + 0.25, 'swish', 0.35);
+  };
+
+  // The product glowing: soft halo, slow light rays, the photo floating (Huel bottle style).
+  SHOTS.glowproduct = (b, bi) => {
+    const box = el('div', 'fitbox gp-wrap' + (WIDE ? ' row' : ''), bi);
+    const st2 = el('div', 'gp-stage', box); const sw = N(WIDE ? 560 : 620); st2.style.width = st2.style.height = sw + 'px';
+    const halo = el('i', 'gp-halo', st2), rays = el('i', 'gp-rays', st2);
+    const ratio = Math.max(0.6, Math.min(1.6, b.imgRatio || 1));
+    const ph = el('div', 'gp-img' + (b.cutout ? ' cut' : ''), st2, '<img src="' + esc(b.img) + '" crossorigin="anonymous" alt="">');
+    const ih = sw * (ratio >= 1 ? 0.78 : 0.62 * ratio + 0.1), iw = ih / ratio;
+    ph.style.width = iw + 'px'; ph.style.height = ih + 'px';
+    const txt = el('div', 'col' + (WIDE ? '' : ' center') + ' gp-text', box);
+    if (b.text) { const t = el('div', 'tx-line', txt, wordsHtml(b.text, null, false)); t.style.fontSize = FS(sizeFor(b.text, 2000, 58, 120)); textEnter(t, b.in + 0.6, textInOr('focus')); }
+    if (b.price != null) { const o = odometer(txt, b.price, '₦', b.in + 0.9, 'chip'); o.style.fontSize = FS(76); }
+    else if (b.sub) { const s2 = el('div', 'tx-sub', txt, esc(b.sub)); s2.style.fontSize = FS(40); tl.from(s2, Object.assign(focusFrom(16), { duration: 0.6 }), b.in + 0.9); }
+    const L = Math.max(0.5, b.t1 - b.t0);
+    tl.fromTo(halo, { scale: 0.3, opacity: 0 }, { scale: 1, opacity: 1, duration: 1.0, ease: 'expo.out', immediateRender: true }, b.in);
+    tl.fromTo(rays, { rotation: -10, opacity: 0 }, { rotation: 30, opacity: 0.7, duration: L, ease: 'none', immediateRender: true }, b.t0);
+    tl.fromTo(ph, { y: N(90), scale: 0.82, opacity: 0, filter: 'blur(' + N(14) + 'px)' }, { y: 0, scale: 1, opacity: 1, filter: 'blur(0px)', duration: 0.9 / SP, ease: 'expo.out', immediateRender: true }, b.in + 0.1);
+    floaty(ph, b, 16, 2);
+    sfx(b.in, 'whoosh-low', 0.4); sfx(b.in + 0.35, 'chime', 0.4);
+  };
+
+  // A bold full-screen colour slide: big headline, italic line under it, an image card tilting in (Hyperframes style).
+  SHOTS.colorslide = (b, bi) => {
+    const k = csCount++ % 3;
+    const panel = el('div', 'cs-panel c' + k, bi);
+    const box = el('div', 'fitbox cs-box' + (WIDE ? ' row' : ''), panel);
+    const txt = el('div', 'cs-text', box);
+    const h = el('div', 'cs-h', txt, wordsHtml(b.text, -1));
+    const longest = Math.max(3, ...String(b.text).split(/\s+/).map((w) => w.length)), boxW = (WIDE ? W * 0.44 : W * 0.84) / U;
+    h.style.fontSize = FS(Math.min(b.img ? 140 : 180, sizeRaw(b.text, b.img ? 2000 : 2600, 70, 200), boxW / (longest * 0.8)));   // heavy capitals: a whole word must fit one line
+    if (b.sub) { const s2 = el('div', 'cs-sub', txt, esc(b.sub)); s2.style.fontSize = FS(52); tl.from(s2, { opacity: 0, x: -N(30), duration: 0.5 }, b.in + 0.55); }
+    let card = null;
+    if (b.img) { card = el('div', 'cs-card', box, '<img src="' + esc(b.img) + '" crossorigin="anonymous" alt="">'); const cw = N(WIDE ? 520 : 560); card.style.width = cw + 'px'; card.style.height = cw * Math.max(0.65, Math.min(1.3, b.imgRatio || 1)) + 'px'; }
+    tl.fromTo(panel, { clipPath: 'inset(100% 0% 0% 0%)' }, { clipPath: 'inset(0% 0% 0% 0%)', duration: 0.45 / SP, ease: 'expo.inOut', immediateRender: true }, b.t0);
+    textEnter(h, b.in + 0.2, textInOr('rise'));
+    if (card) { tl.fromTo(card, { rotationY: -40, rotationZ: 6, x: N(220), opacity: 0 }, { rotationY: -12, rotationZ: 2, x: 0, opacity: 1, duration: 0.9 / SP, ease: 'expo.out', immediateRender: true }, b.in + 0.35); floaty(card, b, 10, 1); }
+    sfx(b.t0 + 0.05, 'whoosh', 0.5);
+    idle(box, b, 0.04);
+  };
+
+  // Photos as phone-shaped cards fanning out in 3D from one stack ("3 colours" iPhone style).
+  SHOTS.fan = (b, bi) => {
+    let imgs = (b.imgs || []).slice(0, 5); while (imgs.length && imgs.length < 3) imgs = imgs.concat(imgs).slice(0, 3);
+    const box = el('div', 'fitbox col center fan-wrap', bi);
+    if (b.text) { const t = el('div', 'sent-line small', box, wordsHtml(b.text, null, false)); t.style.fontSize = FS(sizeRaw(b.text, 1500, 48, 86)); textEnter(t, b.in + 0.5, textInOr('focus')); }
+    const cw = N(WIDE ? 280 : 300), ch = cw * 2;
+    const deck = el('div', 'fan-deck', box); deck.style.width = cw * (1 + (imgs.length - 1) * 0.8) + 'px'; deck.style.height = ch + 'px';
+    const mid = (imgs.length - 1) / 2;
+    const cards = imgs.map((u, k) => { const c = el('div', 'fan-c', deck, '<img src="' + esc(u) + '" crossorigin="anonymous" alt="">'); c.style.width = cw + 'px'; c.style.height = ch + 'px'; c.style.marginLeft = -cw / 2 + 'px'; return c; });
+    cards.forEach((c, k) => {
+      const o = k - mid;
+      tl.fromTo(c, { x: 0, y: N(260), z: 0, rotationY: 0, rotationZ: 0, rotationX: 30, opacity: 0 },
+        { x: o * cw * 0.8, y: 0, z: -Math.abs(o) * N(140), rotationY: -o * 20, rotationZ: o * 3, rotationX: 0, opacity: 1, duration: 1.0 / SP, ease: 'expo.out', immediateRender: true }, b.in + Math.abs(o) * 0.07);
+    });
+    tl.fromTo(deck, { rotationY: -8 }, { rotationY: 8, duration: Math.max(0.5, b.t1 - b.in), ease: 'sine.inOut', immediateRender: false }, b.in);
+    sfx(b.in, 'whoosh', 0.5);
+  };
+
+  // A rotating 3D sphere of glowing dots beside the line (drawn on a canvas, so it stays cheap to render).
+  SHOTS.dotsphere = (b, bi) => {
+    const box = el('div', 'fitbox ds-wrap' + (WIDE ? ' row' : ''), bi);
+    const txt = el('div', 'col' + (WIDE ? '' : ' center') + ' ds-text', box);
+    const t = el('div', 'tx-line', txt, wordsHtml(b.text, null, TH.accentStyle === 'marker')); t.style.fontSize = FS(sizeFor(b.text, 2000, 60, 130));
+    if (b.sub) { const s2 = el('div', 'tx-sub', txt, esc(b.sub)); s2.style.fontSize = FS(40); tl.from(s2, Object.assign(focusFrom(16), { duration: 0.5 }), b.in + 0.7); }
+    const size = Math.round(N(WIDE ? 560 : 620)), cv = el('canvas', 'ds-cv', box);
+    cv.width = cv.height = size; cv.style.width = cv.style.height = size + 'px';
+    const g = cv.getContext('2d'), P = [], NP = 700, c1 = cssVar('--primary') || '#7c5cff', c2 = cssVar('--secondary') || '#ffffff';
+    for (let i = 0; i < NP; i++) { const y = 1 - (i / (NP - 1)) * 2, r = Math.sqrt(1 - y * y), th = i * 2.39996; P.push([Math.cos(th) * r, y, Math.sin(th) * r]); }
+    const p = { r: 0, s: 0, e: 0 };
+    const draw = () => {
+      g.clearRect(0, 0, size, size);
+      const cr = Math.cos(p.r), sr = Math.sin(p.r), tilt = 0.35, ct = Math.cos(tilt), st3 = Math.sin(tilt), Rr = size * 0.4 * p.s;
+      for (let i = 0; i < NP; i++) {
+        let [x, y, z] = P[i];
+        const x1 = x * cr + z * sr, z1 = -x * sr + z * cr;
+        const y2 = y * ct - z1 * st3, z2 = y * st3 + z1 * ct;
+        const k = 1 + p.e * (0.5 + (i % 7) * 0.12), d = (z2 + 1.4) / 2.4;
+        g.globalAlpha = Math.max(0.18, Math.min(1, d * 1.15)) * (1 - p.e * 0.8);
+        g.fillStyle = i % 3 ? c1 : c2;
+        g.beginPath(); g.arc(size / 2 + x1 * Rr * k, size / 2 + y2 * Rr * k, Math.max(1, N(5.2) * (0.45 + d * 0.7)), 0, 6.283); g.fill();
+      }
+      g.globalAlpha = 1;
+    };
+    draw();
+    const L = Math.max(0.5, b.t1 - b.t0);
+    tl.fromTo(p, { r: 0 }, { r: 2.4, duration: L, ease: 'none', onUpdate: draw, immediateRender: false }, b.t0);
+    tl.fromTo(p, { s: 0 }, { s: 1, duration: 1.0 / SP, ease: 'expo.out', onUpdate: draw, immediateRender: false }, b.in);
+    textEnter(t, b.in + 0.3, textInOr('rise'));
+    sfx(b.in, 'whoosh-low', 0.45); sfx(b.in + 0.4, 'chime', 0.3);
+  };
+
   // ------------------------------------------------------------------ transitions between beats
   // Every cut: the outgoing beat LEAVES during [T-d, T], the incoming beat ARRIVES during [T, T+d2].
   function exitBeat(bt, type, T, d) {
@@ -1309,12 +1489,45 @@
       '.fx-circ{position:absolute;border-radius:50%;visibility:hidden} .fx-circ.c1{background:var(--primary)} .fx-circ.c2{background:var(--secondary)}',
       '.fx-bar{position:absolute;top:0;bottom:0} .fx-bar.c1{background:var(--primary)} .fx-bar.c2{background:color-mix(in srgb,var(--primary) 70%,var(--bg))}',
       '.fx-gl{position:absolute;left:-10%;right:-10%;visibility:hidden} .fx-gl.c0{background:var(--primary)} .fx-gl.c1{background:var(--secondary)} .fx-gl.c2{background:var(--text)}',
+      '.fl{position:relative} .fl-row{position:relative;display:inline-block} .fl-t{' + type + 'white-space:nowrap;line-height:1.1;letter-spacing:-.01em;text-shadow:0 0 ' + n(24) + ' color-mix(in srgb,var(--primary) 55%,transparent)}',
+      '.fl-streak{position:absolute;left:-45%;right:-45%;top:50%;height:' + n(5) + ';margin-top:' + n(-2.5) + ';border-radius:50%;background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--primary) 70%,#fff) 30%,#fff 50%,color-mix(in srgb,var(--primary) 70%,#fff) 70%,transparent);box-shadow:0 0 ' + n(24) + ' color-mix(in srgb,var(--primary) 70%,transparent)}',
+      '.fl-core{position:absolute;left:50%;top:50%;width:' + n(320) + ';height:' + n(90) + ';border-radius:50%;background:radial-gradient(closest-side,#fff,color-mix(in srgb,var(--primary) 60%,transparent) 45%,transparent);mix-blend-mode:screen}',
+      '.rg3-wrap{position:absolute;left:50%;top:50%;width:0;height:0;transform-style:preserve-3d} .rg3-ring{position:absolute;left:0;transform-style:preserve-3d}',
+      '.rg3-c{position:absolute;left:0;top:0;' + type + 'line-height:1;color:var(--text);white-space:pre} .rg3-ring.b .rg3-c{color:var(--primary);font-style:italic;font-weight:600}',
+      '.cf-field{position:absolute;left:50%;top:50%;display:grid;gap:' + n(26) + ' ' + n(30) + ';transform-style:preserve-3d}',
+      '.cf-chip{display:flex;align-items:center;gap:.5em;white-space:nowrap;padding:.62em 1em;border-radius:999px;background:color-mix(in srgb,var(--text) 7%,transparent);border:' + n(2) + ' solid color-mix(in srgb,var(--text) 10%,transparent);color:color-mix(in srgb,var(--text) 70%,transparent);font-weight:600}',
+      '.cf-chip .ic{width:1.1em;height:1.1em;color:var(--primary)} .cf-chip.hot{background:var(--primary);color:var(--on-primary);border-color:transparent} .cf-chip.hot .ic{color:var(--on-primary)}',
+      '.rl{display:flex;align-items:center;justify-content:space-between} .rl-w{' + type + 'white-space:nowrap;letter-spacing:-.01em;flex:none}',
+      '.rl-line{flex:1;height:' + n(3) + ';margin:0 ' + n(30) + ';background:color-mix(in srgb,var(--text) 45%,transparent);transform-origin:50% 50%}',
+      '.gp-wrap{display:flex;flex-direction:column;align-items:center} .gp-wrap>*+*{margin-top:' + n(40) + '} .gp-wrap.row{flex-direction:row} .gp-wrap.row>*+*{margin-top:0;margin-left:' + n(70) + '}',
+      '.gp-stage{position:relative;flex:none;display:flex;align-items:center;justify-content:center}',
+      '.gp-halo{position:absolute;inset:-25%;border-radius:50%;background:radial-gradient(closest-side,color-mix(in srgb,#fff 70%,var(--primary)),color-mix(in srgb,var(--primary) 45%,transparent) 40%,transparent 72%);mix-blend-mode:screen}',
+      '.gp-rays{position:absolute;inset:-40%;border-radius:50%;background:repeating-conic-gradient(from 0deg,color-mix(in srgb,var(--primary) 30%,transparent) 0deg 4deg,transparent 4deg 18deg);-webkit-mask:radial-gradient(closest-side,#000 20%,transparent 70%);mask:radial-gradient(closest-side,#000 20%,transparent 70%)}',
+      '.gp-img{position:relative;border-radius:' + n(28) + ';overflow:hidden;box-shadow:0 ' + n(40) + ' ' + n(90) + ' ' + n(-20) + ' rgba(0,0,0,.6)} .gp-img img{width:100%;height:100%;object-fit:cover;display:block}',
+      '.gp-img.cut{border-radius:0;overflow:visible;box-shadow:none} .gp-img.cut img{object-fit:contain;filter:drop-shadow(0 ' + n(30) + ' ' + n(40) + ' rgba(0,0,0,.5))}',
+      '.gp-text{max-width:' + (WIDE ? W * 0.38 : W * 0.86).toFixed(0) + 'px} .gp-text>*+*{margin-top:' + n(24) + '} .gp-text>.odo{align-self:flex-start} .gp-text.center>.odo{align-self:center}',
+      '.cs-panel{position:absolute;inset:0;display:flex;align-items:center;justify-content:center} .cs-panel.c0{background:var(--primary);color:var(--on-primary)} .cs-panel.c1{background:var(--secondary);color:var(--on-secondary)} .cs-panel.c2{background:var(--text);color:var(--bg)}',
+      '.cs-box{display:flex;flex-direction:column;align-items:flex-start} .cs-box>*+*{margin-top:' + n(60) + '} .cs-box.row{flex-direction:row;align-items:center} .cs-box.row>*+*{margin-top:0;margin-left:' + n(80) + '}',
+      '.cs-h .wd{white-space:nowrap} .cs-text{max-width:' + (WIDE ? W * 0.44 : W * 0.84).toFixed(0) + 'px} .cs-h{font-weight:' + HW + ';text-transform:uppercase;line-height:.95;letter-spacing:-.03em}',
+      '.cs-sub{margin-top:' + n(18) + ';font-family:Georgia,"Playfair Display",serif;font-style:italic;opacity:.85}',
+      '.cs-card{border-radius:' + n(30) + ';overflow:hidden;box-shadow:0 ' + n(40) + ' ' + n(80) + ' ' + n(-20) + ' rgba(0,0,0,.45);flex:none} .cs-card img{width:100%;height:100%;object-fit:cover;display:block}',
+      '.fan-deck{position:relative;transform-style:preserve-3d} .fan-c{position:absolute;left:50%;top:0;border-radius:' + n(48) + ';overflow:hidden;border:' + n(9) + ' solid #0d0d10;box-shadow:0 ' + n(40) + ' ' + n(80) + ' ' + n(-24) + ' rgba(0,0,0,.55);background:#0d0d10}',
+      '.fan-c img{width:100%;height:100%;object-fit:cover;display:block;border-radius:' + n(38) + '}',
+      '.ds-wrap{display:flex;flex-direction:column-reverse;align-items:center} .ds-wrap>*+*{margin-bottom:' + n(30) + '} .ds-wrap.row{flex-direction:row} .ds-wrap.row>*+*{margin-bottom:0;margin-left:' + n(60) + '}',
+      '.ds-cv{flex:none} .ds-text{max-width:' + (WIDE ? W * 0.4 : W * 0.86).toFixed(0) + 'px} .ds-text>*+*{margin-top:' + n(22) + '}',
+      '.glowlook .tx-line,.glowlook .sent-line,.glowlook .flip-c,.glowlook .rv-t,.glowlook .slam-main,.glowlook .im-title,.glowlook .tk-on,.glowlook .lk-text .tx-line{text-shadow:0 0 ' + n(14) + ' color-mix(in srgb,var(--primary) 60%,transparent),0 0 ' + n(46) + ' color-mix(in srgb,var(--primary) 40%,transparent)}',
+      '.glowlook .acc .wi,.glowlook .sw.acc{text-shadow:0 0 ' + n(10) + ' var(--primary),0 0 ' + n(40) + ' var(--primary)}',
+      '.glowlook .flow-card,.glowlook .tile,.glowlook .ui-card,.glowlook .im-box,.glowlook .wg{box-shadow:0 0 0 ' + n(2) + ' color-mix(in srgb,var(--primary) 35%,transparent),0 0 ' + n(50) + ' color-mix(in srgb,var(--primary) 25%,transparent)}',
+      '.halolook .sw.acc,.halolook .wd.acc,.halolook .flip-c.acc{position:relative;isolation:isolate}',
+      '.halolook .sw.acc::before,.halolook .wd.acc::before,.halolook .flip-c.acc::before{content:"";position:absolute;left:-.5em;right:-.5em;top:-.45em;bottom:-.45em;z-index:-1;border-radius:50%;background:radial-gradient(closest-side,color-mix(in srgb,var(--primary) 32%,transparent),transparent)}',
       '.fin-grain{position:absolute;inset:0;z-index:70;pointer-events:none;mix-blend-mode:overlay}',
       '.fin-vig{position:absolute;inset:0;z-index:69;pointer-events:none}',
       '.fin-leak{position:absolute;inset:-25%;z-index:68;pointer-events:none;mix-blend-mode:screen;visibility:hidden;background:radial-gradient(ellipse 45% 40% at 22% 30%,rgba(255,170,90,.75),rgba(255,90,60,.25) 45%,transparent 70%)}',
       '.fin-leak.b{background:radial-gradient(ellipse 45% 40% at 78% 70%,rgba(255,200,120,.7),rgba(255,120,80,.22) 45%,transparent 70%)}',
     ].join('\n');
     const st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
+    if (TH.glow) stage.classList.add('glowlook');
+    if (TH.halo) stage.classList.add('halolook');
   }
   // Film finish: fine moving grain and a soft vignette over everything (look.finish 0 = off, 1 = normal).
   function finish() {

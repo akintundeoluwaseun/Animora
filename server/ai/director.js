@@ -21,6 +21,14 @@ export const SHOTS = {
   tunnel: { f: 'text (the line it lands on), imgs (2-6 asset names) or items (2-6 short words)', d: 'PREMIUM 3D: the camera flies through a 3D corridor of photos or words and lands on the line. Great opener or product showcase.' },
   parallax: { f: 'img (asset name), text, sub? or price?', d: 'PREMIUM 3D: the photo as a glossy card turning in 3D over a blurred copy of itself, shapes floating at other depths. Best way to show a product photo.' },
   marquee3d: { f: 'text, sub?, word? (word repeated on the wall; default the brand)', d: 'PREMIUM 3D: a tilted 3D wall of the brand name scrolls behind the main line.' },
+  flare: { f: 'text (max 34 chars), sub?', d: 'PREMIUM GLOW: a horizontal light flare streaks out from the centre and reveals the line, then settles under it as a glowing rule.' },
+  glowproduct: { f: 'img (asset name, best a product photo), text?, sub? or price?', d: 'PREMIUM GLOW: the product floats in a soft glowing halo with slow light rays; text beside it.' },
+  chipfield: { f: 'text (the chosen option, max 24 chars), items (4-10 other options), icon?', d: 'PREMIUM UI: a field of option chips; the camera pushes in on the chosen one, which lights up.' },
+  rule: { f: 'text ("left words | right words")', d: 'APPLE: two words pushed to the two ends of a thin line that draws outward ("tells a ———— story").' },
+  fan: { f: 'imgs (2-5 asset names), text?', d: 'APPLE: photos as phone-shaped cards fanning out in 3D from one stack.' },
+  ring3d: { f: 'text (row 2), items? (row 1 words) or word?', d: 'STUDIO 3D: words wrapped round a rotating 3D cylinder, two rows turning opposite ways.' },
+  colorslide: { f: 'text (max 40), sub?, img?', d: 'STUDIO: the whole screen floods with a bold colour; big uppercase headline, italic line under it, an image card tilting in.' },
+  dotsphere: { f: 'text, sub?', d: 'STUDIO 3D: a rotating sphere of glowing dots beside the line (AI / tech / future topics).' },
   logo: { f: 'text?, sub?', d: 'the business LOGO big in the centre, rings pulse out, name rises below. Needs an uploaded logo. Follow it with cut "dive" to zoom the camera INTO the logo.' },
   sentence: { f: 'text, sub?', d: 'premium: a short sentence builds word by word, the last word in the accent colour (letters drop in).' },
   flip: { f: 'text (2-6 words)', d: 'words replace each other one at a time in the centre ("Introducing" / "TechDesk" / "AI").' },
@@ -67,6 +75,9 @@ export const PRESETS = {
   editorial: { d: 'calm and elegant, one strong line at a time, lots of space', shots: ['reveal', 'sentence', 'flip', 'parallax', 'ticker', 'iconmorph'], cuts: ['focus', 'iris', 'line', 'cube'], look: { textIn: 'focus', energy: 1, drift: 0.4, finish: 0.7, leaks: 0.6, chroma: 0, ambient: ['frame'] } },
   hype: { d: 'loud pop energy for promos, sales and launches', shots: ['slam', 'poster', 'marquee3d', 'counter', 'parallax', 'zoomword', 'pills'], cuts: ['cover', 'glitch', 'whip', 'shutter', 'flash'], look: { textIn: 'chars', energy: 3, finish: 0.6, chroma: 1, leaks: 0, ambient: ['rays', 'particles'] } },
   luxury: { d: 'luxury: slow, golden, glossy 3D product shots', shots: ['reveal', 'parallax', 'sentence', 'tunnel', 'logo', 'isocard'], cuts: ['focus', 'cube', 'iris', 'line'], look: { textIn: 'focus', energy: 1, drift: 0.5, finish: 1, leaks: 1, chroma: 0, ambient: ['glow', 'sparkles'] } },
+  apple: { d: 'Apple ad style: calm, small clean type that builds word by word with a soft glow on the key word, widgets that open into cards, phones fanning, rule lines (best on light styles)', shots: ['sentence', 'rule', 'iconmorph', 'widgets', 'fan', 'flip', 'collage', 'reveal', 'stack'], cuts: ['focus', 'morph', 'iris'], look: { textIn: 'focus', energy: 1, halo: 1, drift: 0.3, finish: 0.4, leaks: 0, chroma: 0, ambient: [] } },
+  glow: { d: 'dark premium launch: glowing luminous text, light flares, glowing product shots, glass cards joined by light lines (best on dark styles)', shots: ['flare', 'glowproduct', 'ticker', 'flow', 'chipfield', 'sentence', 'reveal', 'logo'], cuts: ['focus', 'zoom', 'morph', 'dive'], look: { textIn: 'focus', energy: 1, glow: 1, drift: 0.3, finish: 0.8, leaks: 0, chroma: 0, ambient: ['glow'] } },
+  studio: { d: 'bold studio piece: full-screen colour slides, a rotating 3D word ring, a particle sphere, glitch cuts', shots: ['ring3d', 'colorslide', 'dotsphere', 'poster', 'slam', 'marquee3d'], cuts: ['glitch', 'cover', 'shutter', 'whip'], look: { textIn: 'chars', energy: 3, chroma: 0.8, finish: 0.7, leaks: 0, ambient: ['grid'] } },
   tech: { d: 'tech / app: UI pieces, 3D depth, glitch cuts', shots: ['iconmorph', 'widgets', 'tunnel', 'poster', 'notify', 'chat', 'reveal'], cuts: ['glitch', 'cube', 'morph', 'whip'], look: { textIn: 'chars', energy: 2, finish: 0.7, chroma: 0.7, leaks: 0, ambient: ['grid', 'dots'] } },
 };
 
@@ -95,7 +106,7 @@ export function sanitizeLook(look) {
   const d = Number(look.drift); if (d >= 0 && d <= 1.5) out.drift = d;
   if (look.sound === 'off') out.sound = 'off';
   if (look.textIn === 'chars') out.textIn = 'chars';
-  for (const k of ['finish', 'leaks', 'chroma']) { const v = Number(look[k]); if (look[k] != null && v >= 0 && v <= 1.5) out[k] = v; }
+  for (const k of ['finish', 'leaks', 'chroma', 'glow', 'halo']) { const v = Number(look[k]); if (look[k] != null && v >= 0 && v <= 1.5) out[k] = v; }
   const t = Number(look.tempo); if (t >= 80 && t <= 140) out.tempo = Math.round(t);
   const pre = PRESETS[look.preset];
   if (pre) { out.preset = look.preset; for (const [k, v] of Object.entries(pre.look)) if (out[k] == null) out[k] = v; }
@@ -165,7 +176,8 @@ export function sanitizeBeats(raw, { duration, assets = [], plan = {}, calm = fa
     if (shot === 'lockup' && !o.text) o.text = brand;
     if (shot === 'brand' && !o.text) o.text = brand;
     if (shot === 'poster' && !o.text && o.lines?.length) o.text = o.lines.join(' ');
-    if (shot === 'parallax' && !o.img) { const a = images.find((x) => x.role !== 'logo'); if (a) { o.img = a.url; o.imgRatio = a.width && a.height ? a.height / a.width : 1; } }
+    if (o.img) { const a2 = images.find((x) => x.url === o.img); if (a2 && (a2.transparent || a2.has_alpha)) o.cutout = true; }
+    if ((shot === 'parallax' || shot === 'glowproduct') && !o.img) { const a = images.find((x) => x.role !== 'logo'); if (a) { o.img = a.url; o.imgRatio = a.width && a.height ? a.height / a.width : 1; } }
     o.hasLogo = !!logo;
     for (const k of Object.keys(o)) if (o[k] === '' || (Array.isArray(o[k]) && !o[k].length && k !== 'subs')) delete o[k];
     if (!o.subs) o.subs = [];
@@ -255,7 +267,8 @@ DIRECTION RULES
   * Contrast scale: follow a giant-type beat (slam / poster / zoomword) with a calmer detail beat, then a 3D beat (tunnel / parallax / marquee3d / isocard). Never three similar beats in a row.
   * The first beat is the strongest: slam, poster, tunnel, logo+dive or parallax. Short punchy words on screen (1-4 words for slam / poster).
   * Rhythm: beats of 1.5-2.5 s, a few faster ones (about 1 s) right before the reveal of the offer or the brand.
-  * Every uploaded product photo should appear at least once, ideally in parallax or tunnel.
+  * Every uploaded product photo should appear at least once, ideally in parallax, glowproduct, fan or tunnel.
+  * Match the preset to the style: light / white styles suit "apple"; dark styles suit "glow", "cinematic" or "luxury"; loud colourful styles suit "studio", "kinetic" or "hype".
 - Open with a strong hook in the first 2 seconds. End with a "lockup" beat (at least 2.5 s) with the phone/website in "button".
 - Keep on-screen text SHORT (headlines under 7 words, card and button text under 26 characters). Use the business's exact names, prices, phone numbers and addresses; never invent them.
 - TRUTH: never invent people's names, counts, numbers, percentages, reviews, testimonials, awards or claims (no "148 new inquiries", "Hundreds in hours", "from Sarah", "#1 in Lagos", "10,000 happy customers"). Only use numbers and facts that appear in the brief. In chat / notification shots write plain generic messages ("New message", "Can you make my video ad?").
