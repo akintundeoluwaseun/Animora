@@ -11,6 +11,7 @@ import DownloadVideo from '../components/DownloadVideo.jsx';
 import FlyerDownload from '../components/FlyerDownload.jsx';
 import BuyCredits from '../components/BuyCredits.jsx';
 import { enablePush } from '../lib/notify.js';
+import { KindBadge } from './Dashboard.jsx';
 
 const SUGGESTIONS = ['Start by zooming into my logo', 'Make the text bigger', 'Use calmer, premium transitions', 'Make the price stand out more'];
 const FLYER_SUGGESTIONS = ['Try a different layout', 'Make the headline shorter', 'Show the prices bigger', 'Use darker colours'];
@@ -264,7 +265,7 @@ export default function Studio() {
     <div className="mx-auto max-w-6xl px-4 py-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
-          <h1 className="truncate text-xl font-extrabold sm:text-2xl">{project.title}</h1>
+          <div className="flex items-center gap-2"><KindBadge kind={project.kind} className="shrink-0" /><h1 className="truncate text-xl font-extrabold sm:text-2xl">{project.title}</h1></div>
           <p className="text-sm text-ink-mute">{flyer ? 'Flyer' : duration(project.durationSeconds)} · {ASPECTS[project.aspectRatio]?.label}</p>
         </div>
         <div className="flex items-center gap-3">

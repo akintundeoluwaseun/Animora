@@ -7,6 +7,7 @@ import { api, ASPECTS, duration, shrinkImage, imageLook } from '../lib.jsx';
 import { Alert, Button, PageLoader, Spinner, Steps } from '../components/ui.jsx';
 import MicButton from '../components/MicButton.jsx';
 import { StylePicker } from './Dashboard.jsx';
+import { KindBadge } from './Dashboard.jsx';
 
 const MAX_PICS = 10;
 
@@ -338,7 +339,7 @@ export default function Plan() {
   return (
     <div className="mx-auto max-w-6xl px-0 sm:px-4 sm:py-5">
       <div className="hidden flex-wrap items-center justify-between gap-3 sm:flex">
-        <h1 className="truncate text-xl font-bold tracking-[-0.03em] sm:text-2xl">{b.name || project.title}</h1>
+        <div className="flex min-w-0 items-center gap-2"><KindBadge kind={project.kind} className="shrink-0" /><h1 className="truncate text-xl font-bold tracking-[-0.03em] sm:text-2xl">{b.name || project.title}</h1></div>
         {project.kind !== 'flyer' && <Steps current="plan" projectId={id} hasPlan={!!project.plan} hasCode={!!project.code} />}
       </div>
 

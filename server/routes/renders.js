@@ -33,6 +33,7 @@ r.post('/projects/:id/renders', async (req, res) => {
   }
   const p = await one('SELECT * FROM projects WHERE id=$1 AND user_id=$2', [req.params.id, req.user.id]);
   if (!p) return res.status(404).json({ error: 'Project not found.' });
+  if (p.kind === 'flyer') return res.status(400).json({ error: 'Flyers are downloaded as pictures. Open your video to make an MP4.' });
   try {
     const render = await createRender(req.user, p, { adViewId: req.body?.adViewId });
     if (config.githubRender && config.serverless) await dispatchRender(render);   // a GitHub Actions run makes the MP4

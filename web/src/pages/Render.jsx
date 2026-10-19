@@ -1,7 +1,7 @@
 import { publicMessage } from '../lib/errors.js';
 // Page 3: watch an ad if needed, render with our engine, then download.
 import { useEffect, useRef, useState } from 'react';
-import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { api, ASPECTS, clock, duration, naira, useAuth, usePolling } from '../lib.jsx';
 import { Alert, Button, Modal, PageLoader, Spinner, Steps } from '../components/ui.jsx';
 import { VideoPhone } from '../components/Preview.jsx';
@@ -134,6 +134,7 @@ async function shareVideo(render, title) {
 
 export default function Render() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const { refresh } = useAuth();
   const [project, setProject] = useState(null);
@@ -155,6 +156,7 @@ export default function Render() {
     (async () => {
       try {
         const [p, c, list] = await Promise.all([api(`/projects/${id}`), api(`/projects/${id}/render-check`), api('/renders')]);
+        if (p.project.kind === 'flyer') { navigate(`/p/${id}/studio`, { replace: true }); return; }   // flyers are downloaded as pictures, never made into an MP4
         setProject(p.project); setCheck(c);
         // the last MP4 of this video, unless the video was edited after it was made (then make a new one)
         const last = list.renders.find((x) => x.projectId === id);

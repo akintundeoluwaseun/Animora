@@ -149,7 +149,20 @@ function statusLabel(p) {
   if (r?.status === 'queued') return { t: 'In the queue', c: 'bg-danfo text-white' };
   if (r?.status === 'done') return { t: 'Video ready', c: 'bg-money text-white' };
   if (r?.status === 'failed') return { t: 'Render failed', c: 'bg-alert text-white' };
-  return { planning: { t: 'Planning', c: 'bg-white text-ink' }, coding: { t: p.kind === 'flyer' ? 'Designing' : 'Making video', c: 'bg-white text-ink' }, ready: { t: 'Ready', c: 'bg-ink text-white' }, rendered: { t: 'Video ready', c: 'bg-money text-white' } }[p.status];
+  return { planning: { t: 'Planning', c: 'bg-white text-ink' }, coding: { t: p.kind === 'flyer' ? 'Designing' : 'Making video', c: 'bg-white text-ink' }, ready: { t: p.kind === 'flyer' ? 'Flyer ready' : 'Ready', c: 'bg-ink text-white' }, rendered: { t: 'Video ready', c: 'bg-money text-white' } }[p.status];
+}
+
+// Video or flyer, at a glance: a play icon for videos, a picture icon for flyers.
+export function KindBadge({ kind, className = '' }) {
+  const flyer = kind === 'flyer';
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-bold ${flyer ? 'bg-[#FFE8A3] text-[#5A4300]' : 'bg-[#DCEBFF] text-[#0B3B80]'} ${className}`}>
+      {flyer
+        ? <svg width="11" height="11" viewBox="0 0 12 12" aria-hidden="true"><rect x="1" y="1" width="10" height="10" rx="2" fill="none" stroke="currentColor" strokeWidth="1.6" /><path d="M2.5 9l2.5-3 2 2 1.5-1.5L10 9" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" /></svg>
+        : <svg width="11" height="11" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 1.8v8.4L10 6z" fill="currentColor" /></svg>}
+      {flyer ? 'Flyer' : 'Video'}
+    </span>
+  );
 }
 
 function nextStep(p) {
@@ -258,6 +271,7 @@ export default function Dashboard() {
                         : <span className="grid size-full place-items-center"><img src="/animora-mark.png" alt="" className="size-10 animate-pulse opacity-60" /></span>}
                     </div>
                     <span className={`absolute left-2.5 top-2.5 rounded-md px-2 py-0.5 text-xs font-semibold ${st.c}`}>{st.t}</span>
+                    <KindBadge kind={p.kind} className="absolute right-2.5 top-2.5" />
                   </div>
                   <p className="mt-3 line-clamp-2 font-semibold leading-snug tracking-[-0.01em]">{p.title}</p>
                 </Link>

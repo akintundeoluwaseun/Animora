@@ -1,12 +1,15 @@
 import { Component, StrictMode, lazy, Suspense } from 'react';
 import { createRoot } from 'react-dom/client';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom';
 import './styles.css';
 import { AuthProvider, useAuth } from './lib.jsx';
 import { Nav, PageLoader } from './components/ui.jsx';
 import Home from './pages/Home.jsx';
 import ExportScreen from './components/ExportScreen.jsx';
 import InstallPrompt from './components/InstallApp.jsx';
+
+function Keyed({ el: Page }) { const { id } = useParams(); return <Page key={id} />; }
+
 
 const Dashboard = lazy(() => import('./pages/Dashboard.jsx'));
 const Styles = lazy(() => import('./pages/Styles.jsx'));
@@ -80,9 +83,10 @@ function App() {
               <Route path="/signup" element={<Navigate to="/videos" replace />} />
               <Route path="/pricing" element={<Pricing />} />
               <Route path="/dashboard" element={<DashboardRedirect />} />
-              <Route path="/p/:id/plan" element={<Private><Plan /></Private>} />
-              <Route path="/p/:id/studio" element={<Private><Studio /></Private>} />
-              <Route path="/p/:id/render" element={<Private><Render /></Private>} />
+              {/* each project gets a fresh page, so a flyer never shows the video's buttons (or the other way round) */}
+              <Route path="/p/:id/plan" element={<Private><Keyed el={Plan} /></Private>} />
+              <Route path="/p/:id/studio" element={<Private><Keyed el={Studio} /></Private>} />
+              <Route path="/p/:id/render" element={<Private><Keyed el={Render} /></Private>} />
               <Route path="/checkout" element={<Private><Checkout /></Private>} />
               <Route path="/creator" element={<Navigate to="/videos" replace />} />
               <Route path="*" element={<NotFound />} />
