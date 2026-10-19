@@ -166,6 +166,75 @@ function CodePanel({ project, onUpdate }) {
   );
 }
 
+// "Adjust": change the size, colours, text size and speed with a tap, instantly, without typing to the AI.
+const SIZES_VIDEO = [['9:16', 'Status / TikTok'], ['1:1', 'Square'], ['4:5', 'Feed post'], ['16:9', 'YouTube']];
+const SIZES_FLYER = [['4:5', 'Feed post'], ['9:16', 'Status / Story'], ['1:1', 'Square'], ['A4', 'Print A4']];
+const COLOR_FIELDS = [['primary', 'Main colour'], ['secondary', 'Second colour'], ['background', 'Background'], ['text', 'Text']];
+function AdjustPanel({ project, onUpdate }) {
+  const flyer = project.kind === 'flyer';
+  const [look, setLook] = useState(null);
+  const [cols, setCols] = useState({});
+  const [busy, setBusy] = useState('');
+  const [msg, setMsg] = useState('');
+  const [err, setErr] = useState('');
+  useEffect(() => { api(`/projects/${project.id}/look`).then((l) => { setLook(l); setCols(l.colors || {}); }).catch(() => setLook({})); }, [project.id, project.code]);
+  const apply = async (key, changes) => {
+    setBusy(key); setErr(''); setMsg('');
+    try { const r = await api(`/projects/${project.id}/adjust`, { method: 'POST', body: changes }); onUpdate(r.project); setMsg(r.summary); }
+    catch (e) { setErr(e.message); } finally { setBusy(''); }
+  };
+  const changedCols = Object.fromEntries(Object.entries(cols).filter(([k, v]) => v && look?.colors?.[k] && v.toLowerCase() !== String(look.colors[k]).toLowerCase()));
+  const chip = (on) => `press rounded-xl border px-3 py-2.5 text-left text-sm ${on ? 'border-ink bg-ink text-white' : 'border-ink/12 bg-white hover:border-ink/30'}`;
+  return (
+    <div className="h-full space-y-6 overflow-y-auto p-4">
+      {msg && <p className="rounded-xl bg-money/10 px-3 py-2 text-sm font-semibold text-ink" role="status">{msg} Undo is under the preview.</p>}
+      {err && <Alert onClose={() => setErr('')}>{err}</Alert>}
+      <div>
+        <h3 className="font-bold">Size</h3>
+        <p className="text-sm text-ink-mute">Same design, new shape. Your words and shots stay.</p>
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          {(flyer ? SIZES_FLYER : SIZES_VIDEO).map(([v, l]) => (
+            <button key={v} type="button" disabled={!!busy || project.aspectRatio === v} onClick={() => apply('size', { aspect: v })} className={chip(project.aspectRatio === v)} aria-pressed={project.aspectRatio === v}>
+              <span className="block font-semibold">{busy === 'size' ? '…' : v}</span><span className="block text-xs opacity-70">{l}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+      <div>
+        <h3 className="font-bold">Colours</h3>
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          {COLOR_FIELDS.map(([k, l]) => (
+            <label key={k} className="flex items-center gap-2 rounded-xl border border-ink/12 bg-white px-2.5 py-2 text-sm">
+              <input type="color" value={cols[k] && /^#[0-9a-f]{6}$/i.test(cols[k]) ? cols[k] : '#000000'} onChange={(e) => setCols((c) => ({ ...c, [k]: e.target.value }))} className="size-8 cursor-pointer rounded-lg border-0 bg-transparent p-0" aria-label={l} />
+              <span>{l}</span>
+            </label>
+          ))}
+        </div>
+        <Button size="sm" className="mt-3" disabled={!Object.keys(changedCols).length || !!busy} loading={busy === 'colors'} onClick={() => apply('colors', { colors: changedCols })}>Apply colours</Button>
+      </div>
+      {!flyer && (
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <h3 className="font-bold">Text size</h3>
+            <div className="mt-2 flex gap-2">
+              <Button variant="outline" size="sm" disabled={!!busy} onClick={() => apply('text', { textScale: 0.88 })}>Smaller</Button>
+              <Button variant="outline" size="sm" disabled={!!busy} onClick={() => apply('text', { textScale: 1.14 })}>Bigger</Button>
+            </div>
+          </div>
+          <div>
+            <h3 className="font-bold">Speed</h3>
+            <div className="mt-2 flex gap-2">
+              <Button variant="outline" size="sm" disabled={!!busy} onClick={() => apply('speed', { speed: 0.85 })}>Slower</Button>
+              <Button variant="outline" size="sm" disabled={!!busy} onClick={() => apply('speed', { speed: 1.18 })}>Faster</Button>
+            </div>
+          </div>
+        </div>
+      )}
+      <p className="text-xs text-ink-mute">For anything else (words, pictures, scenes), use the Edit tab and say it in your own words.</p>
+    </div>
+  );
+}
+
 export default function Studio() {
   const [full, setFull] = useState(false);   // full-screen view of the flyer / video
   const { id } = useParams();
@@ -301,13 +370,14 @@ export default function Studio() {
 
           <section className="flex h-[calc(100vh-12rem)] min-h-[520px] flex-col overflow-hidden surface">
             <div className="segmented m-2" role="tablist">
-              {(flyer ? [['edit', 'Edit']] : [['edit', 'Edit'], ['voice', 'Script'], ['plan', 'Scenes']]).map(([k, l]) => (
+              {(flyer ? [['edit', 'Edit'], ['adjust', 'Adjust']] : [['edit', 'Edit'], ['adjust', 'Adjust'], ['voice', 'Script'], ['plan', 'Scenes']]).map(([k, l]) => (
                 <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)}
                   className="press">{l}</button>
               ))}
             </div>
             <div className="min-h-0 flex-1">
               {tab === 'edit' && <EditPanel project={project} onUpdate={setProject} />}
+              {tab === 'adjust' && <AdjustPanel project={project} onUpdate={setProject} />}
               {tab === 'voice' && <VoicePanel project={project} />}
               {tab === 'plan' && (
                 <div className="h-full overflow-y-auto p-4">

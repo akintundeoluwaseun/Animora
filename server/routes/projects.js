@@ -14,6 +14,7 @@ import { voiceoverFormats, generateVoiceTrack, VOICES, hasOfflineVoice } from '.
 import { config } from '../config.js';
 import { cleanBrief, briefToPlanRules, suggest, autoStyleSlug, parseBrief } from '../ai/brief.js';
 import { makeFlyer, flyerFitNotice } from '../ai/flyer.js';
+import { adjustDesign, aspectOf, currentLook } from '../ai/adjust.js';
 import { useCredit, NEED_CREDITS } from '../billing.js';
 import { describeAssets } from '../ai/describe.js';
 import { loadImage } from '../ai/index.js';
@@ -353,14 +354,35 @@ r.post('/:id/edit', async (req, res) => {
   res.json({ project: shape(u), summary: out.summary, changed: true });
 });
 
+// The editor's Adjust panel: size, colours, text size and speed, changed instantly without the AI.
+r.get('/:id/look', async (req, res) => {
+  const p = await loadProject(req, res); if (!p) return;
+  res.json(p.code_html ? currentLook(p.code_html) : {});
+});
+r.post('/:id/adjust', async (req, res) => {
+  const p = await loadProject(req, res); if (!p) return;
+  if (!p.code_html) return res.status(400).json({ error: 'Make the design first.' });
+  let out;
+  try { out = adjustDesign({ html: p.code_html, plan: p.plan_json || {}, assets: await projectAssets(p.id), changes: req.body || {} }); }
+  catch (e) { return res.status(400).json({ error: e.message }); }
+  const versions = [...(p.code_versions || []), p.code_html].slice(-MAX_VERSIONS);
+  const history = [...(p.edit_history || []), { role: 'model', text: out.summary }];
+  const plan = out.aspect && p.plan_json ? { ...p.plan_json, aspect_ratio: out.aspect } : p.plan_json;
+  const u = await one(`UPDATE projects SET code_html=$2, code_versions=$3, edit_history=$4, aspect_ratio=COALESCE($5, aspect_ratio), plan_json=$6, updated_at=now() WHERE id=$1 RETURNING *`,
+    [p.id, out.html, JSON.stringify(versions), JSON.stringify(history), out.aspect, plan ? JSON.stringify(plan) : null]);
+  thumbnail(p.id, out.html, u.aspect_ratio);
+  res.json({ project: shape(u), summary: out.summary });
+});
+
 r.post('/:id/undo', async (req, res) => {
   const p = await loadProject(req, res); if (!p) return;
   const versions = [...(p.code_versions || [])];
   if (!versions.length) return res.status(400).json({ error: 'Nothing to undo.' });
   const prev = versions.pop();
   const history = [...(p.edit_history || []), { role: 'model', text: '↩︎ Undid the last change.' }];
-  const u = await one(`UPDATE projects SET code_html=$2, code_versions=$3, edit_history=$4, updated_at=now() WHERE id=$1 RETURNING *`,
-    [p.id, prev, JSON.stringify(versions), JSON.stringify(history)]);
+  const size = aspectOf(prev);   // undoing a size change puts the old size back too
+  const u = await one(`UPDATE projects SET code_html=$2, code_versions=$3, edit_history=$4, aspect_ratio=COALESCE($5, aspect_ratio), updated_at=now() WHERE id=$1 RETURNING *`,
+    [p.id, prev, JSON.stringify(versions), JSON.stringify(history), size]);
   res.json({ project: shape(u) });
 });
 
