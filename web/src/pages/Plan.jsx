@@ -97,7 +97,7 @@ const label = (q, v, b, styles) => {
   if (q.id === 'aspect') return ASPECT_OPTS.find((o) => o.v === v)?.l || v;
   if (q.id === 'duration') return `${v} seconds`;
   if (q.id === 'voiceover') return v === true || v === 'yes' ? 'Yes, write me a script' : 'No script';
-  if (q.id === 'sound') return { all: 'Sound effects', sfx: 'Sound effects', none: 'No sound', own: 'My own music' }[v] || v;
+  if (q.id === 'sound') return { all: 'Sound effects', sfx: 'Sound effects', none: 'No sound', own: 'My own music', piano: 'Soft piano', soft: 'Soft music' }[v] || v;
   if (q.id === 'style') return b.styleAuto ? 'Let Animora choose' : styles?.find((s) => s.id === v)?.name || 'Chosen';
   if (q.id === 'colors') return v === 'style' ? "The style's colours" : v === 'logo' ? 'Matched to my logo' : 'My own colours';
   if (q.id === 'pictures') return `${v} picture${v === 1 ? '' : 's'}`;
@@ -426,6 +426,8 @@ export default function Plan() {
                       catch (err) { setError(err.message); } finally { setUploading(false); e.target.value = ''; }
                     }} />
                     <Chip sub="Smooth whooshes, pops and clicks timed to the motion" onClick={() => answer('sfx')}>Sound effects</Chip>
+                    <Chip sub="Gentle piano under the effects" onClick={() => answer('piano')}>Soft piano</Chip>
+                    <Chip sub="Light, calm background music under the effects" onClick={() => answer('soft')}>Soft music</Chip>
                     <Chip sub="Upload an MP3 or WAV" onClick={() => musicRef.current?.click()}>{uploading ? 'Uploading…' : 'Use my own music'}</Chip>
                     <Chip onClick={() => answer('none')}>No sound</Chip>
                   </div>

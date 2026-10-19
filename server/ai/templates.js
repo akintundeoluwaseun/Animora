@@ -876,7 +876,8 @@ export function templateFromPlan(plan, { themeKey = 'bold', assets = plan.assets
   const sound = plan.sound || (plan.sfx === false ? 'none' : 'sfx');
   const mood = MUSIC[look?.music] ? look.music : MUSIC[plan.music_mood] ? plan.music_mood : MUSIC_FOR_THEME[key] || 'calm';
   // built-in background songs are off (people preferred effects only); only the owner's own music is used
-  const music = sound === 'own' && plan.music_url ? { url: plan.music_url } : null;
+  // music only when chosen: the owner's own track, or one of the two soft tracks from the library (effects stay on top)
+  const music = sound === 'own' && plan.music_url ? { url: plan.music_url } : sound === 'piano' || sound === 'soft' ? { url: `/music/${sound}.mp3`, builtin: sound } : null;
   const paced = premiumize(fillPacing(beats, duration, plan, theme, rnd));
   const tempo = music?.bpm || Number(look?.tempo) || ({ 1: 96, 2: 112, 3: 124 }[look?.energy || theme.energy] || 112);
   let finalBeats = directed?.length ? snapToBeat(paced, tempo, duration) : paced;

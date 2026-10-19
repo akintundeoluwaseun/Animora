@@ -28,7 +28,7 @@ export function cleanBrief(b = {}) {
     duration: Number(b.duration) || undefined, styleId: b.styleId ? String(b.styleId) : undefined, styleAuto: !!b.styleAuto,
     colors: b.colors && typeof b.colors === 'object' ? Object.fromEntries(Object.entries(b.colors).filter(([k, v]) => ['primary', 'secondary', 'background', 'text'].includes(k) && /^#[0-9a-f]{6}$/i.test(v))) : undefined,
     voiceover: b.voiceover === undefined || b.voiceover === null ? undefined : b.voiceover === true || b.voiceover === 'yes',
-    sound: ['all', 'sfx', 'none', 'own'].includes(b.sound) ? b.sound : b.sfx === true || b.sfx === 'yes' ? 'all' : b.sfx === false || b.sfx === 'no' ? 'none' : undefined,
+    sound: ['all', 'sfx', 'none', 'own', 'piano', 'soft'].includes(b.sound) ? b.sound : b.sfx === true || b.sfx === 'yes' ? 'all' : b.sfx === false || b.sfx === 'no' ? 'none' : undefined,
     extra: str(b.extra, 3000), done: !!b.done, mode: ['steps', 'paste'].includes(b.mode) ? b.mode : undefined, pasted: b.pasted ? true : undefined, pasteText: str(b.pasteText, 6000),
     colorMode: ['style', 'logo', 'own'].includes(b.colorMode) ? b.colorMode : undefined, picturesDone: b.picturesDone ? true : undefined,
   };
@@ -244,6 +244,8 @@ export function parseBriefRules(text) {
   if (priced.length) out.products = priced.slice(0, 8);
   if (/no (music|sound|audio)|without (music|sound)|silent/i.test(t)) out.sound = 'none';
   else if (/only (sound )?effects|no music/i.test(t)) out.sound = 'sfx';
+  else if (/piano/i.test(t)) out.sound = 'piano';
+  else if (/soft music|background music|calm music/i.test(t)) out.sound = 'soft';
   if (/voice[- ]?over|narrat/i.test(t)) out.voiceover = !/no (voice|narrat)/i.test(t);
   out.pasteText = str(t, 6000);   // the whole text also goes to the AI director (kept apart from the last question's answer)
   return out;

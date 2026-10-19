@@ -46,7 +46,8 @@ function decode(src) {
   });
 }
 // Only the owner's own uploaded music is mixed in; the built-in background songs are retired (effects only).
-const musicSource = (m) => m?.url || null;
+// built-in library tracks (/music/piano.mp3, /music/soft.mp3) are read from disk; anything else is a URL
+const musicSource = (m) => { const u = m?.url || null; return u && /^\/music\/[\w-]+\.mp3$/.test(u) ? path.join(MUSIC_DIR, path.basename(u)) : u; };
 
 /** Mix the cues into a WAV buffer (mono, 44.1 kHz) of `duration` seconds. timeScale stretches cue times. */
 export function mixSfx(events, duration, { timeScale = 1, gain = 0.6, music = null } = {}) {

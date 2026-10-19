@@ -158,12 +158,8 @@ d = .28; n = int(SR * d)
 y = sweep_noise(d, 800, 4000, .5) * swell(n, .5, 1.5) * .6 + glide(520, 1040, d) * env_ar(n, 6, .07) * .5
 save('send', room(lp(y, 8000), .4, .14), -19)
 
-# glitch: a short digital stutter (glitch cuts)
-d = .32; n = int(SR * d); tt = t(d)
-sq = np.sign(np.sin(2 * np.pi * 180 * tt)) * .4 + bp(rng.standard_normal(n), 800, 5000) * .6
-gate = (np.floor(tt * 38) % 3 != 1).astype(float)
-crush = np.round(sq * 6) / 6
-save('glitch', room(lp(crush * gate * env_ar(n, 1, .18), 7000), .3, .1), -19)
+# glitch, glitch-big, swipe, logo-glitch, jingle, intro: real recordings from the owner's sound library (Pixabay,
+# Pixabay Content License), trimmed so their hit lands on the motion. They live in assets/sfx and are not generated here.
 
 # ---- tones ----------------------------------------------------------------------------------------
 # ding: a glassy notification bell

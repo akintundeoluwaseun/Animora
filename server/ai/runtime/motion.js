@@ -20,6 +20,17 @@
   // The preview plays them live; the renderer mixes them into the MP4. look.sound: 'off' | 'soft' | 'punchy'.
   const SFX = [];
   const SND = TH.sound === 'off' ? 'off' : 'soft';   // sounds are always soft; 'off' adds none at all
+  // Signature sounds by look: glitchy logo sting for tech / loud looks, a clean melodic sting for light calm looks,
+  // a soft opening swell for cinematic and glowing looks.
+  const LOOK_TECH = () => ['tech', 'creator', 'studio', 'kinetic', 'hype'].includes(TH.preset) || (TH.chroma || 0) > 0;
+  const LOOK_LIGHT = () => ['apple', 'playful', 'editorial'].includes(TH.preset) || !!TH.halo;
+  let stings = 0;
+  const logoSting = (land) => {   // land = the moment the logo arrives (the signature sting plays once; later logos get a soft hit)
+    if (stings++) { sfx(land, 'thud', 0.6); return; }
+    if (LOOK_TECH()) sfx(Math.max(0.02, land - 2.25), 'logo-glitch', 0.9);   // its build hits 2.25 s in
+    else if (LOOK_LIGHT()) sfx(land - 0.05, 'jingle', 0.75);
+    else { sfx(land, 'impact', 0.7); sfx(land + 0.45, 'chime', 0.5); }
+  };
   const sfx = (t, k, v) => {
     if (SND === 'off' || !(t >= 0) || t > DURATION - 0.08) return;
     const vol = (v == null ? 1 : v) * 0.8;
@@ -603,6 +614,7 @@
     if (b.button) btn = el('div', 'cta-btn', box, icon(/whatsapp|chat|order/i.test(b.button + ' ' + (b.text || '')) ? 'chat' : 'phone') + '<span>' + esc(b.button) + '</span>');
     if (btn) btn.style.fontSize = FS(WIDE ? 50 : 58);
     tl.from(m, { scale: 0, rotation: -90, duration: 0.6, ease: 'back.out(1.8)' }, b.in);
+    logoSting(b.in + 0.3);
     tl.from(div, { [WIDE ? 'scaleY' : 'scaleX']: 0, duration: 0.5, ease: 'expo.inOut' }, b.in + 0.3);
     textEnter(t, b.in + 0.45, 'rise');
     tl.from($$('.tx-sub', txt), { y: N(30), opacity: 0, duration: 0.45, stagger: 0.08 }, b.in + 0.7);
@@ -614,7 +626,7 @@
       const tap = b.in + 1.35 * q, room = DURATION - tap;
       tl.fromTo(cur, { x: W * 0.45, y: H * 0.45, opacity: 0 }, { x: N(60), y: N(30), opacity: 1, duration: 0.6 * q, ease: 'expo.inOut', immediateRender: true }, b.in + 0.75 * q);
       tl.to(btn, { scale: 0.9, duration: 0.1, yoyo: true, repeat: 1, ease: 'power2.inOut' }, tap);
-      sfx(b.in + 0.6 * q, 'pop', 0.6); sfx(tap, 'click', 0.9);
+      sfx(tap, 'click', 0.9);
       tl.fromTo(ring, { scale: 0.6, opacity: 0.9 }, { scale: 2.2, opacity: 0, duration: Math.max(0.2, Math.min(0.7, room - 0.05)), ease: 'power2.out', immediateRender: false }, tap);
       if (room > 1.0) tl.to(cur, { opacity: 0, y: '+=' + N(40), duration: 0.4 }, tap + 0.5);
       const n = Math.floor((b.t1 - tap - 0.8) / 0.9);
@@ -1139,7 +1151,7 @@
     tl.to(field, { scale: WIDE ? 1.9 : 1.7, rotationX: 0, duration: Math.max(0.5, b.t1 - push - 0.15), ease: 'power2.inOut' }, push);
     tl.to(others, { opacity: 0.22, duration: 0.6 }, push);
     tl.fromTo(hot, { boxShadow: '0 0 0 0 transparent' }, { boxShadow: '0 0 ' + N(60) + 'px ' + N(8) + 'px color-mix(in srgb, var(--primary) 55%, transparent)', duration: 0.6, immediateRender: false }, push + 0.2);
-    sfx(b.in, 'swish', 0.4); sfx(push + 0.25, 'pop', 0.55);
+    sfx(b.in, 'swipe', 0.5); sfx(push + 0.25, 'pop', 0.55);
   };
 
   // Two words pushed to the ends of a thin line drawing outward ("tells a ———— story", Apple style).
@@ -1154,7 +1166,7 @@
     tl.from(lw, Object.assign(focusFrom(0), { x: N(140), duration: 0.8 / SP, ease: 'expo.out' }), b.in);
     tl.fromTo(line, { scaleX: 0 }, { scaleX: 1, duration: 0.9 / SP, ease: 'expo.inOut', immediateRender: true }, b.in + 0.25);
     tl.from(rw, Object.assign(focusFrom(0), { x: -N(140), duration: 0.8 / SP, ease: 'expo.out' }), b.in + 0.55);
-    sfx(b.in + 0.25, 'swish', 0.35);
+    sfx(b.in + 0.25, 'swipe', 0.45);
   };
 
   // The product glowing: soft halo, slow light rays, the photo floating (Huel bottle style).
@@ -1313,7 +1325,7 @@
       tl.fromTo(c, { x: R(-W * 0.45, W * 0.45), y: R(-H * 0.4, H * 0.4), rotation: R(-160, 160), scale: 0.25, opacity: 0, borderRadius: '50%' },
         { x: 0, y: 0, rotation: 0, scale: 1, opacity: 1, duration: 0.85 / SP, ease: 'back.out(1.4)', immediateRender: true }, at);
     });
-    sfx(b.in + 0.2, 'whoosh', 0.45); sfx(b.in + 0.95, 'thud', 0.65);
+    sfx(b.in + 0.2, 'whoosh', 0.45); logoSting(b.in + 0.95);
     if (b.sub) { const s2 = el('div', 'tx-sub asm-sub', box, esc(b.sub)); s2.style.fontSize = FS(42); gsap.set(s2, { xPercent: -50 }); tl.from(s2, Object.assign(focusFrom(16), { duration: 0.5 }), b.in + 1.1); }
     idle(bi, b, 0.04);
   };
@@ -1355,7 +1367,7 @@
       const t = el('div', 'tx-line', front, wordsHtml(b.text, null, TH.accentStyle === 'marker')); t.style.fontSize = FS(sizeFor(b.text, 2100, 64, 130));
       textEnter(t, b.in + 0.6, textInOr('rise'));
     }
-    sfx(b.in, 'whoosh-low', 0.5);
+    sfx(b.in, 'swipe', 0.55);
   };
 
   // A numbered title card: big number, an icon tile beside it, a label pill below ("#3  Caveman").
@@ -1468,7 +1480,7 @@
       const at = b.in + 0.2 + k * step, cs = $$('.cr', w);
       tl.fromTo(cs, { yPercent: 110, opacity: 0 }, { yPercent: 0, opacity: 1, duration: 0.4, stagger: 0.03, ease: 'back.out(1.6)', immediateRender: true }, at);
       if (k < words.length - 1) tl.to(cs, { yPercent: -110, opacity: 0, duration: 0.3, stagger: 0.025, ease: 'power2.in' }, at + step - 0.32);
-      sfx(at, 'swish', 0.3);
+      sfx(at, 'swipe', 0.4);
     });
   };
 
@@ -1506,7 +1518,7 @@
     const gap = Math.min(0.28, (b.t1 - b.in - 1.2) / Math.max(1, words.length));
     ws.forEach((e, k) => tl.from(e, Object.assign(focusFrom(18), { duration: 0.5, ease: 'power3.out' }), b.in + 0.5 + k * gap));
     if (b.sub) { const s2 = el('div', 'tx-sub', box, esc(b.sub)); s2.style.fontSize = FS(38); tl.from(s2, Object.assign(focusFrom(14), { duration: 0.6 }), b.in + 0.7 + words.length * gap); }
-    sfx(b.in, 'thud', 0.7); sfx(b.in + 0.5 + words.length * gap, 'chime', 0.5);
+    logoSting(b.in + 0.25);
   };
 
   // ------------------------------------------------------------------ transitions between beats
@@ -1675,7 +1687,7 @@
     const at = b.in, n = (b.items || []).length;
     const each = (k, from, gap, vol) => { for (let j = 0; j < Math.min(n, 6); j++) sfx(from + j * gap, k, vol); };
     switch (b.shot) {
-      case 'logo': sfx(at, 'impact', 0.7); sfx(at + 0.45, 'chime', 0.5); break;
+      case 'logo': logoSting(at + 0.1); break;
       case 'brand': sfx(at, 'pop', 0.7); sfx(at + 0.7, 'chime', 0.45); break;
       case 'zoomword': sfx(at, 'zoom', 0.5); break;
       case 'kinetic': sfx(at, 'whoosh', 0.45); break;
@@ -1888,7 +1900,7 @@
     if (BLURRY.includes(c.type)) { blurWindow(b._el, b.t1 - dOut - 0.01, b.t1 + 0.01); blurWindow(nx._el, b.t1 - 0.01, b.t1 + dIn + 0.02); }
     else if (c.type === 'glitch') { filterWindow(b._el, b.t1 - dOut - 0.01, b.t1 + 0.01, chroma(1.4)); filterWindow(nx._el, b.t1 - 0.01, b.t1 + dIn + 0.02, chroma(1.4)); }
     cutFx(c.type, b.t1, d, i, dIn);
-    const CUT_SND = { whip: ['whoosh', 0.6], swoosh: ['whoosh', 0.7], wipe: ['whoosh', 0.55], rise: ['whoosh-low', 0.6], line: ['whoosh-low', 0.5], zoom: ['zoom', 0.6], dive: ['zoom', 0.75], focus: ['swish', 0.7], morph: ['pop', 0.55], flash: ['swish', 0.6], iris: ['swish', 0.6], cover: ['whoosh', 0.65], cube: ['whoosh-low', 0.7], glitch: ['glitch', 0.8], shutter: ['whoosh', 0.55] }[c.type];
+    const CUT_SND = { whip: ['whoosh', 0.6], swoosh: ['whoosh', 0.7], rise: ['whoosh-low', 0.6], line: ['whoosh-low', 0.5], zoom: ['zoom', 0.6], dive: ['zoom', 0.75], focus: ['swish', 0.7], morph: ['pop', 0.55], flash: ['swish', 0.6], iris: ['swish', 0.6], cover: ['whoosh', 0.65], glitch: [ENERGY >= 3 && !beats.slice(0, i).some((p) => p.cut && p.cut.type === 'glitch') ? 'glitch-big' : 'glitch', 0.8], shutter: ['swipe', 0.6], wipe: ['swipe', 0.6], cube: ['swipe', 0.65] }[c.type];
     if (CUT_SND) sfx(b.t1 - (c.type === 'morph' ? 0.05 : c.type === 'flash' || c.type === 'glitch' ? 0.03 : dOut * 0.9), CUT_SND[0], CUT_SND[1]);
   });
   // slow camera drift (premium styles): the whole frame breathes and tilts a touch
@@ -1926,10 +1938,11 @@
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(fit);
 
   // expose the sound cues (sorted; the same sound twice within 60ms plays once)
+  if ((TH.leaks || TH.glow) && !LOOK_TECH() && DURATION > 6) sfx(0.02, 'intro', 0.7);   // soft opening swell (cinematic / glow looks)
   SFX.sort((x, y) => x.t - y.t);
   // Sound design pass: a sound only when it means something. Higher-priority sounds win a crowded moment,
   // typing ticks are thinned, and no second of video carries more than four effects.
-  const PRI = { impact: 3, riser: 3, chime: 3, glitch: 3, ding: 2.5, zoom: 2.5, shimmer: 2.5, whoosh: 2, 'whoosh-low': 2, send: 2, click: 1.5, thud: 1.5, swish: 1.5, pop: 1, tick: 0 };
+  const PRI = { 'logo-glitch': 3.5, jingle: 3.5, intro: 3, 'glitch-big': 3, swipe: 1.5, impact: 3, riser: 3, chime: 3, glitch: 3, ding: 2.5, zoom: 2.5, shimmer: 2.5, whoosh: 2, 'whoosh-low': 2, send: 2, click: 1.5, thud: 1.5, swish: 1.5, pop: 1, tick: 0 };
   const pri = (e) => (PRI[e.k] == null ? 1 : PRI[e.k]);
   const kept = [];
   for (const e of SFX) {

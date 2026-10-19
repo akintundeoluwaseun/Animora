@@ -1,22 +1,4 @@
 {
- "calm": {
-  "bpm": 84,
-  "seconds": 91.429
- },
- "pulse": {
-  "bpm": 110,
-  "seconds": 69.818
- },
- "warm": {
-  "bpm": 100,
-  "seconds": 76.8
- },
- "cinematic": {
-  "bpm": 72,
-  "seconds": 106.667
- },
- "bright": {
-  "bpm": 120,
-  "seconds": 64.0
- }
+ "piano": { "label": "Soft piano", "seconds": 46.0 },
+ "soft": { "label": "Soft music", "seconds": 40.8 }
 }
