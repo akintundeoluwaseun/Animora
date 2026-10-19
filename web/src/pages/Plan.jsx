@@ -87,6 +87,7 @@ const FLYER_QUESTIONS = QUESTIONS.filter((x) => !['duration', 'voiceover', 'soun
   ...(FLYER_TEXT[x.id] ? { ask: FLYER_TEXT[x.id] } : {}),
   ...(x.id === 'aspect' ? { options: FLYER_ASPECTS } : {}),
   ...(x.id === 'headline' ? { hint: 'One to three messages work best on a flyer.' } : {}),
+  ...(x.id === 'paste' ? { placeholder: 'e.g. My business is Oluwaseun Computers in Ado Ekiti. We sell and repair laptops. HP EliteBook ₦250,000, Dell ₦300,000. Call or WhatsApp 0807 691 1614. Square flyer for WhatsApp, clean and premium.' } : {}),
   ...(x.id === 'extra' ? { placeholder: 'e.g. "Put the prices in big circles" or "Make it look like a Christmas sale"' } : {}),
 }));
 
@@ -170,7 +171,20 @@ function Chip({ active, onClick, children, sub, multi }) {
   );
 }
 
+// Phones: the chat is exactly as tall as the part of the screen you can see, so the message box is never
+// hidden under the keyboard or pushed off the screen.
+function useVisibleHeight() {
+  useEffect(() => {
+    const vv = window.visualViewport; if (!vv) return undefined;
+    const root = document.documentElement;
+    const fit = () => { root.style.setProperty('--vvh', `${Math.round(vv.height)}px`); if (window.innerWidth < 640 && vv.height < window.innerHeight - 40) window.scrollTo(0, 0); };
+    fit(); vv.addEventListener('resize', fit); vv.addEventListener('scroll', fit);
+    return () => { vv.removeEventListener('resize', fit); vv.removeEventListener('scroll', fit); root.style.removeProperty('--vvh'); };
+  }, []);
+}
+
 export default function Plan() {
+  useVisibleHeight();
   const { id } = useParams();
   const navigate = useNavigate();
   const [project, setProject] = useState(null);
@@ -344,7 +358,7 @@ export default function Plan() {
       </div>
 
       <div className="grid gap-6 sm:mt-5 lg:grid-cols-[1fr_320px]">
-        <section className="chat flex h-[calc(100dvh-3.5rem)] flex-col overflow-hidden sm:h-[calc(100dvh-9.5rem)] sm:min-h-[560px]" aria-label="Questions">
+        <section className="chat flex h-[calc(var(--vvh,100dvh)-3.5rem)] flex-col overflow-hidden sm:h-[calc(100dvh-9.5rem)] sm:min-h-[560px]" aria-label="Questions">
           <div className="chat-progress" aria-hidden="true"><div style={{ width: `${Math.round((Math.min(step, visible.length) / visible.length) * 100)}%` }} /></div>
           <div className="flex-1 space-y-5 overflow-y-auto px-4 py-5 sm:px-8 sm:py-7" aria-live="polite">
             {answered.map((qq, i) => (qq.show && !qq.show(b)) ? null : (
@@ -486,7 +500,7 @@ export default function Plan() {
               }}>
                 {q.type === 'long' ? (
                   <textarea value={text} onChange={(e) => setText(e.target.value)} rows={q.id === 'paste' ? 5 : 3} placeholder={q.placeholder} aria-label="Your answer"
-                    className="composer-input max-h-56 min-h-[4.5rem] resize-none py-3" />
+                    className="composer-input max-h-32 min-h-[4.5rem] resize-none py-3 sm:max-h-56" />
                 ) : (
                   <input value={text} onChange={(e) => setText(e.target.value)} autoFocus placeholder={q.placeholder || (q.typed ? 'Or type your own answer…' : 'Type your answer…')} aria-label="Your answer"
                     className="composer-input h-12" />
@@ -538,9 +552,9 @@ export default function Plan() {
           {project.plan && (
             <div className="surface p-5">
               <h2 className="font-bold">Plan</h2>
-              <p className="text-sm text-ink-mute">{duration(project.plan.duration_seconds)} · {ASPECTS[project.plan.aspect_ratio]?.label} · {project.plan.scenes.length} scenes</p>
+              <p className="text-sm text-ink-mute">{what === 'flyer' ? `Flyer · ${project.plan.aspect_ratio}` : `${duration(project.plan.duration_seconds)} · ${ASPECTS[project.plan.aspect_ratio]?.label} · ${project.plan.scenes.length} scenes`}</p>
               <ol className="mt-3 max-h-64 space-y-1.5 overflow-auto text-sm">
-                {project.plan.scenes.map((s) => <li key={s.id} className="rounded-xl bg-lilac px-3 py-2"><span className="tabular-nums text-ink-mute">{s.start}–{s.end}s</span> {[].concat(s.on_screen_text).filter(Boolean).join(' · ')}</li>)}
+                {project.plan.scenes.map((s) => <li key={s.id} className="rounded-xl bg-lilac px-3 py-2">{what !== 'flyer' && <span className="tabular-nums text-ink-mute">{s.start}–{s.end}s</span>} {[].concat(s.on_screen_text).filter(Boolean).join(' · ')}</li>)}
               </ol>
             </div>
           )}

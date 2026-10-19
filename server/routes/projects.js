@@ -215,7 +215,7 @@ r.post('/:id/brief/parse', async (req, res) => {
   const text = String(req.body?.text || '').trim();
   if (text.length < 10) return res.status(400).json({ error: 'Paste a few sentences about your business and the ad you want.' });
   const current = p.brief_json || {};
-  const { aiError, ...found } = await parseBrief(text, current);
+  const { aiError, ...found } = await parseBrief(text, current, { flyer: p.kind === 'flyer' });
   // never overwrite answers the user already gave one by one
   const merged = cleanBrief({ ...found, ...Object.fromEntries(Object.entries(current).filter(([, v]) => v !== undefined && v !== '')), pasteText: found.pasteText, mode: 'paste' });
   const u = await one('UPDATE projects SET brief_json=$2, updated_at=now() WHERE id=$1 RETURNING *', [p.id, JSON.stringify(merged)]);
@@ -225,7 +225,7 @@ r.post('/:id/brief/parse', async (req, res) => {
 r.post('/:id/suggest', async (req, res) => {
   const p = await loadProject(req, res); if (!p) return;
   const kind = req.body?.kind === 'features' ? 'features' : 'headline';
-  res.json({ options: await suggest(kind, { ...(p.brief_json || {}), ...(req.body?.brief || {}) }) });
+  res.json({ options: await suggest(kind, { ...(p.brief_json || {}), ...(req.body?.brief || {}) }, { flyer: p.kind === 'flyer' }) });
 });
 
 // All questions answered: turn the brief into the plan (Gemini, or our rules), then the studio generates the video.

@@ -192,7 +192,7 @@ function ruleSuggestions(kind, b) {
   return byGoal[g];
 }
 
-export async function suggest(kind, brief) {
+export async function suggest(kind, brief, { flyer = false } = {}) {
   const b = cleanBrief(brief);
   const fallback = ruleSuggestions(kind, b);
   if (!config.useGemini) return fallback;
@@ -201,7 +201,7 @@ export async function suggest(kind, brief) {
       ? 'Suggest 8 short selling points (2-4 words each) this business could show in its ad.'
       : 'Suggest 5 punchy ad headlines (under 7 words each) for this ad. Different angles: benefit, curiosity, offer, emotion, trust.';
     const { text } = await geminiGenerate({
-      system: 'You write copy for short video ads for Nigerian small businesses. Return JSON only: { "options": ["...", "..."] }. Use the business name naturally; never invent prices or numbers.',
+      system: `You write copy for ${flyer ? 'flyers (still pictures, no video, no sound)' : 'short video ads'} for Nigerian small businesses. Return JSON only: { "options": ["...", "..."] }. Use the business name naturally; never invent prices or numbers.`,
       messages: [{ role: 'user', text: `${ask}\nBusiness: ${b.name} (${b.category || 'business'}). Goal: ${b.goal || 'more customers'}.${b.headlines?.length ? ` Messages: ${b.headlines.join(' / ')}.` : ''}` }],
       json: true, temperature: 1, timeoutMs: 30000, maxOutputTokens: 4096, thinking: 'low',
     });
@@ -251,12 +251,17 @@ export function parseBriefRules(text) {
   return out;
 }
 
-export async function parseBrief(text, current = {}) {
+export async function parseBrief(text, current = {}, { flyer = false } = {}) {
   const rules = parseBriefRules(text);
   if (!config.useGemini) return cleanBrief({ ...rules, mode: 'paste' });
   try {
     const { text: out } = await geminiGenerate({
-      system: `You read a business owner's description of the video ad they want and fill in a form. Return JSON only with any of these keys, and ONLY for things the text clearly says (leave everything else out, never invent):
+      system: flyer ? `You read a business owner's description of the FLYER they want (a still picture: no video, no length, no sound, no voice-over) and fill in a form. Return JSON only with any of these keys, and ONLY for things the text clearly says (leave everything else out, never invent):
+{ "name": business name, "category": what the business does (2-4 words), "goals": ["..."] (why they want the flyer),
+  "headlines": ["..."] (the main messages for the flyer, short), "features": ["..."] (selling points, 2-5 words each),
+  "products": ["Product ₦price", ...], "ctas": ["Order on WhatsApp", "Call now", ...] (what people should do), "contact": phone / website / address,
+  "aspect": "4:5" | "9:16" | "1:1" | "A4",
+  "extra": any other instructions about the look, layout, pictures or style, in their words }` : `You read a business owner's description of the video ad they want and fill in a form. Return JSON only with any of these keys, and ONLY for things the text clearly says (leave everything else out, never invent):
 { "name": business name, "category": what the business does (2-4 words), "goals": ["..."] (why they want the ad),
   "headlines": ["..."] (the main messages / slogans for the video, short), "features": ["..."] (selling points, 2-5 words each),
   "products": ["Product ₦price", ...], "ctas": ["Order on WhatsApp", "Call now", ...] (what viewers should do), "contact": phone / website / address,
@@ -268,6 +273,7 @@ export async function parseBrief(text, current = {}) {
     const g = JSON.parse(out);
     // the AI wins where it found something; rules fill gaps (phone numbers, aspect words); keep the full text for the director
     const merged = { ...rules, ...Object.fromEntries(Object.entries(g).filter(([, v]) => v !== null && v !== '' && !(Array.isArray(v) && !v.length))) };
+    if (flyer) { delete merged.duration; delete merged.voiceover; delete merged.sound; if (!['4:5', '9:16', '1:1', 'A4'].includes(merged.aspect)) delete merged.aspect; }
     delete merged.extra;   // the last question asks for anything extra; the full text goes to the director as pasteText
     return cleanBrief({ ...merged, mode: 'paste' });
   } catch (e) {
