@@ -94,8 +94,10 @@ export async function createApp() {
   catch { console.warn('[gsap] not found; /vendor/gsap must be served as static files'); }
   // Download with a friendly filename.
   app.get('/download/:renderId', async (req, res) => {
-    const r = await one(`SELECT r.video_url, p.title FROM renders r JOIN projects p ON p.id=r.project_id WHERE r.id=$1 AND r.status='done'`, [req.params.renderId]);
+    const r = await one(`SELECT r.id, r.project_id, r.video_url, r.chunk_count, p.title FROM renders r JOIN projects p ON p.id=r.project_id WHERE r.id=$1 AND r.status='done'`, [req.params.renderId]);
     if (!r) return res.status(404).send('Video not found');
+    // MP4s stored in parts can't be sent in one response on the free hosting: open the video page, whose button saves every part
+    if (r.chunk_count > 0) return res.redirect(`/p/${r.project_id}/render?r=${r.id}`);
     const name = `${(r.title || 'adflash-video').replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '-').slice(0, 60) || 'adflash-video'}.mp4`;
     const prefix = `${config.publicBaseUrl}/files/`;
     if (config.storageMode === 'local' && r.video_url.startsWith(prefix)) return res.download(localPathFor(r.video_url.slice(prefix.length)), name);

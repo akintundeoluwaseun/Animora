@@ -5,6 +5,7 @@ import { api, ago, duration, naira, otherDeviceLink, useAuth, usePolling } from 
 import { Alert, Button, Empty, Modal, PageLoader, PlanBadge, Spinner } from '../components/ui.jsx';
 import BuyCredits, { creditsLeft } from '../components/BuyCredits.jsx';
 import { FullView } from '../components/Preview.jsx';
+import { downloadVideo } from '../lib/videoFile.js';
 
 // A style card: shows the poster, plays the preview while hovered or focused.
 export function StyleCard({ s, selected, onPick }) {
@@ -166,6 +167,18 @@ export function KindBadge({ kind, className = '' }) {
   );
 }
 
+// Download straight from the list: fetches the MP4 in parts (like the Download MP4 button), shows progress.
+function DashDownload({ renderId, title }) {
+  const [pct, setPct] = useState(null);
+  const [failed, setFailed] = useState(false);
+  const go = async () => {
+    setPct(0); setFailed(false);
+    try { const { render } = await api(`/renders/${renderId}`); await downloadVideo(render, title, setPct); }
+    catch { setFailed(true); } finally { setPct(null); }
+  };
+  return <button type="button" onClick={go} disabled={pct != null} className="font-semibold text-money hover:underline disabled:opacity-70">{pct != null ? `Saving ${Math.round(pct * 100)}%` : failed ? 'Try again' : 'Download'}</button>;
+}
+
 function nextStep(p) {
   if (p.kind === 'flyer') return p.status === 'planning' ? `/p/${p.id}/plan` : `/p/${p.id}/studio`;
   if (p.last_render && ['queued', 'rendering', 'done'].includes(p.last_render.status)) return `/p/${p.id}/render`;
@@ -287,7 +300,7 @@ export default function Dashboard({ kind = 'video' }) {   // /videos shows video
                 </Link>
                 <div className="mt-1 flex items-center gap-3 text-sm text-ink-mute">
                   <span>{p.kind === 'flyer' ? 'Flyer' : duration(p.duration_seconds)}, {p.aspect_ratio}, {ago(p.updated_at)}</span>
-                  {p.last_render?.status === 'done' && <a href={`/download/${p.last_render.id}`} className="font-semibold text-money hover:underline">Download</a>}
+                  {p.last_render?.status === 'done' && <DashDownload projectId={p.id} renderId={p.last_render.id} title={p.title} />}
                   <button onClick={() => remove(p)} className="ml-auto font-semibold text-ink-mute hover:text-alert focus:opacity-100 sm:opacity-0 sm:group-hover:opacity-100" aria-label={`Delete ${p.title}`}>Delete</button>
                 </div>
               </li>
