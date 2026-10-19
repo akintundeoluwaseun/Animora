@@ -171,7 +171,7 @@ function nextStep(p) {
   return p.status === 'planning' ? `/p/${p.id}/plan` : `/p/${p.id}/studio`;
 }
 
-export default function Dashboard() {
+export default function Dashboard({ kind = 'video' }) {   // /videos shows videos, /flyers shows flyers
   const { user, refresh } = useAuth();
   const [params, setParams] = useSearchParams();
   const [projects, setProjects] = useState(null);
@@ -191,7 +191,7 @@ export default function Dashboard() {
   const newOpen = !!newParam;
   const newKind = newParam === 'video' || newParam === 'flyer' ? newParam : null;
 
-  const load = async () => { try { setProjects((await api('/projects')).projects); } catch (e) { setError(e.message); } };
+  const load = async () => { try { setProjects((await api('/projects')).projects.filter((p) => (p.kind || 'video') === kind)); } catch (e) { setError(e.message); } };
   useEffect(() => { load(); refresh(); api('/pricing').then((r) => setPricing(r.pricing)).catch(() => {}); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   // videos made online have no thumbnail yet: make them here, one at a time, in the background
   const thumbing = useRef(false);
@@ -232,7 +232,7 @@ export default function Dashboard() {
     <div className="mx-auto max-w-[1180px] px-6 py-10 sm:px-10">
       <NewThing open={newOpen} kind={newKind} onPick={(k) => setParams({ new: k })} onClose={() => setParams({})} />
       <div className="flex flex-wrap items-end justify-between gap-4">
-        <h1 className="text-4xl font-bold tracking-[-0.045em]">My videos</h1>
+        <h1 className="text-4xl font-bold tracking-[-0.045em]">{kind === 'flyer' ? 'My flyers' : 'My videos'}</h1>
         <div className="flex flex-wrap items-center gap-4">
           {creditsLeft(user) !== null && (
             <span className="flex items-center gap-2 rounded-full border border-ink/12 bg-white px-3 py-1.5 text-sm">
@@ -252,10 +252,10 @@ export default function Dashboard() {
       {!projects ? <PageLoader /> : (
         <ul className="grid grid-cols-2 gap-x-5 gap-y-8 sm:grid-cols-3 lg:grid-cols-4">
           <li>
-            <button onClick={() => setParams({ new: '1' })} className="press group grid aspect-[4/5] w-full place-items-center rounded-xl border border-dashed border-ink/20 bg-white text-ink-soft hover:border-ink/40 hover:text-ink">
+            <button onClick={() => setParams({ new: kind })} className="press group grid aspect-[4/5] w-full place-items-center rounded-xl border border-dashed border-ink/20 bg-white text-ink-soft hover:border-ink/40 hover:text-ink">
               <span className="flex flex-col items-center gap-3">
                 <span className="grid size-12 place-items-center rounded-full bg-danfo text-white"><svg width="16" height="16" viewBox="0 0 14 14" aria-hidden="true"><path d="M7 1v12M1 7h12" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" /></svg></span>
-                <span className="font-semibold">New video or flyer</span>
+                <span className="font-semibold">{kind === 'flyer' ? 'New flyer' : 'New video'}</span>
               </span>
             </button>
           </li>

@@ -270,7 +270,7 @@ export default function Studio() {
         </div>
         <div className="flex items-center gap-3">
           {!flyer && <Steps current="studio" projectId={id} hasPlan hasCode={!!project.code} />}
-          {project.code && <span className="hidden lg:block">{flyer ? <FlyerDownload project={project} /> : canRender ? <Button onClick={() => navigate(`/p/${id}/render?new=1`)}>Generate Video</Button> : <DownloadVideo project={project} />}</span>}
+          {project.code && <span className="hidden lg:block">{flyer ? <FlyerDownload project={project} /> : canRender ? <Button onClick={() => navigate(`/p/${id}/render?new=1`)}>{project.status === 'rendered' ? 'Render video again' : 'Generate Video'}</Button> : <DownloadVideo project={project} />}</span>}
         </div>
       </div>
       <BuyCredits open={needBuy} onClose={() => setNeedBuy(false)} reason="You've used your free videos" />
@@ -292,7 +292,7 @@ export default function Studio() {
               <Button variant="glass" size="sm" onClick={undo} disabled={!project.versions}>Undo</Button>
               <Button variant="glass" size="sm" onClick={() => { if (confirm(flyer ? 'Design the flyer again? You get a new layout and words (you can undo).' : 'Write the animation again from the plan? Your edits will be replaced (you can undo).')) generate(); }}>Regenerate</Button>
               {!flyer && <Button variant="glass" size="sm" onClick={makeFlyer}>Make a flyer from this</Button>}
-              {flyer ? <FlyerDownload project={project} size="lg" alt="glass" className="w-full sm:ml-2 sm:w-auto lg:hidden" /> : canRender ? <Button size="lg" className="w-full sm:ml-2 sm:w-auto lg:hidden" onClick={() => navigate(`/p/${id}/render?new=1`)}>Generate Video</Button> : <span className="w-full sm:ml-2 sm:w-auto lg:hidden"><DownloadVideo project={project} size="lg" className="w-full" /></span>}
+              {flyer ? <FlyerDownload project={project} size="lg" alt="glass" className="w-full sm:ml-2 sm:w-auto lg:hidden" /> : canRender ? <Button size="lg" className="w-full sm:ml-2 sm:w-auto lg:hidden" onClick={() => navigate(`/p/${id}/render?new=1`)}>{project.status === 'rendered' ? 'Render video again' : 'Generate Video'}</Button> : <span className="w-full sm:ml-2 sm:w-auto lg:hidden"><DownloadVideo project={project} size="lg" className="w-full" /></span>}
             </div>
           </section>
 

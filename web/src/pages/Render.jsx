@@ -146,6 +146,7 @@ export default function Render() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [canShare, setCanShare] = useState(true);
+  const [lastDone, setLastDone] = useState(null);   // the last finished MP4 of this video (maybe from before an edit)
 
   const loadRender = async (rid) => { const r = await api(`/renders/${rid}`); setRender(r.render); return r.render; };
 
@@ -160,6 +161,7 @@ export default function Render() {
         setProject(p.project); setCheck(c);
         // the last MP4 of this video, unless the video was edited after it was made (then make a new one)
         const last = list.renders.find((x) => x.projectId === id);
+        setLastDone(list.renders.find((x) => x.projectId === id && x.status === 'done') || null);
         const rid = params.get('r') || (last && (!last.stale || ['queued', 'rendering'].includes(last.status)) ? last.id : null);
         if (rid) await loadRender(rid);
         else if (params.get('new') && c.ok !== false && !c.needsAd) autoStart.current = true;
@@ -219,7 +221,13 @@ export default function Render() {
           <div className={`grid items-start gap-10 ${render.aspectRatio === '16:9' ? 'lg:grid-cols-[680px_1fr]' : 'md:grid-cols-[400px_1fr]'}`}>
             <div className="stage px-6 py-8"><VideoPhone src={render.videoUrl} poster={render.thumbnailUrl} aspect={render.aspectRatio} maxWidth={320} /><div className="stage-floor" /></div>
             <div className="md:pt-6">
-              <p className="text-sm font-semibold text-money">Your video is ready</p>
+              {render.stale && (
+                <div className="mb-6 rounded-2xl border border-danfo/30 bg-danfo/10 p-4">
+                  <p className="font-semibold">You changed this video after this MP4 was made.</p>
+                  <Button size="lg" className="mt-3 w-full sm:w-auto" onClick={() => { setRender(null); begin(); }} loading={busy}>Render video again</Button>
+                </div>
+              )}
+              <p className="text-sm font-semibold text-money">{render.stale ? 'Your last MP4' : 'Your video is ready'}</p>
               <h2 className="mt-1 text-3xl font-extrabold">Download and post it</h2>
               <p className="mt-2 text-ink-soft">{duration(render.durationSeconds)} · {ASPECTS[render.aspectRatio]?.w}×{ASPECTS[render.aspectRatio]?.h} MP4 · {(render.fileSize / 1e6).toFixed(1)} MB · plays on every phone.</p>
               <div className="mt-6 flex flex-wrap gap-3">
@@ -261,7 +269,8 @@ export default function Render() {
               </div>
               {tooLong
                 ? <Button as={Link} to="/checkout" size="lg" className="mt-5 w-full">Upgrade to Pro — {naira(5000)}/month</Button>
-                : <Button size="lg" className="mt-5 w-full" onClick={render?.status === 'failed' ? retry : begin} loading={busy}>{check.needsAd ? 'Watch ad & Generate Video' : 'Generate Video'}</Button>}
+                : <Button size="lg" className="mt-5 w-full" onClick={render?.status === 'failed' ? retry : begin} loading={busy}>{check.needsAd ? 'Watch ad & ' : ''}{lastDone ? 'Render video again' : 'Generate Video'}</Button>}
+              {lastDone && !tooLong && <button className="mt-3 w-full text-sm font-semibold text-ink-mute hover:text-ink" onClick={() => loadRender(lastDone.id)}>See my last video</button>}
             </div>
           </div>
         )}

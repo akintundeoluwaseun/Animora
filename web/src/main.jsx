@@ -78,7 +78,8 @@ function App() {
               <Route path="/" element={<Home />} />
               <Route path="/about" element={<Navigate to="/" replace />} />
               <Route path="/styles" element={<Private><Styles /></Private>} />
-              <Route path="/videos" element={<Private><Dashboard /></Private>} />
+              <Route path="/videos" element={<Private><Dashboard key="video" kind="video" /></Private>} />
+              <Route path="/flyers" element={<Private><Dashboard key="flyer" kind="flyer" /></Private>} />
               <Route path="/login" element={<Navigate to="/videos" replace />} />
               <Route path="/signup" element={<Navigate to="/videos" replace />} />
               <Route path="/pricing" element={<Pricing />} />

@@ -89,6 +89,7 @@ export function PlanBadge({ plan }) {
 const I = {
   home: <path d="M4 11l8-7 8 7v9H4zM10 20v-6h4v6" />,
   videos: <path d="M4 5h16v14H4zM10 9l5 3-5 3z" />,
+  flyers: <path d="M5 3h14v18H5zM8 15l3-3 2 2 3-3M9 7.5h.01" />,
   styles: <path d="M12 3l9 5-9 5-9-5zM3 13l9 5 9-5" />,
   pricing: <path d="M4 7h16v10H4zM4 11h16M8 15h3" />,
   about: <path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 11v5M12 8h.01" />,
@@ -102,7 +103,7 @@ export function Nav() {
   const navigate = useNavigate();
   const inst = useInstall();
   useEffect(() => { api('/status').then(setStatus).catch(() => {}); }, []);
-  const links = [['/', 'Home', 'home'], ['/videos', 'My videos', 'videos'], ['/styles', 'Styles', 'styles'], ['/pricing', 'Pricing', 'pricing']];
+  const links = [['/', 'Home', 'home'], ['/videos', 'My videos', 'videos'], ['/flyers', 'My flyers', 'flyers'], ['/styles', 'Styles', 'styles'], ['/pricing', 'Pricing', 'pricing']];
   const railLink = () => ({ isActive }) => `rail-link ${isActive ? 'is-active' : ''}`;
   const newVideo = () => { setOpen(false); navigate('/videos?new=1'); };
   return (
