@@ -14,7 +14,8 @@ export function canExportVideo() {
 }
 
 async function pickVideoCodec(width, height, fps) {
-  const bitrate = Math.round(width * height * fps * 0.12);
+  // motion graphics are mostly flat colour: ~3.5 Mbps at 1080p looks the same and keeps a 20 s video around 9 MB
+  const bitrate = Math.min(4_000_000, Math.round(width * height * fps * 0.056));
   // H.264 first (plays everywhere: WhatsApp, Instagram, TikTok); VP9 / AV1 only where H.264 encoding is missing
   const options = [
     ['avc', 'avc1.640033', { avc: { format: 'avc' } }], ['avc', 'avc1.640028', { avc: { format: 'avc' } }],
@@ -31,7 +32,7 @@ async function pickVideoCodec(width, height, fps) {
 async function pickAudioCodec() {
   if (!('AudioEncoder' in window)) return null;
   for (const [mux, codec] of [['aac', 'mp4a.40.2'], ['opus', 'opus']]) {
-    const config = { codec, sampleRate: SR, numberOfChannels: 1, bitrate: 160000 };
+    const config = { codec, sampleRate: SR, numberOfChannels: 1, bitrate: 96000 };
     try { if ((await AudioEncoder.isConfigSupported(config)).supported) return { mux, config }; } catch { /* next */ }
   }
   return null;

@@ -1429,15 +1429,17 @@
   SHOTS.prompt = (b, bi) => {
     const box = el('div', 'fitbox col center pr', bi);
     if (b.title) { const t = el('div', 'sent-line small', box, wordsHtml(b.title, -1, false)); t.style.fontSize = FS(54); textEnter(t, b.in, textInOr('focus')); }
-    const bar = el('div', 'pr-bar', box); bar.style.width = (WIDE ? Math.min(W * 0.56, N(1100)) : W * 0.84) + 'px';
+    const bar = el('div', 'pr-bar', box), barW = WIDE ? Math.min(W * 0.56, N(1100)) : W * 0.84; bar.style.width = barW + 'px';
     el('i', 'pr-plus', bar, '+');
     const field = el('div', 'pr-field', bar);
     const ph = el('span', 'pr-ph', field, esc(b.sub || 'Ask anything'));
     const chars = Array.from(String(b.text));
     const typed = el('span', 'pr-typed', field, chars.map((c) => '<span class="ch">' + (c === ' ' ? '&nbsp;' : esc(c)) + '</span>').join('') + '<i class="pr-caret"></i>');
     field.style.fontSize = FS(Math.min(46, 1500 / Math.max(20, chars.length)));
+    // never cut the typed line off: shrink it until it fits the bar (also after "bigger text" edits)
+    afterFonts.push(() => { const room = barW - N(76 + 84 + 40 + 60); let fz = parseFloat(getComputedStyle(field).fontSize) || 40; for (let i = 0; i < 40 && typed.offsetWidth > room && fz > 12; i++) { fz *= 0.94; field.style.fontSize = fz + 'px'; } });   // measured against the bar's final width (it grows in)
     const send = el('div', 'pr-send', bar, '<svg viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg>');
-    tl.fromTo(bar, { width: N(130), opacity: 0 }, { width: bar.style.width, opacity: 1, duration: 0.7, ease: 'expo.out', immediateRender: true }, b.in + 0.15);
+    tl.fromTo(bar, { width: N(130), opacity: 0 }, { width: barW, opacity: 1, duration: 0.7, ease: 'expo.out', immediateRender: true }, b.in + 0.15);
     const t0 = b.in + 0.8, each = Math.min(0.055, (b.t1 - t0 - 0.8) / Math.max(1, chars.length)) / SP;
     tl.to(ph, { opacity: 0, duration: 0.15 }, t0);
     tl.from($$('.ch', typed), { opacity: 0, duration: 0.01, stagger: each, ease: 'none' }, t0);
@@ -1810,7 +1812,7 @@
       '.sr-n{margin-left:.3em;font-size:.62em;font-weight:800;color:var(--text);white-space:nowrap}',
       '.pr>*+*{margin-top:' + n(44) + '} .pr-bar{display:flex;align-items:center;gap:' + n(20) + ';padding:' + n(18) + ' ' + n(18) + ' ' + n(18) + ' ' + n(24) + ';border-radius:999px;background:var(--surface);border:' + n(2) + ' solid var(--line);box-shadow:var(--shadow);overflow:hidden}',
       '.pr-plus{flex:none;width:' + n(76) + ';height:' + n(76) + ';border-radius:50%;display:flex;align-items:center;justify-content:center;font-style:normal;font-size:' + n(48) + ';color:var(--muted);background:color-mix(in srgb,var(--text) 6%,transparent)}',
-      '.pr-field{position:relative;flex:1;min-width:0;white-space:nowrap;overflow:hidden;font-weight:600;color:var(--text)} .pr-ph{position:absolute;left:0;top:0;color:var(--muted)}',
+      '.pr-field{position:relative;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-align:left;font-weight:600;color:var(--text)} .pr-ph{position:absolute;left:0;top:0;color:var(--muted)}',
       '.pr-caret{display:inline-block;width:.08em;height:1em;margin-left:.05em;vertical-align:-.12em;background:var(--primary)}',
       '.pr-send{flex:none;width:' + n(84) + ';height:' + n(84) + ';border-radius:50%;background:var(--primary);display:flex;align-items:center;justify-content:center} .pr-send svg{width:50%;height:50%;fill:none;stroke:var(--on-primary);stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}',
       '.wsw>*+*{margin-top:' + n(40) + '} .wsw-stack{position:relative} .wsw-pill{position:relative;z-index:3;display:flex;justify-content:center;padding:.32em .7em;border-radius:999px;background:var(--surface);border:' + n(2) + ' solid var(--line);box-shadow:var(--shadow);height:1.75em}',

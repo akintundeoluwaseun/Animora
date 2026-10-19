@@ -92,6 +92,6 @@ export async function addSfxToVideo(videoFile, outFile, events, duration, opts =
   const src = musicSource(opts.music);
   if (src) { try { music = await decode(src); } catch (e) { console.warn('[sfx] music skipped:', e.message); } }
   await writeFile(wav, mixSfx(events, duration, { ...opts, music }));
-  await ffmpeg(['-y', '-loglevel', 'error', '-i', videoFile, '-i', wav, '-map', '0:v:0', '-map', '1:a:0', '-c:v', 'copy', '-c:a', 'aac', '-b:a', '160k', '-shortest', '-movflags', '+faststart', outFile]);
+  await ffmpeg(['-y', '-loglevel', 'error', '-i', videoFile, '-i', wav, '-map', '0:v:0', '-map', '1:a:0', '-c:v', 'copy', '-c:a', 'aac', '-b:a', '96k', '-shortest', '-movflags', '+faststart', outFile]);
   return outFile;
 }

@@ -42,7 +42,7 @@ const DEFAULTS = {
   scale: Number(process.env.ADFLASH_SCALE) || 0.6667,
   frameFormat: 'jpeg', // 'jpeg' is ~3x faster to capture than 'png'; quality 95 is visually lossless after H.264
   jpegQuality: 90,
-  crf: 20,
+  crf: 23,   // flat motion graphics stay crisp; files about a third smaller than crf 20
   preset: 'veryfast',
   loadTimeoutMs: 30000,
   assetTimeoutMs: 8000,
@@ -251,7 +251,7 @@ function startEncoder(outFile, { fps, frameFormat, crf, preset, outW, outH, grai
     '-y', '-loglevel', 'error',
     '-f', 'image2pipe', '-framerate', String(fps),
     '-c:v', frameFormat === 'png' ? 'png' : 'mjpeg', '-i', '-',
-    '-c:v', 'libx264', '-preset', preset, '-crf', String(crf),
+    '-c:v', 'libx264', '-preset', preset, '-crf', String(crf), '-maxrate', '4M', '-bufsize', '8M',   // cap busy scenes too
     // fast captures are upscaled back to full HD with a sharp filter (cheap compared with painting 1080p)
     '-vf', (outW ? `scale=${outW}:${outH}:flags=lanczos:in_range=full:out_range=tv` : 'scale=in_range=full:out_range=tv') + noise,
     '-pix_fmt', 'yuv420p', '-r', String(fps), '-video_track_timescale', String(fps * 1000),
