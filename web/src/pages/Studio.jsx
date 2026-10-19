@@ -235,7 +235,7 @@ export default function Studio() {
         const r = await api(`/projects/${id}/thumbnail`, { method: 'POST', form });
         setProject((p) => (p ? { ...p, thumbnailUrl: r.thumbnailUrl } : p));
       } catch { /* the thumbnail is optional */ }
-    }, 1500);
+    }, 2500);   // fewer server calls while the AI works
     return () => clearTimeout(t);
   }, [project?.code, project?.thumbnailUrl, generating]); // eslint-disable-line react-hooks/exhaustive-deps
 

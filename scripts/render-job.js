@@ -34,7 +34,7 @@ try {
   const result = await renderVideo({
     html: job.html, outFile, aspectRatio: job.aspectRatio, duration: job.duration, signal: controller.signal,
     onProgress: (p) => {
-      if (Date.now() - last < 1500 && p.framesDone < p.totalFrames) return;
+      if (Date.now() - last < 4000 && p.framesDone < p.totalFrames) return;   // progress every 4 s (fewer calls to the free server)
       last = Date.now();
       post('/progress', { percent: Math.round(p.percent * 0.95), framesDone: p.framesDone, totalFrames: p.totalFrames, etaSeconds: p.etaSeconds })
         .then((r) => { if (r.cancelled) controller.abort(); }).catch(() => {});

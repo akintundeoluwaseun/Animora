@@ -81,7 +81,7 @@ export async function createApp() {
       try {
         const f = await getDbObject(decodeURIComponent(req.params[0]));
         if (!f) return res.status(404).send('File not found');
-        res.set({ 'Content-Type': f.type, 'Cache-Control': 'public, max-age=31536000, immutable', 'Access-Control-Allow-Origin': '*' }).send(f.data);
+        res.set({ 'Content-Type': f.type, 'Cache-Control': 'public, max-age=31536000, immutable', 'CDN-Cache-Control': 'public, max-age=31536000, immutable', 'Access-Control-Allow-Origin': '*' }).send(f.data);   // cached at Vercel's edge: repeat views cost nothing
       } catch (e) { next(e); }
     });
   }

@@ -169,7 +169,7 @@ export default function Render() {
   usePolling(async () => {
     const r = await loadRender(render.id).catch(() => null);
     if (r?.status === 'done') refresh();
-  }, 1500, active);
+  }, 3000, active);   // every 3 s: fewer server calls (free plan), still feels live
 
   const start = async (adViewId) => {
     setBusy(true); setError(''); setAdOpen(false);
@@ -237,7 +237,7 @@ export default function Render() {
           <Progress render={render} onCancel={cancel} />
         ) : (
           <div className="mx-auto max-w-lg">
-            {render?.status === 'failed' && <div className="mb-4"><Alert>{render.error} Your video credit was returned.</Alert></div>}
+            {render?.status === 'failed' && <div className="mb-4"><Alert>{render.error}{/cleared/.test(render.error || '') ? '' : ' Your video credit was returned.'}</Alert></div>}
             <div className="surface p-6 sm:p-8">
               <h2 className="text-2xl font-extrabold">Make your MP4</h2>
               <dl className="mt-5 space-y-3 text-[15px]">

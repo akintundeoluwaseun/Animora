@@ -12,14 +12,48 @@ import { inspectAnimation } from './renderer.js';
 
 const API = 'https://generativelanguage.googleapis.com/v1beta/models';
 // "-latest" aliases track Google's current models; pin explicit versions via env for production.
-const CHAT_MODEL = process.env.GEMINI_CHAT_MODEL || 'gemini-flash-latest';
+// chat, brief reading and picture descriptions use the light model: plenty for the job, and a bigger free allowance
+const CHAT_MODEL = process.env.GEMINI_CHAT_MODEL || 'gemini-flash-lite-latest';
 const CODE_MODEL = process.env.GEMINI_CODE_MODEL || 'gemini-pro-latest';
 
 /**
  * messages: [{ role: 'user' | 'model', text, images?: [{ mimeType, data }] }]   (image data is base64)
  */
+// ---------------------------------------------------------------------------
+// Free-allowance guard. Each Gemini model has its own daily allowance. When a model says "used up for today",
+// we remember it (in the database, so every server instance knows) and skip it until Google resets the
+// allowance (midnight Pacific time). When every model is used up we stop calling Gemini at once, and Animora's
+// built-in designer takes over instantly, instead of retrying for a minute on every request.
+// ---------------------------------------------------------------------------
+const paused = new Map();   // model -> until (ms)
+let pausedAt = 0;
+const nextReset = () => { const d = new Date(); const r = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 8, 0, 0)); if (r <= d) r.setUTCDate(r.getUTCDate() + 1); return r.getTime(); };
+async function db() { try { return await import('../db/index.js'); } catch { return null; } }
+async function loadPauses() {
+  if (Date.now() - pausedAt < 60e3) return;
+  pausedAt = Date.now();
+  try {
+    const m = await db(); if (!m) return;
+    const row = await m.one("SELECT value FROM app_state WHERE key='gemini_paused'");
+    for (const [k, v] of Object.entries(row?.value || {})) if (v > Date.now()) paused.set(k, Math.max(paused.get(k) || 0, v));
+  } catch { /* table missing locally: memory only */ }
+}
+async function savePause(model, until) {
+  paused.set(model, until);
+  try {
+    const m = await db(); if (!m) return;
+    const obj = Object.fromEntries([...paused].filter(([, v]) => v > Date.now()));
+    await m.q("INSERT INTO app_state (key, value, updated_at) VALUES ('gemini_paused', $1, now()) ON CONFLICT (key) DO UPDATE SET value=$1, updated_at=now()", [JSON.stringify(obj)]);
+  } catch { /* memory only */ }
+}
+const isPaused = (m) => (paused.get(m) || 0) > Date.now();
+/** true while every model is resting (the app uses the built-in designer meanwhile) */
+export async function geminiResting() { await loadPauses(); return (paused.get('*') || 0) > Date.now(); }
+
 export async function geminiGenerate({ system, messages, model = CHAT_MODEL, temperature = 0.7, maxOutputTokens = 8192, json = false, timeoutMs = 120000, thinking = null, apiKey = process.env.GEMINI_API_KEY }) {
   if (!apiKey) throw new Error('GEMINI_API_KEY is not set');
+  await loadPauses();
+  if (isPaused('*')) throw Object.assign(new Error('Gemini 429: free allowance used up for today (resting)'), { status: 429 });
   const body = {
     systemInstruction: { parts: [{ text: system }] },
     contents: messages.map((m) => ({
@@ -38,7 +72,7 @@ export async function geminiGenerate({ system, messages, model = CHAT_MODEL, tem
   const live = await liveModels(apiKey);
   const kind = /pro/i.test(model) ? 'pro' : 'flash';
   const chain = [resolved.get(model), ...(live[kind] || []), ...(kind === 'pro' ? live.flash || [] : []), model, ...(FALLBACKS[model] || [])]
-    .filter(Boolean).filter((m, i, a) => a.indexOf(m) === i);
+    .filter(Boolean).filter((m, i, a) => a.indexOf(m) === i).filter((m) => !isPaused(m));
   let lastErr;
   const tried = [];
   for (const m of chain) {
@@ -73,13 +107,23 @@ export async function geminiGenerate({ system, messages, model = CHAT_MODEL, tem
       lastErr = new Error(`Gemini ${res.status} (${m}): ${errText.slice(0, 300)}`);
       tried.push(`${m}: ${res.status}`);
       lastErr.status = res.status;
-      if (res.status !== 429 && res.status < 500) break; // only retry rate limits / server errors
+      if (res.status === 429) {   // used up: rest this model (for today, or a minute for a per-minute limit) and try the next one
+        await savePause(m, /per ?day|PerDay|daily|quota.*day/i.test(errText) ? nextReset() : Date.now() + 65e3);
+        break;
+      }
+      if (res.status < 500) break; // only retry server errors
       await new Promise((r) => setTimeout(r, 1200 * (attempt + 1)));
     }
     if (![404, 429, 503, 500, 502, 504].includes(lastErr.status) && lastErr.status < 500) break; // a bad key or bad request won't be fixed by another model
     if (resolved.get(model) === m) resolved.delete(model);
   }
   if (lastErr && tried.length > 1) lastErr.message += ` [tried ${tried.join(', ')}]`;
+  // every model we could try is resting: stop calling Gemini until the earliest one comes back
+  if (!lastErr || lastErr.status === 429) {
+    const back = Math.min(...[...paused.values()].filter((v) => v > Date.now()), nextReset());
+    await savePause('*', back);
+    if (!lastErr) lastErr = Object.assign(new Error('Gemini 429: free allowance used up for today (resting)'), { status: 429 });
+  }
   throw lastErr;
 }
 
@@ -105,8 +149,10 @@ export async function liveModels(apiKey = process.env.GEMINI_API_KEY) {
   return modelCache.list;
 }
 
+// every model has its own free allowance, so a used-up or busy model hands over to the next one
 const FALLBACKS = {
-  [CHAT_MODEL]: ['gemini-flash-latest', 'gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.0-flash'],
+  'gemini-flash-lite-latest': ['gemini-2.5-flash-lite', 'gemini-2.0-flash-lite', 'gemini-flash-latest', 'gemini-2.5-flash', 'gemini-2.0-flash'],
+  'gemini-flash-latest': ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-flash-lite-latest', 'gemini-2.5-flash-lite'],
   [CODE_MODEL]: ['gemini-pro-latest', 'gemini-2.5-pro', 'gemini-flash-latest', 'gemini-2.5-flash'],
 };
 const resolved = new Map();

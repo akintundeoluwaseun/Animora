@@ -320,3 +320,25 @@ Change only what was asked. Picture NAMES must come from the list, and a picture
   };
   return { html: flyerHtml(next), summary: str(o.summary, 200) || 'Done! Check the flyer.' };
 }
+
+/** Simple flyer changes without the AI (when Gemini is resting): new layout, darker / lighter, a colour, a shorter headline. */
+const FLYER_COLORS = { red: '#D7263D', green: '#1F8A4C', blue: '#1F6FEB', yellow: '#FFC93C', gold: '#C9A227', orange: '#E8530E', purple: '#7B2CBF', pink: '#E83E8C', teal: '#0FA3A3', black: '#0B0B0B', white: '#FFFFFF', navy: '#0B2E6B', brown: '#7A4A21' };
+const shade = (hex, f) => { const n = parseInt(String(hex || '#777777').slice(1), 16); const ch = (v) => Math.max(0, Math.min(255, Math.round(f < 1 ? v * f : v + (255 - v) * (f - 1)))); return '#' + [n >> 16, (n >> 8) & 255, n & 255].map((v) => ch(v).toString(16).padStart(2, '0')).join(''); };
+export function offlineFlyerEdit({ html, instruction, assets = [] }) {
+  const data = readFlyer(html);
+  if (!data) return null;
+  const say = String(instruction || '').toLowerCase(), done = [], next = { ...data, colors: { ...data.colors } };
+  const photos = photosOf(assets).length || Object.keys(data.images || {}).length;
+  if (/layout|design|different|arrange|style|another|new look/.test(say)) {
+    const ok = FLYER_LAYOUTS.filter((l) => l !== data.layout && (l === 'grid' ? photos >= 3 : l === 'hero' ? photos >= 1 : l === 'split' ? photos >= 2 : true));
+    if (ok.length) { next.layout = ok[0]; done.push(`a new ${ok[0] === 'type' ? 'typography' : ok[0]} layout`); }
+    else { const c = next.colors; [c.primary, c.secondary] = [c.secondary || c.primary, c.primary]; done.push('a fresh colour arrangement (add photos for more layouts)'); }
+  }
+  if (/dark/.test(say)) { next.colors.background = shade(next.colors.background, 0.35); if (/text/.test(say) === false) next.colors.text = '#FFFFFF'; done.push('darker colours'); }
+  else if (/light|bright/.test(say)) { next.colors.background = shade(next.colors.background, 1.8); next.colors.text = '#111111'; done.push('lighter colours'); }
+  const word = Object.keys(FLYER_COLORS).find((w) => new RegExp(`\\b${w}\\b`).test(say));
+  if (word && !/dark|light/.test(say)) { const k = /background|bg/.test(say) ? 'background' : 'primary'; next.colors[k] = FLYER_COLORS[word]; done.push(`${word} ${k === 'background' ? 'background' : 'accent'}`); }
+  if (/short|fewer words|less text/.test(say) && /headline|title|text|words/.test(say)) { const w = String(next.headline || '').split(/\s+/); if (w.length > 3) { next.headline = w.slice(0, 3).join(' '); done.push('a shorter headline'); } }
+  if (!done.length) return null;
+  return { html: flyerHtml(next), summary: `Done: ${done.join(', ')}.` };
+}

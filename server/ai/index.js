@@ -4,13 +4,13 @@
 // so the product never dead-ends in front of a customer (or a judge).
 import { config } from '../config.js';
 import { getDbObject } from '../storage.js';
-import { planChat, generateAnimation, editAnimation } from '../engine/gemini.js';
+import { planChat, generateAnimation, editAnimation, geminiResting } from '../engine/gemini.js';
 import { validatePlan } from '../engine/validate.js';
 import { offlinePlannerTurn } from './offline.js';
 import { templateFromPlan, offlineEdit } from './templates.js';
 import { directedHtml, directorEdit, readData } from './director.js';
 import { describeAssets, upgradeRuntime } from './describe.js';
-import { isFlyer, editFlyer } from './flyer.js';
+import { isFlyer, editFlyer, offlineFlyerEdit } from './flyer.js';
 
 // 'director' (default): Gemini directs the shots, our motion engine animates them (fast, always renders).
 // 'html': Gemini writes the whole HTML/GSAP file itself (slower, experimental).
@@ -109,10 +109,11 @@ export function enrichPlan(plan, assets) {
 /** A short, plain reason for an AI failure (shown to the user; never contains the key). */
 export function aiReason(e) {
   const m = String(e?.message || e);
-  if (/429|quota|RESOURCE_EXHAUSTED/i.test(m)) return 'your Gemini key has hit its usage limit';
-  if (/40[03]|API key|PERMISSION_DENIED|API_KEY_INVALID/i.test(m)) return 'the Gemini key was refused';
-  if (/timeout|aborted|TimeoutError/i.test(m)) return 'Gemini took too long';
-  if (/JSON|Unexpected token|no text|MAX_TOKENS/i.test(m)) return "Gemini's answer was cut off";
+  // shown to customers: never mention keys or limits, just what happened
+  if (/429|quota|RESOURCE_EXHAUSTED|resting/i.test(m)) return 'the AI is resting for a while';
+  if (/40[03]|API key|PERMISSION_DENIED|API_KEY_INVALID/i.test(m)) return 'the AI is unavailable right now';
+  if (/timeout|aborted|TimeoutError/i.test(m)) return 'the AI took too long';
+  if (/JSON|Unexpected token|no text|MAX_TOKENS/i.test(m)) return "the AI's answer was cut off";
   return m.replace(/key=\S+/g, '').slice(0, 100);
 }
 
@@ -129,7 +130,7 @@ export async function generateCode({ plan, style, assets, brief = null, previous
       return { html, source: 'gemini', problems: [] };
     } catch (e) {
       console.warn('[ai] Gemini director failed:', e.message);
-      return { html: rule(), source: 'template', problems: [], notice: `The AI director couldn't finish (${aiReason(e)}), so this version was arranged automatically. Press Regenerate to try the AI again.` };
+      return { html: rule(), source: 'template', problems: [], notice: /429|quota|resting/i.test(e.message) ? "Animora's built-in designer made this one (the AI is resting for a while). You can still edit it." : `The AI director couldn't finish (${aiReason(e)}), so this version was arranged automatically. Press Regenerate to try the AI again.` };
     }
   }
   if (config.useGemini) {
@@ -151,9 +152,14 @@ export async function generateCode({ plan, style, assets, brief = null, previous
 export async function editCode({ html, instruction, aspectRatio, duration, plan = null, assets = [], brief = null, history = [], onStatus }) {
   if (config.useGemini) assets = await describeAssets(assets, loadImage);
   if (isFlyer(html)) {
-    if (!config.useGemini) return { html, source: 'offline', unchanged: true, summary: 'Flyer changes need the AI, which is off right now.' };
-    try { const r = await editFlyer({ html, instruction, assets }); return { html: r.html, source: 'gemini', summary: r.summary }; }
-    catch (e) { console.warn('[ai] flyer edit failed:', e.message); return { html, source: 'offline', unchanged: true, summary: `I couldn't change the flyer (${aiReason(e)}). Try again.` }; }
+    const simple = () => offlineFlyerEdit({ html, instruction, assets });
+    if (config.useGemini && !(await geminiResting())) {
+      try { const r = await editFlyer({ html, instruction, assets }); return { html: r.html, source: 'gemini', summary: r.summary }; }
+      catch (e) { console.warn('[ai] flyer edit failed:', e.message); }
+    }
+    const r = simple();
+    if (r) return { html: r.html, source: 'offline', summary: r.summary };
+    return { html, source: 'offline', unchanged: true, summary: 'The AI is resting for a while. Right now I can change the layout, make it darker or lighter, change a colour, or shorten the headline.' };
   }
   html = upgradeRuntime(html, assets);
   const directed = !!readData(html)?.beats;

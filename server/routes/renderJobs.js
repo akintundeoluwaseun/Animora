@@ -79,6 +79,7 @@ r.post('/render-jobs/:id/done', async (req, res) => {
   await q(`UPDATE renders SET status='done', progress=100, frames_done=total_frames, eta_seconds=0, video_url=$2, file_size=$3,
     chunk_count=$4, chunk_size=$5, finished_at=now(), job_token=NULL WHERE id=$1`, [j.id, url, Number(size) || null, Number(parts) || 0, PART]);
   await settleRender(j.id).catch(() => {});
+  clearOldVideos().catch((e) => console.warn('[renders] cleanup:', e.message));
   const p = await one('SELECT title FROM projects WHERE id=$1', [j.project_id]);
   await notifyUser(j.user_id, { title: 'Your MP4 is ready', body: `${p?.title || 'Your video'}: tap to download it.`, url: `/p/${j.project_id}/render`, tag: `render-${j.id}` });
   res.json({ ok: true, url });
@@ -92,6 +93,18 @@ r.post('/render-jobs/:id/fail', async (req, res) => {
   await notifyUser(j.user_id, { title: "Your MP4 didn't finish", body: 'Open Animora and try again.', url: `/p/${j.project_id}/render`, tag: `render-${j.id}` });
   res.json({ ok: true });
 });
+
+// Keep the free database small: finished MP4s are cleared after KEEP_DAYS (the video's design stays, so the
+// owner can make the MP4 again for free with one tap). Runs after each finished render.
+const KEEP_DAYS = Number(process.env.MP4_KEEP_DAYS) || 3;
+export async function clearOldVideos() {
+  const old = await q(`SELECT id FROM renders WHERE status='done' AND chunk_count > 0 AND finished_at < now() - ($1 || ' days')::interval LIMIT 50`, [String(KEEP_DAYS)]);
+  for (const { id } of old) {
+    await q("DELETE FROM files WHERE key LIKE $1", [`renders/${id}.mp4%`]);
+    await q("UPDATE renders SET status='failed', chunk_count=0, video_url=NULL, error=$2 WHERE id=$1", [id, `This MP4 was cleared after ${KEEP_DAYS} days to keep Animora free. Press Generate Video to make it again (free).`]);
+  }
+  if (old.length) console.log(`[renders] cleared ${old.length} old MP4(s)`);
+}
 
 // The finished MP4, served in ranges of at most 4 MB (players and our download button ask for the next part).
 r.get('/render-file/:id', async (req, res) => {
@@ -113,7 +126,7 @@ r.get('/render-file/:id', async (req, res) => {
   const body = Buffer.concat(chunks);
   res.status(206).set({
     'Content-Type': 'video/mp4', 'Accept-Ranges': 'bytes', 'Content-Range': `bytes ${start}-${start + body.length - 1}/${size}`,
-    'Content-Length': body.length, 'Cache-Control': 'public, max-age=31536000, immutable', 'Access-Control-Allow-Origin': '*',
+    'Content-Length': body.length, 'Cache-Control': 'public, max-age=31536000, immutable', 'CDN-Cache-Control': 'public, max-age=31536000, immutable', 'Access-Control-Allow-Origin': '*',
   }).send(body);
 });
 

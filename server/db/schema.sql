@@ -258,3 +258,7 @@ CREATE TABLE IF NOT EXISTS credit_payments (
 ALTER TABLE device_keys ENABLE ROW LEVEL SECURITY;
 ALTER TABLE device_codes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE credit_payments ENABLE ROW LEVEL SECURITY;
+
+-- v10: small app-wide settings (e.g. which Gemini models are resting after using their free allowance)
+CREATE TABLE IF NOT EXISTS app_state (key TEXT PRIMARY KEY, value JSONB NOT NULL DEFAULT '{}', updated_at TIMESTAMPTZ NOT NULL DEFAULT now());
+ALTER TABLE app_state ENABLE ROW LEVEL SECURITY;
