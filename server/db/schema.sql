@@ -262,3 +262,6 @@ ALTER TABLE credit_payments ENABLE ROW LEVEL SECURITY;
 -- v10: small app-wide settings (e.g. which Gemini models are resting after using their free allowance)
 CREATE TABLE IF NOT EXISTS app_state (key TEXT PRIMARY KEY, value JSONB NOT NULL DEFAULT '{}', updated_at TIMESTAMPTZ NOT NULL DEFAULT now());
 ALTER TABLE app_state ENABLE ROW LEVEL SECURITY;
+
+-- v11: when the owner downloaded the MP4 (it is cleared 2 hours later; the design stays)
+ALTER TABLE renders ADD COLUMN IF NOT EXISTS downloaded_at timestamptz;

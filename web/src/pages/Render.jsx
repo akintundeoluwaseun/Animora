@@ -89,6 +89,7 @@ function Progress({ render, onCancel }) {
 
 // Fetch the whole MP4. Videos made online come back in 4 MB ranges, so ask for each part in turn.
 async function fetchVideo(url, onProgress = () => {}) {
+  url = `${url}${url.includes('?') ? '&' : '?'}dl=1`;   // a real download: the server clears the MP4 2 hours later
   const first = await fetch(url, { headers: { Range: 'bytes=0-' } });
   if (first.status !== 206) return first.blob();
   const total = Number((first.headers.get('content-range') || '').split('/')[1]) || 0;

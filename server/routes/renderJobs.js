@@ -80,7 +80,7 @@ r.post('/render-jobs/:id/done', async (req, res) => {
   await q(`UPDATE renders SET status='done', progress=100, frames_done=total_frames, eta_seconds=0, video_url=$2, file_size=$3,
     chunk_count=$4, chunk_size=$5, finished_at=now(), job_token=NULL WHERE id=$1`, [j.id, url, Number(size) || null, Number(parts) || 0, PART]);
   await settleRender(j.id).catch(() => {});
-  clearOldVideos().catch((e) => console.warn('[renders] cleanup:', e.message));
+  clearOldVideos({ force: true }).catch((e) => console.warn('[renders] cleanup:', e.message));
   const p = await one('SELECT title FROM projects WHERE id=$1', [j.project_id]);
   await notifyUser(j.user_id, { title: 'Your MP4 is ready', body: `${p?.title || 'Your video'}: tap to download it.`, url: `/p/${j.project_id}/render`, tag: `render-${j.id}` });
   res.json({ ok: true, url });
@@ -95,14 +95,20 @@ r.post('/render-jobs/:id/fail', async (req, res) => {
   res.json({ ok: true });
 });
 
-// Keep the free database small: finished MP4s are cleared after KEEP_DAYS (the video's design stays, so the
-// owner can make the MP4 again for free with one tap). Runs after each finished render.
-const KEEP_DAYS = Number(process.env.MP4_KEEP_DAYS) || 3;
-export async function clearOldVideos() {
-  const old = await q(`SELECT id FROM renders WHERE status='done' AND chunk_count > 0 AND finished_at < now() - ($1 || ' days')::interval LIMIT 50`, [String(KEEP_DAYS)]);
+// Keep the free database small: an MP4 is cleared 2 hours after it was downloaded, or 1 day after it was made
+// if nobody downloaded it. The video's design (its code) stays, so the owner can make the MP4 again for free.
+const AFTER_DOWNLOAD_H = Number(process.env.MP4_KEEP_AFTER_DOWNLOAD_HOURS) || 2;
+const KEEP_H = Number(process.env.MP4_KEEP_HOURS) || 24;
+let lastSweep = 0;
+export async function clearOldVideos({ force = false } = {}) {
+  if (!force && Date.now() - lastSweep < 10 * 60 * 1000) return;   // at most every 10 minutes
+  lastSweep = Date.now();
+  const old = await q(`SELECT id FROM renders WHERE status='done' AND chunk_count > 0 AND (
+      (downloaded_at IS NOT NULL AND downloaded_at < now() - ($1 || ' hours')::interval)
+      OR finished_at < now() - ($2 || ' hours')::interval) LIMIT 100`, [String(AFTER_DOWNLOAD_H), String(KEEP_H)]);
   for (const { id } of old) {
     await q("DELETE FROM files WHERE key LIKE $1", [`renders/${id}.mp4%`]);
-    await q("UPDATE renders SET status='failed', chunk_count=0, video_url=NULL, error=$2 WHERE id=$1", [id, `This MP4 was cleared after ${KEEP_DAYS} days to keep Animora free. Press Generate Video to make it again (free).`]);
+    await q("UPDATE renders SET status='failed', chunk_count=0, video_url=NULL, error=$2 WHERE id=$1", [id, 'This MP4 was cleared to keep Animora free. Your video is saved: press Generate Video to make the MP4 again (free).']);
   }
   if (old.length) console.log(`[renders] cleared ${old.length} old MP4(s)`);
 }
@@ -125,6 +131,10 @@ r.get('/render-file/:id', async (req, res) => {
     chunks.push(f.data.subarray(Math.max(0, start - s0), Math.min(f.data.length, end - s0 + 1)));
   }
   const body = Buffer.concat(chunks);
+  if (end >= size - 1 && req.query.dl) {   // the last part of a Download / Share went out
+    q('UPDATE renders SET downloaded_at=now() WHERE id=$1 AND downloaded_at IS NULL', [j.id]).catch(() => {});
+  }
+  clearOldVideos().catch(() => {});
   res.status(206).set({
     'Content-Type': 'video/mp4', 'Accept-Ranges': 'bytes', 'Content-Range': `bytes ${start}-${start + body.length - 1}/${size}`,
     'Content-Length': body.length, 'Cache-Control': 'public, max-age=31536000, immutable', 'CDN-Cache-Control': 'public, max-age=31536000, immutable', 'Access-Control-Allow-Origin': '*',
