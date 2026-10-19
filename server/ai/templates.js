@@ -414,7 +414,9 @@ function planBeats(plan, scenes, theme, rnd, ctx) {
 
     if (s.kind === 'cta') {
       const lock = { shot: 'lockup', text: ctx.brand, subs: [s.head, ...s.subs].filter((x) => x && x !== ctx.brand).slice(0, 2), button: s.button };
-      if (len >= 4 && (theme.prefer.cta || []).includes('chat') && s.head && s.head.length <= 60) {
+      if (theme.calm && len >= 4) {   // premium: a tiny app-style demo of the customer's journey, then the lockup
+        add(s, [{ weight: 1, shot: 'status', items: ['Request sent', 'Confirmed', 'See you soon'], title: ctx.brand }, { weight: 1.3, ...lock }]);
+      } else if (len >= 4 && (theme.prefer.cta || []).includes('chat') && s.head && s.head.length <= 60) {
         add(s, [{ weight: 1.2, shot: 'chat', text: s.head, sub: s.subs[0] || `Yes! ${s.button ? s.button : "We're ready for you."}` }, { weight: 1.2, ...lock }]);
       } else if (len >= 6 && theme.prefer.list.includes('phone') && ctx.menu.length >= 2) {
         add(s, [{ weight: 0.8, shot: pick('hook', { text: s.head }), text: s.head }, { weight: 1, shot: 'phone', title: '', items: ctx.menu.slice(0, 3), button: s.button }, { weight: 1.3, ...lock }]);
@@ -800,14 +802,14 @@ function css(theme, c, W, H) {
   /* moving background layers get their own compositor layer: painted once, then only moved (2x faster renders) */
   .bg-glow, .bg-streak, .bg-beam, .bg-rays, .bg-grid, .bg-dots, .bg-halftone, .bg-kente, .bg-wave, .bg-marq, .bg-p, .bg-frame { will-change: transform, opacity; }
   .bg-base { position: absolute; inset: 0; background: ${lightBg
-    ? 'radial-gradient(ellipse at 50% 35%, #ffffff 0%, var(--bg) 70%)'
+    ? 'radial-gradient(ellipse 75% 60% at 50% 42%, #ffffff 0%, color-mix(in srgb, var(--bg) 88%, #c9cbd1) 62%, color-mix(in srgb, var(--bg) 72%, #b7b9c0) 100%)'
     : 'radial-gradient(ellipse at 50% 30%, color-mix(in srgb, var(--primary) 18%, var(--bg)) 0%, var(--bg) 70%)'}; }
   .bg-grid { position: absolute; inset: ${n(-200)}; background-image: linear-gradient(var(--line) ${n(2)}, transparent ${n(2)}), linear-gradient(90deg, var(--line) ${n(2)}, transparent ${n(2)}); background-size: ${n(90)} ${n(90)};
     -webkit-mask: radial-gradient(ellipse at 50% 50%, #000 20%, transparent 70%); mask: radial-gradient(ellipse at 50% 50%, #000 20%, transparent 70%); }
   .bg-dots { position: absolute; inset: ${n(-200)}; background-image: radial-gradient(var(--line) ${n(3)}, transparent ${n(3)}); background-size: ${n(60)} ${n(60)}; }
   .bg-glow { position: absolute; width: ${Math.round(W * 1.1)}px; height: ${Math.round(W * 1.1)}px; border-radius: 50%; left: ${Math.round(-W * 0.3)}px; top: ${Math.round(H * 0.05)}px;
-    background: radial-gradient(circle, color-mix(in srgb, var(--primary) ${lightBg ? 22 : 38}%, transparent) 0%, transparent 65%); }
-  .bg-glow.g2 { left: auto; right: ${Math.round(-W * 0.35)}px; top: auto; bottom: ${Math.round(H * 0.02)}px; background: radial-gradient(circle, color-mix(in srgb, var(--secondary) ${lightBg ? 22 : 30}%, transparent) 0%, transparent 65%); }
+    background: ${lightBg ? 'radial-gradient(circle, rgba(255,255,255,.85) 0%, transparent 62%)' : 'radial-gradient(circle, color-mix(in srgb, var(--primary) 38%, transparent) 0%, transparent 65%)'}; }
+  .bg-glow.g2 { left: auto; right: ${Math.round(-W * 0.35)}px; top: auto; bottom: ${Math.round(H * 0.02)}px; background: ${lightBg ? 'radial-gradient(circle, rgba(150,154,165,.16) 0%, transparent 62%)' : 'radial-gradient(circle, color-mix(in srgb, var(--secondary) 30%, transparent) 0%, transparent 65%)'}; }
   .bg-streak { position: absolute; left: 0; top: 40%; width: ${Math.round(W * 0.9)}px; height: ${n(70)}; border-radius: 999px; filter: blur(${n(18)});
     background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--secondary) 75%, transparent), transparent); opacity: .55; }
   .bg-streak.s1 { top: 62%; background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--primary) 80%, transparent), transparent); }

@@ -280,10 +280,16 @@ DIRECTION RULES
 - The video is ${duration} seconds, ${aspect}. Use about one beat per ${duration <= 20 ? '1.5-2.2' : '2-3'} seconds, so return AT LEAST ${Math.ceil(duration / 3)} beats; no beat longer than 3.5 seconds. If the answers run out, write new short lines from the business info (benefits, a question to the viewer, how it works, a promise) instead of repeating. The "seconds" values should add up to about ${duration}.
 - Every beat shows ONE idea. Never repeat the same shot twice in a row, and vary the shots across the video; it must not feel like a pattern.
 - PREMIUM ONLY: this must look like a top agency ad on TikTok, never like a template. Generous empty space, one idea per shot, short words, smooth camera.
+- STORY FIRST (this is how the best TikTok product ads are built; follow it unless the special instructions ask for something else):
+  1. HOOK (1-2 beats): a feeling or problem the viewer already knows, in 2-5 plain words ("Everyone knows the feeling.", "These days, shopping takes forever.", "Hungry and nothing at home?"). A calm "sentence" beat, or on loud styles a "slam" / glitch-cut beat.
+  2. TURN (1 beat): the business arrives: "Welcome to <name>" / "Introducing <name>" with the logo ("logo" or "iconmorph").
+  3. SHOW HOW IT WORKS (2-4 beats, in order, like a tiny app demo of the customer's real journey): someone types what they want ("prompt"), the product or order appears ("card" / "parallax" with a real photo), it gets confirmed ("status": "Order confirmed" / "Booking approved"), then a "notify" message ("Your order is on the way") or "stars". Use the business's real products, prices and steps; plain generic messages, never invented names or numbers.
+  4. BENEFITS (1-2 beats): two or three short punches in a row, one word in the accent colour ("No waiting.", "No stress.", "Fresh daily."), using "wordswap", "rollword" or "sentence".
+  5. LOCKUP (last beat): logo + a 2-4 word tagline that sounds finished ("Eating. Done your way.", "Hair. Done right.") with phone/website, in "endcard" or "lockup".
+  Every beat is ONE small idea with lots of empty space around it. Small, calm type beats giant type: use slam/poster only on loud styles, at most once.
 - PREMIUM DIRECTION (this is what separates a top motion designer from a template):
   * At least half of the beats use the chosen preset's signature shots. Use only 2-3 cut types from the preset in the whole video, so it feels like one film.
-  * Contrast scale: follow a giant-type beat (slam / poster / zoomword) with a calmer detail beat, then a 3D beat (tunnel / parallax / marquee3d / isocard). Never three similar beats in a row.
-  * The first beat is the strongest: slam, poster, tunnel, logo+dive or parallax. Short punchy words on screen (1-4 words for slam / poster).
+  * Contrast scale: follow a text beat with a UI or product beat, then a 3D beat (parallax / isocard / fan). Never three similar beats in a row.
   * Rhythm: beats of 1.5-2.5 s, a few faster ones (about 1 s) right before the reveal of the offer or the brand.
   * Every uploaded product photo should appear at least once, ideally in parallax, glowproduct, fan or tunnel.
   * Match the preset to the style: light / white styles suit "apple"; dark styles suit "glow", "cinematic" or "luxury"; loud colourful styles suit "studio", "kinetic" or "hype".
