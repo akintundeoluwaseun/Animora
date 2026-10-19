@@ -17,7 +17,7 @@ export default function Styles() {
   return (
     <div className="mx-auto max-w-[1180px] px-6 py-10 sm:px-10">
       <h1 className="text-4xl font-bold tracking-[-0.045em]">Styles</h1>
-      <p className="mt-2 max-w-[60ch] text-ink-soft">Hover a style to watch it. Pick one to start a video in that look; the AI still plans every shot new for your business.</p>
+      <p className="mt-2 max-w-[60ch] text-ink-soft">Hover a style to watch it. Pick one to start a video in that look; every shot is still planned new for your business.</p>
       <div className="mt-8"><Alert>{error}</Alert>{busy ? <PageLoader /> : <StylePicker onPick={start} />}</div>
     </div>
   );

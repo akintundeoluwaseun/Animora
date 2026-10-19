@@ -4,6 +4,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { api, ago, duration, naira, otherDeviceLink, useAuth, usePolling } from '../lib.jsx';
 import { Alert, Button, Empty, Modal, PageLoader, PlanBadge, Spinner } from '../components/ui.jsx';
 import BuyCredits, { creditsLeft } from '../components/BuyCredits.jsx';
+import { FullView } from '../components/Preview.jsx';
 
 // A style card: shows the poster, plays the preview while hovered or focused.
 export function StyleCard({ s, selected, onPick }) {
@@ -191,6 +192,8 @@ export default function Dashboard({ kind = 'video' }) {   // /videos shows video
   const newOpen = !!newParam;
   const newKind = newParam === 'video' || newParam === 'flyer' ? newParam : null;
 
+  const [full, setFull] = useState(null);   // { html, aspect } of the flyer shown full screen
+  const openFull = async (p) => { try { const { project } = await api(`/projects/${p.id}`); if (project.code) setFull({ html: project.code, aspect: project.aspectRatio }); } catch (e) { setError(e.message); } };
   const load = async () => { try { setProjects((await api('/projects')).projects.filter((p) => (p.kind || 'video') === kind)); } catch (e) { setError(e.message); } };
   useEffect(() => { load(); refresh(); api('/pricing').then((r) => setPricing(r.pricing)).catch(() => {}); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   // videos made online have no thumbnail yet: make them here, one at a time, in the background
@@ -221,7 +224,7 @@ export default function Dashboard({ kind = 'video' }) {   // /videos shows video
   usePolling(load, 3000, active);
 
   const remove = async (p) => {
-    if (!confirm(`Delete "${p.title}"? This also deletes its videos.`)) return;
+    if (!confirm(p.kind === 'flyer' ? `Delete the flyer "${p.title}"?` : `Delete "${p.title}" and its MP4s? This can't be undone.`)) return;
     await api(`/projects/${p.id}`, { method: 'DELETE' }); load();
   };
 
@@ -230,6 +233,7 @@ export default function Dashboard({ kind = 'video' }) {   // /videos shows video
 
   return (
     <div className="mx-auto max-w-[1180px] px-6 py-10 sm:px-10">
+      {full && <FullView html={full.html} aspect={full.aspect} still onClose={() => setFull(null)} />}
       <NewThing open={newOpen} kind={newKind} onPick={(k) => setParams({ new: k })} onClose={() => setParams({})} />
       <div className="flex flex-wrap items-end justify-between gap-4">
         <h1 className="text-4xl font-bold tracking-[-0.045em]">{kind === 'flyer' ? 'My flyers' : 'My videos'}</h1>
@@ -272,13 +276,19 @@ export default function Dashboard({ kind = 'video' }) {   // /videos shows video
                     </div>
                     <span className={`absolute left-2.5 top-2.5 rounded-md px-2 py-0.5 text-xs font-semibold ${st.c}`}>{st.t}</span>
                     <KindBadge kind={p.kind} className="absolute right-2.5 top-2.5" />
+                    {p.kind === 'flyer' && ['ready', 'rendered'].includes(p.status) && (
+                      <button type="button" aria-label={`See ${p.title} full screen`} onClick={(e) => { e.preventDefault(); e.stopPropagation(); openFull(p); }}
+                        className="press absolute bottom-2.5 right-2.5 flex items-center gap-1.5 rounded-full bg-black/60 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur hover:bg-black/80">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" /></svg>Full screen
+                      </button>
+                    )}
                   </div>
                   <p className="mt-3 line-clamp-2 font-semibold leading-snug tracking-[-0.01em]">{p.title}</p>
                 </Link>
                 <div className="mt-1 flex items-center gap-3 text-sm text-ink-mute">
                   <span>{p.kind === 'flyer' ? 'Flyer' : duration(p.duration_seconds)}, {p.aspect_ratio}, {ago(p.updated_at)}</span>
                   {p.last_render?.status === 'done' && <a href={`/download/${p.last_render.id}`} className="font-semibold text-money hover:underline">Download</a>}
-                  <button onClick={() => remove(p)} className="ml-auto opacity-0 hover:text-alert focus:opacity-100 group-hover:opacity-100" aria-label={`Delete ${p.title}`}>Delete</button>
+                  <button onClick={() => remove(p)} className="ml-auto font-semibold text-ink-mute hover:text-alert focus:opacity-100 sm:opacity-0 sm:group-hover:opacity-100" aria-label={`Delete ${p.title}`}>Delete</button>
                 </div>
               </li>
             );

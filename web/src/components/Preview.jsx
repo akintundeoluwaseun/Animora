@@ -196,3 +196,27 @@ export function VideoPhone({ src, aspect = '9:16', maxWidth = 320, poster, autoP
     </PhoneFrame>
   );
 }
+
+// Full screen: the flyer (or video) as big as the screen allows, sharp, with every detail readable.
+export function FullView({ html, aspect = '9:16', still = false, onClose }) {
+  const [box, setBox] = useState({ w: window.innerWidth, h: window.innerHeight });
+  useEffect(() => {
+    const fit = () => setBox({ w: window.innerWidth, h: window.innerHeight });
+    const key = (e) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('resize', fit); window.addEventListener('keydown', key);
+    const prev = document.body.style.overflow; document.body.style.overflow = 'hidden';
+    return () => { window.removeEventListener('resize', fit); window.removeEventListener('keydown', key); document.body.style.overflow = prev; };
+  }, [onClose]);
+  const a = ASPECTS[aspect] || ASPECTS['9:16'];
+  const width = Math.floor(Math.min(box.w - 24, (box.h - (still ? 90 : 150)) * (a.w / a.h)));
+  return (
+    <div className="fixed inset-0 z-[80] flex flex-col items-center justify-center bg-black/92 p-3" role="dialog" aria-modal="true" aria-label="Full screen" onClick={onClose}>
+      <button type="button" onClick={onClose} className="absolute right-3 top-3 z-10 grid size-11 place-items-center rounded-full bg-white/12 text-white hover:bg-white/20" aria-label="Close full screen">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M6 6l12 12M18 6 6 18" /></svg>
+      </button>
+      <div onClick={(e) => e.stopPropagation()}>
+        <LivePreview html={html} aspect={aspect} maxWidth={width} still={still} autoPlay={!still} />
+      </div>
+    </div>
+  );
+}

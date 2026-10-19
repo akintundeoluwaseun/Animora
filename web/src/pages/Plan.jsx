@@ -34,7 +34,7 @@ export function fitSeconds(b = {}) {
 export function lengthWarning(b, v) {
   const rec = fitSeconds(b), sec = Number(v);
   if (!sec) return null;
-  if (sec >= rec * 1.6 && sec - rec >= 15) return { rec, text: `Your details fill about ${rec} seconds. At ${sec} seconds the AI has to stretch them, so the video can feel slow and repeat itself. Add more messages, selling points or products, or choose ${rec} seconds.` };
+  if (sec >= rec * 1.6 && sec - rec >= 15) return { rec, text: `Your details fill about ${rec} seconds. At ${sec} seconds the video has to stretch them, so the video can feel slow and repeat itself. Add more messages, selling points or products, or choose ${rec} seconds.` };
   if (sec <= rec * 0.7 && rec - sec >= 10) return { rec, text: `That's a lot for ${sec} seconds: everything will flash by too fast to read. ${rec} seconds fits your details, or remove some of them.` };
   return null;
 }

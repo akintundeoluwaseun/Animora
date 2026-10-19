@@ -13,7 +13,7 @@ import { probeBuffer, toMp3 } from '../media.js';
 import { voiceoverFormats, generateVoiceTrack, VOICES, hasOfflineVoice } from '../ai/voice.js';
 import { config } from '../config.js';
 import { cleanBrief, briefToPlanRules, suggest, autoStyleSlug, parseBrief } from '../ai/brief.js';
-import { makeFlyer } from '../ai/flyer.js';
+import { makeFlyer, flyerFitNotice } from '../ai/flyer.js';
 import { useCredit, NEED_CREDITS } from '../billing.js';
 import { describeAssets } from '../ai/describe.js';
 import { loadImage } from '../ai/index.js';
@@ -146,6 +146,10 @@ r.patch('/:id', async (req, res) => {
 
 r.delete('/:id', async (req, res) => {
   const p = await loadProject(req, res); if (!p) return;
+  // its MP4s and thumbnails go too, so deleted videos don't keep using the free database space
+  const rs = await q('SELECT id FROM renders WHERE project_id=$1', [p.id]).catch(() => []);
+  for (const { id } of rs) await q('DELETE FROM files WHERE key LIKE $1', [`renders/${id}.%`]).catch(() => {});
+  await q('DELETE FROM renders WHERE project_id=$1', [p.id]).catch(() => {});
   await q('DELETE FROM projects WHERE id=$1', [p.id]);
   res.json({ ok: true });
 });
@@ -314,6 +318,7 @@ async function runGenerate(p, user) {
       const assets = config.useGemini ? await describeAssets(await projectAssets(p.id), loadImage) : await projectAssets(p.id);
       setMsg('Designing your flyer');
       out = { html: await makeFlyer({ brief: p.brief_json || {}, plan: p.plan_json, style, assets, previous: p.code_html || null, useAI: config.useGemini }), source: config.useGemini ? 'gemini' : 'template' };
+      out.notice = flyerFitNotice(out.html);
     } else out = await generateCode({ plan: p.plan_json, style: await loadStyle(p.style_id), assets: await projectAssets(p.id), brief: p.brief_json || null, previous: p.code_html || null, onStatus: setMsg });
     const versions = [...(p.code_versions || []), ...(p.code_html ? [p.code_html] : [])].slice(-MAX_VERSIONS);
     const u = await one(`UPDATE projects SET code_html=$2, code_versions=$3, status='ready', ai_source=$4, edit_history='[]'::jsonb, updated_at=now(),

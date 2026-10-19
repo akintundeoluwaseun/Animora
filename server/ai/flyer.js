@@ -148,6 +148,11 @@ export function flyerHtml(data) {
   } else if (layout === 'split') {
     const pics = [hero, ...items.map((i) => i.src)].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i).slice(0, 3);
     body = `<section class="panel">${head}${h1}${sub}${feats}${priceTags}</section><section class="strip n${pics.length || 1}">${pics.map((p) => `<div class="ph"><img src="${esc(p)}" crossorigin="anonymous" alt=""></div>`).join('') || '<div class="ph none"></div>'}</section>${badge}${foot}`;
+  } else if (layout === 'type' && !hero) {
+    // no photo: a big brand showcase fills the middle, so the flyer never looks empty
+    const mark = logo ? `<img src="${esc(logo.url)}" crossorigin="anonymous" alt="">` : `<b>${esc(String(brand || '?').trim().charAt(0).toUpperCase())}</b>`;
+    const art = `<section class="art"><i class="ring r1"></i><i class="ring r2"></i><i class="ring r3"></i><i class="spark s1"></i><i class="spark s2"></i><i class="spark s3"></i><div class="art-mark ${logo && !logo.transparent ? 'boxed' : ''}">${mark}</div>${badge}</section>`;
+    body = `${head}<section class="giant">${h1}${sub}</section>${art}<section class="mid wide">${feats}${priceTags}</section>${foot}`;
   } else if (layout === 'type') {
     body = `${head}<section class="giant">${h1}${sub}</section>${hero ? `<div class="orb"><img src="${esc(hero)}" crossorigin="anonymous" alt=""></div>` : ''}${badge}<section class="mid">${feats}${priceTags}</section>${foot}`;
   } else {   // hero
@@ -189,7 +194,11 @@ h1 em { font-style:inherit; color:var(--primary); }
 .contacts { display:flex; flex-direction:column; gap:${n(8)}; font-family:${subStack}; font-weight:700; font-size:${n(36)}; min-width:0; }
 .contacts span { display:flex; align-items:center; gap:${n(12)}; } .contacts .ic { color:var(--primary); width:${n(36)}; height:${n(36)}; }
 .ph { border-radius:${n(36)}; overflow:hidden; background:var(--surface); box-shadow:var(--shadow); }
-.ph.none { display:grid; place-items:center; color:var(--primary); }
+.ph.none { display:grid; place-items:center; color:#fff; position:relative;
+  background: radial-gradient(circle at 30% 25%, color-mix(in srgb, var(--primary) 55%, #ffffff), var(--primary) 55%, color-mix(in srgb, var(--primary) 50%, var(--secondary))); }
+.ph.none::before { content:''; position:absolute; width:58%; aspect-ratio:1; border-radius:50%; border:${n(3)} solid rgba(255,255,255,.3); }
+.ph.none::after { content:''; position:absolute; width:92%; aspect-ratio:1; border-radius:50%; border:${n(2)} dashed rgba(255,255,255,.18); }
+.ph.none .ic.big { opacity:1; width:${n(110)}; height:${n(110)}; position:relative; z-index:1; filter:drop-shadow(0 ${n(10)} ${n(20)} rgba(0,0,0,.25)); }
 /* hero */
 .photo { position:relative; margin:${n(-64)} ${n(-64)} 0; height:${tall ? '50%' : '46%'}; flex:none; border-radius:0 0 ${n(70)} ${n(70)}; overflow:hidden; background:color-mix(in srgb, var(--primary) 30%, var(--bg)); }
 .photo > img { position:absolute; inset:0; } .photo .shade { position:absolute; inset:0; background:linear-gradient(180deg, rgba(0,0,0,.45), transparent 35%); }
@@ -217,6 +226,19 @@ h1 em { font-style:inherit; color:var(--primary); }
 .orb { position:absolute; right:${n(-120)}; top:${n(tall ? 700 : 300)}; width:${n(560)}; height:${n(560)}; border-radius:50%; overflow:hidden; box-shadow:var(--shadow); border:${n(12)} solid var(--surface); z-index:1; }
 .mid { display:flex; flex-direction:column; gap:${n(22)}; max-width:${Math.round(W * 0.62)}px; position:relative; z-index:2; }
 .giant + .orb + .badge { top:auto; bottom:${n(tall ? 520 : 300)}; }
+/* type, no photo: brand showcase */
+.art { position:relative; flex:1; min-height:${n(300)}; border-radius:${n(56)}; overflow:hidden; display:grid; place-items:center; box-shadow:var(--shadow);
+  background: radial-gradient(circle at 50% 42%, color-mix(in srgb, var(--primary) 55%, #ffffff) 0%, var(--primary) 46%, color-mix(in srgb, var(--primary) 55%, var(--secondary)) 100%); }
+.art .ring { position:absolute; left:50%; top:50%; aspect-ratio:1; border-radius:50%; transform:translate(-50%,-50%); border:${n(3)} solid rgba(255,255,255,.28); }
+.art .r1 { width:46%; } .art .r2 { width:72%; border-style:dashed; border-color:rgba(255,255,255,.2); } .art .r3 { width:104%; border-color:rgba(255,255,255,.12); }
+.art .spark { position:absolute; width:${n(18)}; height:${n(18)}; border-radius:50%; background:#fff; box-shadow:0 0 ${n(24)} ${n(6)} rgba(255,255,255,.7); }
+.art .s1 { left:18%; top:24%; } .art .s2 { right:16%; bottom:22%; width:${n(12)}; height:${n(12)}; } .art .s3 { left:30%; bottom:16%; width:${n(10)}; height:${n(10)}; opacity:.7; }
+.art-mark { position:relative; z-index:2; width:${n(tall ? 300 : 230)}; aspect-ratio:1; border-radius:28%; display:grid; place-items:center; overflow:hidden;
+  background:rgba(255,255,255,.16); border:${n(3)} solid rgba(255,255,255,.4); box-shadow:0 ${n(40)} ${n(90)} ${n(-20)} rgba(0,0,0,.45); }
+.art-mark.boxed { background:#fff; } .art-mark img { object-fit:contain; width:78%; height:78%; } .art-mark.boxed img { object-fit:contain; width:100%; height:100%; }
+.art-mark b { font-size:${n(tall ? 180 : 140)}; color:#fff; font-weight:${theme.headWeight}; line-height:1; }
+.art .badge { top:${n(30)}; right:${n(30)}; bottom:auto; width:${n(210)}; height:${n(210)}; font-size:${n(38)}; }
+.mid.wide { max-width:none; } .mid.wide .feats { gap:${n(16)}; }
 .layout-hero .badge { top:calc(${tall ? "50%" : "46%"} - ${n(64 + 225)}); right:${n(60)}; }
 .layout-grid .badge { top:${n(40)}; right:${n(40)}; width:${n(200)}; height:${n(200)}; font-size:${n(38)}; }
 ${theme.css ? '' : ''}`;
@@ -287,6 +309,18 @@ export const readFlyer = (html) => {
   const m = String(html || '').match(/window\.FLYER_DATA = (.*);<\/script>/);
   try { return m ? JSON.parse(m[1]) : null; } catch { return null; }
 };
+/** Plain-words heads-up when the answers are too thin to fill the flyer's size well (shown to the owner). */
+export function flyerFitNotice(html) {
+  const d = readFlyer(html); if (!d) return '';
+  const photos = Object.keys(d.images || {}).length, feats = (d.features || []).length, items = (d.items || []).length;
+  const tall = d.H / d.W > 1.3, words = [d.headline, d.subhead, ...(d.features || [])].join(' ').split(/\s+/).filter(Boolean).length;
+  const missing = [];
+  if (!photos) missing.push('a product photo');
+  if (feats + items < 3) missing.push('two or three more selling points or prices');
+  if (!d.logo) missing.push('your logo');
+  if (!missing.length || (!tall && (photos || words > 22))) return '';
+  return `Your details were a bit thin for this ${tall ? 'tall ' : ''}flyer size, so I filled the space with a brand design. For a fuller flyer, add ${missing.slice(0, 2).join(' and ')}${tall ? ', or pick the Square 1:1 or Post 4:5 size' : ''}, then press Regenerate.`;
+}
 export const isFlyer = (html) => /engine=flyer-/.test(String(html || ''));
 
 /** Plain-words change to a flyer: Gemini rewrites the flyer's fields. */

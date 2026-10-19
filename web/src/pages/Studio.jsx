@@ -5,7 +5,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { api, ASPECTS, duration, shrinkImage } from '../lib.jsx';
 import { Alert, Button, Modal, PageLoader, Spinner, Steps } from '../components/ui.jsx';
 import MicButton from '../components/MicButton.jsx';
-import { LivePreview } from '../components/Preview.jsx';
+import { FullView, LivePreview } from '../components/Preview.jsx';
 import VoicePanel from '../components/VoicePanel.jsx';
 import DownloadVideo from '../components/DownloadVideo.jsx';
 import FlyerDownload from '../components/FlyerDownload.jsx';
@@ -54,11 +54,11 @@ function Feedback({ open, project, onClose, onUpdate, onHappy }) {
   return (
     <Modal open={open} onClose={() => !busy && onClose()} label="How is it?">
       {busy ? (
-        <div className="py-8 text-center"><Spinner className="mx-auto size-8" /><p className="mt-3 font-semibold">Changing your {flyer ? 'flyer' : 'video'}…</p><p className="mt-1 text-sm text-ink-mute">The AI is reading your request carefully. This takes about 20 to 60 seconds.</p></div>
+        <div className="py-8 text-center"><Spinner className="mx-auto size-8" /><p className="mt-3 font-semibold">Changing your {flyer ? 'flyer' : 'video'}…</p><p className="mt-1 text-sm text-ink-mute">Animora is working on your change. This takes about 20 to 60 seconds.</p></div>
       ) : (
         <>
           <h2 className="text-xl font-bold">How is it?</h2>
-          <p className="mt-1 text-sm text-ink-soft">Not quite right? Tell the AI what to change, in your own words. Say everything at once; it does all of it in one go.</p>
+          <p className="mt-1 text-sm text-ink-soft">Not quite right? Tell Animora what to change, in your own words. Say everything at once; it does all of it in one go.</p>
           <div className="mt-4 flex items-start gap-2">
             <textarea value={text} onChange={(e) => setText(e.target.value)} rows={3} autoFocus aria-label="What should change?"
               placeholder={flyer ? 'e.g. "Put the prices in big circles and use my second photo"' : 'e.g. "Slow down the start, make the logo bigger, and end with my phone number"'}
@@ -71,7 +71,7 @@ function Feedback({ open, project, onClose, onUpdate, onHappy }) {
           {error && <p className="mt-3 text-sm text-alert" role="alert">{publicMessage(error)}</p>}
           <div className="mt-5 flex gap-2">
             <Button variant="ghost" className="flex-1" onClick={onHappy}>{flyer ? 'Looks good' : 'Looks good, make the MP4'}</Button>
-            <Button className="flex-1" onClick={send} disabled={!text.trim()}>Send to the AI</Button>
+            <Button className="flex-1" onClick={send} disabled={!text.trim()}>Make the change</Button>
           </div>
         </>
       )}
@@ -167,6 +167,7 @@ function CodePanel({ project, onUpdate }) {
 }
 
 export default function Studio() {
+  const [full, setFull] = useState(false);   // full-screen view of the flyer / video
   const { id } = useParams();
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
@@ -280,6 +281,7 @@ export default function Studio() {
       {error && <div className="mt-4"><Alert onClose={() => setError('')}>{error}</Alert></div>}
       {notice && <div className="mt-4"><Alert kind="warn" onClose={() => setNotice('')}>{publicMessage(notice)}</Alert></div>}
 
+      {full && project.code && <FullView html={project.code} aspect={project.aspectRatio} still={flyer} onClose={() => setFull(false)} />}
       {project.code ? (
         <div className="mt-5 grid gap-6 lg:grid-cols-[minmax(0,1fr)_420px]">
           <section aria-label="Preview" className="stage flex flex-col justify-center px-4 py-8 sm:px-8">
@@ -289,6 +291,7 @@ export default function Studio() {
               onSoundChange={async (on) => { setProject((p) => ({ ...p, sfx: on })); try { const r = await api(`/projects/${id}`, { method: 'PATCH', body: { sfx: on } }); setProject((p) => ({ ...p, code: r.project.code, sfx: r.project.sfx })); } catch { /* keep the local choice */ } }} />
             {!flyer && <p className="mt-3 text-center text-xs text-white/55">{project.sfx !== false ? 'Sound is on. Tap play to hear it; the same sound effects go into your MP4.' : 'Sound is off for this video.'}</p>}
             <div className="mt-6 flex flex-wrap justify-center gap-2">
+              <Button variant="glass" size="sm" onClick={() => setFull(true)}>Full screen</Button>
               <Button variant="glass" size="sm" onClick={undo} disabled={!project.versions}>Undo</Button>
               <Button variant="glass" size="sm" onClick={() => { if (confirm(flyer ? 'Design the flyer again? You get a new layout and words (you can undo).' : 'Write the animation again from the plan? Your edits will be replaced (you can undo).')) generate(); }}>Regenerate</Button>
               {!flyer && <Button variant="glass" size="sm" onClick={makeFlyer}>Make a flyer from this</Button>}
