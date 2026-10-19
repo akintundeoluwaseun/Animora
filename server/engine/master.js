@@ -1,0 +1,83 @@
+// Mastering for the effects track: the same code runs on the server (Node) and in the browser (phone export),
+// so both MP4s sound the same.
+//   1. glue: a gentle compressor so soft and loud effects sit together
+//   2. loudness: gated loudness measured like LUFS (400 ms blocks, K-weighting approximated by a high-shelf boost
+//      and a low cut), then the whole track is lifted to the social-media level (about -14 LUFS)
+//   3. a look-ahead peak limiter keeps everything under -1 dBFS, so nothing crackles on phone speakers
+
+const db = (x) => 20 * Math.log10(Math.max(1e-9, x));
+const lin = (d) => 10 ** (d / 20);
+
+// one-pole filters for the loudness weighting
+function weighted(x, sr) {
+  const out = new Float32Array(x.length);
+  const aH = Math.exp(-2 * Math.PI * 80 / sr);        // low cut ~80 Hz
+  const aS = Math.exp(-2 * Math.PI * 1500 / sr);      // high shelf from ~1.5 kHz (+4 dB, like K-weighting)
+  let hpPrev = 0, hpOut = 0, lpOut = 0;
+  for (let i = 0; i < x.length; i++) {
+    hpOut = aH * (hpOut + x[i] - hpPrev); hpPrev = x[i];
+    lpOut = (1 - aS) * hpOut + aS * lpOut;
+    out[i] = hpOut + (hpOut - lpOut) * 0.58;
+  }
+  return out;
+}
+
+/** Integrated loudness (LUFS-like, mono) with the absolute (-70) and relative (-10 LU) gates. */
+export function loudness(x, sr) {
+  const w = weighted(x, sr), block = Math.round(sr * 0.4), hop = Math.round(sr * 0.1), pw = [];
+  for (let s = 0; s + block <= w.length; s += hop) {
+    let e = 0; for (let i = s; i < s + block; i++) e += w[i] * w[i];
+    pw.push(e / block);
+  }
+  const lufs = (p) => -0.691 + 10 * Math.log10(Math.max(1e-12, p));
+  const abs = pw.filter((p) => lufs(p) > -70);
+  if (!abs.length) return -70;
+  const mean = abs.reduce((a, b) => a + b, 0) / abs.length;
+  const rel = abs.filter((p) => lufs(p) > lufs(mean) - 10);
+  return lufs(rel.reduce((a, b) => a + b, 0) / rel.length);
+}
+
+function compress(x, sr, { threshold = -20, ratio = 2.5, attack = 0.006, release = 0.12 } = {}) {
+  const aA = Math.exp(-1 / (sr * attack)), aR = Math.exp(-1 / (sr * release));
+  let envDb = -90;
+  for (let i = 0; i < x.length; i++) {
+    const lvl = db(Math.abs(x[i]));
+    envDb = lvl > envDb ? aA * envDb + (1 - aA) * lvl : aR * envDb + (1 - aR) * lvl;
+    const over = envDb - threshold;
+    if (over > 0) x[i] *= lin(-over * (1 - 1 / ratio));
+  }
+  return x;
+}
+
+function limit(x, sr, ceiling = lin(-1.5), lookMs = 5, releaseMs = 80) {   // -1.5 dB leaves room for the AAC encoder
+  const look = Math.max(1, Math.round(sr * lookMs / 1000)), aR = Math.exp(-1 / (sr * releaseMs / 1000));
+  const n = x.length, need = new Float32Array(n);
+  for (let i = 0; i < n; i++) { const a = Math.abs(x[i]); need[i] = a > ceiling ? ceiling / a : 1; }
+  // minimum of the needed gain over the look-ahead window (sliding window via a monotonic deque)
+  const minAhead = new Float32Array(n), dq = new Int32Array(n); let h = 0, tl = 0;
+  for (let i = n - 1; i >= 0; i--) {
+    while (tl > h && need[dq[tl - 1]] >= need[i]) tl--;
+    dq[tl++] = i;
+    while (dq[h] > i + look) h++;
+    minAhead[i] = need[dq[h]];
+  }
+  let g = 1;
+  for (let i = 0; i < n; i++) {
+    const target = minAhead[i];
+    g = target < g ? target : aR * g + (1 - aR) * target;
+    x[i] *= g;
+  }
+  return x;
+}
+
+/** Master a mono effects track in place. Returns { gainDb, lufs } for logging. */
+export function masterTrack(x, sr, { target = -14 } = {}) {
+  if (!x?.length) return { gainDb: 0, lufs: -70 };
+  compress(x, sr);
+  const before = loudness(x, sr);
+  const gainDb = before > -69 ? Math.max(-12, Math.min(24, target - before)) : 0;
+  const g = lin(gainDb);
+  for (let i = 0; i < x.length; i++) x[i] *= g;
+  limit(x, sr);
+  return { gainDb, lufs: loudness(x, sr) };
+}

@@ -55,11 +55,21 @@ async function sound(k) {
   try { const r = await fetch(`/sfx/${k}.wav`); buffers[k] = await ctx().decodeAudioData(await r.arrayBuffer()); } catch { buffers[k] = null; }
   return buffers[k];
 }
+// every effect goes through one master bus (glue compressor + make-up gain), like the downloaded MP4
+let bus = null;
+function master(c) {
+  if (bus) return bus;
+  const comp = c.createDynamicsCompressor();
+  comp.threshold.value = -20; comp.knee.value = 8; comp.ratio.value = 3; comp.attack.value = 0.005; comp.release.value = 0.15;
+  const out = c.createGain(); out.gain.value = 1.9;
+  comp.connect(out).connect(c.destination);
+  bus = comp; return bus;
+}
 function playSfx(e) {
   const c = ctx(); const b = buffers[e.k];
   if (!c || c.state !== 'running' || !b) return;
   const src = c.createBufferSource(); const g = c.createGain();
-  g.gain.value = Math.min(1.2, (e.v || 1) * 0.8); src.buffer = b; src.connect(g).connect(c.destination); src.start();
+  g.gain.value = Math.min(1.2, (e.v || 1) * 0.8); src.buffer = b; src.connect(g).connect(master(c)); src.start();
 }
 
 export function LivePreview({ html, aspect = '9:16', autoPlay = true, maxWidth = 340, onError, sound: soundOn = true, onSoundChange, still = false, onEnded }) {

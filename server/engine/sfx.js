@@ -5,6 +5,7 @@ import { writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
+import { masterTrack } from './master.js';
 
 export const SFX_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../assets/sfx');
 export const MUSIC_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../assets/music');
@@ -56,21 +57,20 @@ export function mixSfx(events, duration, { timeScale = 1, gain = 0.6, music = nu
     const start = Math.round(e.t * timeScale * SR), v = (Number(e.v) || 1) * gain;
     for (let i = 0; i < s.length && start + i < n; i++) if (start + i >= 0) mix[start + i] += s[i] * v;
   }
-  // level the effects (loudest moment about -7 dB)
-  let peak = 0; for (let i = 0; i < n; i++) peak = Math.max(peak, Math.abs(mix[i]));
-  const lift = peak > 0 ? Math.min(2, (music ? 0.38 : 0.45) / peak) : 1;
-  for (let i = 0; i < n; i++) mix[i] *= lift;
+  // music (the owner's own) sits under the effects before mastering
   // the music bed sits underneath: looped, faded in and out, about -10 dB at its peak
   if (music?.length) {
     let mp = 0; for (let i = 0; i < music.length; i++) mp = Math.max(mp, Math.abs(music[i]));
-    const g = mp > 0 ? 0.32 / mp : 0, fin = SR * 0.4, fout = SR * 1.6;
+    const g = mp > 0 ? 0.22 / mp : 0, fin = SR * 0.4, fout = SR * 1.6;
     for (let i = 0; i < n; i++) {
       const fade = Math.min(1, i / fin, (n - i) / fout);
       mix[i] += music[i % music.length] * g * fade;
     }
   }
+  // master: glue, loudness to the social-media level (about -14 LUFS measured; the built-in meter reads ~1.5 dB low), peaks under -1.5 dBFS
+  masterTrack(mix, SR, { target: -12.5 });
   const pcm = Buffer.alloc(44 + n * 2);
-  for (let i = 0; i < n; i++) pcm.writeInt16LE(Math.round(Math.tanh(mix[i] * 1.1) * 0.95 * 32767), 44 + i * 2);
+  for (let i = 0; i < n; i++) pcm.writeInt16LE(Math.round(Math.max(-1, Math.min(1, mix[i])) * 32767), 44 + i * 2);
   pcm.write('RIFF', 0); pcm.writeUInt32LE(36 + n * 2, 4); pcm.write('WAVE', 8); pcm.write('fmt ', 12);
   pcm.writeUInt32LE(16, 16); pcm.writeUInt16LE(1, 20); pcm.writeUInt16LE(1, 22); pcm.writeUInt32LE(SR, 24);
   pcm.writeUInt32LE(SR * 2, 28); pcm.writeUInt16LE(2, 32); pcm.writeUInt16LE(16, 34); pcm.write('data', 36); pcm.writeUInt32LE(n * 2, 40);

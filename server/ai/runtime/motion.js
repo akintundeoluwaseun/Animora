@@ -947,7 +947,7 @@
     const hot = rows[acc], barAt = b.in + rows.length * 0.085 / SP + 0.35;
     tl.fromTo(hot.bar, { scaleX: 0 }, { scaleX: 1, duration: 0.42 / SP, ease: 'expo.inOut', immediateRender: true }, barAt);
     tl.set(hot.t, { color: onP }, barAt + 0.18);
-    sfx(b.in, 'whoosh', 0.45); sfx(barAt + 0.1, 'impact', 0.35);
+    sfx(b.in, 'whoosh', 0.45); sfx(barAt + 0.1, 'thud', 0.6);
     tl.fromTo(box, { scale: 1 }, { scale: 1.05, duration: Math.max(0.5, b.t1 - b.t0), ease: 'none', immediateRender: false }, b.t0);
   };
 
@@ -1003,9 +1003,9 @@
     tl.to(p, { z: zEnd + N(140), duration: Math.max(0.3, L - travel), ease: 'none', onUpdate: upd }, b.in + travel);
     textEnter(t, b.in + travel - 0.3, textInOr('focus'));
     if (b.sub) tl.from($('.tx-sub', fin), { opacity: 0, y: N(20), duration: 0.45 }, b.in + travel);
-    sfx(b.in, 'whoosh-low', 0.5);
-    for (let k = 0; k < n; k++) sfx(b.in + travel * (0.3 + 0.55 * (k + 1) / (n + 1)), 'whoosh', 0.28);
-    sfx(b.in + travel, 'impact', 0.45);
+    sfx(b.in, 'riser', 0.5);
+    for (let k = 0; k < n; k += 2) sfx(b.in + travel * (0.3 + 0.55 * (k + 1) / (n + 1)), 'swish', 0.35);
+    sfx(b.in + travel, 'impact', 0.55);
   };
 
   // Photo in 2.5D: blurred copy fills the back, the sharp photo card turns in 3D, shapes float at other depths.
@@ -1086,7 +1086,7 @@
     tl.to(core, { opacity: 0, scale: 1.6, duration: 0.5, ease: 'power2.in' }, b.in + 0.55);
     tl.to(streak, { scaleX: 0.35, opacity: 0.4, y: '0.62em', duration: 0.8, ease: 'expo.inOut' }, b.in + 0.7);
     if (b.sub) { const s2 = el('div', 'tx-sub', box, esc(b.sub)); s2.style.fontSize = FS(40); tl.from(s2, Object.assign(focusFrom(16), { duration: 0.6 }), b.in + 0.8); }
-    sfx(b.in, 'swish', 0.5); sfx(b.in + 0.2, 'chime', 0.35);
+    sfx(b.in, 'shimmer', 0.6);
     idle(bi, b, 0.04);
   };
 
@@ -1175,7 +1175,7 @@
     tl.fromTo(rays, { rotation: -10, opacity: 0 }, { rotation: 30, opacity: 0.7, duration: L, ease: 'none', immediateRender: true }, b.t0);
     tl.fromTo(ph, { y: N(90), scale: 0.82, opacity: 0, filter: 'blur(' + N(14) + 'px)' }, { y: 0, scale: 1, opacity: 1, filter: 'blur(0px)', duration: 0.9 / SP, ease: 'expo.out', immediateRender: true }, b.in + 0.1);
     floaty(ph, b, 16, 2);
-    sfx(b.in, 'whoosh-low', 0.4); sfx(b.in + 0.35, 'chime', 0.4);
+    sfx(b.in, 'whoosh-low', 0.45); sfx(b.in + 0.3, 'shimmer', 0.5);
   };
 
   // A bold full-screen colour slide: big headline, italic line under it, an image card tilting in (Hyperframes style).
@@ -1212,7 +1212,7 @@
         { x: o * cw * 0.8, y: 0, z: -Math.abs(o) * N(140), rotationY: -o * 20, rotationZ: o * 3, rotationX: 0, opacity: 1, duration: 1.0 / SP, ease: 'expo.out', immediateRender: true }, b.in + Math.abs(o) * 0.07);
     });
     tl.fromTo(deck, { rotationY: -8 }, { rotationY: 8, duration: Math.max(0.5, b.t1 - b.in), ease: 'sine.inOut', immediateRender: false }, b.in);
-    sfx(b.in, 'whoosh', 0.5);
+    sfx(b.in, 'whoosh', 0.5); sfx(b.in + 0.75, 'thud', 0.5);
   };
 
   // A rotating 3D sphere of glowing dots beside the line (drawn on a canvas, so it stays cheap to render).
@@ -1245,7 +1245,7 @@
     tl.fromTo(p, { r: 0 }, { r: 2.4, duration: L, ease: 'none', onUpdate: draw, immediateRender: false }, b.t0);
     tl.fromTo(p, { s: 0 }, { s: 1, duration: 1.0 / SP, ease: 'expo.out', onUpdate: draw, immediateRender: false }, b.in);
     textEnter(t, b.in + 0.3, textInOr('rise'));
-    sfx(b.in, 'whoosh-low', 0.45); sfx(b.in + 0.4, 'chime', 0.3);
+    sfx(b.in, 'whoosh-low', 0.45); sfx(b.in + 0.4, 'shimmer', 0.45);
   };
 
   // ------------------------------------------------------------------ reference looks, batch 2
@@ -1280,8 +1280,8 @@
     const show = () => { const v = dec ? p.v.toFixed(dec) : fmt(p.v); num.textContent = m[1] + v + m[3]; };
     tl.fromTo(card, { scale: 0.7, opacity: 0, filter: 'blur(' + N(16) + 'px)' }, { scale: 1, opacity: 1, filter: 'blur(0px)', duration: 0.6, ease: 'expo.out', immediateRender: true }, b.in);
     tl.fromTo(p, { v: target * 0.08 }, { v: target, duration: Math.min(1.6, (b.t1 - b.in) * 0.55) / SP, ease: 'power3.out', onUpdate: show, immediateRender: false }, b.in + 0.1);
-    for (let j = 0; j < 6; j++) sfx(b.in + 0.15 + j * 0.16, 'tick', 0.3);
-    sfx(b.in + Math.min(1.6, (b.t1 - b.in) * 0.55) + 0.05, 'pop', 0.5);
+    for (let j = 0; j < 5; j++) sfx(b.in + 0.15 + j * 0.16, 'tick', 0.35);
+    sfx(b.in + Math.min(1.6, (b.t1 - b.in) * 0.55) + 0.05, 'thud', 0.7);
     idle(bi, b, 0.04);
   };
 
@@ -1313,7 +1313,7 @@
       tl.fromTo(c, { x: R(-W * 0.45, W * 0.45), y: R(-H * 0.4, H * 0.4), rotation: R(-160, 160), scale: 0.25, opacity: 0, borderRadius: '50%' },
         { x: 0, y: 0, rotation: 0, scale: 1, opacity: 1, duration: 0.85 / SP, ease: 'back.out(1.4)', immediateRender: true }, at);
     });
-    sfx(b.in + 0.3, 'whoosh', 0.45); sfx(b.in + 1.0, 'pop', 0.55);
+    sfx(b.in + 0.2, 'whoosh', 0.45); sfx(b.in + 0.95, 'thud', 0.65);
     if (b.sub) { const s2 = el('div', 'tx-sub asm-sub', box, esc(b.sub)); s2.style.fontSize = FS(42); gsap.set(s2, { xPercent: -50 }); tl.from(s2, Object.assign(focusFrom(16), { duration: 0.5 }), b.in + 1.1); }
     idle(bi, b, 0.04);
   };
@@ -1506,7 +1506,7 @@
     const gap = Math.min(0.28, (b.t1 - b.in - 1.2) / Math.max(1, words.length));
     ws.forEach((e, k) => tl.from(e, Object.assign(focusFrom(18), { duration: 0.5, ease: 'power3.out' }), b.in + 0.5 + k * gap));
     if (b.sub) { const s2 = el('div', 'tx-sub', box, esc(b.sub)); s2.style.fontSize = FS(38); tl.from(s2, Object.assign(focusFrom(14), { duration: 0.6 }), b.in + 0.7 + words.length * gap); }
-    sfx(b.in, 'pop', 0.5); sfx(b.in + 0.5 + words.length * gap, 'chime', 0.4);
+    sfx(b.in, 'thud', 0.7); sfx(b.in + 0.5 + words.length * gap, 'chime', 0.5);
   };
 
   // ------------------------------------------------------------------ transitions between beats
@@ -1888,9 +1888,8 @@
     if (BLURRY.includes(c.type)) { blurWindow(b._el, b.t1 - dOut - 0.01, b.t1 + 0.01); blurWindow(nx._el, b.t1 - 0.01, b.t1 + dIn + 0.02); }
     else if (c.type === 'glitch') { filterWindow(b._el, b.t1 - dOut - 0.01, b.t1 + 0.01, chroma(1.4)); filterWindow(nx._el, b.t1 - 0.01, b.t1 + dIn + 0.02, chroma(1.4)); }
     cutFx(c.type, b.t1, d, i, dIn);
-    const CUT_SND = { whip: ['whoosh', 0.6], swoosh: ['whoosh', 0.7], wipe: ['whoosh', 0.55], rise: ['whoosh-low', 0.6], line: ['whoosh-low', 0.5], zoom: ['zoom', 0.6], dive: ['zoom', 0.75], focus: ['swish', 0.7], morph: ['pop', 0.55], flash: ['swish', 0.6], iris: ['swish', 0.6], cover: ['whoosh', 0.65], cube: ['whoosh-low', 0.7], glitch: ['tick', 0.8], shutter: ['whoosh', 0.55] }[c.type];
+    const CUT_SND = { whip: ['whoosh', 0.6], swoosh: ['whoosh', 0.7], wipe: ['whoosh', 0.55], rise: ['whoosh-low', 0.6], line: ['whoosh-low', 0.5], zoom: ['zoom', 0.6], dive: ['zoom', 0.75], focus: ['swish', 0.7], morph: ['pop', 0.55], flash: ['swish', 0.6], iris: ['swish', 0.6], cover: ['whoosh', 0.65], cube: ['whoosh-low', 0.7], glitch: ['glitch', 0.8], shutter: ['whoosh', 0.55] }[c.type];
     if (CUT_SND) sfx(b.t1 - (c.type === 'morph' ? 0.05 : c.type === 'flash' || c.type === 'glitch' ? 0.03 : dOut * 0.9), CUT_SND[0], CUT_SND[1]);
-    if (c.type === 'glitch') sfx(b.t1 + 0.02, 'swish', 0.5);
   });
   // slow camera drift (premium styles): the whole frame breathes and tilts a touch
   if (TH.drift) tl.fromTo(cam, { rotation: -1.4 * TH.drift }, { rotation: 1.4 * TH.drift, duration: DURATION, ease: 'sine.inOut', immediateRender: true }, 0);
@@ -1928,7 +1927,26 @@
 
   // expose the sound cues (sorted; the same sound twice within 60ms plays once)
   SFX.sort((x, y) => x.t - y.t);
-  window.__sfx = SFX.filter((e, i, arr) => !arr.slice(Math.max(0, i - 4), i).some((p) => p.k === e.k && e.t - p.t < 0.06));
+  // Sound design pass: a sound only when it means something. Higher-priority sounds win a crowded moment,
+  // typing ticks are thinned, and no second of video carries more than four effects.
+  const PRI = { impact: 3, riser: 3, chime: 3, glitch: 3, ding: 2.5, zoom: 2.5, shimmer: 2.5, whoosh: 2, 'whoosh-low': 2, send: 2, click: 1.5, thud: 1.5, swish: 1.5, pop: 1, tick: 0 };
+  const pri = (e) => (PRI[e.k] == null ? 1 : PRI[e.k]);
+  const kept = [];
+  for (const e of SFX) {
+    const p = pri(e), gap = p === 0 ? 0.11 : 0.17;
+    const near = kept.filter((k) => Math.abs(e.t - k.t) < gap);
+    if (near.some((k) => pri(k) >= p || (p === 0 && pri(k) > 0))) continue;
+    if (p === 0 && kept.filter((k) => k.k === 'tick' && e.t - k.t < 1.2).length >= 5) continue;   // typing: a few keys, not a machine gun
+    if (p > 0) for (const k of near) if (pri(k) < p) kept.splice(kept.indexOf(k), 1);   // the bigger sound replaces a small one
+    kept.push(Object.assign({}, e, { v: Math.round(e.v * (p === 0 ? 0.7 : p >= 3 ? 1 : 0.9) * 100) / 100 }));
+  }
+  const out = [];
+  kept.sort((x, y) => x.t - y.t).forEach((e) => {
+    const sec = out.filter((k) => k.k !== 'tick' && e.t - k.t < 1);
+    if (e.k !== 'tick' && sec.length >= 4) { const low = sec.reduce((a, b) => (pri(a) <= pri(b) ? a : b)); if (pri(low) < pri(e)) out.splice(out.indexOf(low), 1); else return; }
+    out.push(e);
+  });
+  window.__sfx = out;
   tl.set({}, {}, DURATION);
   window.__timeline = tl;
 })();
