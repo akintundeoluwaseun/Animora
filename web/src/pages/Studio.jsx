@@ -200,6 +200,37 @@ function AdjustPanel({ project, onUpdate }) {
           ))}
         </div>
       </div>
+      {look?.themes?.length > 0 && (
+        <div>
+          <h3 className="font-bold">Look</h3>
+          <p className="text-sm text-ink-mute">A whole new style: fonts, colours and background. Your words stay.</p>
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            {look.themes.map((t) => {
+              const on = look.theme === t.key;
+              return (
+                <button key={t.key} type="button" disabled={!!busy || on} onClick={() => apply('theme', { theme: t.key })} className={`${chip(on)} flex items-center gap-2.5`} aria-pressed={on}>
+                  <span className="flex shrink-0 overflow-hidden rounded-md border border-ink/10" aria-hidden="true">
+                    {[t.colors?.background, t.colors?.primary, t.colors?.secondary].map((c, i) => <i key={i} className="block h-6 w-3" style={{ background: c }} />)}
+                  </span>
+                  <span className="min-w-0 truncate font-semibold">{busy === 'theme' ? '…' : t.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+      {!flyer && look && (
+        <div>
+          <h3 className="font-bold">Background music</h3>
+          <p className="text-sm text-ink-mute">Plays quietly under the sound effects.</p>
+          <div className="mt-3 grid grid-cols-3 gap-2">
+            {[['none', 'None'], ['piano', 'Soft piano'], ['soft', 'Soft music']].map(([v, l]) => {
+              const on = (look.music || 'none') === v;
+              return <button key={v} type="button" disabled={!!busy || on} onClick={() => apply('music', { music: v })} className={chip(on)} aria-pressed={on}><span className="block text-center font-semibold">{busy === 'music' ? '…' : l}</span></button>;
+            })}
+          </div>
+        </div>
+      )}
       <div>
         <h3 className="font-bold">Colours</h3>
         <div className="mt-3 grid grid-cols-2 gap-2">
@@ -370,7 +401,7 @@ export default function Studio() {
 
           <section className="flex h-[calc(100vh-12rem)] min-h-[520px] flex-col overflow-hidden surface">
             <div className="segmented m-2" role="tablist">
-              {(flyer ? [['edit', 'Edit'], ['adjust', 'Adjust']] : [['edit', 'Edit'], ['adjust', 'Adjust'], ['voice', 'Script'], ['plan', 'Scenes']]).map(([k, l]) => (
+              {(flyer ? [['edit', 'Edit'], ['adjust', 'Size & look']] : [['edit', 'Edit'], ['adjust', 'Size & look'], ['voice', 'Script'], ['plan', 'Scenes']]).map(([k, l]) => (
                 <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)}
                   className="press">{l}</button>
               ))}

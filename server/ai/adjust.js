@@ -4,6 +4,7 @@ import { CANVAS } from '../engine/renderer.js';
 import { templateFromPlan } from './templates.js';
 import { readData } from './director.js';
 import { readFlyer, flyerHtml, isFlyer } from './flyer.js';
+import { THEMES } from './themes.js';
 
 const HEX = /^#[0-9a-f]{6}$/i;
 const VIDEO_SIZES = ['9:16', '1:1', '4:5', '16:9'];
@@ -11,14 +12,19 @@ const FLYER_SIZES = ['4:5', '9:16', '1:1', 'A4'];
 const getVar = (html, name) => (String(html).match(new RegExp(`--${name}:\\s*([^;]+);`)) || [])[1];
 const setVar = (html, name, value) => html.replace(new RegExp(`(--${name}:\\s*)([^;]+)(;)`), `$1${value}$3`);
 
+// the looks a design can switch to, with their names and colours (for the swatches in the panel)
+const THEME_LIST = Object.entries(THEMES).map(([key, t]) => ({ key, label: t.label || key, colors: t.colors, mode: t.mode }));
+const MUSIC = { piano: { url: '/music/piano.mp3', builtin: 'piano' }, soft: { url: '/music/soft.mp3', builtin: 'soft' } };
+
 /** What the panel shows as the current values. */
 export function currentLook(html) {
   if (isFlyer(html)) {
     const d = readFlyer(html) || {};
-    return { flyer: true, colors: { primary: d.colors?.primary, secondary: d.colors?.secondary, background: d.colors?.background, text: d.colors?.text } };
+    return { flyer: true, theme: d.theme, themes: THEME_LIST, colors: { primary: d.colors?.primary, secondary: d.colors?.secondary, background: d.colors?.background, text: d.colors?.text } };
   }
+  const data = readData(html) || {};
   return {
-    flyer: false,
+    flyer: false, theme: data.theme?.key, themes: THEME_LIST, music: data.music?.builtin || (data.music?.url ? 'own' : 'none'),
     colors: { primary: getVar(html, 'primary'), secondary: getVar(html, 'secondary'), background: getVar(html, 'bg'), text: getVar(html, 'text') },
     scale: Number(getVar(html, 'scale') || 1), speed: Number((String(html).match(/const SPEED = ([\d.]+);/) || [])[1] || 1),
   };
@@ -40,6 +46,7 @@ export function adjustDesign({ html, plan = {}, assets = [], changes = {} }) {
       const { width, height } = CANVAS[changes.aspect];
       if (width !== d.W || height !== d.H) { d.W = width; d.H = height; aspect = changes.aspect; done.push(`size ${changes.aspect}`); }
     }
+    if (changes.theme && THEMES[changes.theme] && changes.theme !== d.theme) { d.theme = changes.theme; d.colors = { ...THEMES[changes.theme].colors }; done.push(`look (${THEMES[changes.theme].label || changes.theme})`); }
     if (Object.keys(colors).length) { d.colors = { ...d.colors, ...colors }; done.push('colours'); }
     if (!done.length) throw new Error('Nothing to change.');
     return { html: flyerHtml(d), aspect, summary: `Changed the ${done.join(' and ')}.` };
@@ -57,6 +64,28 @@ export function adjustDesign({ html, plan = {}, assets = [], changes = {} }) {
       for (const v of ['primary', 'secondary', 'bg', 'text', 'scale']) { const old = getVar(html, v); if (old) out = setVar(out, v, old); }
       const sp = String(html).match(/const SPEED = ([\d.]+);/); if (sp) out = out.replace(/const SPEED = ([\d.]+);/, sp[0]);
       aspect = changes.aspect; done.push(`size ${changes.aspect}`);
+    }
+  }
+  if (changes.theme && THEMES[changes.theme] && changes.theme !== data.theme?.key) {
+    // a whole new look (fonts, colours, background, motion style); the shots, words and timing stay
+    const cur = readData(out) || data;
+    const { width, height } = { width: cur.W, height: cur.H };
+    const asp = Object.entries(CANVAS).find(([, c]) => c.width === width && c.height === height)?.[0] || plan.aspect_ratio || '9:16';
+    const keep = Object.fromEntries(['preset', 'tempo', 'finish', 'leaks', 'chroma', 'glow', 'halo'].filter((k) => cur.theme?.[k] !== undefined).map((k) => [k, cur.theme[k]]));
+    const fresh = templateFromPlan({ ...plan, aspect_ratio: asp, style: { ...(plan.style || {}), colors: undefined } }, { themeKey: changes.theme, assets, beats: cur.beats, look: keep });
+    const nd = readData(fresh);
+    out = fresh.replace(/window\.ADFLASH_DATA = (.*);\n/, () => `window.ADFLASH_DATA = ${JSON.stringify({ ...nd, beats: cur.beats, music: cur.music, captions: cur.captions }).replace(/</g, '\\u003c')};\n`);
+    const sp = String(html).match(/const SPEED = ([\d.]+);/); if (sp) out = out.replace(/const SPEED = ([\d.]+);/, sp[0]);
+    done.push(`look (${THEMES[changes.theme].label || changes.theme})`);
+  }
+  if (changes.music && ['none', 'piano', 'soft'].includes(changes.music)) {
+    const cur = readData(out);
+    if (cur) {
+      const next = MUSIC[changes.music] || null;
+      if ((cur.music?.builtin || (cur.music ? 'own' : 'none')) !== changes.music) {
+        out = out.replace(/window\.ADFLASH_DATA = (.*);\n/, () => `window.ADFLASH_DATA = ${JSON.stringify({ ...cur, music: next }).replace(/</g, '\\u003c')};\n`);
+        done.push(changes.music === 'none' ? 'no background music' : changes.music === 'piano' ? 'soft piano music' : 'soft background music');
+      }
     }
   }
   if (Object.keys(colors).length) {
