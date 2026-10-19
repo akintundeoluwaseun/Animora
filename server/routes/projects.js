@@ -394,7 +394,7 @@ async function saveVoice(p, mp3, duration, source) {
 r.post('/:id/voiceover/generate', async (req, res) => {
   const p = await loadProject(req, res); if (!p) return;
   if (!p.plan_json) return res.status(400).json({ error: 'Plan your video first.' });
-  if (!config.useGemini && !hasOfflineVoice) return res.status(400).json({ error: 'Making the voice here needs a Gemini API key. Use the script with a text-to-speech app instead, then upload the audio.' });
+  if (!config.useGemini && !hasOfflineVoice) return res.status(400).json({ error: 'Something went wrong. Please try again later.' });
   const voice = VOICES.some((v) => v.name === req.body?.voice) ? req.body.voice : 'Sulafat';
   const style = String(req.body?.style || '').slice(0, 120) || undefined;
   const engine = req.body?.engine === 'basic' || !config.useGemini ? 'basic' : 'gemini';

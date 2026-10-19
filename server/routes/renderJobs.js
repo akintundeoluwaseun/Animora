@@ -27,9 +27,10 @@ export async function dispatchRender(render) {
   });
   if (!res.ok) {
     const t = (await res.text()).slice(0, 200);
-    await q("UPDATE renders SET status='failed', error=$2, finished_at=now() WHERE id=$1", [render.id, `Couldn't start the video server (GitHub ${res.status}). Check GH_DISPATCH_TOKEN. ${t}`]);
+    await q("UPDATE renders SET status='failed', error=$2, finished_at=now() WHERE id=$1", [render.id, 'Something went wrong. Please try again later.']);
+    console.error(`[render] GitHub dispatch ${res.status}: ${t}`);
     await refundRender(render.id);
-    throw Object.assign(new Error(`Couldn't start the video server (GitHub ${res.status}).`), { status: 502 });
+    throw Object.assign(new Error('Something went wrong. Please try again later.'), { status: 502 });
   }
 }
 

@@ -1,3 +1,4 @@
+import { publicMessage } from '../lib/errors.js';
 // Buy a pack of videos with Flutterwave or Paystack (card, bank transfer, USSD). No sign-in: the videos go to this device's
 // account (and every device linked to it). The payment page sends the buyer back to /videos?paid=<reference>.
 import { useState } from 'react';
@@ -44,7 +45,7 @@ export default function BuyCredits({ open, onClose, reason }) {
       <label className="mt-4 block text-sm font-semibold text-ink" htmlFor="buy-email">Email for your receipt <span className="font-normal text-ink-mute">(optional)</span></label>
       <input id="buy-email" type="email" inputMode="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com"
         className="mt-1.5 w-full rounded-[10px] border border-ink/15 bg-white px-3 py-2.5 text-ink outline-none focus:border-ink/40" />
-      {error && <p className="mt-3 text-sm text-alert" role="alert">{error}</p>}
+      {error && <p className="mt-3 text-sm text-alert" role="alert">{publicMessage(error)}</p>}
       <div className="mt-5 flex gap-2">
         <Button variant="ghost" className="flex-1" onClick={onClose} disabled={busy}>Not now</Button>
         <Button className="flex-1" onClick={pay} loading={busy}>Pay {naira(c.packPriceNgn || 4000)}</Button>

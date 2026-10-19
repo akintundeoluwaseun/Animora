@@ -1,3 +1,4 @@
+import { publicMessage } from '../lib/errors.js';
 // The full screen you see while your MP4 is being made (no bar at the top of the page).
 // It shows the progress, says plainly when it is paused, and gives Try again / Save again at the end.
 import { useNavigate } from 'react-router-dom';
@@ -20,7 +21,7 @@ export default function ExportScreen() {
     else if (p.stage === 'Adding sound') { heading = '99%'; line = 'Adding the music and sound effects'; }
     else { heading = '0%'; line = 'Getting your video ready'; }
   } else if (job.status === 'done') { heading = 'Saved'; line = `${fileName(job.title)} is in your downloads.`; }
-  else if (job.status === 'failed') { heading = "It didn't finish"; line = job.error; }
+  else if (job.status === 'failed') { heading = "It didn't finish"; line = publicMessage(job.error); }
   else { heading = 'It stopped'; line = 'The page was closed before your video was made. Start it again and keep Animora open on screen.'; }
 
   const close = () => dismissExport();

@@ -5,6 +5,7 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
 import { SFX_DIR, MUSIC_DIR } from './engine/sfx.js';
+import { publicMessage, SIMPLE_ERROR } from './errors.js';
 import { config, ROOT } from './config.js';
 import { initDb, one, withStartupLock } from './db/index.js';
 import { initStorage, localPathFor, getDbObject } from './storage.js';
@@ -115,7 +116,8 @@ export async function createApp() {
     console.error('[error]', req.method, req.path, err);
     if (res.headersSent) return;
     if (err.code === 'LIMIT_FILE_SIZE') return res.status(400).json({ error: 'File is too large.' });
-    res.status(err.status || 500).json({ error: err.status ? err.message : 'Something went wrong. Please try again.' });
+    // customers only ever see plain words; the technical reason stays in the log above
+    res.status(err.status || 500).json({ error: err.status && err.status < 500 ? publicMessage(err.message) : SIMPLE_ERROR, ...(err.code === 'NEED_CREDITS' ? { code: err.code } : {}) });
   });
   return app;
 }

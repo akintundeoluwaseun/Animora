@@ -1,3 +1,4 @@
+import { publicMessage } from '../lib/errors.js';
 // Page 2: live preview + edit by prompt + code view.
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
@@ -66,7 +67,7 @@ function Feedback({ open, project, onClose, onUpdate, onHappy }) {
           <div className="mt-3 flex flex-wrap gap-2">
             {chips.map((c) => <button key={c} type="button" className="chip press !px-3 !py-1.5 !text-xs" onClick={() => setText((x) => (x ? `${x.trim()}. ${c}` : c))}>{c}</button>)}
           </div>
-          {error && <p className="mt-3 text-sm text-alert" role="alert">{error}</p>}
+          {error && <p className="mt-3 text-sm text-alert" role="alert">{publicMessage(error)}</p>}
           <div className="mt-5 flex gap-2">
             <Button variant="ghost" className="flex-1" onClick={onHappy}>{flyer ? 'Looks good' : 'Looks good, make the MP4'}</Button>
             <Button className="flex-1" onClick={send} disabled={!text.trim()}>Send to the AI</Button>
@@ -276,7 +277,7 @@ export default function Studio() {
         onUpdate={(p) => { setProject(p); setTab('edit'); setNotice('Done. Your change is in the preview. Watch it again, or keep editing below.'); }}
         onHappy={() => { setAskOpen(false); if (!flyer && canRender) navigate(`/p/${id}/render?new=1`); }} />
       {error && <div className="mt-4"><Alert onClose={() => setError('')}>{error}</Alert></div>}
-      {notice && <div className="mt-4"><Alert kind="warn" onClose={() => setNotice('')}>{notice}</Alert></div>}
+      {notice && <div className="mt-4"><Alert kind="warn" onClose={() => setNotice('')}>{publicMessage(notice)}</Alert></div>}
 
       {project.code ? (
         <div className="mt-5 grid gap-6 lg:grid-cols-[minmax(0,1fr)_420px]">

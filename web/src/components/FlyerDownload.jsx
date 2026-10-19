@@ -1,3 +1,4 @@
+import { publicMessage } from '../lib/errors.js';
 // Download a flyer: a picture for WhatsApp / Instagram, or a PDF for printing. Made on this device in a few seconds.
 import { useState } from 'react';
 import { Button } from './ui.jsx';
@@ -24,7 +25,7 @@ export default function FlyerDownload({ project, size = 'md', className = '', al
         <Button size={size} onClick={() => go('png')} loading={busy === 'png'} disabled={!project?.code || !!busy}>Download picture</Button>
         <Button size={size} variant={alt} onClick={() => go('pdf')} loading={busy === 'pdf'} disabled={!project?.code || !!busy}>PDF for printing</Button>
       </div>
-      {error && <p className="mt-2 text-sm text-alert" role="alert">{error}</p>}
+      {error && <p className="mt-2 text-sm text-alert" role="alert">{publicMessage(error)}</p>}
     </div>
   );
 }

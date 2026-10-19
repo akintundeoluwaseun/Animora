@@ -130,7 +130,7 @@ export async function generateCode({ plan, style, assets, brief = null, previous
       return { html, source: 'gemini', problems: [] };
     } catch (e) {
       console.warn('[ai] Gemini director failed:', e.message);
-      return { html: rule(), source: 'template', problems: [], notice: /429|quota|resting/i.test(e.message) ? "Animora's built-in designer made this one (the AI is resting for a while). You can still edit it." : `The AI director couldn't finish (${aiReason(e)}), so this version was arranged automatically. Press Regenerate to try the AI again.` };
+      return { html: rule(), source: 'template', problems: [], notice: "Animora's built-in designer made this version. You can still edit it, or press Regenerate later." };
     }
   }
   if (config.useGemini) {
@@ -159,7 +159,7 @@ export async function editCode({ html, instruction, aspectRatio, duration, plan 
     }
     const r = simple();
     if (r) return { html: r.html, source: 'offline', summary: r.summary };
-    return { html, source: 'offline', unchanged: true, summary: 'The AI is resting for a while. Right now I can change the layout, make it darker or lighter, change a colour, or shorten the headline.' };
+    return { html, source: 'offline', unchanged: true, summary: 'Something went wrong. Please try again later.' };
   }
   html = upgradeRuntime(html, assets);
   const directed = !!readData(html)?.beats;
@@ -181,8 +181,8 @@ export async function editCode({ html, instruction, aspectRatio, duration, plan 
     return {
       html, source: 'offline', unchanged: true,
       summary: config.useGemini
-        ? "The AI editor couldn't be reached just now, and that change needs it. Please try again in a moment."
-        : 'The practice AI can change text size ("make the text bigger"), colours ("change the background to green") and speed ("make it faster"). Add a Gemini key for any change.',
+        ? 'Something went wrong. Please try again later.'
+        : 'Something went wrong. Please try again later.',
     };
   }
   return { html: r.html, source: 'offline', summary: `Updated: ${r.changes.join(', ')}.` };

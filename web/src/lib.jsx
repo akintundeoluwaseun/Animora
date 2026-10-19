@@ -1,3 +1,4 @@
+import { publicMessage } from './lib/errors.js';
 // Shared client helpers: API calls, auth context, formatting.
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 
@@ -44,7 +45,7 @@ export async function api(path, { method = 'GET', body, form } = {}) {
   }
   const data = await res.json().catch(() => ({}));
   if (res.status === 401 && token) { setToken(null); window.dispatchEvent(new Event('adflash:logout')); }
-  if (!res.ok) throw new ApiError(data.error || `Request failed (${res.status})`, res.status, data);
+  if (!res.ok) throw new ApiError(publicMessage(data.error), res.status, data);   // plain words only, never technical details
   return data;
 }
 

@@ -1,3 +1,4 @@
+import { publicMessage } from '../lib/errors.js';
 // Page 3: watch an ad if needed, render with our engine, then download.
 import { useEffect, useRef, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
@@ -237,7 +238,7 @@ export default function Render() {
           <Progress render={render} onCancel={cancel} />
         ) : (
           <div className="mx-auto max-w-lg">
-            {render?.status === 'failed' && <div className="mb-4"><Alert>{render.error}{/cleared/.test(render.error || '') ? '' : ' Your video credit was returned.'}</Alert></div>}
+            {render?.status === 'failed' && <div className="mb-4"><Alert>{publicMessage(render.error)}</Alert></div>}
             <div className="surface p-6 sm:p-8">
               <h2 className="text-2xl font-extrabold">Make your MP4</h2>
               <dl className="mt-5 space-y-3 text-[15px]">

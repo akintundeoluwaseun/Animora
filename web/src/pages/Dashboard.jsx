@@ -1,3 +1,4 @@
+import { publicMessage } from '../lib/errors.js';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { api, ago, duration, naira, otherDeviceLink, useAuth, usePolling } from '../lib.jsx';
@@ -135,7 +136,7 @@ function OtherDevice({ onLinked }) {
           </div>
         </div>
         {msg && <p className="mt-3 text-sm font-semibold text-money" role="status">{msg}</p>}
-        {error && <p className="mt-3 text-sm text-alert" role="alert">{error}</p>}
+        {error && <p className="mt-3 text-sm text-alert" role="alert">{publicMessage(error)}</p>}
         <button onClick={copyLink} className="mt-4 text-xs font-semibold text-ink-mute hover:text-ink">{copied ? 'Private link copied' : 'Or copy a private link instead'}</button>
       </Modal>
     </>

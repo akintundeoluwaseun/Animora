@@ -1,3 +1,4 @@
+import { publicMessage } from '../lib/errors.js';
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { useAuth, api, DEVELOPER } from '../lib.jsx';
@@ -41,7 +42,7 @@ export function Field({ label, hint, error, children }) {
       <span className="mb-1.5 block text-sm font-semibold text-ink">{label}</span>
       {children}
       {hint && !error && <span className="mt-1 block text-sm text-ink-mute">{hint}</span>}
-      {error && <span className="mt-1 block text-sm text-alert">{error}</span>}
+      {error && <span className="mt-1 block text-sm text-alert">{publicMessage(error)}</span>}
     </label>
   );
 }
@@ -53,7 +54,7 @@ export function Alert({ kind = 'error', children, onClose }) {
   const c = { error: 'bg-alert/8 text-alert border-alert/25', info: 'bg-lilac text-ink border-lilac-deep', success: 'bg-money/10 text-money border-money/25', warn: 'bg-danfo/15 text-ink border-danfo/40' }[kind];
   return (
     <div role={kind === 'error' ? 'alert' : 'status'} className={`flex items-start gap-3 rounded-2xl border px-4 py-3 text-sm ${c}`}>
-      <div className="flex-1">{children}</div>
+      <div className="flex-1">{typeof children === 'string' ? publicMessage(children) : children}</div>
       {onClose && <button onClick={onClose} className="opacity-60 hover:opacity-100" aria-label="Dismiss">✕</button>}
     </div>
   );
