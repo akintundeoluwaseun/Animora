@@ -201,7 +201,7 @@ export const THEMES = {
   // ---------------- premium (Apple-style) styles: small type, lots of space, UI pieces that morph
   apple: {
     label: 'Studio White', font: 'Inter', fontParam: 'Inter:wght@500;600;700;800', stack: sans('Inter'),
-    headWeight: 700, tracking: -1, mode: 'light', calm: true, textScale: 0.62, drift: 0.6,
+    headWeight: 700, tracking: -1, mode: 'light', calm: true, textScale: 0.9, drift: 0.6,
     colors: { primary: '#0071E3', secondary: '#FF375F', background: '#FFFFFF', text: '#1D1D1F' },
     accentStyle: 'color', textIn: 'focus', energy: 1,
     ambient: ['glow'],
@@ -212,7 +212,7 @@ export const THEMES = {
   },
   midnight: {
     label: 'Midnight Glow', font: 'Inter', fontParam: 'Inter:wght@500;600;700', stack: sans('Inter'),
-    headWeight: 600, tracking: -1, mode: 'dark', calm: true, textScale: 0.62, drift: 0.5,
+    headWeight: 600, tracking: -1, mode: 'dark', calm: true, textScale: 0.9, drift: 0.5,
     colors: { primary: '#1E9BFF', secondary: '#6FE3FF', background: '#040A17', text: '#EAF2FF' },
     accentStyle: 'color', textIn: 'focus', energy: 1,
     ambient: ['glow', 'streaks'],
@@ -224,7 +224,7 @@ export const THEMES = {
   },
   fintech: {
     label: 'Fintech Blue', font: 'Figtree', fontParam: 'Figtree:wght@500;600;700;800', stack: sans('Figtree'),
-    headWeight: 700, tracking: -1, mode: 'light', calm: true, textScale: 0.64, drift: 0.8,
+    headWeight: 700, tracking: -1, mode: 'light', calm: true, textScale: 0.9, drift: 0.8,
     colors: { primary: '#1A2CFF', secondary: '#12A8FF', background: '#F4F6FB', text: '#0A0F2C' },
     accentStyle: 'color', textIn: 'focus', energy: 2,
     ambient: ['glow'],
@@ -235,7 +235,7 @@ export const THEMES = {
   },
   pulse: {
     label: 'Health Pulse', font: 'Inter', fontParam: 'Inter:wght@500;600;700;800', stack: sans('Inter'),
-    headWeight: 700, tracking: -1, mode: 'light', calm: true, textScale: 0.62, drift: 0.6,
+    headWeight: 700, tracking: -1, mode: 'light', calm: true, textScale: 0.9, drift: 0.6,
     colors: { primary: '#FF2D55', secondary: '#FF9F0A', background: '#F2F2F5', text: '#1C1C1E' },
     accentStyle: 'color', textIn: 'focus', energy: 1,
     ambient: ['glow'],
@@ -246,7 +246,7 @@ export const THEMES = {
   },
   graphite: {
     label: 'Graphite Pro', font: 'Inter', fontParam: 'Inter:wght@500;600;700;800', stack: sans('Inter'),
-    headWeight: 700, tracking: -1, mode: 'dark', calm: true, textScale: 0.62, drift: 0.6,
+    headWeight: 700, tracking: -1, mode: 'dark', calm: true, textScale: 0.9, drift: 0.6,
     colors: { primary: '#2997FF', secondary: '#BF5AF2', background: '#161617', text: '#F5F5F7' },
     accentStyle: 'color', textIn: 'focus', energy: 2,
     ambient: ['glow', 'grid'],
@@ -267,7 +267,7 @@ const mix = (a = [], b = []) => { const out = []; for (let i = 0; i < Math.max(a
 for (const t of Object.values(THEMES)) {
   if (t.calm) continue;
   t.calm = true;
-  t.textScale = t.textScale || 0.68;
+  t.textScale = t.textScale || 0.92;
   t.drift = t.drift ?? 0.5;
   t.energy = Math.min(t.energy || 2, 2);
   t.textIn = t.textIn === 'slide' ? 'focus' : t.textIn;

@@ -3,7 +3,8 @@ import { createRoot } from 'react-dom/client';
 import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom';
 import './styles.css';
 import { AuthProvider, useAuth } from './lib.jsx';
-import { Nav, PageLoader } from './components/ui.jsx';
+import { PageLoader } from './components/ui.jsx';
+import Shell from './components/Shell.jsx';
 import Home from './pages/Home.jsx';
 import ExportScreen from './components/ExportScreen.jsx';
 import InstallPrompt from './components/InstallApp.jsx';
@@ -68,9 +69,7 @@ function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <div className="app">
-        <Nav />
-        <main className="app-main">
+        <Shell>
           <ExportScreen />
           <ErrorBoundary>
           <Suspense fallback={<PageLoader />}>
@@ -94,9 +93,8 @@ function App() {
             </Routes>
           </Suspense>
           </ErrorBoundary>
-        </main>
         <InstallPrompt />
-        </div>
+        </Shell>
       </AuthProvider>
     </BrowserRouter>
   );

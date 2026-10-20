@@ -27,19 +27,9 @@
 html { -webkit-text-size-adjust: 100%; }
 body { margin: 0; font-family: var(--font-body); color: var(--color-ink); -webkit-font-smoothing: antialiased; background: #F7F7F9; min-height: 100vh; font-feature-settings: 'ss01'; }
 
-/* App shell: dark editing-suite rail on the left, quiet light canvas on the right */
+/* App shell: see components/Shell.jsx (site / app / focus modes) */
 .app { min-height: 100vh; }
-@media (min-width: 1024px) { .app { display: grid; grid-template-columns: 248px minmax(0, 1fr); } }
-.app-main { min-width: 0; padding-bottom: 3rem; }
-.rail { display: none; }
-@media (min-width: 1024px) {
-  .rail { position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column; color: #fff;
-    background: #0B0A12; border-right: 1px solid rgba(255,255,255,.06); }
-}
-.rail-link { display: flex; align-items: center; gap: .75rem; padding: .6rem .8rem; border-radius: 8px; font-weight: 500; font-size: 14.5px; color: rgba(255,255,255,.6); }
-.rail-link:hover { color: #fff; background: rgba(255,255,255,.06); }
-.rail-link.is-active { color: #fff; background: rgba(255,255,255,.07); }
-.rail-link.is-active svg { color: var(--color-danfo); }
+.app-main { min-width: 0; }
 
 /* The screening monitor on the dashboard: a reel of real style videos drifting past */
 @keyframes reel { from { transform: translateX(0); } to { transform: translateX(-50%); } }

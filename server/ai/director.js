@@ -99,14 +99,22 @@ export const PRESETS = {
 
 // Creative concepts: each video gets a different one, so two ads never share the same structure.
 export const CONCEPTS = [
-  'Product demo: the business shown as a sleek app/UI story (notifications, cards, chat, widgets, phone)',
-  'Kinetic typography: the message carried by bold moving words, flips and scatters, minimal props',
-  'Cinematic photo-led: the uploaded photos are the heroes, big and dramatic, with short punchy lines',
-  'Countdown / numbers: stats, prices and counters drive the story with rolling digits and stat tiles',
-  'Customer story: a customer question in a chat, the problem, then the business as the answer',
-  'Editorial minimal: calm, lots of space, one strong word at a time, elegant dissolves and dives',
-  'Pop energy: loud colours, punch words zooming, whips, flashes, fast rhythm',
-  'Brand reveal: the logo and name are built up piece by piece, then the offer, then the call to action',
+  'ONE OBJECT, ONE JOURNEY: build the whole ad around a single object from this business\'s own world (the order, the booking, the card, the parcel, the appointment) and follow it from start to finish: it appears, changes state, arrives. Use "status", "card", "notify", "stars" as that object\'s life.',
+  'THE SEARCH: the customer searches for what they need ("prompt" typing), the business is the answer that appears, then proof (photo, price, rating) and the next step. Reads like a real phone moment.',
+  'CUSTOMER CHAT: a short chat between a customer and the business ("chat"), cut with the product or photo that answers it, ending on a confirmed message. Warm and human.',
+  'PROBLEM, THEN RELIEF: three fast lines that name the annoying parts of the old way (rollword / wordswap / sentence), a hard cut to calm, then the business as the relief with a clean product moment.',
+  'THE BIG NUMBER: one real number from the brief (a price, an hour, a count of products) is the hero; it counts up huge ("bigcount" / "counter"), and everything else supports it.',
+  'PHOTO-LED CINEMA: the uploaded photos are the heroes, big and slow, with parallax and glow; text is a few short captions over them. If there are no photos, use big glowing product-like objects instead.',
+  'TYPE AS THE STAR: huge confident words fill the frame ("slam", "poster", "reveal"), a different word treatment each time, with one small UI beat for contrast. No props, all attitude.',
+  'BUILD THE BRAND: the logo and name are assembled piece by piece ("assemble", "logo", "iconmorph"), the offer drops in as a card, the call to action lands as a lockup. Confident, simple, finished.',
+  'MENU / SHELF WALK: the products are walked past one by one with prices ("ticker", "stack", "widgets" or "collage"), each one landing with a small hit, then the best one gets a hero moment.',
+  'BEFORE / AFTER: a flat grey first half (plain words, small type), a colour flood, then the business in full colour with big type and motion. The contrast is the whole idea.',
+  'COUNTDOWN / URGENCY: only if the brief has a real deadline, offer or limit: build tension with fast numbered beats ("numbered", "bigcount") and release it on the offer and call to action.',
+  'HOW IT WORKS IN 3 STEPS: three numbered steps ("numbered" / "stepstack" / "flow") that are the customer\'s real steps with this business, each with its own icon, then the result.',
+  'ONE LIGHT LINE: a single glowing line carries the eye from beat to beat (cuts "line" / "dive" / "morph"); each beat is a quiet glowing object it passes through. Dark, premium, minimal.',
+  'LOUD AND LOCAL: fast, colourful, big and proud; punch words, whips, flashes, a product slam, a price that pops, a button that gets pressed. Made for the street, not a boardroom.',
+  'ELEGANT SLOW REVEAL: very few beats, each held longer; words dissolve in, the product turns in 3D, one golden detail at a time ("reveal", "parallax", "isocard", "tunnel").',
+  'PROOF AND TRUST: the ad is built on things the brief really says (years, location, what is included, guarantees) as clean stat tiles and checkmark beats, ending on an easy way to contact them.',
 ];
 const AMBIENT = ['glow', 'grid', 'dots', 'beams', 'particles', 'sparkles', 'frame'];   // calm, premium backgrounds only
 
@@ -248,7 +256,7 @@ function assetLines(assets) {
 
 function styleLines(style, themeKey) {
   const t = THEMES[themeKey] || THEMES.bold;
-  return `Style: "${style?.name || t.label}" (${t.calm ? 'PREMIUM / calm: small clean type, UI morphs; avoid zoomword and kinetic' : `energy ${t.energy} of 3`}).
+  return `Style: "${style?.name || t.label}" (${t.calm ? 'PREMIUM: clean confident type, smooth UI morphs; you may still use one big slam / poster / reveal moment for contrast' : `energy ${t.energy} of 3`}).
 This style's favourite shots: hook ${t.prefer.hook.join('/')}; text ${t.prefer.text.join('/')}; price ${t.prefer.price.join('/')}; lists ${t.prefer.list.join('/')}; brand ${t.prefer.brand.join('/')}.
 Favourite cuts: ${t.transitions.join(', ')}.`;
 }
@@ -279,14 +287,15 @@ Return { "concept": "one line describing your idea", "look": {...}, "beats": [..
 DIRECTION RULES
 - The video is ${duration} seconds, ${aspect}. Use about one beat per ${duration <= 20 ? '1.5-2.2' : '2-3'} seconds, so return AT LEAST ${Math.ceil(duration / 3)} beats; no beat longer than 3.5 seconds. If the answers run out, write new short lines from the business info (benefits, a question to the viewer, how it works, a promise) instead of repeating. The "seconds" values should add up to about ${duration}.
 - Every beat shows ONE idea. Never repeat the same shot twice in a row, and vary the shots across the video; it must not feel like a pattern.
-- PREMIUM ONLY: this must look like a top agency ad on TikTok, never like a template. Generous empty space, one idea per shot, short words, smooth camera.
-- STORY FIRST (this is how the best TikTok product ads are built; follow it unless the special instructions ask for something else):
-  1. HOOK (1-2 beats): a feeling or problem the viewer already knows, in 2-5 plain words ("Everyone knows the feeling.", "These days, shopping takes forever.", "Hungry and nothing at home?"). A calm "sentence" beat, or on loud styles a "slam" / glitch-cut beat.
-  2. TURN (1 beat): the business arrives: "Welcome to <name>" / "Introducing <name>" with the logo ("logo" or "iconmorph").
-  3. SHOW HOW IT WORKS (2-4 beats, in order, like a tiny app demo of the customer's real journey): someone types what they want ("prompt"), the product or order appears ("card" / "parallax" with a real photo), it gets confirmed ("status": "Order confirmed" / "Booking approved"), then a "notify" message ("Your order is on the way") or "stars". Use the business's real products, prices and steps; plain generic messages, never invented names or numbers.
-  4. BENEFITS (1-2 beats): two or three short punches in a row, one word in the accent colour ("No waiting.", "No stress.", "Fresh daily."), using "wordswap", "rollword" or "sentence".
-  5. LOCKUP (last beat): logo + a 2-4 word tagline that sounds finished ("Eating. Done your way.", "Hair. Done right.") with phone/website, in "endcard" or "lockup".
-  Every beat is ONE small idea with lots of empty space around it. Small, calm type beats giant type: use slam/poster only on loud styles, at most once.
+- PREMIUM ONLY: this must look like a top agency ad on TikTok, never like a template. One idea per shot, short words, smooth camera, rich detail on the objects, confident scale. Space around a subject is good; an empty frame with a tiny line of text is not.
+- CONCEPT FIRST (this is what makes every ad different): before writing any beat, decide in one line:
+  (a) THE WORLD: what does this customer actually see, touch or do with this business? (a food business: the order, the bag arriving, the first bite; a hotel: the room key, the view, the booking confirmed; a school: the first day, the grades, the certificate; a salon: the mirror, the before and after, the booking slot; a shop: the shelf, the cart, the parcel.) Build the props from THAT world, not from generic widgets.
+  (b) THE SIGNATURE DEVICE: ONE visual idea that returns through the ad so it feels like one film (a glowing line that carries the eye, a pill that keeps morphing, a colour that floods in on every cut, an object that keeps changing state).
+  (c) THE ARC: use the CREATIVE CONCEPT in the brief. Do NOT default to "hook, welcome, demo, benefits, logo"; that arc is only one option, and an ad that always follows it looks like a template. Open on whatever the concept needs (an object, a number, a question, a photo, a single word).
+  Two businesses in the same category must still get different worlds, devices and arcs. Make a bold choice a human motion designer would be proud of.
+- REAL OBJECTS BEAT TEXT: at least two out of every three beats must show an object, interface or photo (card, notification, receipt-like status, chat, search bar, phone, product photo, stars, counter, logo), not only words. Text-only beats go between objects as punctuation, never two in a row.
+- SCALE CONTRAST: mix scales on purpose. A huge word that fills most of the frame ("slam", "poster", "reveal", "bigcount") next to a small, precise UI object is what looks expensive; tiny text floating in an empty frame looks unfinished. Keep ONE accent colour word per text beat.
+- Always end on the business: logo + a finished 2-4 word tagline + phone/website ("endcard" or "lockup"). The tagline must sound like the business, not like marketing.
 - PREMIUM DIRECTION (this is what separates a top motion designer from a template):
   * At least half of the beats use the chosen preset's signature shots. Use only 2-3 cut types from the preset in the whole video, so it feels like one film.
   * Contrast scale: follow a text beat with a UI or product beat, then a 3D beat (parallax / isocard / fan). Never three similar beats in a row.

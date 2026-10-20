@@ -245,23 +245,33 @@ export default function Dashboard({ kind = 'video' }) {   // /videos shows video
   const limit = pricing?.proVideosPerMonth || 30;
 
   return (
-    <div className="mx-auto max-w-[1180px] px-6 py-10 sm:px-10">
+    <div className="mx-auto max-w-[1180px] px-5 py-8 sm:px-10 sm:py-10">
       {full && <FullView html={full.html} aspect={full.aspect} still onClose={() => setFull(null)} />}
       <NewThing open={newOpen} kind={newKind} onPick={(k) => setParams({ new: k })} onClose={() => setParams({})} />
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <h1 className="text-4xl font-bold tracking-[-0.045em]">{kind === 'flyer' ? 'My flyers' : 'My videos'}</h1>
-        <div className="flex flex-wrap items-center gap-4">
-          {creditsLeft(user) !== null && (
-            <span className="flex items-center gap-2 rounded-full border border-ink/12 bg-white px-3 py-1.5 text-sm">
-              <b className="tabular-nums">{creditsLeft(user)}</b> {user.credits.free > 0 && !user.credits.paid ? 'free ' : ''}video{creditsLeft(user) === 1 ? '' : 's'} left
-              <button className="font-semibold text-danfo hover:underline" onClick={() => setBuyOpen(true)}>Buy {user.credits.packSize}</button>
-            </span>
-          )}
-          <OtherDevice onLinked={() => { load(); refresh(); }} />
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-[-0.045em] sm:text-4xl">{kind === 'flyer' ? 'Flyers' : 'Videos'}</h1>
+          <p className="mt-1 text-sm text-ink-mute">{projects ? `${projects.length} ${kind === 'flyer' ? 'flyer' : 'video'}${projects.length === 1 ? '' : 's'}` : '\u00a0'}</p>
         </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="segmented w-full sm:w-[200px]" role="tablist" aria-label="Library">
+            <button role="tab" aria-selected={kind === 'video'} onClick={() => navigate('/videos')}>Videos</button>
+            <button role="tab" aria-selected={kind === 'flyer'} onClick={() => navigate('/flyers')}>Flyers</button>
+          </div>
+          <Button onClick={() => setParams({ new: kind })}><svg width="16" height="16" viewBox="0 0 14 14" aria-hidden="true"><path d="M7 1v12M1 7h12" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" /></svg>New {kind === 'flyer' ? 'flyer' : 'video'}</Button>
+        </div>
+      </div>
+      <div className="mt-5 flex flex-wrap items-center gap-x-6 gap-y-2 border-y border-ink/8 py-3 text-sm">
+        {creditsLeft(user) !== null && (
+          <span className="flex items-center gap-2 text-ink-soft">
+            <b className="tabular-nums text-ink">{creditsLeft(user)}</b> {user.credits.free > 0 && !user.credits.paid ? 'free ' : ''}video{creditsLeft(user) === 1 ? '' : 's'} left
+            <button className="font-semibold text-danfo hover:underline" onClick={() => setBuyOpen(true)}>Buy {user.credits.packSize}</button>
+          </span>
+        )}
         {!user.testMode && (user.plan === 'pro'
-          ? <p className="text-sm text-ink-soft">{user.proVideosRemaining} of {limit} ad-free videos left this month</p>
-          : <Link to="/checkout" className="text-sm font-semibold text-ink-soft hover:text-ink">Upgrade to Pro for {naira(pricing?.proPriceNgn || 5000)}/month</Link>)}
+          ? <span className="text-ink-soft">{user.proVideosRemaining} of {limit} ad-free videos left this month</span>
+          : <Link to="/checkout" className="font-semibold text-ink-soft hover:text-ink">Upgrade to Pro for {naira(pricing?.proPriceNgn || 5000)}/month</Link>)}
+        <span className="ml-auto"><OtherDevice onLinked={() => { load(); refresh(); }} /></span>
       </div>
       <BuyCredits open={buyOpen} onClose={() => setBuyOpen(false)} />
       {paidMsg && <div className="mt-6 rounded-[12px] border border-money/30 bg-money/10 px-4 py-3 text-sm font-semibold text-ink" role="status">{paidMsg}</div>}
@@ -269,7 +279,7 @@ export default function Dashboard({ kind = 'video' }) {   // /videos shows video
       {!projects ? <PageLoader /> : (
         <ul className="grid grid-cols-2 gap-x-5 gap-y-8 sm:grid-cols-3 lg:grid-cols-4">
           <li>
-            <button onClick={() => setParams({ new: kind })} className="press group grid aspect-[4/5] w-full place-items-center rounded-xl border border-dashed border-ink/20 bg-white text-ink-soft hover:border-ink/40 hover:text-ink">
+            <button onClick={() => setParams({ new: kind })} className="press group grid aspect-[9/14] w-full place-items-center rounded-xl border border-dashed border-ink/20 bg-white text-ink-soft hover:border-ink/40 hover:text-ink">
               <span className="flex flex-col items-center gap-3">
                 <span className="grid size-12 place-items-center rounded-full bg-danfo text-white"><svg width="16" height="16" viewBox="0 0 14 14" aria-hidden="true"><path d="M7 1v12M1 7h12" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" /></svg></span>
                 <span className="font-semibold">{kind === 'flyer' ? 'New flyer' : 'New video'}</span>
@@ -278,12 +288,12 @@ export default function Dashboard({ kind = 'video' }) {   // /videos shows video
           </li>
           {projects.map((p) => {
             const st = statusLabel(p);
-            const ratio = p.aspect_ratio === '16:9' ? 'aspect-video w-full' : p.aspect_ratio === '1:1' ? 'aspect-square w-full' : p.aspect_ratio === '4:5' ? 'aspect-[4/5] h-full' : p.aspect_ratio === 'A4' ? 'aspect-[1240/1754] h-full' : 'aspect-[9/16] h-full';
+            const tile = p.aspect_ratio === '16:9' ? 'aspect-video' : p.aspect_ratio === '1:1' ? 'aspect-square' : p.aspect_ratio === 'A4' ? 'aspect-[1240/1754]' : p.aspect_ratio === '4:5' ? 'aspect-[4/5]' : 'aspect-[9/14]';
             return (
               <li key={p.id} className="group">
                 <Link to={nextStep(p)} className="block">
-                  <div className="relative grid aspect-[4/5] place-items-center overflow-hidden rounded-xl bg-[#0B0A12]">
-                    <div className={`relative ${ratio} overflow-hidden`}>
+                  <div className={`relative grid ${tile} place-items-center overflow-hidden rounded-xl bg-[#0B0A12] ring-1 ring-ink/10 transition-transform duration-200 group-hover:-translate-y-0.5`}>
+                    <div className="relative size-full overflow-hidden">
                       {p.thumbnail_url ? <img src={p.thumbnail_url} alt="" className="size-full object-cover" loading="lazy" />
                         : <span className="grid size-full place-items-center"><img src="/animora-mark.png" alt="" className="size-10 animate-pulse opacity-60" /></span>}
                     </div>
