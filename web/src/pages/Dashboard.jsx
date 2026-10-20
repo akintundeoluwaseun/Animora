@@ -158,7 +158,7 @@ function statusLabel(p) {
 export function KindBadge({ kind, className = '' }) {
   const flyer = kind === 'flyer';
   return (
-    <span className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-bold ${flyer ? 'bg-[#FFE8A3] text-[#5A4300]' : 'bg-[#DCEBFF] text-[#0B3B80]'} ${className}`}>
+    <span className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-bold ${flyer ? 'bg-flyer text-white' : 'bg-video text-white'} ${className}`}>
       {flyer
         ? <svg width="11" height="11" viewBox="0 0 12 12" aria-hidden="true"><rect x="1" y="1" width="10" height="10" rx="2" fill="none" stroke="currentColor" strokeWidth="1.6" /><path d="M2.5 9l2.5-3 2 2 1.5-1.5L10 9" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" /></svg>
         : <svg width="11" height="11" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 1.8v8.4L10 6z" fill="currentColor" /></svg>}
@@ -246,19 +246,16 @@ export default function Dashboard({ kind = 'video' }) {   // /videos shows video
 
   return (
     <div className="mx-auto max-w-[1180px] px-5 py-8 sm:px-10 sm:py-10">
+      <div className={`mb-6 h-1.5 w-16 rounded-full ${kind === 'flyer' ? 'bg-flyer' : 'bg-video'}`} aria-hidden="true" />
       {full && <FullView html={full.html} aspect={full.aspect} still onClose={() => setFull(null)} />}
       <NewThing open={newOpen} kind={newKind} onPick={(k) => setParams({ new: k })} onClose={() => setParams({})} />
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-[-0.045em] sm:text-4xl">{kind === 'flyer' ? 'Flyers' : 'Videos'}</h1>
+          <h1 className={`text-3xl font-bold tracking-[-0.045em] sm:text-4xl ${kind === 'flyer' ? 'text-flyer' : 'text-video'}`}>{kind === 'flyer' ? 'Your flyers' : 'Your videos'}</h1>
           <p className="mt-1 text-sm text-ink-mute">{projects ? `${projects.length} ${kind === 'flyer' ? 'flyer' : 'video'}${projects.length === 1 ? '' : 's'}` : '\u00a0'}</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <div className="segmented w-full sm:w-[200px]" role="tablist" aria-label="Library">
-            <button role="tab" aria-selected={kind === 'video'} onClick={() => navigate('/videos')}>Videos</button>
-            <button role="tab" aria-selected={kind === 'flyer'} onClick={() => navigate('/flyers')}>Flyers</button>
-          </div>
-          <Button onClick={() => setParams({ new: kind })}><svg width="16" height="16" viewBox="0 0 14 14" aria-hidden="true"><path d="M7 1v12M1 7h12" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" /></svg>New {kind === 'flyer' ? 'flyer' : 'video'}</Button>
+          <Button className={kind === 'flyer' ? '!bg-flyer hover:!bg-flyer' : '!bg-video hover:!bg-video'} onClick={() => setParams({ new: kind })}><svg width="16" height="16" viewBox="0 0 14 14" aria-hidden="true"><path d="M7 1v12M1 7h12" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" /></svg>New {kind === 'flyer' ? 'flyer' : 'video'}</Button>
         </div>
       </div>
       <div className="mt-5 flex flex-wrap items-center gap-x-6 gap-y-2 border-y border-ink/8 py-3 text-sm">
@@ -281,7 +278,7 @@ export default function Dashboard({ kind = 'video' }) {   // /videos shows video
           <li>
             <button onClick={() => setParams({ new: kind })} className="press group grid aspect-[9/14] w-full place-items-center rounded-xl border border-dashed border-ink/20 bg-white text-ink-soft hover:border-ink/40 hover:text-ink">
               <span className="flex flex-col items-center gap-3">
-                <span className="grid size-12 place-items-center rounded-full bg-danfo text-white"><svg width="16" height="16" viewBox="0 0 14 14" aria-hidden="true"><path d="M7 1v12M1 7h12" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" /></svg></span>
+                <span className={`grid size-12 place-items-center rounded-full text-white ${kind === 'flyer' ? 'bg-flyer' : 'bg-video'}`}><svg width="16" height="16" viewBox="0 0 14 14" aria-hidden="true"><path d="M7 1v12M1 7h12" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" /></svg></span>
                 <span className="font-semibold">{kind === 'flyer' ? 'New flyer' : 'New video'}</span>
               </span>
             </button>
@@ -292,13 +289,15 @@ export default function Dashboard({ kind = 'video' }) {   // /videos shows video
             return (
               <li key={p.id} className="group">
                 <Link to={nextStep(p)} className="block">
-                  <div className={`relative grid ${tile} place-items-center overflow-hidden rounded-xl bg-[#0B0A12] ring-1 ring-ink/10 transition-transform duration-200 group-hover:-translate-y-0.5`}>
-                    <div className="relative size-full overflow-hidden">
+                  <div className={`relative grid ${tile} place-items-center overflow-hidden ${p.kind === 'flyer' ? 'rounded-md bg-[#F4EFE8] p-2 ring-2 ring-flyer/35' : 'rounded-xl bg-[#0B0A12] ring-2 ring-video/30'} transition-transform duration-200 group-hover:-translate-y-0.5`}>
+                    <div className={`relative size-full overflow-hidden ${p.kind === 'flyer' ? 'shadow-md' : ''}`}>
                       {p.thumbnail_url ? <img src={p.thumbnail_url} alt="" className="size-full object-cover" loading="lazy" />
                         : <span className="grid size-full place-items-center"><img src="/animora-mark.png" alt="" className="size-10 animate-pulse opacity-60" /></span>}
                     </div>
                     <span className={`absolute left-2.5 top-2.5 rounded-md px-2 py-0.5 text-xs font-semibold ${st.c}`}>{st.t}</span>
                     <KindBadge kind={p.kind} className="absolute right-2.5 top-2.5" />
+                    {p.kind !== 'flyer' && <span className="pointer-events-none absolute inset-0 grid place-items-center"><span className="grid size-12 place-items-center rounded-full bg-black/45 text-white backdrop-blur"><svg width="18" height="18" viewBox="0 0 12 12" aria-hidden="true"><path d="M3.5 1.8v8.4L10 6z" fill="currentColor" /></svg></span></span>}
+                    {p.kind !== 'flyer' && p.duration_seconds > 0 && <span className="absolute bottom-2.5 left-2.5 rounded bg-black/65 px-1.5 py-0.5 text-xs font-semibold tabular-nums text-white">{duration(p.duration_seconds)}</span>}
                     {p.kind === 'flyer' && ['ready', 'rendered'].includes(p.status) && (
                       <button type="button" aria-label={`See ${p.title} full screen`} onClick={(e) => { e.preventDefault(); e.stopPropagation(); openFull(p); }}
                         className="press absolute bottom-2.5 right-2.5 flex items-center gap-1.5 rounded-full bg-black/60 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur hover:bg-black/80">

@@ -1,0 +1,37 @@
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:100%;height:100%;overflow:hidden;background:#000}
+body{font-family:var(--font),'Inter','Helvetica Neue',Arial,sans-serif;-webkit-font-smoothing:antialiased;color:var(--ink)}
+#stage{position:absolute;left:0;top:0;width:var(--W);height:var(--H);overflow:hidden;background:var(--bg1);perspective:2600px;perspective-origin:50% 45%}
+#bg,#cam,#fx,#grain,#vig{position:absolute;inset:0}
+#bg{overflow:hidden;background:linear-gradient(165deg,var(--bg1) 0%,var(--bg2) 100%)}
+.lamp{position:absolute;border-radius:50%;pointer-events:none}
+.bokeh{position:absolute;border-radius:50%;pointer-events:none;background:radial-gradient(circle,var(--bokeh) 0%,transparent 68%)}
+#cam{}
+.scene{position:absolute;inset:0;opacity:0;perspective:2200px;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.abs{position:absolute}
+.center{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%)}
+#grain{opacity:var(--grain);mix-blend-mode:overlay;pointer-events:none;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='300' height='300'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .5  0 0 0 0 .5  0 0 0 0 .5  0 0 0 1.2 -.1'/></filter><rect width='300' height='300' filter='url(%23n)'/></svg>");background-size:300px 300px}
+#vig{pointer-events:none;background:radial-gradient(ellipse at 50% 46%,transparent 52%,var(--vig) 100%)}
+#fx{pointer-events:none;overflow:hidden}
+.sweep{position:absolute;top:-20%;height:140%;width:42%;left:0;opacity:0;transform:skewX(-18deg);background:linear-gradient(90deg,transparent,var(--sweep),transparent);mix-blend-mode:screen}
+/* type */
+.tl{overflow:hidden;line-height:1;padding:.1em .06em .16em;margin:-.1em -.06em -.16em;white-space:nowrap}
+.tw{display:inline-block;will-change:transform}
+.tx{font-weight:800;letter-spacing:-.04em;color:var(--ink);text-align:center}
+.tx.sub{font-weight:500;letter-spacing:-.01em;color:var(--mute)}
+.acc{background:linear-gradient(100deg,var(--a1),var(--a2));-webkit-background-clip:text;background-clip:text;color:transparent;padding-right:.04em}
+.eyebrow{font-weight:700;letter-spacing:.22em;text-transform:uppercase;color:var(--mute);font-size:30px}
+/* surfaces */
+.glass{background:var(--card);border-radius:44px;box-shadow:0 1px 0 var(--hi) inset,0 0 0 1.5px var(--cardLine),0 60px 90px -40px var(--shadow),0 18px 30px -14px var(--shadow2)}
+.appicon{position:relative;border-radius:23%;overflow:hidden;display:grid;place-items:center;box-shadow:0 14px 28px -10px var(--shadow),inset 0 2px 0 rgba(255,255,255,.38),inset 0 -4px 8px rgba(0,0,0,.16)}
+.appicon::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.34),transparent 52%)}
+.appicon svg{position:relative;z-index:2;width:56%;height:56%;fill:none;stroke:#fff;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;filter:drop-shadow(0 2px 2px rgba(0,0,0,.2))}
+.pill{display:inline-flex;align-items:center;gap:18px;border-radius:999px;background:var(--card);box-shadow:0 1px 0 var(--hi) inset,0 0 0 1.5px var(--cardLine),0 36px 60px -30px var(--shadow)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:16px;border-radius:999px;color:#fff;font-weight:700;background:linear-gradient(180deg,var(--a1),var(--a1d));box-shadow:0 1px 0 rgba(255,255,255,.4) inset,0 24px 40px -16px var(--a1),0 0 0 1.5px rgba(255,255,255,.12) inset}
+.notif{display:flex;align-items:center;gap:26px;padding:26px 32px;border-radius:46px;background:var(--notif);box-shadow:0 1px 0 var(--hi) inset,0 0 0 1.5px var(--cardLine),0 50px 70px -34px var(--shadow)}
+.notif .tt{font-size:36px;font-weight:700;letter-spacing:-.02em;color:var(--ink)}
+.notif .bd{font-size:31px;font-weight:500;color:var(--mute);margin-top:4px;letter-spacing:-.01em}
+.notif .tm{font-size:26px;color:var(--mute);margin-left:auto;align-self:flex-start;margin-top:6px}
+.paper{background:#fffdf8;color:#1b1713;-webkit-mask:conic-gradient(from -45deg at bottom,#0000,#000 1deg 89deg,#0000 90deg) 50%/34px 100%;mask:conic-gradient(from -45deg at bottom,#0000,#000 1deg 89deg,#0000 90deg) 50%/34px 100%}
+.dash{border-top:3px dashed rgba(27,23,19,.22)}
+.mono{font-family:'DejaVu Sans Mono','Courier New',monospace}

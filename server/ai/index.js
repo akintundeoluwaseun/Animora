@@ -4,13 +4,16 @@
 // so the product never dead-ends in front of a customer (or a judge).
 import { config } from '../config.js';
 import { getDbObject } from '../storage.js';
-import { planChat, generateAnimation, editAnimation, geminiResting } from '../engine/gemini.js';
+import { planChat, generateAnimation, editAnimation } from '../engine/gemini.js';
 import { validatePlan } from '../engine/validate.js';
 import { offlinePlannerTurn } from './offline.js';
 import { templateFromPlan, offlineEdit } from './templates.js';
 import { directedHtml, directorEdit, readData } from './director.js';
 import { describeAssets, upgradeRuntime } from './describe.js';
-import { isFlyer, editFlyer, offlineFlyerEdit } from './flyer.js';
+import { isFlyer, editFlyer } from './flyer.js';
+import { THEMES } from './themes.js';
+import { directCinema, cinemaEdit, isCinema, readCinema, CINEMA_ASPECTS } from './cinema/index.js';
+import { directMotion, motionEdit, motionOfflineEdit, isMotion, readMotion, MOTION_ASPECTS } from './motion/index.js';
 
 // 'director' (default): Gemini directs the shots, our motion engine animates them (fast, always renders).
 // 'html': Gemini writes the whole HTML/GSAP file itself (slower, experimental).
@@ -109,11 +112,10 @@ export function enrichPlan(plan, assets) {
 /** A short, plain reason for an AI failure (shown to the user; never contains the key). */
 export function aiReason(e) {
   const m = String(e?.message || e);
-  // shown to customers: never mention keys or limits, just what happened
-  if (/429|quota|RESOURCE_EXHAUSTED|resting/i.test(m)) return 'the AI is resting for a while';
-  if (/40[03]|API key|PERMISSION_DENIED|API_KEY_INVALID/i.test(m)) return 'the AI is unavailable right now';
-  if (/timeout|aborted|TimeoutError/i.test(m)) return 'the AI took too long';
-  if (/JSON|Unexpected token|no text|MAX_TOKENS/i.test(m)) return "the AI's answer was cut off";
+  if (/429|quota|RESOURCE_EXHAUSTED/i.test(m)) return 'your Gemini key has hit its usage limit';
+  if (/40[03]|API key|PERMISSION_DENIED|API_KEY_INVALID/i.test(m)) return 'the Gemini key was refused';
+  if (/timeout|aborted|TimeoutError/i.test(m)) return 'Gemini took too long';
+  if (/JSON|Unexpected token|no text|MAX_TOKENS/i.test(m)) return "Gemini's answer was cut off";
   return m.replace(/key=\S+/g, '').slice(0, 100);
 }
 
@@ -122,6 +124,33 @@ export async function generateCode({ plan, style, assets, brief = null, previous
   if (config.useGemini) { onStatus?.('Looking at your pictures'); assets = await describeAssets(assets, loadImage); }
   const planWithAssets = enrichPlan(plan, assets);
   const themeKey = themeKeyFor(style);
+  // Every video size is made by the Motion engine (Apple-style product films): the AI directs, or the rule-based composer without a key
+  const motion = CODE_MODE !== 'html' && process.env.ANIMORA_ENGINE !== 'cinema' && MOTION_ASPECTS.includes(planWithAssets.aspect_ratio || '9:16');
+  if (motion) {
+    try {
+      onStatus?.(config.useGemini ? 'Directing the film' : 'Building animation');
+      const prev = readMotion(previous) || readCinema(previous);
+      const r = await directMotion({
+        plan: planWithAssets, brief, assets: planWithAssets.assets, themeColors: THEMES[themeKey]?.colors || {},
+        images: config.useGemini ? await imageParts(assets) : [], useAi: !!config.useGemini,
+        salt: previous ? String(Date.now()) : '', avoid: (prev?.beats || prev?.scenes || []).map((x) => x.type),
+      });
+      return { html: r.html, source: config.useGemini && r.source === 'gemini' ? 'gemini' : 'template', problems: [], ...(config.useGemini && r.source !== 'gemini' ? { notice: "The AI director couldn't finish, so this version was arranged automatically. Press Regenerate to try the AI again." } : {}) };
+    } catch (e) { console.warn('[motion] failed, trying Cinema:', e.message); }
+  }
+  // older engine (kept for 9:16 if Motion fails, and for editing videos made before Motion)
+  const cinema = CODE_MODE !== 'html' && CINEMA_ASPECTS.includes(planWithAssets.aspect_ratio || '9:16');
+  if (cinema) {
+    try {
+      onStatus?.(config.useGemini ? 'Directing the scenes' : 'Building animation');
+      const r = await directCinema({
+        plan: planWithAssets, brief, assets: planWithAssets.assets, themeColors: THEMES[themeKey]?.colors || {},
+        images: config.useGemini ? await imageParts(assets) : [], useAi: !!config.useGemini,
+        salt: previous ? String(Date.now()) : '', avoid: (readCinema(previous)?.scenes || []).map((x) => x.type),
+      });
+      return { html: r.html, source: config.useGemini && r.source === 'gemini' ? 'gemini' : 'template', problems: [], ...(config.useGemini && r.source !== 'gemini' ? { notice: "The AI director couldn't finish, so this version was arranged automatically. Press Regenerate to try the AI again." } : {}) };
+    } catch (e) { console.warn('[cinema] failed, using the classic engine:', e.message); }
+  }
   const rule = () => templateFromPlan(planWithAssets, { themeKey, salt: previous ? String(Date.now()) : '' });   // regenerate = a different arrangement
   if (config.useGemini && CODE_MODE !== 'html') {
     try {
@@ -130,7 +159,7 @@ export async function generateCode({ plan, style, assets, brief = null, previous
       return { html, source: 'gemini', problems: [] };
     } catch (e) {
       console.warn('[ai] Gemini director failed:', e.message);
-      return { html: rule(), source: 'template', problems: [], notice: "Animora's built-in designer made this version. You can still edit it, or press Regenerate later." };
+      return { html: rule(), source: 'template', problems: [], notice: `The AI director couldn't finish (${aiReason(e)}), so this version was arranged automatically. Press Regenerate to try the AI again.` };
     }
   }
   if (config.useGemini) {
@@ -149,17 +178,26 @@ export async function generateCode({ plan, style, assets, brief = null, previous
 }
 
 /** Plain-words edit. Returns { html, source, summary } */
-export async function editCode({ html, instruction, aspectRatio, duration, plan = null, assets = [], brief = null, history = [], onStatus }) {
+export async function editCode({ html, instruction, aspectRatio, duration, plan = null, assets = [], onStatus }) {
   if (config.useGemini) assets = await describeAssets(assets, loadImage);
   if (isFlyer(html)) {
-    const simple = () => offlineFlyerEdit({ html, instruction, assets });
-    if (config.useGemini && !(await geminiResting())) {
-      try { const r = await editFlyer({ html, instruction, assets }); return { html: r.html, source: 'gemini', summary: r.summary }; }
-      catch (e) { console.warn('[ai] flyer edit failed:', e.message); }
+    if (!config.useGemini) return { html, source: 'offline', unchanged: true, summary: 'Flyer changes need the AI, which is off right now.' };
+    try { const r = await editFlyer({ html, instruction, assets }); return { html: r.html, source: 'gemini', summary: r.summary }; }
+    catch (e) { console.warn('[ai] flyer edit failed:', e.message); return { html, source: 'offline', unchanged: true, summary: `I couldn't change the flyer (${aiReason(e)}). Try again.` }; }
+  }
+  if (isMotion(html)) {
+    if (config.useGemini) {
+      try { const r = await motionEdit({ html, instruction, assets, images: await imageParts(assets) }); return { html: r.html, source: 'gemini', summary: r.summary }; }
+      catch (e) { console.warn('[motion] edit failed:', e.message); }
     }
-    const r = simple();
-    if (r) return { html: r.html, source: 'offline', summary: r.summary };
-    return { html, source: 'offline', unchanged: true, summary: 'Something went wrong. Please try again later.' };
+    const off = motionOfflineEdit(html, instruction);
+    if (off) return { html: off.html, source: 'offline', summary: `Updated: ${off.changes.join(', ')}.` };
+    return { html, source: 'offline', unchanged: true, summary: config.useGemini ? "I couldn't make that change just now. Please try again in a moment." : 'Without the AI I can change the colour ("make it blue"), the backgrounds ("make it dark") and the pace ("make it faster"). Add a Gemini key for any change.' };
+  }
+  if (isCinema(html)) {
+    if (!config.useGemini) return { html, source: 'offline', unchanged: true, summary: 'Changes to a Cinema video need the AI, which is off right now. Add a Gemini key.' };
+    try { const r = await cinemaEdit({ html, instruction, assets, images: await imageParts(assets) }); return { html: r.html, source: 'gemini', summary: r.summary }; }
+    catch (e) { console.warn('[cinema] edit failed:', e.message); return { html, source: 'offline', unchanged: true, summary: `I couldn't make that change (${aiReason(e)}). Try again.` }; }
   }
   html = upgradeRuntime(html, assets);
   const directed = !!readData(html)?.beats;
@@ -167,7 +205,7 @@ export async function editCode({ html, instruction, aspectRatio, duration, plan 
     try {
       if (directed) {
         const planWithAssets = plan ? enrichPlan(plan, assets) : null;
-        const r = await directorEdit({ html, plan: planWithAssets, instruction, assets: planWithAssets?.assets || assets, images: await imageParts(assets), brief, history });
+        const r = await directorEdit({ html, plan: planWithAssets, instruction, assets: planWithAssets?.assets || assets, images: await imageParts(assets) });
         return { html: r.html, source: 'gemini', summary: r.summary };
       }
       const r = await editAnimation(html, instruction, { aspectRatio, duration, onStatus });
@@ -181,8 +219,8 @@ export async function editCode({ html, instruction, aspectRatio, duration, plan 
     return {
       html, source: 'offline', unchanged: true,
       summary: config.useGemini
-        ? 'Something went wrong. Please try again later.'
-        : 'Something went wrong. Please try again later.',
+        ? "The AI editor couldn't be reached just now, and that change needs it. Please try again in a moment."
+        : 'The practice AI can change text size ("make the text bigger"), colours ("change the background to green") and speed ("make it faster"). Add a Gemini key for any change.',
     };
   }
   return { html: r.html, source: 'offline', summary: `Updated: ${r.changes.join(', ')}.` };

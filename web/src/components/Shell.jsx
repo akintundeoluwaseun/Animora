@@ -40,8 +40,8 @@ function CreateSheet({ open, onClose }) {
       <h2 className="text-2xl font-bold tracking-[-0.03em]">What are we making?</h2>
       <div className="mt-5 grid gap-3 sm:grid-cols-2">
         {items.map(([k, t, d, icon]) => (
-          <button key={k} onClick={() => go(k)} className="press group rounded-2xl border border-ink/12 bg-white p-5 text-left hover:border-danfo hover:shadow-[0_0_0_3px_color-mix(in_srgb,var(--color-danfo)_14%,transparent)]">
-            <span className="grid size-11 place-items-center rounded-xl bg-ink text-white group-hover:bg-danfo"><Icon k={icon} /></span>
+          <button key={k} onClick={() => go(k)} className={`press group rounded-2xl border-2 p-5 text-left ${k === 'flyer' ? 'border-[#FFD9BF] bg-[#FFF8F3] hover:border-flyer' : 'border-[#D9D6FF] bg-[#F6F5FF] hover:border-video'}`}>
+            <span className={`grid size-11 place-items-center rounded-xl text-white ${k === 'flyer' ? 'bg-flyer' : 'bg-video'}`}><Icon k={icon} /></span>
             <span className="mt-4 block text-lg font-semibold tracking-[-0.02em]">{t}</span>
             <span className="mt-1 block text-sm leading-snug text-ink-mute">{d}</span>
           </button>
@@ -106,7 +106,6 @@ function SiteFooter() {
 
 // ---------------------------------------------------------------- app (library)
 const RAIL_LINKS = [
-  ['Library', [['/videos', 'Videos', 'videos'], ['/flyers', 'Flyers', 'flyers']]],
   ['Explore', [['/styles', 'Styles', 'styles'], ['/pricing', 'Pricing', 'pricing']]],
 ];
 const railCls = ({ isActive }) => `group flex items-center gap-3 rounded-[10px] px-3 py-2.5 text-[14.5px] font-medium transition-colors ${isActive ? 'bg-ink text-white' : 'text-ink-soft hover:bg-ink/5 hover:text-ink'}`;
@@ -134,6 +133,27 @@ function Account() {
   );
 }
 
+
+// Videos and flyers are two different places, each with its own colour, home and "new" button.
+function Studio({ kind, to, label, sub, icon }) {
+  const navigate = useNavigate();
+  const { pathname } = useLocation();
+  const on = pathname.startsWith(to);
+  const v = kind === 'video';
+  const c = v ? { solid: 'bg-video', soft: 'bg-video-soft', text: 'text-video', ring: 'border-video' } : { solid: 'bg-flyer', soft: 'bg-flyer-soft', text: 'text-flyer', ring: 'border-flyer' };
+  return (
+    <div className={`overflow-hidden rounded-2xl border-2 bg-white transition-colors ${on ? c.ring : 'border-ink/8'}`}>
+      <Link to={to} className={`flex items-center gap-3 px-3 py-3 ${on ? c.soft : 'hover:bg-ink/[0.03]'}`}>
+        <span className={`grid size-10 place-items-center rounded-xl text-white ${c.solid}`}><Icon k={icon} size={20} /></span>
+        <span className="min-w-0 leading-tight"><b className="block text-[15px] tracking-[-0.02em]">{label}</b><span className="block truncate text-xs text-ink-mute">{sub}</span></span>
+      </Link>
+      <button onClick={() => navigate(`${to}?new=${kind}`)} className={`press flex h-9 w-full items-center justify-center gap-1.5 border-t border-ink/8 text-[13px] font-semibold ${c.text} hover:${c.soft}`}>
+        <Icon k="plus" size={15} />New {v ? 'video' : 'flyer'}
+      </button>
+    </div>
+  );
+}
+
 function Rail({ onCreate }) {
   const [status, setStatus] = useState(null);
   const inst = useInstall();
@@ -141,12 +161,11 @@ function Rail({ onCreate }) {
   return (
     <aside className="sticky top-0 hidden h-screen flex-col border-r border-ink/8 bg-[#FBFBFD] lg:flex" aria-label="Main">
       <div className="px-5 pb-2 pt-6"><Logo /></div>
-      <div className="px-4 pt-5">
-        <button onClick={onCreate} className="press flex h-11 w-full items-center justify-center gap-2 rounded-[10px] bg-danfo font-semibold text-white shadow-[0_8px_20px_-10px_var(--color-danfo)] hover:bg-danfo-deep">
-          <Icon k="plus" size={18} />Create
-        </button>
+      <div className="mt-5 space-y-3 px-4">
+        <Studio kind="video" to="/videos" label="Videos" sub="Motion ads, MP4" icon="videos" />
+        <Studio kind="flyer" to="/flyers" label="Flyers" sub="Posters, still designs" icon="flyers" />
       </div>
-      <nav className="mt-6 flex flex-col gap-6 px-3" aria-label="Sections">
+      <nav className="mt-7 flex flex-col gap-6 px-3" aria-label="Sections">
         {RAIL_LINKS.map(([group, links]) => (
           <div key={group}>
             <p className="mb-1.5 px-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-mute">{group}</p>
@@ -172,8 +191,8 @@ function BottomTabs({ onCreate }) {
   return (
     <>
       <nav className="fixed inset-x-0 bottom-0 z-40 flex items-end border-t border-ink/10 bg-white/92 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl lg:hidden" aria-label="Main">
-        <NavLink to="/videos" className={tab}><Icon k="videos" />Videos</NavLink>
-        <NavLink to="/flyers" className={tab}><Icon k="flyers" />Flyers</NavLink>
+        <NavLink to="/videos" className={({ isActive }) => `${tab({ isActive: false })} ${isActive ? '!text-video' : ''}`}><span className="grid size-8 place-items-center rounded-lg bg-video-soft text-video"><Icon k="videos" size={18} /></span>Videos</NavLink>
+        <NavLink to="/flyers" className={({ isActive }) => `${tab({ isActive: false })} ${isActive ? '!text-flyer' : ''}`}><span className="grid size-8 place-items-center rounded-lg bg-flyer-soft text-flyer"><Icon k="flyers" size={18} /></span>Flyers</NavLink>
         <div className="flex flex-1 justify-center">
           <button onClick={onCreate} aria-label="Create" className="press -mt-5 grid size-14 place-items-center rounded-full bg-danfo text-white shadow-[0_10px_24px_-8px_var(--color-danfo)]"><Icon k="plus" size={26} /></button>
         </div>

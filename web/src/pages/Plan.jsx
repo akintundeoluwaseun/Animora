@@ -9,6 +9,35 @@ import MicButton from '../components/MicButton.jsx';
 import { StylePicker } from './Dashboard.jsx';
 import { KindBadge } from './Dashboard.jsx';
 
+// Which kinds of scenes the owner can ask for (ids match server/ai/motion/compose.js MOTION_WANTS)
+const SCENE_OPTIONS = [
+  { id: 'typing', t: 'Search and type', d: 'A search bar types what people look for, and your business pops up', g: 'search' },
+  { id: 'chat', t: 'WhatsApp chat', d: 'A customer asks, you reply, the order is made', g: 'chat' },
+  { id: 'button', t: 'Button press', d: 'A cursor glides in and taps your "Order now" button', g: 'cursor' },
+  { id: 'notifs', t: 'Phone alerts', d: 'Your messages drop in as phone notifications', g: 'bell' },
+  { id: 'phone', t: '3D phone', d: 'A floating phone with your app icon on the home screen', g: 'phone' },
+  { id: 'prices', t: 'Order card', d: 'Your items and prices add up on a clean order card', g: 'receipt', needs: 'Uses your products and prices' },
+  { id: 'offer', t: 'Big price', d: 'Your price or discount rolls in, huge', g: 'tag', needs: 'Needs a price or offer' },
+  { id: 'photos', t: 'Floating photos', d: 'Your photos float in 3D while the camera glides past', g: 'film', needs: 'Needs your photos' },
+  { id: 'grid', t: 'Photo grid', d: 'Your photos pop into a grid that tilts away in 3D', g: 'grid', needs: 'Needs 4 or more photos' },
+  { id: 'menu', t: 'Card stack', d: 'Colourful cards stack up with your products or strengths', g: 'cards' },
+  { id: 'checklist', t: 'Switches', d: 'Your strengths switch on one by one, like phone settings', g: 'toggle', needs: 'Uses your selling points' },
+  { id: 'swap', t: 'Rolling words', d: 'A button whose words roll through what you offer', g: 'swap', needs: 'Uses your selling points' },
+  { id: 'orbit', t: 'Orbiting icons', d: 'Your logo in the middle, your strengths fly in around it', g: 'orbit' },
+  { id: 'steps', t: 'How it works', d: 'Three cards joined by a line that draws through them', g: 'steps' },
+  { id: 'highlight', t: 'Text highlight', d: 'Your key words get selected like on a screen', g: 'highlight' },
+  { id: 'bigtype', t: 'Big words', d: 'One huge word at a time, fast and loud', g: 'type' },
+  { id: 'glow', t: 'Glowing words', d: 'A calm glowing line on black, like a film trailer', g: 'glow' },
+  { id: 'numbers', t: 'Big number', d: 'A number card that counts up', g: 'num', needs: 'Needs a number, like 2000 customers' },
+  { id: 'timer', t: 'Timer ring', d: 'A ring fills up: "Under 30 minutes"', g: 'timer', needs: 'Needs a time, like 30 minutes' },
+  { id: 'location', t: 'Map pin', d: 'A pin drops on your address on a clean map', g: 'pin', needs: 'Needs an address' },
+  { id: 'event', t: 'Date card', d: 'A calendar card with your date, time and place', g: 'calendar', needs: 'Needs a date' },
+  { id: 'countdown', t: 'Countdown', d: '3, 2, 1, then a big reveal. Great for launches', g: 'countdown' },
+];
+
+// The questions are grouped so people always know where they are
+const GROUP_OF = { mode: 'Start', paste: 'Start', flyerType: 'Your business', offer: 'Your message', when: 'Your message', layout: 'Look and feel', name: 'Your business', category: 'Your business', goal: 'Your business', headline: 'Your message', features: 'Your message', products: 'Your message', cta: 'Your message', contact: 'Your message', aspect: 'Format', duration: 'Format', pictures: 'Look and feel', colors: 'Look and feel', style: 'Look and feel', scenes: 'Look and feel', voiceover: 'Finish', sound: 'Finish', extra: 'Finish' };
+
 const MAX_PICS = 10;
 
 const CATEGORIES = ['Food & drinks', 'Fashion & clothing', 'Beauty & salon', 'Tech & software', 'Finance & payments', 'Health & fitness', 'Real estate', 'Events & parties', 'School & training', 'Shop & retail', 'Services'];
@@ -59,6 +88,7 @@ const QUESTIONS = [
   { id: 'pictures', type: 'upload', optional: true, ask: () => `Add your logo and product photos if you have them (up to ${MAX_PICS}). Both are optional. You can also paste a picture with Ctrl+V.` },
   { id: 'colors', type: 'colors', ask: () => 'Which colours should the video use?' },
   { id: 'style', type: 'style', ask: () => 'Pick a look for your video, or let me choose one that fits.' },
+  { id: 'scenes', type: 'scenes', ask: () => 'Which kinds of scenes would you like in your video?', hint: 'Pick any you love. Not sure? Let the AI choose what suits your business best.' },
   { id: 'voiceover', type: 'single', options: [{ v: 'yes', l: 'Yes, write me a script', d: 'For ElevenLabs, CapCut and other voice apps' }, { v: 'no', l: 'No, just on-screen text' }], ask: () => 'Do you want a narration script for a voice-over app?' },
   { id: 'sound', type: 'sound', ask: () => 'What sound should the video have?' },
   { id: 'extra', type: 'long', optional: true, chips: EXTRA_CHIPS, ask: () => 'Last one: any other special instructions? Anything goes. You can paste pictures here too.', placeholder: 'e.g. "Start by zooming into the logo of the chatbot, then show the app screen"', done: true },
@@ -82,14 +112,42 @@ const FLYER_TEXT = {
   style: () => 'Pick a look for your flyer, or let me choose one that fits.',
   extra: () => 'Last one: anything special for the flyer? Anything goes.',
 };
-const FLYER_QUESTIONS = QUESTIONS.filter((x) => !['duration', 'voiceover', 'sound'].includes(x.id)).map((x) => ({
-  ...x,
-  ...(FLYER_TEXT[x.id] ? { ask: FLYER_TEXT[x.id] } : {}),
-  ...(x.id === 'aspect' ? { options: FLYER_ASPECTS } : {}),
-  ...(x.id === 'headline' ? { hint: 'One to three messages work best on a flyer.' } : {}),
-  ...(x.id === 'paste' ? { placeholder: 'e.g. My business is Oluwaseun Computers in Ado Ekiti. We sell and repair laptops. HP EliteBook ₦250,000, Dell ₦300,000. Call or WhatsApp 0807 691 1614. Square flyer for WhatsApp, clean and premium.' } : {}),
-  ...(x.id === 'extra' ? { placeholder: 'e.g. "Put the prices in big circles" or "Make it look like a Christmas sale"' } : {}),
-}));
+// Flyers ask different things from videos: what kind of flyer, the one big thing on it, when and where, and how it is laid out.
+const FLYER_TYPES = [
+  { v: 'sale', l: 'Sale or discount', d: 'A price or percentage is the star' },
+  { v: 'event', l: 'Event or party', d: 'Date, time and place matter most' },
+  { v: 'launch', l: 'New product or opening', d: 'Introduce something new' },
+  { v: 'menu', l: 'Menu or price list', d: 'A tidy list of items and prices' },
+  { v: 'service', l: 'Services we offer', d: 'What you do, in a clean grid' },
+  { v: 'hiring', l: 'We are hiring', d: 'A job or training announcement' },
+  { v: 'brand', l: 'Brand or thank-you poster', d: 'A bold statement poster' },
+];
+const FLYER_LAYOUTS = [
+  { v: 'photo', l: 'Photo first', d: 'Your picture fills the flyer, text sits on top' },
+  { v: 'type', l: 'Big type first', d: 'Huge words, minimal and bold' },
+  { v: 'price', l: 'Price first', d: 'A giant price or offer in the middle' },
+  { v: 'auto', l: 'Let the AI decide', d: 'It picks what suits your business' },
+];
+const FLYER_QUESTIONS = [
+  { id: 'mode', type: 'single', options: QUESTIONS[0].options, ask: QUESTIONS[0].ask },
+  { ...QUESTIONS.find((x) => x.id === 'paste'), ask: FLYER_TEXT.paste, placeholder: 'e.g. My business is Oluwaseun Computers in Ado Ekiti. We sell and repair laptops. HP EliteBook ₦250,000, Dell ₦300,000. Call or WhatsApp 0807 691 1614. Square flyer for WhatsApp, clean and premium.' },
+  { id: 'name', type: 'text', ask: () => "What's your business name?", placeholder: 'e.g. Kemi Cakes' },
+  { id: 'category', type: 'single', options: CATEGORIES, typed: true, ask: (b) => `Nice! What does ${b.name} do?`, placeholder: 'Or type your own' },
+  { id: 'flyerType', type: 'multi', max: 3, options: FLYER_TYPES, typed: true, ask: () => 'What kind of flyer is this?', hint: 'Pick one or more. A sale and a new opening can share one flyer.', placeholder: 'Or describe it in your own words' },
+  { id: 'headline', type: 'multi', max: 3, suggest: 'headline', typed: true, ask: () => 'What is the big title? The words people read first.', hint: 'Short wins. One to three lines work best on a flyer.' },
+  { id: 'offer', type: 'text', optional: true, ask: () => 'Is there one big thing to show huge: a price, a discount or a date?', placeholder: 'e.g. 30% OFF or ₦5,000 or 24 Dec' },
+  { id: 'products', type: 'long', optional: true, ask: () => 'Any items, services or prices to list? One per line.', placeholder: 'Jollof rice ₦2,500\nFried rice ₦3,000' },
+  { id: 'when', type: 'text', optional: true, show: (b) => !b.flyerType || [].concat(b.flyerType).some((x) => x === 'event' || x === 'launch' || /event|party|show|launch|open/i.test(x)), ask: () => 'When and where? Date, time and venue.', placeholder: 'e.g. Sat 14 Dec, 4pm, Ado Ekiti Town Hall' },
+  { id: 'cta', type: 'multi', max: 3, options: CTAS, typed: true, ask: FLYER_TEXT.cta, placeholder: 'Or type your own' },
+  { id: 'contact', type: 'text', optional: true, ask: FLYER_TEXT.contact, placeholder: 'e.g. 0803 123 4567 · @yourhandle' },
+  { id: 'aspect', type: 'single', options: FLYER_ASPECTS, ask: FLYER_TEXT.aspect },
+  { id: 'pictures', type: 'upload', optional: true, ask: FLYER_TEXT.pictures },
+  { id: 'layout', type: 'single', options: FLYER_LAYOUTS, ask: () => 'How should the flyer be laid out?' },
+  { id: 'colors', type: 'colors', ask: FLYER_TEXT.colors },
+  { id: 'style', type: 'style', ask: FLYER_TEXT.style },
+  { id: 'extra', type: 'long', optional: true, chips: ['Make the price really big', 'Keep it calm and premium', 'Make it loud and colourful', 'Use my photo as the background'], ask: FLYER_TEXT.extra, placeholder: 'e.g. "Put the prices in big circles" or "Make it look like a Christmas sale"' },
+];
+
 
 
 const label = (q, v, b, styles) => {
@@ -103,6 +161,9 @@ const label = (q, v, b, styles) => {
   if (q.id === 'style') return b.styleAuto ? 'Let Animora choose' : styles?.find((s) => s.id === v)?.name || 'Chosen';
   if (q.id === 'colors') return v === 'style' ? "The style's colours" : v === 'logo' ? 'Matched to my logo' : 'My own colours';
   if (q.id === 'pictures') return `${v} picture${v === 1 ? '' : 's'}`;
+  if (q.id === 'flyerType') return [].concat(v).map((x) => FLYER_TYPES.find((o) => o.v === x)?.l || x).join(', ');
+  if (q.id === 'layout') return FLYER_LAYOUTS.find((o) => o.v === v)?.l || v;
+  if (q.id === 'scenes') return v === 'auto' ? 'Let the AI choose' : (Array.isArray(v) ? v : []).map((id) => SCENE_OPTIONS.find((o) => o.id === id)?.t || id).join(', ');
   return Array.isArray(v) ? v.join(', ') : String(v);
 };
 
@@ -118,6 +179,7 @@ function valueOf(q, b, pics) {
   if (q.id === 'pictures') return b.picturesDone ? pics : undefined;
   if (q.id === 'voiceover') return b.voiceover === undefined ? undefined : b.voiceover ? 'yes' : 'no';
   if (q.id === 'sound') return b.sound;
+  if (q.id === 'scenes') return b.sceneAuto === undefined ? undefined : b.sceneAuto ? 'auto' : b.scenes;
   return b[q.id];
 }
 
@@ -141,38 +203,19 @@ async function logoColors(url) {
   return { primary: top[0], secondary: top.find((x) => x !== top[0]) || top[0] };
 }
 
-// The conversation: Animora's questions sit on the left with its mark; your answers are light chips on the right.
-function Bubble({ who, children, onEdit, current }) {
-  if (who === 'me') {
-    return (
-      <div className="flex justify-end">
-        <button type="button" onClick={onEdit || undefined} disabled={!onEdit} aria-label={onEdit ? `Change answer: ${typeof children === 'string' ? children : ''}` : undefined}
-          className="answer-chip group max-w-[85%] whitespace-pre-wrap text-left">
-          <span>{children}</span>
-          {onEdit && <svg className="ml-2 inline size-3.5 shrink-0 opacity-40 group-hover:opacity-90" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>}
-        </button>
-      </div>
-    );
-  }
-  return (
-    <div className={`flex items-start gap-3 ${current ? 'ask-current' : ''}`}>
-      <img src="/animora-mark.png" alt="" className={`mt-0.5 shrink-0 ${current ? 'size-8' : 'size-6 opacity-70'}`} />
-      <p className={`min-w-0 whitespace-pre-wrap ${current ? 'text-[19px] font-semibold leading-snug tracking-[-0.015em] text-ink sm:text-[21px]' : 'pt-0.5 text-[14px] leading-relaxed text-ink-mute'}`}>{children}</p>
-    </div>
-  );
-}
+const Chk = () => <svg viewBox="0 0 16 16" className="size-3" aria-hidden="true"><path d="M3.5 8.5 6.5 11.5 12.5 4.5" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" /></svg>;
 
+// one option: a card you tap (with a tick for multi-choice)
 function Chip({ active, onClick, children, sub, multi }) {
   return (
     <button type="button" onClick={onClick} aria-pressed={!!active} className="option press">
-      {multi && <span className="option-check" aria-hidden="true">{active && <svg viewBox="0 0 16 16" className="size-3"><path d="M3.5 8.5 6.5 11.5 12.5 4.5" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" /></svg>}</span>}
+      {multi && <span className="option-check" aria-hidden="true">{active && <Chk />}</span>}
       <span className="min-w-0">{children}{sub && <span className="mt-0.5 block text-[13px] font-normal leading-snug text-ink-mute">{sub}</span>}</span>
     </button>
   );
 }
 
-// Phones: the chat is exactly as tall as the part of the screen you can see, so the message box is never
-// hidden under the keyboard or pushed off the screen.
+// Phones: the page is exactly as tall as the part of the screen you can see, so the keyboard never hides the box.
 function useVisibleHeight() {
   useEffect(() => {
     const vv = window.visualViewport; if (!vv) return undefined;
@@ -181,6 +224,40 @@ function useVisibleHeight() {
     fit(); vv.addEventListener('resize', fit); vv.addEventListener('scroll', fit);
     return () => { vv.removeEventListener('resize', fit); vv.removeEventListener('scroll', fit); root.style.removeProperty('--vvh'); };
   }, []);
+}
+
+// little line drawings for the scene picker
+const SG = {
+  cursor: <path d="M5 3l12 10.5-5.5.6 3.2 6.4-2.3 1.1-3.2-6.5L5 19z" />, phone: <><rect x="6.5" y="2.5" width="11" height="19" rx="2.6" /><path d="M10.5 5h3" /></>, receipt: <><path d="M5.5 3h13v18l-2.2-1.4L14 21l-2-1.4L10 21l-2.3-1.4L5.5 21z" /><path d="M9 8h6M9 12h6M9 16h3" /></>,
+  grid: <><rect x="3.5" y="3.5" width="7" height="7" rx="1.5" /><rect x="13.5" y="3.5" width="7" height="7" rx="1.5" /><rect x="3.5" y="13.5" width="7" height="7" rx="1.5" /><rect x="13.5" y="13.5" width="7" height="7" rx="1.5" /></>, toggle: <><rect x="2.5" y="7" width="19" height="10" rx="5" /><circle cx="16.5" cy="12" r="3" /></>,
+  swap: <><rect x="3" y="8" width="18" height="8" rx="4" /><path d="M9 4h6M10 20h4" /></>, highlight: <><path d="M4 9h16M4 15h9" /><path d="M14.5 12.5h6v5h-6z" /></>, glow: <><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6 7 7M17 17l1.4 1.4M5.6 18.4 7 17M17 7l1.4-1.4" /><circle cx="12" cy="12" r="3.5" /></>,
+  calendar: <><rect x="3.5" y="5" width="17" height="15" rx="2.5" /><path d="M3.5 9.5h17M8 3v4M16 3v4" /></>, countdown: <><circle cx="12" cy="12" r="8.5" /><path d="M10 9.5h3.5l-2 3a2 2 0 1 1-1.5 3.3" /></>,
+  search: <><circle cx="10" cy="10" r="5.5" /><path d="M14.5 14.5 20 20" /></>, chat: <path d="M4 5.5h16v11H10L5.5 20v-3.5H4z" />, ring: <><ellipse cx="12" cy="12" rx="9" ry="3.6" /><rect x="8.5" y="7" width="7" height="10" rx="1.6" /></>,
+  tag: <><path d="M3.5 12.5V4.5h8l9 9-8 8z" /><circle cx="8" cy="9" r="1.2" /></>, burst: <path d="M12 2.5v4M12 17.5v4M2.5 12h4M17.5 12h4M5.3 5.3l2.8 2.8M15.9 15.9l2.8 2.8M18.7 5.3l-2.8 2.8M8.1 15.9l-2.8 2.8" />, split: <><rect x="3" y="4.5" width="18" height="15" rx="2.5" /><path d="M12 4.5v15" /></>,
+  num: <path d="M6 5v14M6 5 4 7M13 8.5a3.2 3.2 0 0 1 6.4 0c0 3-6.4 4.5-6.4 8.5h6.4" />, steps: <><circle cx="5.5" cy="6" r="2" /><circle cx="18.5" cy="12" r="2" /><circle cx="5.5" cy="18" r="2" /><path d="M7.5 6.5c8 0 9 3 9 4.5M16.5 13c0 2-3 4.500-9 4.500" /></>,
+  check: <><rect x="3.5" y="4" width="17" height="16" rx="3" /><path d="M8 12.5l2.8 2.8L16.5 9.5" /></>, type: <path d="M5 6.5V5h14v1.5M12 5v14M9 19h6" />, blob: <path d="M5 13c-1.500-4 1.500-8 6-8s8.500 2.500 8 7c-.5 4.500-4 7-8 6.500-3-.4-5-2-6-5.500z" />,
+  orbit: <><circle cx="12" cy="12" r="2.6" /><ellipse cx="12" cy="12" rx="9" ry="4.2" transform="rotate(-25 12 12)" /><circle cx="19" cy="8" r="1.1" /></>, cards: <><rect x="6" y="3.5" width="14" height="14" rx="2.4" /><path d="M3.5 7v11.500a2 2 0 0 0 2 2H16" /></>,
+  pin: <><path d="M12 21s7-6.200 7-11.500a7 7 0 0 0-14 0C5 14.800 12 21 12 21z" /><circle cx="12" cy="9.500" r="2.400" /></>, film: <><rect x="4" y="3" width="16" height="18" rx="2" /><path d="M4 8h16M4 16h16M8 3v5M16 3v5M8 16v5M16 16v5" /></>,
+  timer: <><circle cx="12" cy="13" r="7.500" /><path d="M12 9v4.500l3 1.500M9.500 3h5" /></>, bell: <path d="M6 16.500V11a6 6 0 0 1 12 0v5.500l1.500 2h-15zM10 20.500a2 2 0 0 0 4 0" />, vs: <><path d="M3.500 6.500h7v11h-7zM13.500 6.500h7v11h-7z" /></>,
+};
+function ScenePicker({ value, onChange, hasPhotos }) {
+  const toggle = (id) => onChange(value.includes(id) ? value.filter((x) => x !== id) : value.length >= 8 ? value : [...value, id]);
+  return (
+    <div className="scene-grid">
+      {SCENE_OPTIONS.map((o) => {
+        const on = value.includes(o.id);
+        return (
+          <button key={o.id} type="button" aria-pressed={on} onClick={() => toggle(o.id)} className="scene-card press">
+            <span className="scene-ico" aria-hidden="true"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">{SG[o.g]}</svg></span>
+            <span className="scene-tick" aria-hidden="true">{on && <Chk />}</span>
+            <span className="mt-3 block text-[15px] font-bold leading-tight tracking-[-0.01em]">{o.t}</span>
+            <span className="mt-1 block text-[12.5px] leading-snug text-ink-mute">{o.d}</span>
+            {o.needs && <span className="mt-2 block text-[11.5px] font-semibold text-ink-soft/80">{(o.id === 'photos' || o.id === 'grid') && hasPhotos ? 'You have photos for this' : o.needs}</span>}
+          </button>
+        );
+      })}
+    </div>
+  );
 }
 
 export default function Plan() {
@@ -202,6 +279,7 @@ export default function Plan() {
   const [reading, setReading] = useState(false);   // reading a pasted description
   const [error, setError] = useState('');
   const [toast, setToast] = useState('');
+  const [backMode, setBackMode] = useState(false);   // walking back through earlier answers
   const [lenWarn, setLenWarn] = useState(null);   // { v, rec, text } while the person decides
   const endRef = useRef(null);
   const logoRef = useRef(null);
@@ -270,11 +348,20 @@ export default function Plan() {
   };
   const saved = () => saving.current;
 
+  const shown = (qq, brief) => !(qq.show && !qq.show(brief));
+  const nextShown = (from, brief) => { let i = from + 1; while (i < QS.length && !shown(QS[i], brief)) i++; return i; };
+  const prevShown = (from, brief) => { let i = from - 1; while (i >= 0 && !shown(QS[i], brief)) i--; return i; };
   const advance = (next) => {
-    if (editing) { setEditing(false); const brief = next; const f = QS.findIndex((qq) => valueOf(qq, brief, pics.length) === undefined && !(qq.optional && brief[`${qq.id}Skipped`])); setStep(f < 0 ? QS.length : f); return; }
+    if (backMode) {
+      const n = nextShown(step, next);
+      if (n < QS.length && valueOf(QS[n], next, pics.length) !== undefined) { setStep(n); return; }
+      setBackMode(false);
+    }
+    if (editing) { setEditing(false); const f = QS.findIndex((qq) => valueOf(qq, next, pics.length) === undefined && !(qq.optional && next[`${qq.id}Skipped`])); setStep(f < 0 ? QS.length : f); return; }
     const f = QS.findIndex((qq) => valueOf(qq, next, pics.length) === undefined && !(qq.optional && next[`${qq.id}Skipped`]));
     setStep(f < 0 ? QS.length : f);
   };
+  const goBack = () => { const p = prevShown(step, bRef.current); if (p >= 0) { setBackMode(true); setStep(p); } };
 
   const answer = async (value, extra = {}) => {
     if (!q || reading) return;
@@ -300,6 +387,7 @@ export default function Plan() {
     else if (q.id === 'headline') patch = { headlines: value, headline: value[0] };
     else if (q.id === 'goal') patch = { goals: value, goal: value.join(' + ') };
     else if (q.id === 'cta') patch = { ctas: value, cta: value[0] };
+    else if (q.id === 'scenes') patch = value === 'auto' ? { sceneAuto: true, scenes: [] } : { sceneAuto: false, scenes: value };
     else patch = { [q.id]: value };
     const next = save({ ...patch, ...extra, [`${q.id}Skipped`]: false });
     advance(next);
@@ -346,34 +434,80 @@ export default function Plan() {
   const finish = async (value) => { const next = save({ extra: value || '', extraSkipped: !value, done: true }); setBuilding(true); await saved(); build(next); };
 
   if (!project) return error ? <div className="mx-auto max-w-xl p-8"><Alert>{error}</Alert></div> : <PageLoader />;
-  const answered = visible.slice(0, Math.min(step, visible.length));
-  const opts = q?.suggest ? (suggestions[q.id] || []) : q?.options || [];
+  const shownQs = visible.map((qq, i) => ({ qq, i })).filter(({ qq }) => !(qq.show && !qq.show(b)));
   const finished = step >= visible.length;
+  const pos = finished ? shownQs.length : Math.max(0, shownQs.findIndex(({ i }) => i === step));
+  const opts = q?.suggest ? (suggestions[q.id] || []) : q?.options || [];
+  const group = q ? GROUP_OF[q.id] : 'Finish';
+  const groups = [...new Set(shownQs.map(({ qq }) => GROUP_OF[qq.id] || 'Start'))];
+  const isFirst = shownQs.length ? shownQs[0].i === step : true;
+  const typedKind = !finished && q && ['text', 'long', 'single', 'multi'].includes(q.type) && (q.typed || q.type === 'text' || q.type === 'long' || q.type === 'multi');
+  const needsContinue = typedKind || q?.type === 'scenes' || q?.type === 'upload';
+  const submitText = (e) => {
+    e?.preventDefault();
+    const v = text.trim();
+    if (q.type === 'multi') { const all = [...multi, ...(v && !multi.includes(v) ? [v] : [])]; if (!all.length) return; return answer(all); }
+    if (q.done) return finish(v);
+    if (!v) return;
+    answer(q.type === 'long' ? v.split('\n').map((x) => x.trim()).filter(Boolean).join(q.id === 'products' ? '\n' : ' ') : v);
+  };
+  const continueDisabled = reading || (q?.type === 'multi' ? !multi.length && !text.trim() : q?.type === 'scenes' ? false : q?.type === 'upload' ? uploading : q?.done ? false : !text.trim());
+  const continueLabel = q?.done ? (text.trim() ? `Make my ${what}` : "No, that's all") : q?.type === 'multi' ? (multi.length ? `Continue · ${multi.length + (text.trim() && !multi.includes(text.trim()) ? 1 : 0)}` : 'Continue')
+    : q?.type === 'scenes' ? (multi.length ? `Use my ${multi.length} pick${multi.length === 1 ? '' : 's'}` : 'Continue') : q?.type === 'upload' ? (pics.length ? 'Continue' : 'Continue without pictures') : q?.id === 'paste' ? 'Read it' : 'Continue';
+  const onContinue = (e) => {
+    if (q.type === 'scenes') { e?.preventDefault(); return multi.length ? answer(multi) : answer('auto'); }
+    if (q.type === 'upload') { e?.preventDefault(); return pics.length ? answer(pics.length, { picturesDone: true }) : skip(); }
+    return submitText(e);
+  };
 
   return (
-    <div className="mx-auto max-w-6xl px-0 sm:px-4 sm:py-5">
-      <div className="hidden flex-wrap items-center justify-between gap-3 sm:flex">
-        <div className="flex min-w-0 items-center gap-2"><KindBadge kind={project.kind} className="shrink-0" /><h1 className="truncate text-xl font-bold tracking-[-0.03em] sm:text-2xl">{b.name || project.title}</h1></div>
+    <div className="wiz">
+      <div className="mx-auto hidden max-w-[1180px] flex-wrap items-center justify-between gap-3 px-6 pt-6 sm:flex sm:px-10">
+        <div className="flex min-w-0 items-center gap-3"><KindBadge kind={project.kind} className="shrink-0" /><h1 className="truncate text-xl font-bold tracking-[-0.03em] sm:text-2xl">{b.name || project.title}</h1></div>
         {project.kind !== 'flyer' && <Steps current="plan" projectId={id} hasPlan={!!project.plan} hasCode={!!project.code} />}
       </div>
 
-      <div className="grid gap-6 sm:mt-5 lg:grid-cols-[1fr_320px]">
-        <section className="chat flex h-[calc(var(--vvh,100dvh)-3.5rem)] flex-col overflow-hidden sm:h-[calc(100dvh-9.5rem)] sm:min-h-[560px]" aria-label="Questions">
-          <div className="chat-progress" aria-hidden="true"><div style={{ width: `${Math.round((Math.min(step, visible.length) / visible.length) * 100)}%` }} /></div>
-          <div className="flex-1 space-y-5 overflow-y-auto px-4 py-5 sm:px-8 sm:py-7" aria-live="polite">
-            {answered.map((qq, i) => (qq.show && !qq.show(b)) ? null : (
-              <div key={qq.id} className="space-y-2">
-                <Bubble who="ai">{qq.ask(b)}</Bubble>
-                <Bubble who="me" onEdit={building ? null : () => { setEditing(true); setStep(i); }}>{label(qq, valueOf(qq, b, pics.length), b, styles)}</Bubble>
+      <div className="wiz-grid">
+        {/* left: where you are */}
+        <nav className="wiz-rail" aria-label="Progress">
+          {groups.map((g) => {
+            const items = shownQs.filter(({ qq }) => (GROUP_OF[qq.id] || 'Start') === g);
+            const done = items.filter(({ qq }) => { const v = valueOf(qq, b, pics.length); return v !== undefined || (qq.optional && b[`${qq.id}Skipped`]); }).length;
+            const now = group === g && !finished;
+            return (
+              <div key={g} className="wiz-group" data-now={now} data-done={done === items.length}>
+                <div className="wiz-group-head"><span className="wiz-dot">{done === items.length ? <Chk /> : null}</span><span>{g}</span><small>{done}/{items.length}</small></div>
+                {now && (
+                  <ul className="wiz-items">
+                    {items.map(({ qq, i }) => { const v = valueOf(qq, b, pics.length); const has = v !== undefined; return (
+                      <li key={qq.id}><button type="button" disabled={!has || building} onClick={() => { setBackMode(false); setEditing(true); setStep(i); }} data-cur={i === step} data-has={has}>
+                        <span className="truncate">{has ? label(qq, v, b, styles) : qq.id === q.id ? 'Now' : '·'}</span></button></li>
+                    ); })}
+                  </ul>
+                )}
               </div>
-            ))}
+            );
+          })}
+        </nav>
 
+        {/* centre: one question at a time */}
+        <section className="wiz-main" aria-label="Question">
+          <div className="wiz-meta">
+            <div className="wiz-track" aria-hidden="true"><div style={{ width: `${Math.round((pos / Math.max(1, shownQs.length)) * 100)}%` }} /></div>
+            <p>{finished ? 'All done' : `${group} · ${pos + 1} of ${shownQs.length}`}</p>
+          </div>
+
+          <form className="wiz-card" key={finished ? 'end' : q.id} onSubmit={onContinue}>
             {!finished && q && (
-              <div key={q.id} className="ask-block space-y-4 pt-2">
-                <Bubble who="ai" current>{q.ask(b)}</Bubble>
+              <>
+                <h2 className="wiz-q">{q.ask(b)}</h2>
+                {q.type === 'multi' && <p className="wiz-hint">{q.hint || 'Pick one or more, or type your own.'}</p>}
+                {q.type === 'scenes' && <p className="wiz-hint">{q.hint}</p>}
+                {(q.type === 'text' || q.type === 'long') && q.placeholder && q.type === 'text' && <p className="wiz-hint">Just type it in the box below.</p>}
+                {q.type === 'long' && q.optional && <p className="wiz-hint">You can skip this one.</p>}
 
                 {(q.type === 'single' || q.type === 'multi') && (
-                  <div className={`options pl-11 ${opts.some((o) => o.d || String(o.l ?? o).length > 26) ? 'options-wide' : ''}`}>
+                  <div className={`options mt-6 ${opts.some((o) => o.d || String(o.l ?? o).length > 26) ? 'options-wide' : ''}`}>
                     {loadingSug && !opts.length && <span className="flex items-center gap-2 text-sm text-ink-mute"><Spinner className="size-4" />Writing some ideas…</span>}
                     {opts.filter((o) => q.id !== 'duration' || (o >= limits.minSeconds && o <= limits.maxSeconds)).map((o) => {
                       const v = o.v ?? o, l = o.l ?? (q.id === 'duration' ? `${o} seconds` : o);
@@ -385,55 +519,62 @@ export default function Plan() {
                         setMulti((m) => (m.includes(v) ? m.filter((x) => x !== v) : m.length >= (q.max || 9) ? m : [...m, v]));
                       }}>{l}</Chip>;
                     })}
-                    {q.type === 'multi' && multi.filter((v) => !opts.includes(v)).map((v) => <Chip key={v} active multi onClick={() => setMulti((m) => m.filter((x) => x !== v))}>{v}</Chip>)}
+                    {q.type === 'multi' && multi.filter((v) => !opts.some((o) => (o.v ?? o) === v)).map((v) => <Chip key={v} active multi onClick={() => setMulti((m) => m.filter((x) => x !== v))}>{v}</Chip>)}
                   </div>
                 )}
                 {q.id === 'duration' && lenWarn && (
-                  <div className="ml-11 rounded-[14px] border border-amber-300 bg-amber-50 p-4 text-[14px] leading-relaxed text-ink" role="alert">
+                  <div className="mt-4 rounded-[14px] border border-amber-300 bg-amber-50 p-4 text-[14px] leading-relaxed text-ink" role="alert">
                     <p>{lenWarn.text}</p>
                     <div className="mt-3 flex flex-wrap gap-2">
-                      <Button size="sm" onClick={() => { const v = lenWarn.rec; setLenWarn(null); answer(v); }}>Use {lenWarn.rec} seconds</Button>
-                      <Button size="sm" variant="outline" onClick={() => { const v = lenWarn.v; setLenWarn(null); answer(v); }}>Keep {lenWarn.v} seconds</Button>
+                      <Button size="sm" type="button" onClick={() => { const v = lenWarn.rec; setLenWarn(null); answer(v); }}>Use {lenWarn.rec} seconds</Button>
+                      <Button size="sm" type="button" variant="outline" onClick={() => { const v = lenWarn.v; setLenWarn(null); answer(v); }}>Keep {lenWarn.v} seconds</Button>
                     </div>
-                  </div>
-                )}
-                {q.type === 'multi' && <p className="pl-11 text-[13px] text-ink-mute">{q.hint || 'Pick one or more, or type your own.'}</p>}
-                {reading && (
-                  <div className="space-y-2">
-                    <Bubble who="me">My details (pasted)</Bubble>
-                    <div className="flex items-center gap-3"><div className="bubble-ai typing px-4 py-3.5"><span /><span /><span /></div><span className="text-sm text-ink-mute">Reading your details…</span></div>
                   </div>
                 )}
 
+                {typedKind && (
+                  <div className="wiz-field mt-6">
+                    <label className="wiz-label" htmlFor="wiz-in">{q.type === 'long' ? 'Your answer' : q.typed ? 'Or write your own' : 'Your answer'}</label>
+                    <div className="wiz-box">
+                      {q.type === 'long' ? (
+                        <textarea id="wiz-in" value={text} onChange={(e) => setText(e.target.value)} rows={q.id === 'paste' ? 8 : 4} placeholder={q.placeholder} className="wiz-input resize-none" />
+                      ) : (
+                        <input id="wiz-in" value={text} onChange={(e) => setText(e.target.value)} autoFocus placeholder={q.placeholder || (q.typed ? 'Type your own answer…' : 'Type your answer…')} className="wiz-input" />
+                      )}
+                      <MicButton onText={(t) => setText((x) => (x.trim() ? `${x.trim()} ${t}` : t))} onError={setError} className="wiz-mic" />
+                    </div>
+                    <p className="wiz-foot">{q.type === 'long' ? 'Press Continue when you are done' : 'Press Enter to continue'} · or tap the mic and say it</p>
+                  </div>
+                )}
+
+                {reading && <div className="mt-5 flex items-center gap-3"><div className="bubble-ai typing px-4 py-3.5"><span /><span /><span /></div><span className="text-sm text-ink-mute">Reading your details…</span></div>}
+
                 {q.type === 'upload' && (
-                  <div className="ml-11 rounded-2xl border border-dashed border-ink/20 bg-white p-4">
+                  <div className="wiz-drop mt-6">
                     <input ref={logoRef} type="file" accept="image/*" hidden onChange={(e) => upload([...e.target.files], 'logo')} />
                     <input ref={photoRef} type="file" accept="image/*" multiple hidden onChange={(e) => upload([...e.target.files], 'photo')} />
-                    <div className="flex flex-wrap gap-2">
-                      <Button size="sm" variant="dark" onClick={() => logoRef.current?.click()} disabled={uploading || !!logo || pics.length >= MAX_PICS}>{logo ? 'Logo added' : 'Add logo'}</Button>
-                      <Button size="sm" variant="outline" onClick={() => photoRef.current?.click()} disabled={uploading || pics.length >= MAX_PICS}>Add photos</Button>
-                      <span className="self-center text-sm text-ink-mute">{pics.length}/{MAX_PICS} · or paste with Ctrl+V</span>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Button size="sm" type="button" variant="dark" onClick={() => logoRef.current?.click()} disabled={uploading || !!logo || pics.length >= MAX_PICS}>{logo ? 'Logo added' : 'Add logo'}</Button>
+                      <Button size="sm" type="button" variant="outline" onClick={() => photoRef.current?.click()} disabled={uploading || pics.length >= MAX_PICS}>Add photos</Button>
+                      <span className="text-sm text-ink-mute">{pics.length}/{MAX_PICS} · or paste with Ctrl+V</span>
                     </div>
                     {pics.length > 0 && (
-                      <ul className="mt-3 grid grid-cols-5 gap-2">
+                      <ul className="mt-4 grid grid-cols-4 gap-3 sm:grid-cols-5">
                         {pics.map((a) => (
                           <li key={a.id} className="relative">
-                            <img src={a.url} alt={a.name} className={`aspect-square w-full rounded-xl bg-white ${a.role === 'logo' ? 'object-contain p-1' : 'object-cover'}`} />
-                            <span className="mt-0.5 block truncate text-[11px] text-ink-soft">{a.role === 'logo' ? '⭐ logo' : a.name}</span>
-                            <button onClick={() => removePic(a)} className="absolute right-1 top-1 grid size-6 place-items-center rounded-full bg-ink/80 text-xs text-white" aria-label={`Remove ${a.name}`}>✕</button>
+                            <img src={a.url} alt={a.name} className={`aspect-square w-full rounded-xl bg-white ring-1 ring-ink/10 ${a.role === 'logo' ? 'object-contain p-1' : 'object-cover'}`} />
+                            <span className="mt-1 block truncate text-[11px] text-ink-soft">{a.role === 'logo' ? '⭐ logo' : a.name}</span>
+                            <button type="button" onClick={() => removePic(a)} className="absolute right-1 top-1 grid size-6 place-items-center rounded-full bg-ink/80 text-xs text-white" aria-label={`Remove ${a.name}`}>✕</button>
                           </li>
                         ))}
                       </ul>
                     )}
-                    {uploading && <p className="mt-2 flex items-center gap-2 text-sm text-ink-soft"><Spinner className="size-4" />Uploading…</p>}
-                    <div className="mt-3 flex gap-2">
-                      <Button size="sm" onClick={() => (pics.length ? answer(pics.length, { picturesDone: true }) : skip())} disabled={uploading}>{pics.length ? 'Continue' : 'Continue without pictures'}</Button>
-                    </div>
+                    {uploading && <p className="mt-3 flex items-center gap-2 text-sm text-ink-soft"><Spinner className="size-4" />Uploading…</p>}
                   </div>
                 )}
 
                 {q.type === 'sound' && (
-                  <div className="options options-wide pl-11">
+                  <div className="options options-wide mt-6">
                     <input ref={musicRef} type="file" accept="audio/*" hidden onChange={async (e) => {
                       const f = e.target.files?.[0]; if (!f) return;
                       setUploading(true); setError('');
@@ -449,7 +590,7 @@ export default function Plan() {
                 )}
 
                 {q.type === 'colors' && (
-                  <div className="options pl-11">
+                  <div className="options mt-6">
                     <Chip onClick={() => answer('style', { colorMode: 'style', colors: {} })}>The style's colours</Chip>
                     {logo && <Chip onClick={async () => { try { const c = await logoColors(logo.url); answer('logo', { colorMode: 'logo', colors: c || {} }); } catch { answer('style', { colorMode: 'style', colors: {} }); } }}>Match my logo</Chip>}
                     <ColorPick onPick={(c) => answer('own', { colorMode: 'own', colors: c })} />
@@ -457,89 +598,74 @@ export default function Plan() {
                 )}
 
                 {q.type === 'style' && (
-                  <div className="sm:ml-11">
-                    <Button size="sm" className="mb-3" onClick={() => answer('auto', { styleAuto: true, styleId: undefined })}>Let Animora choose for me</Button>
+                  <div className="mt-6">
+                    <Button size="sm" type="button" className="mb-4" onClick={() => answer('auto', { styleAuto: true, styleId: undefined })}>Let Animora choose for me</Button>
                     <StylePicker value={b.styleId} onPick={(s) => answer(s.id, { styleId: s.id, styleAuto: false })} />
                   </div>
                 )}
 
+                {q.type === 'scenes' && (
+                  <div className="mt-6">
+                    <button type="button" className="auto-pick press" onClick={() => answer('auto')}>
+                      <span className="auto-spark" aria-hidden="true">✦</span>
+                      <span><b>Let the AI choose for me</b><small>It plans the best scenes for your business. Recommended.</small></span>
+                    </button>
+                    <p className="wiz-sub">Or pick the scenes you want</p>
+                    <ScenePicker value={multi} onChange={setMulti} hasPhotos={pics.filter((p) => p.role !== 'logo').length >= 2} />
+                    <p className="wiz-foot mt-3">The AI adds the rest. Pick up to 8.</p>
+                  </div>
+                )}
+
                 {q.chips && (
-                  <div className="options pl-11">
+                  <div className="options mt-4">
                     {q.chips.map((c) => <Chip key={c} onClick={() => setText((t) => (t ? `${t.trim()}\n${c}` : c))}>{c}</Chip>)}
                   </div>
                 )}
-              </div>
-            )}
-
-            {finished && (
-              <div className="space-y-3">
-                <Bubble who="ai" current>{building ? (what === 'flyer' ? "Great, I have everything. Designing your flyer now…" : "Great, I have everything. I'm planning your scenes now…") : project.plan ? `Your answers are saved. Change any answer above, or make the ${what}.` : 'All set!'}</Bubble>
-                {building && <div className="flex"><div className="bubble-ai typing px-4 py-3.5"><span /><span /><span /></div></div>}
-              </div>
-            )}
-            <div ref={endRef} />
-          </div>
-
-          {/* composer: always lets you type (or say) your own answer */}
-          <div className="composer">
-            {error && <div className="mb-2"><Alert onClose={() => setError('')}>{error}</Alert></div>}
-            {!finished && q && (
-              <div className="mb-2 flex items-center justify-between px-1 text-[12.5px] text-ink-mute">
-                <span>Question {step + 1} of {visible.length}</span>
-                {q.optional && !q.done && <button type="button" onClick={skip} className="font-semibold text-ink-soft hover:text-ink">Skip this one</button>}
-              </div>
-            )}
-            {!finished && q && ['text', 'long', 'single', 'multi'].includes(q.type) && (q.typed || q.type === 'text' || q.type === 'long' || q.type === 'multi') && (
-              <form className="composer-box" onSubmit={(e) => {
-                e.preventDefault();
-                const v = text.trim();
-                if (q.type === 'multi') { const all = [...multi, ...(v && !multi.includes(v) ? [v] : [])]; if (!all.length) return; return answer(all); }
-                if (q.done) return finish(v);
-                if (!v) return;
-                answer(q.type === 'long' ? v.split('\n').map((x) => x.trim()).filter(Boolean).join(q.id === 'products' ? '\n' : ' ') : v);
-              }}>
-                {q.type === 'long' ? (
-                  <textarea value={text} onChange={(e) => setText(e.target.value)} rows={q.id === 'paste' ? 5 : 3} placeholder={q.placeholder} aria-label="Your answer"
-                    className="composer-input max-h-32 min-h-[4.5rem] resize-none py-3 sm:max-h-56" />
-                ) : (
-                  <input value={text} onChange={(e) => setText(e.target.value)} autoFocus placeholder={q.placeholder || (q.typed ? 'Or type your own answer…' : 'Type your answer…')} aria-label="Your answer"
-                    className="composer-input h-12" />
-                )}
-                <div className="flex shrink-0 items-center gap-1.5 self-end p-1.5">
-                  <MicButton onText={(t) => setText((x) => (x.trim() ? `${x.trim()} ${t}` : t))} onError={setError} className="!size-10 !rounded-full !border-0 !bg-transparent hover:!bg-ink/5" />
-                  <Button type="submit" className="!h-10 !rounded-full !px-4" loading={reading}
-                    disabled={reading || (q.done ? false : q.type === 'multi' ? !multi.length && !text.trim() : !text.trim())}>
-                    {q.done ? (text.trim() ? `Make my ${what}` : "No, that's all") : q.type === 'multi' ? (multi.length ? `Continue · ${multi.length + (text.trim() && !multi.includes(text.trim()) ? 1 : 0)}` : 'Continue') : q.id === 'paste' ? 'Read it' : (
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-label="Send"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
-                    )}
-                  </Button>
-                </div>
-              </form>
-            )}
-            {finished && (
-              <>
-                {what === 'video' && !project.code && lengthWarning(b, b.duration) && (
-                  <div className="mb-3 rounded-[14px] border border-amber-300 bg-amber-50 p-4 text-[14px] leading-relaxed text-ink" role="alert">
-                    <p>{lengthWarning(b, b.duration).text}</p>
-                    <Button size="sm" className="mt-3" onClick={() => save({ duration: lengthWarning(b, b.duration).rec })}>Use {lengthWarning(b, b.duration).rec} seconds</Button>
-                  </div>
-                )}
-                <Button size="lg" className="w-full" loading={building} onClick={() => (project.plan && b.done ? navigate(`/p/${id}/studio${project.code ? '' : '?generate=1'}`) : build(b))}>
-                  {project.plan && project.code ? `Open my ${what}` : `Make my ${what}`}
-                </Button>
-                {project.plan && <button onClick={() => build(b)} disabled={building} className="mt-2 w-full text-sm font-semibold text-ink-mute hover:text-ink">Plan again from my answers</button>}
               </>
             )}
-          </div>
+
+            {finished && (
+              <div className="py-4">
+                <h2 className="wiz-q">{building ? (what === 'flyer' ? 'Designing your flyer…' : 'Planning your scenes…') : project.plan ? 'Your answers are saved.' : `Ready when you are.`}</h2>
+                <p className="wiz-hint">{building ? 'This takes a few seconds.' : project.plan ? `Change any answer on the left, or open your ${what}.` : `I have everything I need to make your ${what}.`}</p>
+                {building && <div className="mt-5 flex"><div className="bubble-ai typing px-4 py-3.5"><span /><span /><span /></div></div>}
+                {what === 'video' && !project.code && lengthWarning(b, b.duration) && (
+                  <div className="mt-5 rounded-[14px] border border-amber-300 bg-amber-50 p-4 text-[14px] leading-relaxed text-ink" role="alert">
+                    <p>{lengthWarning(b, b.duration).text}</p>
+                    <Button size="sm" type="button" className="mt-3" onClick={() => save({ duration: lengthWarning(b, b.duration).rec })}>Use {lengthWarning(b, b.duration).rec} seconds</Button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {error && <div className="mt-5"><Alert onClose={() => setError('')}>{error}</Alert></div>}
+
+            <div className="wiz-actions">
+              {!finished && <button type="button" onClick={goBack} disabled={isFirst || building} className="wiz-back">← Back</button>}
+              <span className="flex-1" />
+              {!finished && q?.optional && !q.done && <button type="button" onClick={skip} className="wiz-skip">Skip</button>}
+              {!finished && needsContinue && <Button type="submit" size="lg" loading={reading} disabled={continueDisabled}>{continueLabel}</Button>}
+              {finished && (
+                <div className="flex w-full flex-col gap-2 sm:w-auto sm:items-end">
+                  <Button type="button" size="lg" className="w-full sm:w-auto" loading={building} onClick={() => (project.plan && b.done ? navigate(`/p/${id}/studio${project.code ? '' : '?generate=1'}`) : build(b))}>
+                    {project.plan && project.code ? `Open my ${what}` : `Make my ${what}`}
+                  </Button>
+                  {project.plan && <button type="button" onClick={() => build(b)} disabled={building} className="text-sm font-semibold text-ink-mute hover:text-ink">Plan again from my answers</button>}
+                </div>
+              )}
+            </div>
+          </form>
         </section>
 
-        <aside className="hidden space-y-4 lg:block">
+        {/* right: your ad so far */}
+        <aside className="wiz-side">
           <div className="surface p-5">
-            <h2 className="font-bold">Your ad so far</h2>
-            <dl className="mt-3 space-y-2 text-sm">
+            <h2 className="font-bold">Your {what} so far</h2>
+            <dl className="mt-3 space-y-2.5 text-sm">
               {b.name && <div><dt className="text-ink-mute">Business</dt><dd className="font-semibold">{b.name}{b.category ? ` · ${b.category}` : ''}</dd></div>}
               {b.headline && <div><dt className="text-ink-mute">Message</dt><dd className="font-semibold">{(b.headlines || [b.headline]).join(', ')}</dd></div>}
-              {b.aspect && <div><dt className="text-ink-mute">Format</dt><dd className="font-semibold">{ASPECT_OPTS.find((o) => o.v === b.aspect)?.l} · {b.duration ? duration(b.duration) : ''}</dd></div>}
+              {b.aspect && <div><dt className="text-ink-mute">Format</dt><dd className="font-semibold">{ASPECT_OPTS.find((o) => o.v === b.aspect)?.l} {b.duration ? `· ${duration(b.duration)}` : ''}</dd></div>}
+              {b.scenes?.length > 0 && <div><dt className="text-ink-mute">Scenes</dt><dd className="font-semibold">{b.scenes.map((id) => SCENE_OPTIONS.find((o) => o.id === id)?.t || id).join(', ')}</dd></div>}
               {b.colors?.primary && <div><dt className="text-ink-mute">Colours</dt><dd className="flex gap-1">{Object.values(b.colors).map((c) => <span key={c} className="size-5 rounded-full ring-1 ring-black/10" style={{ background: c }} />)}</dd></div>}
             </dl>
             {pics.length > 0 && (

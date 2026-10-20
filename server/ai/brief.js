@@ -7,6 +7,8 @@
 import { config } from '../config.js';
 import { geminiGenerate } from '../engine/gemini.js';
 import { validatePlan } from '../engine/validate.js';
+import { WANT_IDS } from './cinema/compose.js';
+import { MOTION_WANTS } from './motion/compose.js';
 
 const PHONE_RE = /(\+?234[\s-]?|0)[789][01]\d[\s-]?\d{3}[\s-]?\d{4}/;
 const URL_RE = /\b((?:https?:\/\/)?(?:www\.)?[a-z0-9-]+\.(?:com|ng|com\.ng|space|app|io|co|org|net|store|shop)(?:\/\S*)?)\b/i;
@@ -28,15 +30,20 @@ export function cleanBrief(b = {}) {
     duration: Number(b.duration) || undefined, styleId: b.styleId ? String(b.styleId) : undefined, styleAuto: !!b.styleAuto,
     colors: b.colors && typeof b.colors === 'object' ? Object.fromEntries(Object.entries(b.colors).filter(([k, v]) => ['primary', 'secondary', 'background', 'text'].includes(k) && /^#[0-9a-f]{6}$/i.test(v))) : undefined,
     voiceover: b.voiceover === undefined || b.voiceover === null ? undefined : b.voiceover === true || b.voiceover === 'yes',
-    sound: ['all', 'sfx', 'none', 'own', 'piano', 'soft'].includes(b.sound) ? b.sound : b.sfx === true || b.sfx === 'yes' ? 'all' : b.sfx === false || b.sfx === 'no' ? 'none' : undefined,
+    sound: ['all', 'sfx', 'none', 'own'].includes(b.sound) ? b.sound : b.sfx === true || b.sfx === 'yes' ? 'all' : b.sfx === false || b.sfx === 'no' ? 'none' : undefined,
+    // which scene styles the owner asked for (ids from the form's scene picker); sceneAuto = let the AI decide
+    scenes: (Array.isArray(b.scenes) ? b.scenes : []).map(String).filter((x) => WANT_IDS.includes(x) || x in MOTION_WANTS).slice(0, 8), sceneAuto: b.sceneAuto === undefined ? undefined : !!b.sceneAuto,
+    // flyer-only answers
+    flyerType: (Array.isArray(b.flyerType) ? list(b.flyerType) : b.flyerType ? [str(b.flyerType, 60)] : []).map((x) => str(x, 60)).filter(Boolean).slice(0, 3), offer: str(b.offer, 60), when: str(b.when, 120), layout: ['photo', 'type', 'price', 'auto'].includes(b.layout) ? b.layout : undefined,
     extra: str(b.extra, 3000), done: !!b.done, mode: ['steps', 'paste'].includes(b.mode) ? b.mode : undefined, pasted: b.pasted ? true : undefined, pasteText: str(b.pasteText, 6000),
     colorMode: ['style', 'logo', 'own'].includes(b.colorMode) ? b.colorMode : undefined, picturesDone: b.picturesDone ? true : undefined,
   };
   // optional questions the user skipped (so they are not asked again)
-  for (const k of ['features', 'products', 'contact', 'pictures', 'extra']) if (b[`${k}Skipped`] !== undefined) out[`${k}Skipped`] = !!b[`${k}Skipped`];
+  for (const k of ['features', 'products', 'contact', 'pictures', 'extra', 'scenes']) if (b[`${k}Skipped`] !== undefined) out[`${k}Skipped`] = !!b[`${k}Skipped`];
   if (out.headlines.length) out.headline = out.headlines[0]; else delete out.headlines;
   if (out.ctas.length) out.cta = str(out.ctas[0], 60); else delete out.ctas;
   if (out.goals.length) out.goal = str(out.goals.join(' + '), 200); else delete out.goals;
+  if (Array.isArray(out.flyerType) && !out.flyerType.length) delete out.flyerType;
   for (const k of Object.keys(out)) if (out[k] === undefined || out[k] === '') delete out[k];
   return out;
 }
@@ -66,7 +73,8 @@ export function briefToPlanRules(brief, { assets = [], limits = { minSeconds: 15
 
   const scenes = [];
   const add = (purpose, text, weight, imgs = []) => scenes.push({ purpose, on_screen_text: text.filter(Boolean), weight, images: imgs });
-  add('hook', [b.headline || `${b.name}`], 1);
+  add('hook', [b.headline || `${b.name}`, b.offer], 1);
+  if (b.when) add('detail', [b.when], 1);
   add('brand', [b.name, b.category ? `${b.category}${place ? ` · ${place}` : ''}` : place], 1, logo ? [{ asset: logo.name, placement: 'center', fit: 'contain' }] : []);
   (b.headlines || []).slice(1).forEach((h) => add('detail', [h], 1));   // the other chosen messages
   if (photos[0]) add('product', [b.features[0] || b.headline || b.name, b.category].slice(0, 2), 1, [{ asset: photos[0].name, placement: 'center', fit: 'cover' }]);
@@ -192,7 +200,7 @@ function ruleSuggestions(kind, b) {
   return byGoal[g];
 }
 
-export async function suggest(kind, brief, { flyer = false } = {}) {
+export async function suggest(kind, brief) {
   const b = cleanBrief(brief);
   const fallback = ruleSuggestions(kind, b);
   if (!config.useGemini) return fallback;
@@ -201,7 +209,7 @@ export async function suggest(kind, brief, { flyer = false } = {}) {
       ? 'Suggest 8 short selling points (2-4 words each) this business could show in its ad.'
       : 'Suggest 5 punchy ad headlines (under 7 words each) for this ad. Different angles: benefit, curiosity, offer, emotion, trust.';
     const { text } = await geminiGenerate({
-      system: `You write copy for ${flyer ? 'flyers (still pictures, no video, no sound)' : 'short video ads'} for Nigerian small businesses. Return JSON only: { "options": ["...", "..."] }. Use the business name naturally; never invent prices or numbers.`,
+      system: 'You write copy for short video ads for Nigerian small businesses. Return JSON only: { "options": ["...", "..."] }. Use the business name naturally; never invent prices or numbers.',
       messages: [{ role: 'user', text: `${ask}\nBusiness: ${b.name} (${b.category || 'business'}). Goal: ${b.goal || 'more customers'}.${b.headlines?.length ? ` Messages: ${b.headlines.join(' / ')}.` : ''}` }],
       json: true, temperature: 1, timeoutMs: 30000, maxOutputTokens: 4096, thinking: 'low',
     });
@@ -244,24 +252,17 @@ export function parseBriefRules(text) {
   if (priced.length) out.products = priced.slice(0, 8);
   if (/no (music|sound|audio)|without (music|sound)|silent/i.test(t)) out.sound = 'none';
   else if (/only (sound )?effects|no music/i.test(t)) out.sound = 'sfx';
-  else if (/piano/i.test(t)) out.sound = 'piano';
-  else if (/soft music|background music|calm music/i.test(t)) out.sound = 'soft';
   if (/voice[- ]?over|narrat/i.test(t)) out.voiceover = !/no (voice|narrat)/i.test(t);
   out.pasteText = str(t, 6000);   // the whole text also goes to the AI director (kept apart from the last question's answer)
   return out;
 }
 
-export async function parseBrief(text, current = {}, { flyer = false } = {}) {
+export async function parseBrief(text, current = {}) {
   const rules = parseBriefRules(text);
   if (!config.useGemini) return cleanBrief({ ...rules, mode: 'paste' });
   try {
     const { text: out } = await geminiGenerate({
-      system: flyer ? `You read a business owner's description of the FLYER they want (a still picture: no video, no length, no sound, no voice-over) and fill in a form. Return JSON only with any of these keys, and ONLY for things the text clearly says (leave everything else out, never invent):
-{ "name": business name, "category": what the business does (2-4 words), "goals": ["..."] (why they want the flyer),
-  "headlines": ["..."] (the main messages for the flyer, short), "features": ["..."] (selling points, 2-5 words each),
-  "products": ["Product ₦price", ...], "ctas": ["Order on WhatsApp", "Call now", ...] (what people should do), "contact": phone / website / address,
-  "aspect": "4:5" | "9:16" | "1:1" | "A4",
-  "extra": any other instructions about the look, layout, pictures or style, in their words }` : `You read a business owner's description of the video ad they want and fill in a form. Return JSON only with any of these keys, and ONLY for things the text clearly says (leave everything else out, never invent):
+      system: `You read a business owner's description of the video ad they want and fill in a form. Return JSON only with any of these keys, and ONLY for things the text clearly says (leave everything else out, never invent):
 { "name": business name, "category": what the business does (2-4 words), "goals": ["..."] (why they want the ad),
   "headlines": ["..."] (the main messages / slogans for the video, short), "features": ["..."] (selling points, 2-5 words each),
   "products": ["Product ₦price", ...], "ctas": ["Order on WhatsApp", "Call now", ...] (what viewers should do), "contact": phone / website / address,
@@ -273,7 +274,6 @@ export async function parseBrief(text, current = {}, { flyer = false } = {}) {
     const g = JSON.parse(out);
     // the AI wins where it found something; rules fill gaps (phone numbers, aspect words); keep the full text for the director
     const merged = { ...rules, ...Object.fromEntries(Object.entries(g).filter(([, v]) => v !== null && v !== '' && !(Array.isArray(v) && !v.length))) };
-    if (flyer) { delete merged.duration; delete merged.voiceover; delete merged.sound; if (!['4:5', '9:16', '1:1', 'A4'].includes(merged.aspect)) delete merged.aspect; }
     delete merged.extra;   // the last question asks for anything extra; the full text goes to the director as pasteText
     return cleanBrief({ ...merged, mode: 'paste' });
   } catch (e) {

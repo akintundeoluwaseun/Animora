@@ -1,0 +1,875 @@
+/* Animora Motion: Apple-style product motion graphics.
+ * One idea per beat, clean light/black stages, sentences that build word by word, real-looking UI objects,
+ * springy physics, depth of field, and a logo + wordmark ending. Deterministic: one paused GSAP timeline.
+ * Input: window.MOTION = { W, H, seed, brand, logo, font, accent, accent2, beats: [{ type, dur, bg, out, ...props }] } */
+(function () {
+  const D = window.MOTION, W = D.W, H = D.H;
+  const U = Math.min(W, H) / 1080, N = (n) => n * U, px = (n) => N(n) + 'px';
+  const PORTRAIT = H > W * 1.2, WIDE = W > H * 1.2;
+  const tl = gsap.timeline({ paused: true, defaults: { ease: 'expo.out' } });
+  // springy eases overshoot; a blur below zero is invalid CSS and would stick. Blur always gets its own smooth ease.
+  const _fromTo = tl.fromTo.bind(tl);
+  tl.fromTo = (t, from, to, pos) => {
+    if (to && to.filter !== undefined && /back|elastic|bounce/.test(String(to.ease || ''))) {
+      const f = Object.assign({}, from), v = Object.assign({}, to);
+      const fb = { filter: f.filter }, tb = { filter: v.filter, duration: (v.duration || 0.5) * 0.8, ease: 'power2.out' };
+      if (v.immediateRender !== undefined) tb.immediateRender = v.immediateRender;
+      delete f.filter; delete v.filter;
+      if (fb.filter !== undefined) _fromTo(t, fb, tb, pos);
+      return _fromTo(t, f, v, pos);
+    }
+    return _fromTo(t, from, to, pos);
+  };
+  let __s = (D.seed || 7) % 2147483646 + 1; const rnd = () => ((__s = (__s * 16807) % 2147483647) / 2147483647); const R = (a, b) => a + rnd() * (b - a);
+  const el = (tag, cls, parent, html, css) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; if (css) Object.assign(e.style, css); if (parent) parent.appendChild(e); return e; };
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+  // ------------------------------------------------------------ colour
+  const hex = (h) => { h = String(h || '').replace('#', ''); if (h.length === 3) h = h.split('').map((c) => c + c).join(''); const n = parseInt(h, 16); return isNaN(n) ? [85, 70, 255] : [n >> 16, (n >> 8) & 255, n & 255]; };
+  const toHex = (c) => '#' + c.map((v) => clamp(Math.round(v), 0, 255).toString(16).padStart(2, '0')).join('');
+  const mix = (a, b, t) => { const x = hex(a), y = hex(b); return toHex(x.map((v, i) => v + (y[i] - v) * t)); };
+  const lum = (h) => { const c = hex(h).map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }); return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; };
+  const rgba = (h, a) => { const c = hex(h); return `rgba(${c[0]},${c[1]},${c[2]},${a})`; };
+  const ACC = /^#[0-9a-f]{3,6}$/i.test(D.accent || '') ? D.accent : '#2F6BFF';
+  let A_L = ACC; for (let i = 0; i < 12 && lum(A_L) > 0.3; i++) A_L = mix(A_L, '#000000', 0.12);          // readable on white
+  let A_D = ACC; for (let i = 0; i < 12 && lum(A_D) < 0.2; i++) A_D = mix(A_D, '#FFFFFF', 0.14);          // readable on black
+  const A2 = /^#[0-9a-f]{3,6}$/i.test(D.accent2 || '') ? D.accent2 : mix(ACC, '#FFFFFF', 0.35);
+  const BRAND_DARK = lum(ACC) < 0.42;            // white text on the brand colour?
+  const root = document.documentElement;
+  Object.entries({ W: W + 'px', H: H + 'px', u: U + 'px', font: `'${D.font || 'Inter'}'`, a1: ACC, a1l: mix(ACC, '#FFFFFF', 0.22), a1d: mix(ACC, '#000000', 0.32) }).forEach(([k, v]) => root.style.setProperty('--' + k, v));
+  const inkOf = (bg) => (bg === 'light' ? '#111114' : bg === 'brand' ? (BRAND_DARK ? '#FFFFFF' : '#111114') : '#F5F5F7');
+  const muteOf = (bg) => (bg === 'light' ? '#86868F' : bg === 'brand' ? (BRAND_DARK ? 'rgba(255,255,255,.72)' : 'rgba(0,0,0,.55)') : '#9B9BA5');
+  const accOf = (bg) => (bg === 'light' ? A_L : bg === 'brand' ? (BRAND_DARK ? '#FFFFFF' : '#111114') : A_D);
+
+  // ------------------------------------------------------------ sound cues
+  const SFX = []; const KM = { pop: 'click' };
+  const sfx = (t, k, v) => { SFX.push({ t: Math.max(0, Math.round(t * 1000) / 1000), k: KM[k] || k, v: Math.round((v == null ? 0.6 : v) * 100) / 100 }); };
+
+  // ------------------------------------------------------------ glyphs (24px line icons)
+  const G = {
+    check: 'M5 12.5l4.2 4.2L19 7', bolt: 'M13 2L4 14h7l-1 8 9-12h-7z', heart: 'M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z',
+    star: 'M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z', bag: 'M6 8h12l-1 12H7zM9 8a3 3 0 0 1 6 0',
+    clock: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 7v5l3 2', pin: 'M12 21s7-6.1 7-11.5A7 7 0 0 0 5 9.5C5 14.9 12 21 12 21zM12 12a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z',
+    chat: 'M4 5h16v11H9l-5 4z', phone: 'M8 3h8a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zM11 18h2', card: 'M3 6h18v12H3zM3 10h18M7 15h3',
+    gift: 'M4 11h16v9H4zM3 7h18v4H3zM12 7v13M12 7c-2-4-6-3-5-1s5 1 5 1zm0 0c2-4 6-3 5-1s-5 1-5 1z', sparkle: 'M12 3l1.8 5.4L19 10l-5.2 1.6L12 17l-1.8-5.4L5 10l5.2-1.6z',
+    leaf: 'M5 19c0-8 6-14 15-14 0 9-6 15-14 15M5 19l7-7', shield: 'M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z', truck: 'M3 7h11v9H3zM14 10h4l3 3v3h-7M7 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM17 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4z',
+    cake: 'M4 21h16v-8H4zM4 16c2 1.5 4 1.5 6 0s4-1.5 6 0 3 1 4 0M12 13V9M12 6a1.2 1.2 0 0 0 0-2.4', cup: 'M5 8h12v6a5 5 0 0 1-5 5h-2a5 5 0 0 1-5-5zM17 10h1.5a2.5 2.5 0 0 1 0 5H17M8 3v2M12 3v2',
+    scissors: 'M6 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM8.5 7.5L20 19M8.5 16.5L20 5', home: 'M3 11l9-7 9 7v9H3zM9 20v-6h6v6',
+    book: 'M4 5a2 2 0 0 1 2-2h14v16H6a2 2 0 0 0-2 2zM4 21V5', chart: 'M4 20V10M10 20V4M16 20v-7M22 20H2', search: 'M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM16 16l5 5',
+    tag: 'M3 12V4h8l10 10-8 8zM7.5 8.5h.01', wifi: 'M2 9a15 15 0 0 1 20 0M5.5 12.5a10 10 0 0 1 13 0M9 16a5 5 0 0 1 6 0M12 19.5h.01', smile: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8.5 14a4.5 4.5 0 0 0 7 0M9 9.5h.01M15 9.5h.01',
+    car: 'M5 16l1.5-5.5A2 2 0 0 1 8.4 9h7.2a2 2 0 0 1 1.9 1.5L19 16M4 16h16v3H4zM7 19v1M17 19v1', dumbbell: 'M6 7v10M18 7v10M3 10v4M21 10v4M6 12h12',
+    shirt: 'M8 3l-5 3 2 4 3-1v12h8V9l3 1 2-4-5-3c-.5 1.5-2 2.5-4 2.5S8.5 4.5 8 3z', tooth: 'M7 3c-3 0-4 3-3 6 1 2 1 4 2 8 .5 2 2 3 2.5 1s1-5 3.5-5 3 3 3.5 5 2 1 2.5-1c1-4 1-6 2-8 1-3 0-6-3-6-2 0-3 1-5 1s-3-1-5-1z',
+    globe: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM3 12h18M12 3c2.5 2.5 3.5 5.5 3.5 9s-1 6.5-3.5 9c-2.5-2.5-3.5-5.5-3.5-9s1-6.5 3.5-9z', money: 'M3 6h18v12H3zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM6 9v.01M18 15v.01',
+  };
+  const glyph = (k, size, color, sw) => `<svg width="${N(size)}" height="${N(size)}" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="${sw || 2}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${G[k] || G.sparkle}"/></svg>`;
+
+  // ------------------------------------------------------------ stage
+  const stage = document.getElementById('stage');
+  const BGS = { light: el('div', 'bg bg-light', stage), dark: el('div', 'bg bg-dark', stage), brand: el('div', 'bg bg-brand', stage) };
+  const world = el('div', 'layer', stage);
+  el('div', '', stage).id = 'vig';
+  if (!window.__ANIMORA_RENDER) el('div', '', stage).id = 'grain';
+
+  // ------------------------------------------------------------ building blocks
+  const shadow = (k) => `0 ${N(2)}px ${N(4)}px rgba(0,0,0,${0.05 * k}), 0 ${N(14)}px ${N(30)}px rgba(0,0,0,${0.08 * k}), 0 ${N(44)}px ${N(90)}px rgba(0,0,0,${0.12 * k})`;
+  const blur = (n) => `blur(${N(n)}px)`;
+  const initials = (s) => { const w = String(s || '?').replace(/[^\p{L}\p{N} ]/gu, '').trim().split(/\s+/).filter((x) => !/^(the|and|of|&)$/i.test(x)); return (w.length > 1 ? w[0][0] + w[1][0] : (w[0] || '?')[0]).toUpperCase(); };
+
+  // the brand's app icon: a glossy squircle (their logo on white, or a monogram on the brand colour)
+  function brandIcon(parent, size, opts) {
+    opts = opts || {};
+    const onBrand = opts.onBrand;
+    const ic = el('div', 'squircle gloss', parent, '', { width: px(size), height: px(size), flex: '0 0 auto', boxShadow: onBrand ? `0 ${N(20)}px ${N(50)}px rgba(0,0,0,.22)` : shadow(1.1) });
+    if (D.logo) {
+      ic.style.background = '#FFFFFF';
+      el('img', '', ic, null, { width: '74%', height: '74%', objectFit: 'contain' }).src = D.logo;
+    } else {
+      ic.style.background = onBrand ? '#FFFFFF' : `linear-gradient(155deg, ${mix(ACC, '#FFFFFF', 0.18)} 0%, ${ACC} 52%, ${mix(ACC, '#000000', 0.25)} 100%)`;
+      const ini = initials(D.brand);
+      el('div', '', ic, esc(ini), { color: onBrand ? A_L : (lum(ACC) > 0.6 ? '#111' : '#fff'), fontSize: px(size * (ini.length > 1 ? 0.4 : 0.52)), fontWeight: 750, letterSpacing: '-0.04em', lineHeight: 1, position: 'relative', zIndex: 1 });
+    }
+    return ic;
+  }
+
+  // text measuring (layout widths ignore transforms, so this is safe before animating)
+  function fitFont(node, maxW, minPx) {
+    let fs = parseFloat(node.style.fontSize);
+    const w = node.offsetWidth;
+    if (w > maxW) { fs = Math.max(minPx || 10, fs * (maxW / w) * 0.98); node.style.fontSize = fs + 'px'; }
+    return fs;
+  }
+  const maxTextW = () => W * (PORTRAIT ? 0.86 : 0.8);
+
+  // A row of items (words or objects) revealed one by one; the visible part stays centred, like a sentence being written.
+  function buildRow(row, items, at, per, opts) {
+    opts = opts || {};
+    const ws = items.map((it) => it.offsetWidth + (parseFloat(it.style.marginRight) || 0));
+    const rest = (i) => ws.slice(i + 1).reduce((a, b) => a + b, 0) / 2;
+    const xs = items.map((_, i) => rest(i));
+    tl.set(row, { x: xs[0] }, 0);
+    items.forEach((it, i) => {
+      const t = at + i * per;
+      if (it.__icon) tl.fromTo(it, { opacity: 0, scale: 0.2, rotation: -18, filter: blur(10) }, { opacity: 1, scale: 1, rotation: 0, filter: blur(0), duration: 0.9, ease: 'back.out(1.9)' }, t);
+      else tl.fromTo(it, { opacity: 0, y: '0.32em', filter: blur(opts.blur == null ? 9 : opts.blur) }, { opacity: 1, y: 0, filter: blur(0), duration: 0.7 }, t);
+      if (i > 0) tl.fromTo(row, { x: xs[i - 1] }, { x: xs[i], duration: 0.7, ease: 'expo.out', immediateRender: false }, t);
+    });
+    return at + (items.length - 1) * per + 0.7;
+  }
+  function wordsRow(parent, text, size, opts) {
+    opts = opts || {};
+    const row = el('div', 'row', parent, '', { fontSize: px(size), fontWeight: opts.weight || 650, letterSpacing: opts.track || '-0.035em', lineHeight: 1.12, color: opts.color || 'inherit' });
+    const words = String(text).trim().split(/\s+/).filter(Boolean);
+    const acc = opts.accent || new Set();
+    const items = words.map((w, i) => el('span', 'w', row, esc(w), { marginRight: i < words.length - 1 ? '0.25em' : '0', color: acc.has(i + (opts.offset || 0)) ? opts.accColor : null }));
+    if (opts.fit !== false) fitFont(row, opts.maxW || maxTextW(), N(40));
+    return { row, items, words };
+  }
+  // the brand name beside its icon; long names wrap onto two lines instead of shrinking to nothing
+  function nameBlock(wrap, text, sizePx, color, maxW) {
+    const long = String(text).length > 22;
+    const name = el('div', '', wrap, esc(text), { fontSize: (long ? sizePx * 0.72 : sizePx) + 'px', fontWeight: 700, letterSpacing: '-0.04em', whiteSpace: long ? 'normal' : 'nowrap', color, lineHeight: long ? 1.04 : 1.15, maxWidth: long ? maxW + 'px' : 'none', textAlign: 'left' });
+    if (long) { name.style.width = Math.min(maxW, name.offsetWidth) + 'px'; let fs = parseFloat(name.style.fontSize); for (let i = 0; i < 12 && name.offsetHeight > fs * 2.3; i++) { fs *= 0.92; name.style.fontSize = fs + 'px'; } }
+    else fitFont(name, maxW, N(36));
+    return name;
+  }
+  // macOS-style pointer
+  function cursor(parent) {
+    const c = el('div', '', parent, `<svg width="${N(64)}" height="${N(64)}" viewBox="0 0 24 24"><path d="M5 2.5l13.5 12.2-6.2.6 3.6 7.2-2.6 1.3-3.6-7.3-4.7 4.4z" fill="#111" stroke="#fff" stroke-width="1.4" stroke-linejoin="round"/></svg>`, { position: 'absolute', left: '50%', top: '50%', zIndex: 20, filter: `drop-shadow(0 ${N(6)}px ${N(8)}px rgba(0,0,0,.3))`, transformOrigin: '20% 10%' });
+    return c;
+  }
+  function posIn(node, anc) { let x = 0, y = 0, n = node; while (n && n !== anc) { x += n.offsetLeft; y += n.offsetTop; n = n.offsetParent; } return { x: x - anc.offsetWidth / 2, y: y - anc.offsetHeight / 2, w: node.offsetWidth, h: node.offsetHeight }; }
+  // glide the pointer onto a target and press it
+  function pointAt(c, s, target, at, fromX, fromY) {
+    const p = posIn(target, s);
+    tl.fromTo(c, { x: N(fromX == null ? 420 : fromX), y: N(fromY == null ? 640 : fromY), opacity: 0 }, { x: p.x + p.w * 0.62, y: p.y + p.h * 0.52, opacity: 1, duration: 0.85, ease: 'power3.inOut' }, at);
+    return at + 0.85;
+  }
+  function click(c, target, at, sound) {
+    tl.to(c, { scale: 0.82, duration: 0.09, ease: 'power2.in' }, at).to(c, { scale: 1, duration: 0.25, ease: 'back.out(2)' }, at + 0.09);
+    if (target) tl.to(target, { scale: 0.93, duration: 0.09, ease: 'power2.in' }, at).to(target, { scale: 1, duration: 0.5, ease: 'elastic.out(1,0.45)' }, at + 0.09);
+    if (sound !== false) sfx(at, 'click', 0.7);
+  }
+  // rolling digits (odometer); non-digits sit still
+  function odometer(parent, value, size, color) {
+    const box = el('div', 'row tnum', parent, '', { fontSize: px(size), fontWeight: 750, letterSpacing: '-0.045em', lineHeight: 1, color, height: px(size * 1.08), overflow: 'hidden', alignItems: 'flex-start' });
+    const cols = [];
+    String(value).split('').forEach((ch) => {
+      if (/\d/.test(ch)) {
+        const cell = el('span', '', box, '', { display: 'inline-block', height: px(size * 1.08), overflow: 'hidden' });
+        const col = el('span', '', cell, '', { display: 'block' });
+        let h = ''; for (let k = 0; k < 20; k++) h += `<span style="display:block;height:${N(size * 1.08)}px;line-height:${N(size * 1.08)}px">${k % 10}</span>`;
+        col.innerHTML = h; cols.push({ col, d: +ch });
+      } else el('span', '', box, esc(ch), { display: 'inline-block', lineHeight: N(size * 1.08) + 'px' });
+    });
+    return { box, play: (at) => cols.slice().reverse().forEach((c, i) => { tl.fromTo(c.col, { y: 0 }, { y: -N(size * 1.08) * (10 + c.d), duration: 1.4 + i * 0.1, ease: 'expo.out' }, at + i * 0.04); tl.fromTo(c.col, { filter: blur(size * 0.06) }, { filter: blur(0), duration: 0.9 + i * 0.08, ease: 'power2.in' }, at + i * 0.04); }) };
+  }
+  const PASTEL = [['#FBD5DA', '#C42B3E'], ['#D7E5FC', '#2C62C4'], ['#D5F2DB', '#21883D'], ['#FCEFC7', '#A26B00'], ['#E7DEFC', '#5E3FD0'], ['#FFE0CC', '#C6531A']];
+  const float = (e, t0, t1, amp) => tl.fromTo(e, { y: 0 }, { y: -N(amp || 10), duration: Math.max(0.5, t1 - t0), ease: 'sine.inOut', immediateRender: false }, t0);
+
+  // ================================================================ BEATS
+  const B = {};
+
+  // WORDS: a sentence written word by word (build), one big word at a time (slam), or glowing on black (glow)
+  B.words = (s, o, t0, t1, bg) => {
+    const lines = [].concat(o.lines || o.text || '').filter(Boolean).slice(0, 3);
+    const acc = new Set([].concat(o.accent || []));
+    const size = o.size || (PORTRAIT ? 120 : 100);
+    const total = lines.join(' ').split(/\s+/).length;
+    if (o.mode === 'slam') {
+      const words = lines.join(' ').split(/\s+/);
+      const per = clamp((t1 - t0 - 0.6) / words.length, 0.32, 0.6);
+      words.forEach((w, i) => {
+        const big = el('div', '', s, esc(w), { position: 'absolute', fontSize: px(o.size || 210), fontWeight: 750, letterSpacing: '-0.05em', color: acc.has(i) ? accOf(bg) : 'inherit', whiteSpace: 'nowrap' });
+        fitFont(big, maxTextW(), N(60));
+        const a = t0 + 0.05 + i * per, last = i === words.length - 1;
+        tl.fromTo(big, { opacity: 0, scale: 1.35, filter: blur(16) }, { opacity: 1, scale: 1, filter: blur(0), duration: 0.42, ease: 'expo.out' }, a);
+        if (!last) tl.to(big, { opacity: 0, scale: 0.86, filter: blur(10), duration: 0.18, ease: 'power2.in' }, a + per - 0.14);
+        sfx(a, 'tick', 0.35);
+      });
+      return;
+    }
+    const box = el('div', 'col', s, '', { gap: px(size * 0.12) });
+    const per = clamp((t1 - t0 - 1.1) / Math.max(1, total), 0.12, 0.3);
+    let at = t0 + 0.1, offset = 0;
+    const rows = lines.map((line, li) => { const r = wordsRow(box, line, li > 0 && o.small ? size * 0.62 : size, { accent: acc, offset, accColor: accOf(bg), weight: o.weight || (o.mode === 'glow' ? 600 : 650) }); offset += r.words.length; return r; });
+    if (rows.length > 1) {   // keep the visible lines centred vertically as later lines arrive
+      const hs = rows.map((r) => r.row.offsetHeight + size * U * 0.12);
+      const restY = (i) => hs.slice(i + 1).reduce((a, b) => a + b, 0) / 2;
+      tl.set(box, { y: restY(0) }, 0);
+      rows.forEach((r, i) => { if (i > 0) tl.fromTo(box, { y: restY(i - 1) }, { y: restY(i), duration: 0.8, ease: 'expo.out', immediateRender: false }, at + i * 0.02 + rows.slice(0, i).reduce((a, rr) => a + rr.items.length * per, 0)); });
+    }
+    rows.forEach((r) => {
+      if (o.mode === 'glow') {
+        r.row.style.textShadow = `0 0 ${N(18)}px rgba(255,255,255,.55), 0 0 ${N(60)}px ${rgba(A_D, 0.55)}`;
+        r.items.forEach((it, i) => tl.fromTo(it, { opacity: 0, filter: blur(22), letterSpacing: '0.12em' }, { opacity: 1, filter: blur(0), letterSpacing: '-0.035em', duration: 1.1, ease: 'expo.out' }, at + i * per * 0.8));
+        at += r.items.length * per * 0.8;
+      } else at = buildRow(r.row, r.items, at, per) - 0.7 + per;
+    });
+    if (o.mode === 'glow') {   // a scan line passing through the glow
+      const scan = el('div', '', s, '', { position: 'absolute', left: 0, right: 0, height: px(3), top: '50%', background: `linear-gradient(90deg, transparent, ${rgba('#FFFFFF', 0.5)}, transparent)` });
+      tl.fromTo(scan, { y: -N(160), opacity: 0 }, { y: N(160), opacity: 1, duration: 1.4, ease: 'power1.inOut' }, t0 + 0.3).to(scan, { opacity: 0, duration: 0.3 }, t0 + 1.6);
+      sfx(t0 + 0.1, 'whoosh', 0.3);
+    }
+    if (o.sub) { const sub = el('div', '', box, esc(o.sub), { marginTop: px(26), fontSize: px(o.subSize || 40), fontWeight: 500, color: muteOf(bg), letterSpacing: '-0.01em', whiteSpace: 'nowrap' }); fitFont(sub, maxTextW()); tl.fromTo(sub, { opacity: 0, y: N(16), filter: blur(6) }, { opacity: 1, y: 0, filter: blur(0), duration: 0.8 }, Math.min(at + 0.2, t1 - 0.9)); }
+  };
+
+  // ICON: the brand's app icon. solo | wordmark (icon slides aside, name reveals) | welcome ("Welcome to [icon]")
+  B.icon = (s, o, t0, t1, bg) => {
+    const mode = o.mode || 'wordmark';
+    const size = o.size || (mode === 'solo' ? 300 : 190);
+    const ink = inkOf(bg);
+    if (mode === 'welcome') {
+      const r = wordsRow(s, o.prefix || 'Welcome to', o.textSize || 96, { fit: false });
+      const ic = brandIcon(r.row, size * 0.82, { onBrand: bg === 'brand' }); ic.__icon = true; ic.style.marginLeft = '0.3em'; ic.style.alignSelf = 'center';
+      r.items[r.items.length - 1].style.marginRight = '0';
+      fitFont(r.row, maxTextW(), N(40));
+      buildRow(r.row, [...r.items, ic], t0 + 0.1, 0.22);
+      sfx(t0 + 0.1 + r.items.length * 0.22, 'pop', 0.7);
+      return;
+    }
+    const grp = el('div', 'row', s, '', { alignItems: 'center' });
+    const ic = brandIcon(grp, size, { onBrand: bg === 'brand' });
+    tl.fromTo(ic, { opacity: 0, scale: 0.25, rotation: -14, filter: blur(14) }, { opacity: 1, scale: 1, rotation: 0, filter: blur(0), duration: 1.0, ease: 'back.out(1.7)' }, t0 + 0.08);
+    sfx(t0 + 0.12, 'pop', 0.8);
+    let after = t0 + 0.9;
+    if (mode === 'wordmark') {
+      const nameSize = o.textSize || Math.round(size * 0.56);
+      const wrap = el('div', '', grp, '', { overflow: 'hidden', paddingLeft: px(size * 0.2), paddingRight: px(6) });
+      const name = nameBlock(wrap, o.name || D.brand, N(nameSize), ink, maxTextW() - N(size) - N(size * 0.2));
+      const shift = wrap.offsetWidth / 2;
+      tl.fromTo(grp, { x: shift }, { x: 0, duration: 1.0, ease: 'expo.inOut', immediateRender: true }, t0 + 0.75);
+      tl.fromTo(name, { xPercent: -105, opacity: 0 }, { xPercent: 0, opacity: 1, duration: 1.0, ease: 'expo.inOut' }, t0 + 0.75);
+      sfx(t0 + 0.8, 'whoosh', 0.3);
+      after = t0 + 1.6;
+    }
+    if (o.tagline) {
+      const tg = wordsRow(s, o.tagline, o.tagSize || 54, { weight: 550, accent: new Set([].concat(o.accent || [])), accColor: accOf(bg), color: mode === 'solo' ? ink : muteOf(bg) });
+      tg.row.style.marginTop = px(mode === 'solo' ? 60 : 44); tg.row.style.color = mode === 'solo' ? ink : muteOf(bg);
+      buildRow(tg.row, tg.items, Math.min(after, t1 - 1.2), 0.12, { blur: 6 });
+    }
+    tl.fromTo(grp, { scale: 1 }, { scale: 1.04, duration: Math.max(0.5, t1 - t0), ease: 'sine.inOut', immediateRender: false }, t0);
+  };
+
+  // NOTIF: iOS notifications dropping in (one or two)
+  B.notif = (s, o, t0, t1, bg) => {
+    const dark = bg !== 'light';
+    const w = Math.min(W * 0.88, N(920));
+    const items = [].concat(o.items || [{ title: o.title || D.brand, body: o.body }]).filter((x) => x && (x.body || x.title)).slice(0, 3);
+    const stack = el('div', 'col', s, '', { gap: px(22) });
+    items.forEach((it, i) => {
+      const n = el('div', '', stack, '', { width: w + 'px', display: 'flex', gap: px(28), alignItems: 'center', padding: `${N(30)}px ${N(34)}px`, borderRadius: px(52), background: dark ? 'rgba(46,46,52,.86)' : 'rgba(252,252,253,.86)', backdropFilter: 'blur(30px)', boxShadow: dark ? `0 0 0 1px rgba(255,255,255,.08), 0 ${N(30)}px ${N(60)}px rgba(0,0,0,.5)` : shadow(1) });
+      brandIcon(n, 104);
+      const tx = el('div', '', n, '', { flex: 1, minWidth: 0 });
+      const top = el('div', 'row', tx, '', { justifyContent: 'space-between', alignItems: 'baseline' });
+      el('div', '', top, esc(it.title || D.brand), { fontSize: px(36), fontWeight: 650, letterSpacing: '-0.02em', color: dark ? '#fff' : '#111', overflow: 'hidden', textOverflow: 'ellipsis' });
+      el('div', '', top, esc(it.time || (i ? '2m ago' : 'now')), { fontSize: px(28), color: dark ? '#A0A0AA' : '#8A8A93', marginLeft: px(16), flex: '0 0 auto' });
+      el('div', '', tx, esc(it.body || ''), { fontSize: px(33), lineHeight: 1.3, color: dark ? '#E3E3E8' : '#2B2B30', marginTop: px(6), display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' });
+      const a = t0 + 0.15 + i * 0.75;
+      tl.fromTo(n, { y: -N(320), opacity: 0, scale: 0.9, filter: blur(16) }, { y: 0, opacity: 1, scale: 1, filter: blur(0), duration: 0.95, ease: 'back.out(1.35)' }, a);
+      sfx(a + 0.1, 'chime', 0.45);
+    });
+    if (o.lead) { const l = wordsRow(s, o.lead, 76, { accent: new Set([].concat(o.accent || [])), accColor: accOf(bg) }); l.row.style.marginTop = px(70); buildRow(l.row, l.items, t0 + 0.4 + items.length * 0.75, 0.16); }
+    float(stack, t0 + 1, t1, 12);
+  };
+
+  // STACK: pastel cards that stack up (features, services, products)
+  B.stack = (s, o, t0, t1, bg) => {
+    const items = [].concat(o.items || []).filter((x) => x && x.t).slice(0, 4);
+    if (o.title) { const tt = wordsRow(s, o.title, 76, { weight: 700, accent: new Set([].concat(o.accent || [])), accColor: accOf(bg) }); tt.row.style.marginBottom = px(56); buildRow(tt.row, tt.items, t0 + 0.05, 0.14); }
+    const w = Math.min(W * (PORTRAIT ? 0.86 : 0.56), N(920));
+    const col = el('div', 'col', s, '', { gap: px(26) });
+    const off = Math.floor(R(0, PASTEL.length));
+    items.forEach((it, i) => {
+      const [soft, deep] = PASTEL[(off + i) % PASTEL.length];
+      const c = el('div', '', col, '', { width: w + 'px', display: 'flex', alignItems: 'center', gap: px(28), padding: `${N(34)}px ${N(36)}px ${N(34)}px ${N(46)}px`, borderRadius: px(46), background: soft, boxShadow: `0 ${N(20)}px ${N(44)}px ${rgba(deep, 0.16)}` });
+      const tx = el('div', '', c, '', { flex: 1, minWidth: 0 });
+      el('div', '', tx, esc(it.t), { fontSize: px(PORTRAIT ? 50 : 44), fontWeight: 650, color: deep, letterSpacing: '-0.025em', lineHeight: 1.15, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' });
+      if (it.s) el('div', '', tx, esc(it.s), { fontSize: px(PORTRAIT ? 35 : 30), color: rgba(deep, 0.68), marginTop: px(4), whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontWeight: 500 });
+      const g = el('div', 'squircle gloss', c, glyph(it.glyph || 'check', 54, '#fff', 2.2), { width: px(104), height: px(104), background: `linear-gradient(160deg, ${mix(deep, '#fff', 0.15)}, ${deep})`, boxShadow: `0 ${N(10)}px ${N(22)}px ${rgba(deep, 0.35)}`, flex: '0 0 auto' });
+      const a = t0 + 0.35 + i * 0.26;
+      tl.fromTo(c, { y: N(160), opacity: 0, scale: 0.9, filter: blur(14) }, { y: 0, opacity: 1, scale: 1, filter: blur(0), duration: 0.9, ease: 'back.out(1.25)' }, a);
+      tl.fromTo(g, { scale: 0, rotation: -30 }, { scale: 1, rotation: 0, duration: 0.7, ease: 'back.out(2.2)' }, a + 0.25);
+      sfx(a + 0.05, 'pop', 0.45);
+    });
+    float(col, t0 + 1.2, t1, 10);
+  };
+
+  // TOGGLES: an iOS settings card where each strength switches on
+  B.toggles = (s, o, t0, t1, bg) => {
+    const items = [].concat(o.items || []).filter(Boolean).slice(0, 5);
+    if (o.title) { const tt = wordsRow(s, o.title, 72, { weight: 700, accent: new Set([].concat(o.accent || [])), accColor: accOf(bg) }); tt.row.style.marginBottom = px(56); buildRow(tt.row, tt.items, t0 + 0.05, 0.14); }
+    const w = Math.min(W * (PORTRAIT ? 0.84 : 0.56), N(880));
+    const card = el('div', 'card', s, '', { width: w + 'px', padding: `${N(10)}px ${N(40)}px` });
+    if (bg !== 'light') Object.assign(card.style, { background: '#1C1C21', boxShadow: '0 0 0 1px rgba(255,255,255,.07)' });
+    tl.fromTo(card, { y: N(120), opacity: 0, scale: 0.94, filter: blur(14) }, { y: 0, opacity: 1, scale: 1, filter: blur(0), duration: 0.9, ease: 'back.out(1.2)' }, t0 + 0.25);
+    const step = clamp((t1 - t0 - 1.8) / Math.max(1, items.length), 0.28, 0.5);
+    items.forEach((t, i) => {
+      const r = el('div', 'row', card, '', { justifyContent: 'space-between', alignItems: 'center', padding: `${N(30)}px 0`, borderTop: i ? `1px solid ${bg === 'light' ? '#ECECF0' : 'rgba(255,255,255,.08)'}` : 'none' });
+      const lab = el('div', '', r, esc(t), { fontSize: px(40), fontWeight: 550, letterSpacing: '-0.02em', color: inkOf(bg === 'light' ? 'light' : 'dark'), overflow: 'hidden', textOverflow: 'ellipsis', marginRight: px(20) });
+      const track = el('div', '', r, '', { width: px(112), height: px(66), borderRadius: px(40), background: bg === 'light' ? '#E4E4EA' : '#3A3A40', position: 'relative', flex: '0 0 auto' });
+      const knob = el('div', '', track, '', { position: 'absolute', left: px(5), top: px(5), width: px(56), height: px(56), borderRadius: '50%', background: '#fff', boxShadow: `0 ${N(3)}px ${N(8)}px rgba(0,0,0,.25)` });
+      const a = t0 + 0.9 + i * step;
+      tl.fromTo(lab, { opacity: 0.35 }, { opacity: 1, duration: 0.3 }, a);
+      tl.fromTo(track, { backgroundColor: bg === 'light' ? '#E4E4EA' : '#3A3A40' }, { backgroundColor: ACC === '#FFFFFF' ? '#34C759' : ACC, duration: 0.3, ease: 'power2.out' }, a);
+      tl.fromTo(knob, { x: 0 }, { x: N(46), duration: 0.45, ease: 'back.out(2)' }, a);
+      sfx(a, 'tick', 0.55);
+    });
+  };
+
+  // SWAP: a pill whose words roll through a list; earlier pills stack behind (Send money / Receive fast / Save smart)
+  B.swap = (s, o, t0, t1, bg) => {
+    const words = [].concat(o.items || []).filter(Boolean).slice(0, 5);
+    if (o.lead) { const tt = wordsRow(s, o.lead, 76, { weight: 700, accent: new Set([].concat(o.accent || [])), accColor: accOf(bg) }); tt.row.style.marginBottom = px(70); buildRow(tt.row, tt.items, t0 + 0.05, 0.14); }
+    const depthMax = Math.min(2, words.length - 1);
+    const box = el('div', '', s, '', { position: 'relative', width: '100%', height: N(140 + 92 * depthMax) + 'px', display: 'flex', justifyContent: 'center' });
+    const step = clamp((t1 - t0 - 1.6) / Math.max(1, words.length), 0.5, 1.0);
+    const pills = words.map((w) => {
+      const p = el('div', 'pill', box, esc(w), { position: 'absolute', bottom: 0, height: px(140), padding: `0 ${N(70)}px`, fontSize: px(62), fontWeight: 650, letterSpacing: '-0.03em', whiteSpace: 'nowrap', color: BRAND_DARK ? '#fff' : '#111', background: `linear-gradient(180deg, ${mix(ACC, '#FFFFFF', 0.2)}, ${ACC})`, boxShadow: `inset 0 ${N(2)}px 0 rgba(255,255,255,.35), 0 ${N(24)}px ${N(50)}px ${rgba(ACC, 0.38)}` });
+      fitFont(p, maxTextW());
+      return p;
+    });
+    pills.forEach((p, i) => {
+      const a = t0 + 0.3 + i * step;
+      tl.fromTo(p, { y: N(110), opacity: 0, scale: 0.85, filter: blur(16) }, { y: 0, opacity: 1, scale: 1, filter: blur(0), duration: 0.6, ease: 'back.out(1.5)' }, a);
+      sfx(a, 'pop', 0.5);
+      for (let j = 0; j < i; j++) {   // older pills step back
+        const d0 = i - 1 - j, d1 = i - j;
+        tl.fromTo(pills[j], { y: -N(92) * d0, scale: 1 - 0.07 * d0, opacity: d0 ? Math.max(0, 1 - 0.38 * d0) : 1, filter: blur(d0 * 2.5) }, { y: -N(92) * d1, scale: 1 - 0.07 * d1, opacity: Math.max(0, 1 - 0.38 * d1), filter: blur(d1 * 2.5), duration: 0.7, ease: 'expo.out', immediateRender: false }, a);
+      }
+      pills.forEach((q, k) => { if (k <= i) q.style.zIndex = String(10 + k); });
+    });
+  };
+
+  // SEARCH: a search bar types the query, the business is the answer
+  B.search = (s, o, t0, t1, bg) => {
+    const w = Math.min(W * 0.86, N(900));
+    if (o.lead) { const tt = wordsRow(s, o.lead, 64, { weight: 600, color: muteOf(bg) }); tt.row.style.marginBottom = px(50); tt.row.style.color = muteOf(bg); buildRow(tt.row, tt.items, t0 + 0.05, 0.12); }
+    const bar = el('div', 'pill', s, '', { width: w + 'px', height: px(128), padding: `0 ${N(44)}px`, gap: px(22), background: bg === 'light' ? '#FFFFFF' : '#1E1E23', boxShadow: bg === 'light' ? shadow(0.9) : '0 0 0 1px rgba(255,255,255,.08)' });
+    el('div', '', bar, glyph('search', 50, '#8A8A93', 2.4), { display: 'grid' });
+    const field = el('div', '', bar, '', { fontSize: px(46), fontWeight: 500, color: inkOf(bg === 'light' ? 'light' : 'dark'), whiteSpace: 'nowrap', overflow: 'hidden', display: 'flex', alignItems: 'center', letterSpacing: '-0.015em' });
+    const q = String(o.query || '').slice(0, 34);
+    const typed = el('span', '', field, '', {});
+    const caret = el('span', '', field, '', { display: 'inline-block', width: px(4), height: px(54), background: A_L, marginLeft: px(4), borderRadius: px(2) });
+    tl.fromTo(bar, { opacity: 0, scale: 0.88, y: N(40), filter: blur(12) }, { opacity: 1, scale: 1, y: 0, filter: blur(0), duration: 0.85, ease: 'back.out(1.4)' }, t0 + 0.15);
+    const ty = t0 + 0.6, per = clamp(1.1 / Math.max(1, q.length), 0.03, 0.065);
+    const proxy = { n: 0 };
+    tl.fromTo(proxy, { n: 0 }, { n: q.length, duration: per * q.length, ease: 'none', onUpdate: () => { typed.textContent = q.slice(0, Math.round(proxy.n)); } }, ty);
+    typed.textContent = '';
+    for (let k = 0; k < q.length; k += 2) sfx(ty + k * per, 'tick', 0.18);
+    tl.fromTo(caret, { opacity: 1 }, { opacity: 0, duration: 0.3, repeat: Math.max(1, Math.round((t1 - t0) / 0.6)), yoyo: true, ease: 'steps(1)' }, t0 + 0.3);
+    const rt = ty + per * q.length + 0.35;
+    const res = el('div', 'card', s, '', { width: w + 'px', marginTop: px(34), display: 'flex', alignItems: 'center', gap: px(30), padding: px(34) });
+    if (bg !== 'light') Object.assign(res.style, { background: '#1C1C21', boxShadow: '0 0 0 1px rgba(255,255,255,.08)' });
+    brandIcon(res, 124);
+    const tx = el('div', '', res, '', { flex: 1, minWidth: 0 });
+    el('div', '', tx, esc(o.title || D.brand), { fontSize: px(46), fontWeight: 700, letterSpacing: '-0.03em', color: inkOf(bg === 'light' ? 'light' : 'dark'), whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' });
+    if (o.sub) el('div', '', tx, esc(o.sub), { fontSize: px(31), color: '#8A8A93', marginTop: px(4), whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' });
+    const go = el('div', 'pill', res, esc(o.button || 'Open'), { padding: `${N(18)}px ${N(34)}px`, fontSize: px(32), fontWeight: 700, color: A_L, background: rgba(ACC, 0.13), flex: '0 0 auto' });
+    tl.fromTo(res, { opacity: 0, y: N(90), scale: 0.94, filter: blur(14) }, { opacity: 1, y: 0, scale: 1, filter: blur(0), duration: 0.9, ease: 'back.out(1.3)' }, rt);
+    sfx(rt, 'pop', 0.6);
+    if (rt + 1.1 < t1 - 0.4) { const c = cursor(s); click(c, go, pointAt(c, s, go, rt + 0.45) + 0.05); }
+  };
+
+  // MAP: a clean city map, a pin drops on the address, the card slides up
+  B.map = (s, o, t0, t1, bg) => {
+    const mw = W * 1.5, mh = H * 1.5;
+    const svgNS = 'http://www.w3.org/2000/svg';
+    const wrap = el('div', '', s, '', { position: 'absolute', left: '50%', top: '50%', width: mw + 'px', height: mh + 'px', marginLeft: -mw / 2 + 'px', marginTop: -mh / 2 + 'px' });
+    const svg = document.createElementNS(svgNS, 'svg'); svg.setAttribute('width', mw); svg.setAttribute('height', mh); wrap.appendChild(svg);
+    const add = (tag, at) => { const e = document.createElementNS(svgNS, tag); Object.entries(at).forEach(([k, v]) => e.setAttribute(k, v)); svg.appendChild(e); return e; };
+    add('rect', { width: mw, height: mh, fill: '#EEEBE4' });
+    for (let i = 0; i < 5; i++) { const cx = R(0.05, 0.95) * mw, cy = R(0.05, 0.95) * mh, rx = R(90, 260) * U, ry = R(70, 200) * U; add('ellipse', { cx, cy, rx, ry, fill: '#CFE6C3', transform: `rotate(${R(-40, 40)} ${cx} ${cy})` }); }
+    const wy = R(0.65, 0.85) * mh;
+    add('path', { d: `M0 ${wy} C ${mw * 0.3} ${wy - N(260)}, ${mw * 0.55} ${wy + N(240)}, ${mw} ${wy - N(120)} L ${mw} ${mh} L 0 ${mh} Z`, fill: '#B8D8F2' });
+    const rot = R(-24, -10);
+    const g = document.createElementNS(svgNS, 'g'); g.setAttribute('transform', `rotate(${rot} ${mw / 2} ${mh / 2})`); svg.appendChild(g);
+    const road = (x1, y1, x2, y2, wdt, fill, line) => { [[line, wdt + N(6)], [fill, wdt]].forEach(([c, ww]) => { const e = document.createElementNS(svgNS, 'line'); Object.entries({ x1, y1, x2, y2, stroke: c, 'stroke-width': ww, 'stroke-linecap': 'round' }).forEach(([k, v]) => e.setAttribute(k, v)); g.appendChild(e); }); };
+    const step = N(150);
+    for (let x = -mw * 0.3; x < mw * 1.3; x += step * R(0.8, 1.3)) road(x, -mh * 0.3, x + R(-40, 40), mh * 1.3, N(14), '#FFFFFF', '#DCD7CC');
+    for (let y = -mh * 0.3; y < mh * 1.3; y += step * R(0.8, 1.4)) road(-mw * 0.3, y, mw * 1.3, y + R(-40, 40), N(14), '#FFFFFF', '#DCD7CC');
+    road(-mw * 0.3, mh * 0.5 + N(60), mw * 1.3, mh * 0.5 - N(40), N(34), '#FFFFFF', '#D3CEC2');
+    road(mw * 0.5 - N(120), -mh * 0.3, mw * 0.5 + N(60), mh * 1.3, N(40), '#F8D776', '#E2B64A');
+    const area = String(o.area || '').toUpperCase().slice(0, 22);
+    if (area) [[0.3, 0.58], [0.72, 0.74]].forEach(([fx, fy], i) => { const t = add('text', { x: fx * mw, y: fy * mh, 'font-size': N(i ? 30 : 38), 'font-weight': 700, fill: '#8B877E', 'letter-spacing': N(6), 'text-anchor': 'middle', 'font-family': 'inherit' }); t.textContent = i ? String(o.area2 || area).toUpperCase().slice(0, 22) : area; });
+    tl.fromTo(wrap, { scale: 1.35, rotation: 4 }, { scale: 1, rotation: 0, duration: Math.max(1, t1 - t0), ease: 'power2.out' }, t0);
+    tl.fromTo(wrap, { opacity: 0, filter: blur(20) }, { opacity: 1, filter: blur(0), duration: 0.7, ease: 'power2.out' }, t0);
+    // pin
+    const pinBox = el('div', '', s, '', { position: 'relative', width: px(150), height: px(200), marginTop: -N(120) + 'px' });
+    const sh = el('div', '', pinBox, '', { position: 'absolute', left: '50%', bottom: px(-10), width: px(70), height: px(22), marginLeft: px(-35), borderRadius: '50%', background: 'rgba(0,0,0,.28)', filter: blur(4) });
+    const pin = el('div', '', pinBox, `<svg width="${N(150)}" height="${N(190)}" viewBox="0 0 150 190"><defs><linearGradient id="pg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FF5A5F"/><stop offset="1" stop-color="#D92B33"/></linearGradient></defs><path d="M75 186 C 60 150, 6 120, 6 72 A 69 69 0 1 1 144 72 C 144 120, 90 150, 75 186Z" fill="url(#pg)"/><circle cx="75" cy="72" r="28" fill="#fff"/></svg>`, { position: 'absolute', left: 0, top: 0, transformOrigin: '50% 100%', filter: `drop-shadow(0 ${N(10)}px ${N(14)}px rgba(160,20,30,.35))` });
+    const pa = t0 + 0.55;
+    tl.fromTo(pin, { y: -N(700), scaleY: 1.25, scaleX: 0.85 }, { y: 0, scaleY: 1, scaleX: 1, duration: 0.7, ease: 'power3.in' }, pa);
+    tl.to(pin, { scaleY: 0.78, scaleX: 1.18, duration: 0.09, ease: 'power2.out' }, pa + 0.7).to(pin, { scaleY: 1, scaleX: 1, duration: 0.6, ease: 'elastic.out(1,0.35)' }, pa + 0.79);
+    tl.fromTo(sh, { scale: 0.2, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.7, ease: 'power3.in' }, pa);
+    sfx(pa + 0.7, 'impact', 0.5);
+    for (let k = 0; k < 2; k++) { const ring = el('div', '', pinBox, '', { position: 'absolute', left: '50%', bottom: px(-30), width: px(180), height: px(70), marginLeft: px(-90), borderRadius: '50%', border: `${N(4)}px solid #E33A41` }); tl.fromTo(ring, { scale: 0.2, opacity: 0.8 }, { scale: 2.2, opacity: 0, duration: 1.4, ease: 'power2.out' }, pa + 0.75 + k * 0.45); }
+    if (o.label) { const lab = el('div', '', s, esc(o.label), { position: 'absolute', top: PORTRAIT ? '22%' : '14%', fontSize: px(o.labelSize || 150), fontWeight: 750, letterSpacing: '-0.05em', color: '#111114', whiteSpace: 'nowrap', textShadow: `0 0 ${N(40)}px rgba(238,235,228,.9)` }); fitFont(lab, maxTextW()); tl.fromTo(lab, { opacity: 0, scale: 1.25, filter: blur(18) }, { opacity: 1, scale: 1, filter: blur(0), duration: 0.9 }, t0 + 0.2); }
+    if (o.address) {
+      const card = el('div', 'card', s, '', { position: 'absolute', bottom: PORTRAIT ? '17%' : '10%', display: 'flex', alignItems: 'center', gap: px(26), padding: `${N(30)}px ${N(44)}px ${N(30)}px ${N(30)}px`, maxWidth: W * 0.88 + 'px' });
+      el('div', 'squircle', card, glyph('pin', 50, '#fff', 2.2), { width: px(92), height: px(92), background: 'linear-gradient(160deg,#FF6A6F,#D92B33)', flex: '0 0 auto' });
+      const tx = el('div', '', card, '', { minWidth: 0 });
+      el('div', '', tx, esc(o.address), { fontSize: px(40), fontWeight: 650, letterSpacing: '-0.02em', color: '#111', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' });
+      if (o.sub) el('div', '', tx, esc(o.sub), { fontSize: px(30), color: '#8A8A93', marginTop: px(4), whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' });
+      tl.fromTo(card, { y: N(200), opacity: 0, filter: blur(14) }, { y: 0, opacity: 1, filter: blur(0), duration: 0.9, ease: 'back.out(1.3)' }, pa + 1.0);
+    }
+  };
+
+  // RECEIPT: "Your order" card, items slide in, the total counts up, the button gets pressed
+  B.receipt = (s, o, t0, t1, bg) => {
+    const items = [].concat(o.items || []).filter((x) => x && x.name).slice(0, 5);
+    const w = Math.min(W * 0.86, N(900));
+    const card = el('div', 'card', s, '', { width: w + 'px', padding: `${N(56)}px ${N(56)}px ${N(48)}px` });
+    const ink = '#111114';
+    el('div', '', card, esc(o.title || 'Your order'), { fontSize: px(58), fontWeight: 750, letterSpacing: '-0.035em', color: ink, marginBottom: px(30) });
+    tl.fromTo(card, { y: N(140), opacity: 0, scale: 0.92, rotationX: 18, filter: blur(16) }, { y: 0, opacity: 1, scale: 1, rotationX: 0, filter: blur(0), duration: 1.0, ease: 'back.out(1.2)' }, t0 + 0.1);
+    sfx(t0 + 0.15, 'whoosh', 0.3);
+    const step = clamp((t1 - t0 - 2.4) / Math.max(1, items.length), 0.16, 0.32);
+    items.forEach((it, i) => {
+      const r = el('div', 'row', card, '', { justifyContent: 'space-between', alignItems: 'baseline', padding: `${N(22)}px 0`, borderTop: '1px solid #EFEFF2', fontSize: px(PORTRAIT ? 42 : 38), color: '#2A2A30' });
+      el('div', '', r, esc(it.name), { fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', marginRight: px(24), letterSpacing: '-0.015em' });
+      el('div', 'tnum', r, esc(it.price || ''), { fontWeight: 600, flex: '0 0 auto' });
+      const a = t0 + 0.7 + i * step;
+      tl.fromTo(r, { opacity: 0, x: N(50), filter: blur(6) }, { opacity: 1, x: 0, filter: blur(0), duration: 0.6 }, a);
+      sfx(a, 'tick', 0.3);
+    });
+    const after = t0 + 0.7 + items.length * step + 0.2;
+    if (o.total) {
+      const r = el('div', 'row', card, '', { justifyContent: 'space-between', alignItems: 'baseline', paddingTop: px(26), marginTop: px(8), borderTop: '2px solid #111', fontSize: px(46), fontWeight: 750, color: ink, letterSpacing: '-0.03em' });
+      el('div', '', r, esc(o.totalLabel || 'Total'));
+      const v = el('div', 'tnum', r, esc(o.total));
+      const m = String(o.total).match(/^(\D*)([\d,]+)(.*)$/);
+      if (m) { const n = +m[2].replace(/,/g, ''); const pr = { v: 0 }; tl.fromTo(pr, { v: 0 }, { v: n, duration: 1.1, ease: 'expo.out', onUpdate: () => { v.textContent = m[1] + Math.round(pr.v).toLocaleString('en-US') + m[3]; } }, after); }
+      tl.fromTo(r, { opacity: 0 }, { opacity: 1, duration: 0.4 }, after);
+    }
+    if (o.button) {
+      const btn = el('div', 'pill', card, esc(o.button), { marginTop: px(40), height: px(116), justifyContent: 'center', fontSize: px(42), fontWeight: 650, color: BRAND_DARK ? '#fff' : '#111', background: ACC, boxShadow: `0 ${N(16)}px ${N(36)}px ${rgba(ACC, 0.35)}` });
+      tl.fromTo(btn, { opacity: 0, y: N(30) }, { opacity: 1, y: 0, duration: 0.6 }, after + 0.3);
+      if (after + 1.6 < t1 - 0.3) { const c = cursor(s); click(c, btn, pointAt(c, s, btn, after + 0.5) + 0.05); }
+    }
+  };
+
+  // PRICE: a giant number rolls in
+  B.price = (s, o, t0, t1, bg) => {
+    if (o.label) { const l = el('div', '', s, esc(o.label), { fontSize: px(54), fontWeight: 600, color: muteOf(bg), letterSpacing: '-0.02em', marginBottom: px(10) }); tl.fromTo(l, { opacity: 0, y: N(20), filter: blur(8) }, { opacity: 1, y: 0, filter: blur(0), duration: 0.7 }, t0 + 0.1); }
+    if (o.old) { const old = el('div', 'tnum', s, esc(o.old), { fontSize: px(70), fontWeight: 600, color: muteOf(bg), position: 'relative' }); const strike = el('div', '', old, '', { position: 'absolute', left: '-4%', right: '-4%', top: '52%', height: px(7), background: '#FF3B30', transformOrigin: '0 50%', borderRadius: px(4) }); tl.fromTo(old, { opacity: 0 }, { opacity: 1, duration: 0.4 }, t0 + 0.2); tl.fromTo(strike, { scaleX: 0 }, { scaleX: 1, duration: 0.45, ease: 'power3.inOut' }, t0 + 0.55); }
+    const od = odometer(s, o.value, o.size || (PORTRAIT ? 250 : 220), accOf(bg));
+    fitFont(od.box, maxTextW());
+    tl.fromTo(od.box, { scale: 0.85, filter: blur(12), opacity: 0 }, { scale: 1, filter: blur(0), opacity: 1, duration: 0.9 }, t0 + 0.3);
+    od.play(t0 + 0.3); sfx(t0 + 0.35, 'whoosh', 0.35); sfx(t0 + 1.6, 'pop', 0.6);
+    if (o.sub) { const sub = wordsRow(s, o.sub, 56, { weight: 600 }); sub.row.style.marginTop = px(30); buildRow(sub.row, sub.items, t0 + 1.1, 0.12); }
+    const shine = el('div', '', s, '', { position: 'absolute', inset: 0, background: 'linear-gradient(105deg, transparent 40%, rgba(255,255,255,.28) 50%, transparent 60%)', pointerEvents: 'none' });
+    tl.fromTo(shine, { xPercent: -100 }, { xPercent: 100, duration: 1.2, ease: 'power2.inOut' }, t0 + 1.4);
+  };
+
+  // PHOTOS: the owner's photos floating in depth; the camera glides through them
+  B.photos = (s, o, t0, t1, bg) => {
+    const urls = [].concat(o.urls || []).filter(Boolean).slice(0, 5);
+    if (!urls.length) return;
+    const dur = Math.max(1, t1 - t0);
+    const mw = PORTRAIT ? W * 0.66 : W * 0.4, mh = mw * (PORTRAIT ? 1.22 : 0.8);
+    const spots = PORTRAIT
+      ? [[0, -0.02, 1, 0], [-0.36, -0.33, 0.48, 2], [0.38, 0.3, 0.52, 2], [-0.4, 0.36, 0.4, 3], [0.4, -0.36, 0.4, 3]]
+      : [[0, 0, 1, 0], [-0.36, -0.2, 0.55, 2], [0.36, 0.22, 0.55, 2], [-0.38, 0.3, 0.42, 3], [0.38, -0.3, 0.42, 3]];
+    const textBelow = (o.lines && o.lines.length) || o.text;
+    const lift = textBelow ? -N(PORTRAIT ? 110 : 60) : 0;
+    urls.map((u, i) => [u, spots[i]]).reverse().forEach(([u, [fx, fy, sc, depth]], ri) => {
+      const i = urls.length - 1 - ri;
+      const c = el('div', '', s, '', { position: 'absolute', left: '50%', top: '50%', width: mw * sc + 'px', height: mh * sc + 'px', marginLeft: -mw * sc / 2 + 'px', marginTop: -mh * sc / 2 + lift + 'px', borderRadius: px(i === 0 ? 54 : 36), overflow: 'hidden', boxShadow: shadow(i === 0 ? 1.5 : 1), background: '#ddd' });
+      const img = el('img', '', c, null, { width: '100%', height: '100%', objectFit: 'cover' }); img.src = u;
+      const x = fx * W, y = fy * H;
+      const a = t0 + 0.1 + (i === 0 ? 0 : 0.18 + i * 0.1);
+      tl.fromTo(c, { x: x * 1.25, y: y * 1.25 + N(i === 0 ? 120 : 0), opacity: 0, scale: 0.8, filter: blur(depth ? 18 : 16) }, { x, y, opacity: depth ? 0.9 : 1, scale: 1, filter: blur(depth * 2.2), duration: 1.1, ease: 'expo.out' }, a);
+      tl.to(c, { x: x * (1 + 0.25 * depth), y: y * (1 + 0.25 * depth), scale: 1 + (depth ? 0.1 : 0.06), duration: Math.max(0.5, dur - 1.1), ease: 'sine.inOut' }, a + 1.1);
+      tl.fromTo(img, { scale: 1.18 }, { scale: 1.0, duration: dur, ease: 'sine.out' }, t0);
+    });
+    sfx(t0 + 0.1, 'whoosh', 0.4);
+    if (textBelow) {
+      const lines = [].concat(o.lines || o.text);
+      const box = el('div', 'col', s, '', { position: 'absolute', bottom: PORTRAIT ? '11%' : '7%', left: 0, right: 0 });
+      let at = t0 + 0.7;
+      let off = 0; lines.slice(0, 2).forEach((L, li) => { const r = wordsRow(box, L, li ? 54 : 92, { accent: new Set([].concat(o.accent || [])), offset: off, accColor: accOf(bg), weight: li ? 550 : 700 }); off += r.words.length; if (li) r.row.style.color = muteOf(bg); at = buildRow(r.row, r.items, at, 0.12) - 0.4; });
+    }
+  };
+
+  // RING: a progress ring card ("Under 30 minutes")
+  B.ring = (s, o, t0, t1, bg) => {
+    const card = el('div', '', s, '', { display: 'flex', alignItems: 'center', gap: px(50), padding: `${N(50)}px ${N(70)}px ${N(50)}px ${N(50)}px`, borderRadius: px(80), background: bg === 'light' ? '#E9E9EE' : '#1C1C21', boxShadow: bg === 'light' ? `inset 0 ${N(2)}px 0 #fff, ${shadow(0.6)}` : '0 0 0 1px rgba(255,255,255,.07)' });
+    const sz = 260, r = 108, C = 2 * Math.PI * r;
+    const ringBox = el('div', '', card, `<svg width="${N(sz)}" height="${N(sz)}" viewBox="0 0 ${sz} ${sz}"><circle cx="${sz / 2}" cy="${sz / 2}" r="${r}" fill="none" stroke="${bg === 'light' ? '#D6D6DD' : '#33333A'}" stroke-width="22"/><circle class="arc" cx="${sz / 2}" cy="${sz / 2}" r="${r}" fill="none" stroke="${ACC}" stroke-width="22" stroke-linecap="round" stroke-dasharray="${C}" stroke-dashoffset="${C}" transform="rotate(-90 ${sz / 2} ${sz / 2})"/></svg>`, { position: 'relative', width: px(sz), height: px(sz) });
+    const num = el('div', 'tnum', ringBox, esc(o.value), { position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', fontSize: px(String(o.value).length > 4 ? 56 : 76), fontWeight: 700, letterSpacing: '-0.04em', color: inkOf(bg === 'light' ? 'light' : 'dark') });
+    const tx = el('div', '', card);
+    el('div', '', tx, esc(o.label || ''), { fontSize: px(64), fontWeight: 700, letterSpacing: '-0.035em', color: inkOf(bg === 'light' ? 'light' : 'dark'), lineHeight: 1.05 });
+    if (o.sub) el('div', '', tx, esc(o.sub), { fontSize: px(36), color: muteOf(bg === 'light' ? 'light' : 'dark'), marginTop: px(8) });
+    tl.fromTo(card, { opacity: 0, scale: 0.86, y: N(60), filter: blur(14) }, { opacity: 1, scale: 1, y: 0, filter: blur(0), duration: 0.95, ease: 'back.out(1.3)' }, t0 + 0.1);
+    tl.fromTo(ringBox.querySelector('.arc'), { attr: { 'stroke-dashoffset': C } }, { attr: { 'stroke-dashoffset': C * (1 - clamp(o.fill == null ? 0.82 : o.fill, 0.05, 1)) }, duration: 1.6, ease: 'expo.out' }, t0 + 0.5);
+    tl.fromTo(num, { opacity: 0, scale: 0.6 }, { opacity: 1, scale: 1, duration: 0.7, ease: 'back.out(2)' }, t0 + 0.6);
+    tl.fromTo(tx, { opacity: 0, x: -N(30) }, { opacity: 1, x: 0, duration: 0.8 }, t0 + 0.55);
+    sfx(t0 + 0.5, 'whoosh', 0.3);
+  };
+
+  // HIGHLIGHT: a sentence, then a text selection with handles sweeps over the key words
+  B.highlight = (s, o, t0, t1, bg) => {
+    const words = String(o.text || '').split(/\s+/).filter(Boolean);
+    const hot = [].concat(o.hot || [words.length - 1]).filter((i) => i >= 0 && i < words.length);
+    const lo = Math.min(...hot), hi = Math.max(...hot);
+    const row = el('div', 'row', s, '', { fontSize: px(o.size || 92), fontWeight: 650, letterSpacing: '-0.035em', position: 'relative' });
+    const spans = words.map((w, i) => el('span', 'w', row, esc(w), { marginRight: i < words.length - 1 ? '0.25em' : '0', position: 'relative', zIndex: 2 }));
+    fitFont(row, maxTextW(), N(40));
+    tl.fromTo(row, { opacity: 0, y: N(30), filter: blur(10) }, { opacity: 1, y: 0, filter: blur(0), duration: 0.8 }, t0 + 0.1);
+    const left = spans[lo].offsetLeft - N(10), right = spans[hi].offsetLeft + spans[hi].offsetWidth + N(10);
+    const selCol = bg === 'light' ? rgba(ACC, 0.22) : rgba(A_D, 0.32);
+    const sel = el('div', '', row, '', { position: 'absolute', left: left + 'px', top: '-6%', height: '112%', width: right - left + 'px', background: selCol, transformOrigin: '0 50%', zIndex: 1, borderRadius: px(6) });
+    const hand = (side) => { const h = el('div', '', row, '', { position: 'absolute', top: '-14%', height: '128%', width: px(5), background: A_L, left: (side ? right : left) - N(2) + 'px', zIndex: 3 }); el('div', '', h, '', { position: 'absolute', left: px(-12), [side ? 'bottom' : 'top']: px(-24), width: px(29), height: px(29), borderRadius: '50%', background: A_L }); return h; };
+    const h1 = hand(0), h2 = hand(1);
+    const a = t0 + 0.9;
+    tl.fromTo(sel, { scaleX: 0 }, { scaleX: 1, duration: 0.7, ease: 'power3.inOut' }, a);
+    tl.fromTo(h1, { opacity: 0 }, { opacity: 1, duration: 0.2 }, a);
+    tl.fromTo(h2, { opacity: 0, x: -(right - left) }, { opacity: 1, x: 0, duration: 0.7, ease: 'power3.inOut' }, a);
+    sfx(a, 'tick', 0.4);
+    const b2 = a + 1.0;
+    tl.to([sel, h1, h2], { opacity: 0, duration: 0.3 }, b2);
+    hot.forEach((i) => tl.fromTo(spans[i], { color: inkOf(bg) }, { color: accOf(bg), duration: 0.3 }, b2));
+    tl.fromTo(row, { scale: 1 }, { scale: 1.05, duration: 1.2, ease: 'expo.out', immediateRender: false }, b2);
+  };
+
+  // PHONE: a 3D phone with the brand app on the home screen; the app opens to the message
+  B.phone = (s, o, t0, t1, bg) => {
+    const ph = PORTRAIT ? N(1100) : H * 0.66, pw = ph * 0.49;
+    const persp = el('div', '', s, '', { perspective: N(2600) + 'px' });
+    const body = el('div', '', persp, '', { width: pw + 'px', height: ph + 'px', borderRadius: pw * 0.17 + 'px', background: 'linear-gradient(145deg,#3a3a40,#0c0c0f 40%,#26262b)', padding: pw * 0.035 + 'px', boxShadow: `inset 0 0 0 ${N(3)}px #55555c, ${shadow(1.6)}`, transformStyle: 'preserve-3d', position: 'relative' });
+    const scr = el('div', '', body, '', { position: 'relative', width: '100%', height: '100%', borderRadius: pw * 0.14 + 'px', overflow: 'hidden', background: `linear-gradient(170deg, ${mix(ACC, '#FFFFFF', 0.55)} 0%, ${mix(ACC, '#FFFFFF', 0.82)} 55%, #FFFFFF 100%)` });
+    el('div', '', scr, '', { position: 'absolute', top: pw * 0.035 + 'px', left: '50%', width: pw * 0.3 + 'px', height: pw * 0.085 + 'px', marginLeft: -pw * 0.15 + 'px', borderRadius: '99px', background: '#000', zIndex: 5 });
+    const grid = el('div', '', scr, '', { position: 'absolute', top: pw * 0.2 + 'px', left: pw * 0.08 + 'px', right: pw * 0.08 + 'px', display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: pw * 0.07 + 'px ' + pw * 0.06 + 'px' });
+    const tints = ['#FF9F0A', '#30D158', '#0A84FF', '#FF375F', '#BF5AF2', '#64D2FF', '#FFD60A', '#5E5CE6', '#FF6B6B', '#34C759', '#AC8E68', '#8E8E93', '#FF9F0A', '#0A84FF', '#30D158', '#FF375F'];
+    const ks = Object.keys(G);
+    const appIcons = [];
+    let brandCell = null;
+    for (let i = 0; i < 16; i++) {
+      const cell = el('div', 'squircle gloss', grid, '', { width: '100%', aspectRatio: '1', background: `linear-gradient(160deg, ${mix(tints[i], '#fff', 0.15)}, ${tints[i]})` });
+      if (i === 5) { cell.style.background = 'transparent'; cell.style.overflow = 'visible'; const ic = brandIcon(cell, 1, {}); ic.style.width = '100%'; ic.style.height = '100%'; ic.querySelector('div') && (ic.querySelector('div').style.fontSize = pw * 0.07 + 'px'); brandCell = cell; }
+      else cell.innerHTML = glyph(ks[(i * 3) % ks.length], 34 * (pw / N(540)), '#fff', 2.2);
+      appIcons.push(cell);
+    }
+    tl.fromTo(body, { rotationY: -38, rotationX: 12, rotationZ: -6, y: N(300), opacity: 0, filter: blur(18) }, { rotationY: -14, rotationX: 6, rotationZ: -2, y: 0, opacity: 1, filter: blur(0), duration: 1.3, ease: 'expo.out' }, t0 + 0.05);
+    tl.to(body, { rotationY: 12, rotationX: -4, rotationZ: 1, duration: Math.max(0.5, t1 - t0 - 1.3), ease: 'sine.inOut' }, t0 + 1.35);
+    sfx(t0 + 0.1, 'whoosh', 0.45);
+    appIcons.forEach((c, i) => tl.fromTo(c, { scale: 0, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.55, ease: 'back.out(2)' }, t0 + 0.5 + (i % 4) * 0.05 + Math.floor(i / 4) * 0.07));
+    if (brandCell) {
+      const badge = el('div', '', brandCell, '1', { position: 'absolute', right: '-14%', top: '-14%', width: '42%', height: '42%', borderRadius: '50%', background: '#FF3B30', color: '#fff', display: 'grid', placeItems: 'center', fontSize: pw * 0.045 + 'px', fontWeight: 700, zIndex: 3 });
+      tl.fromTo(badge, { scale: 0 }, { scale: 1, duration: 0.5, ease: 'back.out(3)' }, t0 + 1.4);
+      sfx(t0 + 1.4, 'pop', 0.6);
+      tl.fromTo(brandCell, { scale: 1 }, { scale: 1.18, duration: 0.35, yoyo: true, repeat: 1, ease: 'power2.out' }, t0 + 1.6);
+    }
+    if (o.text) {
+      const pill = el('div', 'pill', s, esc(o.text), { position: 'absolute', bottom: PORTRAIT ? '9%' : '6%', padding: `${N(26)}px ${N(46)}px`, fontSize: px(46), fontWeight: 650, letterSpacing: '-0.025em', background: bg === 'light' ? '#fff' : '#1E1E23', color: inkOf(bg === 'light' ? 'light' : 'dark'), boxShadow: shadow(1), whiteSpace: 'nowrap' });
+      fitFont(pill, maxTextW());
+      tl.fromTo(pill, { y: N(140), opacity: 0, filter: blur(10) }, { y: 0, opacity: 1, filter: blur(0), duration: 0.9, ease: 'back.out(1.4)' }, t0 + 1.2);
+    }
+  };
+
+  // BUTTON: the call to action as a real button; a cursor glides in and presses it
+  B.button = (s, o, t0, t1, bg) => {
+    if (o.lead) { const tt = wordsRow(s, o.lead, 80, { weight: 700, accent: new Set([].concat(o.accent || [])), accColor: accOf(bg) }); tt.row.style.marginBottom = px(80); buildRow(tt.row, tt.items, t0 + 0.05, 0.14); }
+    const onBrand = bg === 'brand';
+    const btn = el('div', 'pill', s, '', { height: px(150), padding: `0 ${N(84)}px`, gap: px(22), justifyContent: 'center', fontSize: px(56), fontWeight: 650, letterSpacing: '-0.025em', color: onBrand ? A_L : (BRAND_DARK ? '#fff' : '#111'), background: onBrand ? '#FFFFFF' : `linear-gradient(180deg, ${mix(ACC, '#FFFFFF', 0.16)}, ${ACC})`, boxShadow: onBrand ? '0 30px 60px rgba(0,0,0,.25)' : `inset 0 ${N(2)}px 0 rgba(255,255,255,.35), 0 ${N(26)}px ${N(56)}px ${rgba(ACC, 0.4)}`, position: 'relative', overflow: 'hidden', whiteSpace: 'nowrap' });
+    if (o.glyph) el('div', '', btn, glyph(o.glyph, 56, 'currentColor', 2.3), { display: 'grid' });
+    const lab = el('div', '', btn, '', { position: 'relative', height: px(70), overflow: 'hidden' });
+    const l1 = el('div', '', lab, esc(o.label || 'Order now'), { lineHeight: N(70) + 'px' });
+    const l2 = o.done ? el('div', '', lab, '✓ ' + esc(o.done), { lineHeight: N(70) + 'px', position: 'absolute', left: 0, top: '100%', whiteSpace: 'nowrap' }) : null;
+    if (l2) lab.style.width = Math.max(l1.offsetWidth, l2.offsetWidth) + 'px';
+    fitFont(btn, maxTextW());
+    tl.fromTo(btn, { opacity: 0, scale: 0.6, filter: blur(16) }, { opacity: 1, scale: 1, filter: blur(0), duration: 0.9, ease: 'back.out(1.7)' }, t0 + 0.2);
+    sfx(t0 + 0.25, 'pop', 0.6);
+    const c = cursor(s);
+    const press = pointAt(c, s, btn, t0 + 0.9) + 0.1;
+    click(c, btn, press);
+    const ripple = el('div', '', btn, '', { position: 'absolute', left: '50%', top: '50%', width: px(120), height: px(120), margin: px(-60) + ' 0 0 ' + px(-60), borderRadius: '50%', background: 'rgba(255,255,255,.45)' });
+    tl.fromTo(ripple, { scale: 0, opacity: 0.9 }, { scale: 9, opacity: 0, duration: 0.8, ease: 'power2.out' }, press);
+    if (l2) { tl.to(l1, { yPercent: -100, opacity: 0, filter: blur(6), duration: 0.45, ease: 'power3.inOut' }, press + 0.25); tl.to(l2, { top: 0, duration: 0.45, ease: 'power3.inOut' }, press + 0.25); sfx(press + 0.35, 'chime', 0.5); }
+    tl.to(c, { x: N(240), y: N(260), opacity: 0, duration: 0.6, ease: 'power2.in' }, press + 0.6);
+    if (o.sub) { const sub = el('div', '', s, esc(o.sub), { marginTop: px(60), fontSize: px(44), fontWeight: 600, color: muteOf(bg), letterSpacing: '-0.01em', whiteSpace: 'nowrap' }); fitFont(sub, maxTextW()); tl.fromTo(sub, { opacity: 0, y: N(20), filter: blur(8) }, { opacity: 1, y: 0, filter: blur(0), duration: 0.8 }, press + 0.5); }
+  };
+
+  // END: icon + wordmark, tagline, and a contact pill (like a creator end card)
+  B.end = (s, o, t0, t1, bg) => {
+    const onBrand = bg === 'brand';
+    const grp = el('div', 'row', s, '', { alignItems: 'center' });
+    const size = o.size || 170;
+    const ic = brandIcon(grp, size, { onBrand });
+    const wrap = el('div', '', grp, '', { overflow: 'hidden', paddingLeft: px(size * 0.2), paddingRight: px(6) });
+    const name = nameBlock(wrap, D.brand, N(size * 0.56), inkOf(bg), maxTextW() - N(size * 1.2));
+    const shift = wrap.offsetWidth / 2;
+    tl.fromTo(ic, { opacity: 0, scale: 0.3, rotation: -12, filter: blur(14) }, { opacity: 1, scale: 1, rotation: 0, filter: blur(0), duration: 0.9, ease: 'back.out(1.7)' }, t0 + 0.1);
+    tl.fromTo(grp, { x: shift }, { x: 0, duration: 0.95, ease: 'expo.inOut', immediateRender: true }, t0 + 0.65);
+    tl.fromTo(name, { xPercent: -105, opacity: 0 }, { xPercent: 0, opacity: 1, duration: 0.95, ease: 'expo.inOut' }, t0 + 0.65);
+    sfx(t0 + 0.12, 'pop', 0.7); sfx(t0 + 0.7, 'whoosh', 0.3);
+    let at = t0 + 1.4;
+    if (o.tagline) { const tg = wordsRow(s, o.tagline, 60, { weight: 600, accent: new Set([].concat(o.accent || [])), accColor: onBrand ? (BRAND_DARK ? '#FFFFFF' : '#111') : accOf(bg) }); tg.row.style.marginTop = px(56); tg.row.style.color = onBrand ? inkOf(bg) : muteOf(bg); at = buildRow(tg.row, tg.items, at, 0.13, { blur: 6 }) - 0.3; }
+    if (o.contact) {
+      const pill = el('div', 'pill', s, '', { marginTop: px(70), height: px(104), padding: `0 ${N(46)}px`, gap: px(18), background: onBrand ? 'rgba(255,255,255,.95)' : bg === 'light' ? '#FFFFFF' : '#1E1E23', boxShadow: onBrand ? '0 20px 50px rgba(0,0,0,.2)' : shadow(0.8), fontSize: px(40), fontWeight: 600, color: onBrand || bg === 'light' ? '#111' : '#F5F5F7', whiteSpace: 'nowrap' });
+      el('div', '', pill, glyph(o.contactGlyph || 'search', 42, onBrand || bg === 'light' ? '#8A8A93' : '#9B9BA5', 2.4), { display: 'grid' });
+      el('div', '', pill, esc(o.contact));
+      fitFont(pill, maxTextW());
+      tl.fromTo(pill, { opacity: 0, y: N(60), scale: 0.9, filter: blur(10) }, { opacity: 1, y: 0, scale: 1, filter: blur(0), duration: 0.85, ease: 'back.out(1.5)' }, Math.min(at, t1 - 1.0));
+    }
+    tl.fromTo(s.firstChild ? s : grp, { scale: 1 }, { scale: 1.03, duration: Math.max(0.5, t1 - t0), ease: 'sine.inOut', immediateRender: false }, t0);
+  };
+
+  // STEPS: three cards joined by a glowing line that draws through them (how it works)
+  B.steps = (s, o, t0, t1, bg) => {
+    const items = [].concat(o.items || []).filter((x) => x && x.t).slice(0, 4);
+    if (o.title) { const tt = wordsRow(s, o.title, 76, { weight: 700, accent: new Set([].concat(o.accent || [])), accColor: accOf(bg) }); tt.row.style.marginBottom = px(70); buildRow(tt.row, tt.items, t0 + 0.05, 0.14); }
+    const vertical = PORTRAIT;
+    const wrap = el('div', '', s, '', { position: 'relative', display: 'flex', flexDirection: vertical ? 'column' : 'row', gap: px(vertical ? 70 : 60), alignItems: 'center' });
+    const dark = bg !== 'light';
+    const cards = items.map((it, i) => {
+      const c = el('div', '', wrap, '', { position: 'relative', zIndex: 2, width: px(vertical ? 760 : 420), display: 'flex', flexDirection: vertical ? 'row' : 'column', alignItems: 'center', gap: px(30), padding: px(vertical ? 34 : 44), borderRadius: px(44), background: dark ? 'rgba(30,30,36,.92)' : '#FFFFFF', boxShadow: dark ? `0 0 0 1px ${rgba(A_D, 0.35)}, 0 0 ${N(40)}px ${rgba(A_D, 0.18)}` : shadow(1), textAlign: vertical ? 'left' : 'center' });
+      const g = el('div', 'squircle', c, glyph(it.glyph || ['search', 'chat', 'check', 'star'][i % 4], 58, dark ? A_D : A_L, 2), { width: px(116), height: px(116), background: dark ? rgba(A_D, 0.12) : rgba(ACC, 0.1), flex: '0 0 auto', border: `${N(2)}px solid ${dark ? rgba(A_D, 0.4) : rgba(ACC, 0.2)}` });
+      const tx = el('div', '', c, '', { minWidth: 0 });
+      el('div', '', tx, `<span style="opacity:.45">${i + 1}.</span> ` + esc(it.t), { fontSize: px(46), fontWeight: 700, letterSpacing: '-0.03em', color: dark ? '#fff' : '#111', whiteSpace: 'nowrap' });
+      if (it.s) el('div', '', tx, esc(it.s), { fontSize: px(32), color: muteOf(dark ? 'dark' : 'light'), marginTop: px(6), lineHeight: 1.3 });
+      return { c, g };
+    });
+    // the connecting line (drawn in the wrap's coordinates)
+    const svgNS = 'http://www.w3.org/2000/svg';
+    const ww = wrap.offsetWidth, wh = wrap.offsetHeight;
+    const svg = document.createElementNS(svgNS, 'svg'); svg.setAttribute('width', ww); svg.setAttribute('height', wh); Object.assign(svg.style, { position: 'absolute', left: 0, top: 0, zIndex: 1, overflow: 'visible' }); wrap.insertBefore(svg, wrap.firstChild);
+    const pts = cards.map(({ c }) => [c.offsetLeft + c.offsetWidth / 2, c.offsetTop + c.offsetHeight / 2]);
+    let d = `M ${pts[0][0]} ${pts[0][1]}`; for (let i = 1; i < pts.length; i++) { const [x0, y0] = pts[i - 1], [x1, y1] = pts[i]; d += vertical ? ` C ${x0 + N(420)} ${y0}, ${x1 - N(420)} ${y1}, ${x1} ${y1}` : ` C ${x0} ${y0 + N(240)}, ${x1} ${y1 - N(240)}, ${x1} ${y1}`; }
+    const path = document.createElementNS(svgNS, 'path'); Object.entries({ d, fill: 'none', stroke: dark ? A_D : ACC, 'stroke-width': N(6), 'stroke-linecap': 'round' }).forEach(([k, v]) => path.setAttribute(k, v)); if (dark) path.style.filter = `drop-shadow(0 0 ${N(10)}px ${A_D})`; svg.appendChild(path);
+    const len = path.getTotalLength(); path.setAttribute('stroke-dasharray', len); path.setAttribute('stroke-dashoffset', len);
+    const span = Math.max(1.2, t1 - t0 - 1.6);
+    tl.fromTo(path, { attr: { 'stroke-dashoffset': len } }, { attr: { 'stroke-dashoffset': 0 }, duration: span, ease: 'power1.inOut' }, t0 + 0.5);
+    cards.forEach(({ c, g }, i) => {
+      const a = t0 + 0.4 + (span * i) / Math.max(1, cards.length - 1) * 0.92;
+      tl.fromTo(c, { opacity: 0, scale: 0.85, y: N(40), filter: blur(14) }, { opacity: 1, scale: 1, y: 0, filter: blur(0), duration: 0.8, ease: 'back.out(1.4)' }, a);
+      tl.fromTo(g, { scale: 0.4, rotation: -20 }, { scale: 1, rotation: 0, duration: 0.7, ease: 'back.out(2.2)' }, a + 0.15);
+      sfx(a, 'pop', 0.45);
+    });
+  };
+
+  // GRID: the owner's photos pop into a tidy grid, then the grid tilts away in 3D
+  B.grid = (s, o, t0, t1, bg) => {
+    const urls = [].concat(o.urls || []).filter(Boolean).slice(0, 9);
+    if (!urls.length) return;
+    const cols = urls.length >= 7 ? 3 : 2, rows = Math.ceil(urls.length / cols);
+    const cw = Math.min(W * 0.86, N(PORTRAIT ? 940 : 1100)) / cols - N(18);
+    const persp = el('div', '', s, '', { perspective: N(2400) + 'px' });
+    const g = el('div', '', persp, '', { display: 'grid', gridTemplateColumns: `repeat(${cols}, ${cw}px)`, gap: px(22), transformStyle: 'preserve-3d' });
+    const tiles = urls.map((u) => { const c = el('div', '', g, '', { width: cw + 'px', height: cw * (PORTRAIT && rows <= 2 ? 1.25 : 1) + 'px', borderRadius: px(34), overflow: 'hidden', boxShadow: shadow(0.9), background: '#ddd' }); const im = el('img', '', c, null, { width: '100%', height: '100%', objectFit: 'cover' }); im.src = u; return c; });
+    const order = tiles.map((t, i) => [t, ((i * 7) % tiles.length)]).sort((a, b) => a[1] - b[1]);
+    order.forEach(([t], k) => { const a = t0 + 0.15 + k * 0.09; tl.fromTo(t, { opacity: 0, scale: 0.4, z: -N(400), filter: blur(14) }, { opacity: 1, scale: 1, z: 0, filter: blur(0), duration: 0.8, ease: 'back.out(1.5)' }, a); });
+    sfx(t0 + 0.2, 'pop', 0.5);
+    tl.fromTo(g, { rotationX: 0, rotationZ: 0, scale: 1 }, { rotationX: 24, rotationZ: -8, scale: 0.92, duration: Math.max(0.6, t1 - t0 - 1.2), ease: 'sine.inOut', immediateRender: false }, t0 + 1.1);
+    if (o.text) { const pill = el('div', 'pill', s, esc(o.text), { position: 'absolute', bottom: PORTRAIT ? '10%' : '7%', padding: `${N(26)}px ${N(48)}px`, fontSize: px(48), fontWeight: 650, letterSpacing: '-0.025em', background: 'rgba(255,255,255,.92)', color: '#111', boxShadow: shadow(1), whiteSpace: 'nowrap', backdropFilter: 'blur(20px)' }); fitFont(pill, maxTextW()); tl.fromTo(pill, { y: N(120), opacity: 0, filter: blur(10) }, { y: 0, opacity: 1, filter: blur(0), duration: 0.8, ease: 'back.out(1.4)' }, t0 + 1.0); }
+  };
+
+  // STAT: a number card (only real numbers the owner gave)
+  B.stat = (s, o, t0, t1, bg) => {
+    const card = el('div', '', s, '', { width: px(PORTRAIT ? 640 : 600), padding: px(56), borderRadius: px(64), background: `linear-gradient(160deg, ${mix(ACC, '#000', 0.55)}, ${mix(ACC, '#000', 0.8)})`, boxShadow: `0 ${N(40)}px ${N(90)}px ${rgba(mix(ACC, '#000', 0.5), 0.45)}, inset 0 ${N(2)}px 0 rgba(255,255,255,.15)`, color: '#fff', position: 'relative', overflow: 'hidden' });
+    const od = odometer(card, o.value, 170, '#fff');
+    el('div', '', card, esc(o.label || ''), { fontSize: px(52), fontWeight: 700, letterSpacing: '-0.03em', marginTop: px(8), color: mix(ACC, '#FFFFFF', 0.55) });
+    if (o.sub) el('div', '', card, esc(o.sub), { fontSize: px(32), marginTop: px(6), color: 'rgba(255,255,255,.6)' });
+    const cube = el('div', '', card, '', { position: 'absolute', right: px(-40), bottom: px(-40), width: px(230), height: px(230), borderRadius: px(40), background: `linear-gradient(135deg, ${ACC}, ${mix(ACC, '#000', 0.4)})`, transform: 'rotate(18deg)', opacity: 0.8 });
+    tl.fromTo(card, { opacity: 0, scale: 0.7, rotation: -8, y: N(120), filter: blur(16) }, { opacity: 1, scale: 1, rotation: 0, y: 0, filter: blur(0), duration: 1.0, ease: 'back.out(1.5)' }, t0 + 0.1);
+    tl.fromTo(cube, { rotation: -20, scale: 0.6 }, { rotation: 18, scale: 1, duration: 1.6, ease: 'expo.out' }, t0 + 0.2);
+    od.play(t0 + 0.35); sfx(t0 + 0.15, 'whoosh', 0.4); sfx(t0 + 1.5, 'pop', 0.5);
+    float(card, t0 + 1.2, t1, 14);
+    if (o.lead) { const l = wordsRow(s, o.lead, 64, { weight: 600, accent: new Set([].concat(o.accent || [])), accColor: accOf(bg) }); l.row.style.marginTop = px(70); buildRow(l.row, l.items, t0 + 0.9, 0.13); }
+  };
+
+  // QUOTE: a customer's words with five stars (only when the owner gave a real review)
+  B.quote = (s, o, t0, t1, bg) => {
+    const w = Math.min(W * 0.86, N(900));
+    const card = el('div', 'card', s, '', { width: w + 'px', padding: `${N(60)}px ${N(60)}px ${N(52)}px` });
+    if (bg !== 'light') Object.assign(card.style, { background: '#1C1C21', boxShadow: '0 0 0 1px rgba(255,255,255,.08)' });
+    const stars = el('div', 'row', card, '', { justifyContent: 'flex-start', gap: px(10), marginBottom: px(30) });
+    const st = [0, 1, 2, 3, 4].map(() => el('div', '', stars, `<svg width="${N(56)}" height="${N(56)}" viewBox="0 0 24 24"><path d="${G.star}" fill="#FFB400" stroke="#FFB400" stroke-width="1" stroke-linejoin="round"/></svg>`, { display: 'grid' }));
+    const q = el('div', '', card, '“' + esc(o.text) + '”', { fontSize: px(String(o.text).length > 90 ? 44 : 54), fontWeight: 600, letterSpacing: '-0.025em', lineHeight: 1.25, color: bg === 'light' ? '#111' : '#F5F5F7' });
+    if (o.name) el('div', '', card, '— ' + esc(o.name), { fontSize: px(34), marginTop: px(28), color: '#8A8A93', fontWeight: 500 });
+    tl.fromTo(card, { opacity: 0, y: N(120), scale: 0.92, filter: blur(16) }, { opacity: 1, y: 0, scale: 1, filter: blur(0), duration: 1.0, ease: 'back.out(1.25)' }, t0 + 0.1);
+    st.forEach((x, i) => { tl.fromTo(x, { scale: 0, rotation: -60 }, { scale: 1, rotation: 0, duration: 0.6, ease: 'back.out(2.5)' }, t0 + 0.6 + i * 0.09); });
+    sfx(t0 + 0.6, 'chime', 0.4);
+    tl.fromTo(q, { opacity: 0, filter: blur(8) }, { opacity: 1, filter: blur(0), duration: 0.9 }, t0 + 0.5);
+    float(card, t0 + 1.2, t1, 10);
+  };
+
+  // ORBIT: the brand icon in the middle, strengths as glossy tiles flying in around it
+  B.orbit = (s, o, t0, t1, bg) => {
+    const items = [].concat(o.items || []).filter(Boolean).slice(0, 6);
+    const box = el('div', '', s, '', { position: 'relative', width: px(900), height: px(900) });
+    const ic = brandIcon(box, 260, { onBrand: bg === 'brand' }); Object.assign(ic.style, { position: 'absolute', left: '50%', top: '50%', margin: px(-130) + ' 0 0 ' + px(-130) });
+    tl.fromTo(ic, { scale: 0.2, opacity: 0, filter: blur(14) }, { scale: 1, opacity: 1, filter: blur(0), duration: 0.9, ease: 'back.out(1.8)' }, t0 + 0.1);
+    sfx(t0 + 0.15, 'pop', 0.7);
+    const n = items.length;
+    const nodes = items.map((it, i) => {
+      const ang = -Math.PI / 2 + (i * 2 * Math.PI) / n + 0.35, rad = N(370);
+      const [soft, deep] = PASTEL[i % PASTEL.length];
+      const t = el('div', '', box, '', { position: 'absolute', left: '50%', top: '50%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: px(14), transform: 'translate(-50%,-50%)' });
+      el('div', 'squircle gloss', t, glyph(it.glyph || 'check', 64, '#fff', 2.2), { width: px(140), height: px(140), background: `linear-gradient(160deg, ${mix(deep, '#fff', 0.2)}, ${deep})`, boxShadow: `0 ${N(16)}px ${N(30)}px ${rgba(deep, 0.35)}` });
+      if (it.t) el('div', '', t, esc(it.t), { fontSize: px(32), fontWeight: 650, color: inkOf(bg), whiteSpace: 'nowrap', letterSpacing: '-0.02em' });
+      const x = Math.cos(ang) * rad, y = Math.sin(ang) * rad;
+      const a = t0 + 0.5 + i * 0.12;
+      tl.fromTo(t, { x: x * 2.4, y: y * 2.4, opacity: 0, scale: 0.5, rotation: (i % 2 ? 1 : -1) * 40, filter: blur(16) }, { x, y, opacity: 1, scale: 1, rotation: 0, filter: blur(0), duration: 1.1, ease: 'expo.out' }, a);
+      tl.to(t, { x: x * 1.07, y: y * 1.07 - N(10), duration: Math.max(0.5, t1 - a - 1.1), ease: 'sine.inOut' }, a + 1.1);
+      return t;
+    });
+    sfx(t0 + 0.5, 'whoosh', 0.4);
+    tl.fromTo(box, { rotation: -4 }, { rotation: 4, duration: Math.max(0.5, t1 - t0), ease: 'sine.inOut', immediateRender: false }, t0);
+    void nodes;
+  };
+
+  // COUNTDOWN: 3, 2, 1, then the reveal word (launches and events)
+  B.countdown = (s, o, t0, t1, bg) => {
+    const nums = ['3', '2', '1'];
+    const ringSvg = el('div', '', s, `<svg width="${N(560)}" height="${N(560)}" viewBox="0 0 560 560"><circle cx="280" cy="280" r="250" fill="none" stroke="${bg === 'light' ? '#E2E2E8' : '#26262C'}" stroke-width="10"/><circle class="arc" cx="280" cy="280" r="250" fill="none" stroke="${accOf(bg)}" stroke-width="10" stroke-linecap="round" stroke-dasharray="1571" stroke-dashoffset="1571" transform="rotate(-90 280 280)"/></svg>`, { position: 'absolute' });
+    const per = clamp((t1 - t0 - 1.4) / 3, 0.38, 0.6);
+    tl.fromTo(ringSvg.querySelector('.arc'), { attr: { 'stroke-dashoffset': 1571 } }, { attr: { 'stroke-dashoffset': 0 }, duration: per * 3, ease: 'none' }, t0 + 0.1);
+    nums.forEach((n, i) => {
+      const d = el('div', 'tnum', s, n, { position: 'absolute', fontSize: px(300), fontWeight: 750, letterSpacing: '-0.05em' });
+      const a = t0 + 0.1 + i * per;
+      tl.fromTo(d, { opacity: 0, scale: 1.6, filter: blur(20) }, { opacity: 1, scale: 1, filter: blur(0), duration: per * 0.6, ease: 'expo.out' }, a);
+      tl.to(d, { opacity: 0, scale: 0.7, filter: blur(12), duration: per * 0.35, ease: 'power2.in' }, a + per * 0.65);
+      sfx(a, 'tick', 0.6);
+    });
+    const ra = t0 + 0.1 + per * 3;
+    tl.to(ringSvg, { scale: 2.4, opacity: 0, duration: 0.6, ease: 'power3.in' }, ra - 0.1);
+    const word = el('div', '', s, esc(o.reveal || 'Now open'), { position: 'absolute', fontSize: px(150), fontWeight: 750, letterSpacing: '-0.05em', color: accOf(bg), whiteSpace: 'nowrap' });
+    fitFont(word, maxTextW());
+    tl.fromTo(word, { opacity: 0, scale: 0.6, filter: blur(20) }, { opacity: 1, scale: 1, filter: blur(0), duration: 0.8, ease: 'back.out(1.6)' }, ra);
+    sfx(ra, 'impact', 0.7);
+    if (o.sub) { const sub = el('div', '', s, esc(o.sub), { position: 'absolute', top: '58%', fontSize: px(46), fontWeight: 600, color: muteOf(bg), whiteSpace: 'nowrap' }); fitFont(sub, maxTextW()); tl.fromTo(sub, { opacity: 0, y: N(30) }, { opacity: 1, y: 0, duration: 0.7 }, ra + 0.35); }
+  };
+
+  // CALENDAR: an event card: the date tile flips in, then time and place
+  B.calendar = (s, o, t0, t1, bg) => {
+    const w = Math.min(W * 0.84, N(860));
+    const card = el('div', 'card', s, '', { width: w + 'px', display: 'flex', gap: px(44), alignItems: 'center', padding: px(50), perspective: N(1200) + 'px' });
+    if (bg !== 'light') Object.assign(card.style, { background: '#1C1C21', boxShadow: '0 0 0 1px rgba(255,255,255,.08)' });
+    const tile = el('div', '', card, '', { width: px(220), flex: '0 0 auto', borderRadius: px(40), overflow: 'hidden', background: '#fff', boxShadow: shadow(0.8), textAlign: 'center' });
+    el('div', '', tile, esc(String(o.month || '').toUpperCase().slice(0, 3)), { background: '#FF3B30', color: '#fff', fontSize: px(40), fontWeight: 700, padding: `${N(12)}px 0`, letterSpacing: '0.06em' });
+    el('div', 'tnum', tile, esc(o.day || ''), { fontSize: px(120), fontWeight: 700, letterSpacing: '-0.04em', color: '#111', padding: `${N(10)}px 0 ${N(18)}px` });
+    const tx = el('div', '', card, '', { minWidth: 0 });
+    el('div', '', tx, esc(o.title || ''), { fontSize: px(52), fontWeight: 750, letterSpacing: '-0.03em', color: bg === 'light' ? '#111' : '#fff', lineHeight: 1.1 });
+    const rowsI = [[o.time, 'clock'], [o.place, 'pin']].filter((x) => x[0]);
+    const rs = rowsI.map(([t, gk]) => { const r = el('div', 'row', tx, '', { justifyContent: 'flex-start', gap: px(14), marginTop: px(16), fontSize: px(34), color: '#8A8A93', fontWeight: 500 }); el('div', '', r, glyph(gk, 36, '#8A8A93', 2.2), { display: 'grid' }); el('div', '', r, esc(t), { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }); return r; });
+    tl.fromTo(card, { opacity: 0, y: N(120), scale: 0.92, filter: blur(16) }, { opacity: 1, y: 0, scale: 1, filter: blur(0), duration: 0.9, ease: 'back.out(1.25)' }, t0 + 0.1);
+    tl.fromTo(tile, { rotationY: -100, opacity: 0 }, { rotationY: 0, opacity: 1, duration: 0.9, ease: 'back.out(1.4)' }, t0 + 0.45);
+    sfx(t0 + 0.5, 'pop', 0.6);
+    rs.forEach((r, i) => tl.fromTo(r, { opacity: 0, x: N(30) }, { opacity: 1, x: 0, duration: 0.6 }, t0 + 0.9 + i * 0.18));
+    if (o.lead) { const l = wordsRow(s, o.lead, 80, { weight: 700, accent: new Set([].concat(o.accent || [])), accColor: accOf(bg) }); l.row.style.order = '-1'; l.row.style.marginBottom = px(70); buildRow(l.row, l.items, t0 + 0.05, 0.14); }
+  };
+
+  // CHAT: a WhatsApp-style chat; the customer asks, the business answers (typing dots first)
+  B.chat = (s, o, t0, t1, bg) => {
+    const msgs = [].concat(o.messages || []).filter((m) => m && m.text).slice(0, 4);
+    const w = Math.min(W * 0.88, N(920));
+    const phone = el('div', '', s, '', { width: w + 'px', borderRadius: px(56), overflow: 'hidden', background: '#EFE7DE', boxShadow: shadow(1.3) });
+    const head = el('div', 'row', phone, '', { justifyContent: 'flex-start', gap: px(22), padding: `${N(30)}px ${N(34)}px`, background: '#075E54', color: '#fff' });
+    brandIcon(head, 84);
+    const ht = el('div', '', head);
+    el('div', '', ht, esc(D.brand), { fontSize: px(38), fontWeight: 650, letterSpacing: '-0.02em' });
+    el('div', '', ht, 'online', { fontSize: px(27), opacity: 0.8 });
+    const body = el('div', 'col', phone, '', { alignItems: 'stretch', gap: px(18), padding: `${N(34)}px ${N(30)}px ${N(44)}px`, minHeight: px(560) });
+    tl.fromTo(phone, { opacity: 0, y: N(160), scale: 0.92, filter: blur(16) }, { opacity: 1, y: 0, scale: 1, filter: blur(0), duration: 0.9, ease: 'back.out(1.2)' }, t0 + 0.05);
+    const step = clamp((t1 - t0 - 1.4) / Math.max(1, msgs.length), 0.7, 1.3);
+    msgs.forEach((m, i) => {
+      const me = m.from === 'biz';
+      const b = el('div', '', body, esc(m.text), { alignSelf: me ? 'flex-start' : 'flex-end', maxWidth: '80%', padding: `${N(22)}px ${N(28)}px`, borderRadius: px(30), [me ? 'borderTopLeftRadius' : 'borderTopRightRadius']: px(8), background: me ? '#FFFFFF' : '#D9FDD3', color: '#111', fontSize: px(36), lineHeight: 1.3, boxShadow: `0 ${N(2)}px ${N(3)}px rgba(0,0,0,.12)`, transformOrigin: me ? '0% 100%' : '100% 100%' });
+      const a = t0 + 0.7 + i * step;
+      if (me) {   // typing dots first
+        const dots = el('div', 'row', null, '', { alignSelf: 'flex-start', gap: px(10), padding: `${N(26)}px ${N(30)}px`, borderRadius: px(30), background: '#fff', display: 'none' });
+        body.insertBefore(dots, b);
+        const ds = [0, 1, 2].map(() => el('div', '', dots, '', { width: px(16), height: px(16), borderRadius: '50%', background: '#9AA0A6' }));
+        tl.set(b, { display: 'none' }, 0);
+        tl.set(dots, { display: 'flex' }, a - 0.6);
+        tl.fromTo(dots, { opacity: 0, scale: 0.6 }, { opacity: 1, scale: 1, duration: 0.25, immediateRender: false }, a - 0.6);
+        ds.forEach((d, k) => tl.fromTo(d, { y: 0 }, { y: -N(10), duration: 0.18, yoyo: true, repeat: 1, ease: 'sine.inOut', immediateRender: false }, a - 0.5 + k * 0.1));
+        tl.set(dots, { display: 'none' }, a);
+        tl.set(b, { display: 'block' }, a);
+      }
+      tl.fromTo(b, { opacity: 0, scale: 0.5, y: N(30) }, { opacity: 1, scale: 1, y: 0, duration: 0.55, ease: 'back.out(1.8)' }, a);
+      sfx(a, me ? 'pop' : 'tick', 0.5);
+    });
+  };
+
+  // ================================================================ ambience: depth behind each beat
+  function ambience(wrap, bg, t0, t1, i) {
+    const amb = el('div', 'layer', wrap, '', { pointerEvents: 'none', overflow: 'hidden' });
+    const dur = Math.max(0.6, t1 - t0 + 0.4);
+    if (bg === 'brand') {
+      // glossy 3D orbs drifting in depth (the brand colour, lit from the top left)
+      const spots = PORTRAIT ? [[0.12, 0.16, 300, 0], [0.9, 0.3, 200, 6], [0.82, 0.86, 380, 0], [0.18, 0.78, 150, 8]] : [[0.1, 0.25, 260, 0], [0.92, 0.2, 180, 6], [0.86, 0.85, 320, 0], [0.2, 0.86, 140, 8]];
+      spots.forEach(([x, y, size, b], k) => {
+        const sz = N(size);
+        const o = el('div', '', amb, '', { position: 'absolute', left: x * W - sz / 2 + 'px', top: y * H - sz / 2 + 'px', width: sz + 'px', height: sz + 'px', borderRadius: '50%', background: `radial-gradient(circle at 32% 28%, rgba(255,255,255,.75) 0%, ${mix(ACC, '#FFFFFF', 0.35)} 16%, ${ACC} 48%, ${mix(ACC, '#000000', 0.45)} 100%)`, boxShadow: `0 ${N(40)}px ${N(80)}px ${rgba(mix(ACC, '#000', 0.6), 0.35)}`, filter: b ? blur(b) : 'none', opacity: b ? 0.7 : 0.95 });
+        const dir = k % 2 ? -1 : 1;
+        tl.fromTo(o, { y: N(80) * dir, x: N(30) * dir, scale: 0.6, rotation: 0 }, { y: -N(90) * dir, x: -N(30) * dir, scale: 1, rotation: 40 * dir, duration: dur, ease: 'sine.out', immediateRender: false }, t0 - 0.2);
+      });
+    } else if (bg === 'dark') {
+      // a soft light from above and a faint haze of the brand colour below
+      const cone = el('div', '', amb, '', { position: 'absolute', left: '50%', top: '-20%', width: W * 1.4 + 'px', height: H * 0.9 + 'px', marginLeft: -W * 0.7 + 'px', background: 'radial-gradient(ellipse 50% 60% at 50% 0%, rgba(255,255,255,.10), transparent 70%)' });
+      const haze = el('div', '', amb, '', { position: 'absolute', left: '50%', bottom: '-30%', width: W * 1.2 + 'px', height: H * 0.6 + 'px', marginLeft: -W * 0.6 + 'px', background: `radial-gradient(ellipse 50% 50% at 50% 50%, ${rgba(ACC, 0.16)}, transparent 70%)` });
+      tl.fromTo(cone, { x: -N(60) }, { x: N(60), duration: dur, ease: 'sine.inOut', immediateRender: false }, t0 - 0.2);
+      tl.fromTo(haze, { opacity: 0.6, scale: 0.9 }, { opacity: 1, scale: 1.1, duration: dur, ease: 'sine.inOut', immediateRender: false }, t0 - 0.2);
+    } else {
+      // light: a slow sweep of light across the floor
+      const sweep = el('div', '', amb, '', { position: 'absolute', left: 0, top: 0, width: '60%', height: '100%', background: 'linear-gradient(100deg, transparent 0%, rgba(255,255,255,.55) 50%, transparent 100%)', opacity: 0.6 });
+      tl.fromTo(sweep, { xPercent: -120 }, { xPercent: 220, duration: dur * 1.2, ease: 'none', immediateRender: false }, t0 - 0.2);
+      if (i % 3 === 1) { const tint = el('div', '', amb, '', { position: 'absolute', right: '-20%', top: '-15%', width: W * 0.9 + 'px', height: W * 0.9 + 'px', borderRadius: '50%', background: `radial-gradient(circle, ${rgba(ACC, 0.09)}, transparent 65%)` }); tl.fromTo(tint, { x: 0, y: 0 }, { x: -N(80), y: N(60), duration: dur, ease: 'sine.inOut', immediateRender: false }, t0 - 0.2); }
+    }
+  }
+
+  // ================================================================ timeline
+  function build() {
+    const beats = (D.beats || []).filter((b) => B[b.type]);
+    let t = 0; let prevOut = null; let prevBg = null;
+    const total = beats.reduce((a, b) => a + b.dur, 0);
+    beats.forEach((b, i) => {
+      const t0 = t, t1 = t + b.dur, last = i === beats.length - 1;
+      const bg = ['light', 'dark', 'brand'].includes(b.bg) ? b.bg : 'light';
+      // backgrounds crossfade
+      if (prevBg !== bg) {
+        Object.entries(BGS).forEach(([k, L]) => {
+          if (prevBg === null) gsap.set(L, { opacity: k === bg ? 1 : 0 });
+          else if (k === bg || k === prevBg) tl.fromTo(L, { opacity: k === prevBg ? 1 : 0 }, { opacity: k === bg ? 1 : 0, duration: 0.28, ease: 'power2.inOut', immediateRender: false }, Math.max(0, t0 - 0.2));
+        });
+        prevBg = bg;
+      }
+      const wrap = el('div', 'beat ink-' + bg, world);
+      wrap.style.color = inkOf(bg);
+      ambience(wrap, bg, t0, t1, i);
+      const camEl = el('div', 'beat', wrap); camEl.style.visibility = 'inherit';
+      tl.set(wrap, { visibility: 'visible' }, Math.max(0, t0 - 0.12));
+      // incoming move matches the previous beat's exit
+      if (prevOut === 'whip') tl.fromTo(wrap, { x: W * 0.55, filter: blur(26) }, { x: 0, filter: blur(0), duration: 0.55, ease: 'expo.out', immediateRender: false }, t0 - 0.1);
+      else if (prevOut === 'zoom') tl.fromTo(wrap, { scale: 0.72, opacity: 0, filter: blur(16) }, { scale: 1, opacity: 1, filter: blur(0), duration: 0.6, ease: 'expo.out', immediateRender: false }, t0 - 0.12);
+      else if (prevOut === 'drop') tl.fromTo(wrap, { y: -H * 0.35, filter: blur(22) }, { y: 0, filter: blur(0), duration: 0.6, ease: 'expo.out', immediateRender: false }, t0 - 0.1);
+      else if (prevOut === 'rise') tl.fromTo(wrap, { y: H * 0.35, filter: blur(22) }, { y: 0, filter: blur(0), duration: 0.6, ease: 'expo.out', immediateRender: false }, t0 - 0.1);
+      // the camera breathes
+      tl.fromTo(camEl, { scale: 1 }, { scale: 1 + (b.push == null ? 0.035 : b.push), duration: b.dur, ease: 'sine.inOut', immediateRender: false }, t0);
+      try { B[b.type](camEl, b, t0, t1, bg); } catch (e) { console.error('beat ' + b.type + ' failed: ' + e.message); }
+      // the exit
+      const out = last ? 'hold' : (b.out || 'push');
+      const ot = t1 - 0.3;
+      if (out === 'push') tl.to(wrap, { scale: 1.14, opacity: 0, filter: blur(18), duration: 0.32, ease: 'power2.in' }, ot);
+      else if (out === 'whip') { tl.to(wrap, { x: -W * 0.6, filter: blur(26), duration: 0.32, ease: 'power3.in' }, ot); sfx(ot, 'whoosh', 0.5); }
+      else if (out === 'zoom') { tl.to(wrap, { scale: 2.8, opacity: 0, filter: blur(14), duration: 0.38, ease: 'power3.in' }, ot - 0.06); sfx(ot - 0.06, 'whoosh', 0.45); }
+      else if (out === 'drop') { tl.to(wrap, { y: H * 0.5, filter: blur(24), duration: 0.32, ease: 'power3.in' }, ot); sfx(ot, 'whoosh', 0.4); }
+      else if (out === 'rise') { tl.to(wrap, { y: -H * 0.5, filter: blur(24), duration: 0.32, ease: 'power3.in' }, ot); sfx(ot, 'whoosh', 0.4); }
+      else if (out === 'fade') tl.to(wrap, { opacity: 0, duration: 0.3, ease: 'power1.in' }, ot);
+      if (!last) tl.set(wrap, { visibility: 'hidden' }, t1 + 0.02);
+      prevOut = last ? null : out;
+      t = t1;
+    });
+    tl.set({}, {}, total);
+    window.__sfx = D.sound === 'none' ? [] : SFX.filter((x) => x.t < total - 0.05).sort((a, b) => a.t - b.t).filter((x, i, arr) => !arr.slice(Math.max(0, i - 3), i).some((y) => y.k === x.k && x.t - y.t < 0.06));
+    window.__timeline = tl;
+    window.__MOTION = { tl, total };
+  }
+  Promise.race([document.fonts.ready, new Promise((r) => setTimeout(r, 2500))]).then(() => {
+    const imgs = Array.from(document.images);
+    return Promise.race([Promise.all(imgs.map((im) => im.decode ? im.decode().catch(() => {}) : null)), new Promise((r) => setTimeout(r, 3000))]);
+  }).then(build);
+})();
