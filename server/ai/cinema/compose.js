@@ -22,9 +22,9 @@ export function paletteFor(colors = {}) {
   const dark = lum(bg) < 0.32;
   const a1d = mix(a1, '#000000', 0.22);
   if (dark) {
-    const b1 = mix(bg, '#000000', 0.45), b2 = mix(bg, a1, 0.2);
-    return { dark: true, bg1: b1, bg2: b2, ink: '#F6F7FF', mute: mix('#F6F7FF', bg, 0.45), a1, a2, a1d, card: rgba(mix(bg, '#FFFFFF', 0.12), 0.68), notif: rgba(mix(bg, '#FFFFFF', 0.16), 0.86), cardLine: 'rgba(255,255,255,.16)', hi: 'rgba(255,255,255,.16)', shadow: 'rgba(0,0,0,.7)', shadow2: 'rgba(0,0,0,.5)', bokeh: rgba(a1, 0.38), vig: 'rgba(0,0,10,.6)', grain: 0.09, sweep: rgba(mix(a1, '#FFFFFF', 0.5), 0.55),
-      lamps: [{ x: 0.18, y: 0.14, size: 1600, c: rgba(a1, 0.5), dx: 160 }, { x: 0.88, y: 0.82, size: 1500, c: rgba(a2, 0.3), dx: 140 }] };
+    const b1 = mix(bg, '#000000', 0.78), b2 = mix(bg, a1, 0.08);
+    return { dark: true, bg1: b1, bg2: b2, ink: '#F6F7FF', mute: mix('#F6F7FF', bg, 0.45), a1, a2, a1d, card: rgba(mix(bg, '#FFFFFF', 0.12), 0.68), notif: rgba(mix(bg, '#FFFFFF', 0.16), 0.86), cardLine: 'rgba(255,255,255,.16)', hi: 'rgba(255,255,255,.16)', shadow: 'rgba(0,0,0,.7)', shadow2: 'rgba(0,0,0,.5)', bokeh: rgba(mix(a1, '#FFFFFF', 0.35), 0.22), bokehN: 6, vig: 'rgba(0,0,10,.6)', grain: 0.09, sweep: rgba(mix(a1, '#FFFFFF', 0.5), 0.55),
+      lamps: [{ x: 0.2, y: 0.08, size: 1500, c: rgba(a1, 0.17), dx: 160 }, { x: 0.9, y: 0.9, size: 1300, c: rgba(a2, 0.08), dx: 140 }] };
   }
   const b1 = mix(bg, '#FFFFFF', 0.55), b2 = mix(bg, a1, 0.22);
   const ink = OK.test(colors.text) && lum(colors.text) < 0.3 ? colors.text : '#1B1620';
@@ -164,21 +164,22 @@ export function composeCinema(plan, { brief = {}, assets = [], salt = '', palett
 
   // ---- archetypes: ordered wish-lists; what the facts can't support is skipped ----
   const ARCH = {
-    punch: [kinetic, photos, reel, carousel, coupon, burst, checklist, steps],
-    story: [hook, delivery, chat, menu, checklist, deck],
-    showcase: [ticker, orbit, deck, stats, photos, split, grid],
+    punch: [kinetic, photos, reel, carousel, coupon, burst, checklist],
+    story: [hook, delivery, menu, checklist, deck],
+    showcase: [ticker, deck, stats, photos, grid],
     liquid: [goo, highlight, photos, carousel, grid, burst, stats],
-    editorial: [poster, highlight, checklist, menu, location, photos, chat],
-    proof: [hook, stats, deck, chat, checklist, orbit],
-    local: [kinetic, reel, menu, location, chat, checklist, photos],
+    editorial: [poster, highlight, checklist, menu, location, photos],
+    proof: [hook, stats, deck, checklist],
+    local: [kinetic, reel, menu, location, checklist, photos],
   };
+
   const affinity = { punch: 1, story: food ? 3 : 0.5, showcase: 1.2, liquid: beauty ? 2.5 : 0.8, editorial: beauty || local ? 2.2 : 1, proof: money || tech ? 3 : 0.6, local: local ? 2.5 : 0.7 };
   const score = (k) => ARCH[k].reduce((a, fn) => a + (fn() ? 1 : 0), 0) * affinity[k] * (0.7 + rnd() * 0.6);
   const arche = Object.keys(ARCH).map((k) => [k, score(k)]).sort((a, b) => b[1] - a[1])[0][0];
   const wish = [];
   const add = (x) => [].concat(x || []).filter(Boolean).forEach((sc) => wish.push(sc));
   ARCH[arche].forEach((fn) => add(fn()));
-  [orbit, split, steps, chat, goo, ticker].forEach((fn) => add(fn()));   // fillers when the facts are thin
+  [ticker, highlight].forEach((fn) => add(fn()));   // fillers use only the owner's own words; invented scenes (chat, steps, before/after) appear only when the owner picks them
   // scenes the owner asked for in the form: right after the opener, and always before the fillers
   const wanted = [];
   for (const id of [].concat(brief?.scenes || [])) for (const t of WANT_TYPES[id] || []) { const sc = BUILD[t]?.(); if (sc) { [].concat(sc).forEach((x) => wanted.push(x)); break; } }

@@ -6,7 +6,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { api, ASPECTS, duration, shrinkImage } from '../lib.jsx';
 import { Alert, Button, Modal, PageLoader, Spinner } from '../components/ui.jsx';
 import MicButton from '../components/MicButton.jsx';
-import { FullView, LivePreview } from '../components/Preview.jsx';
+import { FullView, LivePreview, goFull } from '../components/Preview.jsx';
 import VoicePanel from '../components/VoicePanel.jsx';
 import DownloadVideo from '../components/DownloadVideo.jsx';
 import FlyerDownload from '../components/FlyerDownload.jsx';
@@ -345,10 +345,10 @@ export default function Studio() {
   }, [project?.code, project?.thumbnailUrl, generating]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (project?.kind !== 'flyer' || !project.code || generating) return undefined;
+    if (project?.kind !== 'flyer' || !project.code || generating || full) return undefined;   // never pops up over full screen
     const t = setTimeout(() => ask(project.code), 4000);
     return () => clearTimeout(t);
-  }, [project?.code, generating]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [project?.code, generating, full]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const undo = async () => { try { setProject((await api(`/projects/${id}/undo`, { method: 'POST' })).project); } catch (e) { setError(e.message); } };
 
@@ -387,12 +387,12 @@ export default function Studio() {
         <div className="mt-5 grid gap-6 lg:grid-cols-[minmax(0,1fr)_420px]">
           <section aria-label="Preview" className="stage flex flex-col justify-center px-4 py-8 sm:px-8">
             <LivePreview html={project.code} aspect={project.aspectRatio} maxWidth={project.aspectRatio === '16:9' ? 320 : flyer ? 340 : 290} still={flyer}
-              onEnded={() => ask(project.code)}
+              onEnded={flyer ? undefined : () => { if (!full) ask(project.code); }}
               sound={project.sfx !== false}
               onSoundChange={async (on) => { setProject((p) => ({ ...p, sfx: on })); try { const r = await api(`/projects/${id}`, { method: 'PATCH', body: { sfx: on } }); setProject((p) => ({ ...p, code: r.project.code, sfx: r.project.sfx })); } catch { /* keep the local choice */ } }} />
             {!flyer && <p className="mt-3 text-center text-xs text-white/55">{project.sfx !== false ? 'Sound is on. Tap play to hear it; the same sound effects go into your MP4.' : 'Sound is off for this video.'}</p>}
             <div className="mt-6 flex flex-wrap justify-center gap-2">
-              <Button variant="glass" size="sm" onClick={() => setFull(true)}>Full screen</Button>
+              <Button variant="glass" size="sm" onClick={() => { goFull(project.aspectRatio); setFull(true); }}>Full screen</Button>
               <Button variant="glass" size="sm" onClick={undo} disabled={!project.versions}>Undo</Button>
               <Button variant="glass" size="sm" onClick={() => { if (confirm(flyer ? 'Design the flyer again? You get a new layout and words (you can undo).' : 'Write the animation again from the plan? Your edits will be replaced (you can undo).')) generate(); }}>Regenerate</Button>
               {!flyer && <Button variant="glass" size="sm" onClick={makeFlyer}>Make a flyer from this</Button>}

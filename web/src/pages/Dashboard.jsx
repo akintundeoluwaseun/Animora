@@ -4,7 +4,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { api, ago, duration, naira, otherDeviceLink, useAuth, usePolling } from '../lib.jsx';
 import { Alert, Button, Empty, Modal, PageLoader, PlanBadge, Spinner } from '../components/ui.jsx';
 import BuyCredits, { creditsLeft } from '../components/BuyCredits.jsx';
-import { FullView } from '../components/Preview.jsx';
+import { FullView, goFull } from '../components/Preview.jsx';
 import { downloadVideo } from '../lib/videoFile.js';
 import { newPath } from '../components/Shell.jsx';
 
@@ -237,7 +237,13 @@ export default function Dashboard({ kind = 'video' }) {   // /videos shows video
   const startNew = () => navigate(newPath(kind));
 
   const [full, setFull] = useState(null);   // { html, aspect } of the flyer shown full screen
-  const openFull = async (p) => { try { const { project } = await api(`/projects/${p.id}`); if (project.code) setFull({ html: project.code, aspect: project.aspectRatio }); } catch (e) { setError(e.message); } };
+  // full screen starts inside the tap (browsers only allow it there); the flyer loads into it a moment later
+  const openFull = async (p) => {
+    const aspect = p.aspect_ratio || '4:5';
+    goFull(aspect); setFull({ html: null, aspect });
+    try { const { project } = await api(`/projects/${p.id}`); if (project.code) setFull({ html: project.code, aspect: project.aspectRatio || aspect }); else setFull(null); }
+    catch (e) { setFull(null); setError(e.message); }
+  };
   const load = async () => { try { setProjects((await api('/projects')).projects.filter((p) => (p.kind || 'video') === kind)); } catch (e) { setError(e.message); } };
   useEffect(() => { load(); refresh(); api('/pricing').then((r) => setPricing(r.pricing)).catch(() => {}); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   // videos made online have no thumbnail yet: make them here, one at a time, in the background

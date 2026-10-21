@@ -55,18 +55,6 @@ export default function Pricing() {
         </section>
       </div>
 
-      <section className="surface mt-14 grid gap-8 p-7 md:grid-cols-2">
-        <div>
-          <h2 className="text-2xl font-extrabold">For motion designers</h2>
-          <p className="mt-3 text-ink-soft">Upload your animation styles. Each time a business makes a video with your style, you earn {p.creatorSharePercent}% of what that video brings in. Withdraw to any Nigerian bank.</p>
-          <Button as={Link} to="/signup?role=creator" variant="dark" className="mt-5">Become a creator</Button>
-        </div>
-        <dl className="space-y-3 self-center text-[15px]">
-          <div className="flex justify-between gap-4 rounded-2xl bg-white px-4 py-3"><dt>Video made on Free (ad view)</dt><dd className="font-bold text-money">{nairaExact(p.adRevenuePerViewNgn * p.creatorSharePercent / 100)} to you</dd></div>
-          <div className="flex justify-between gap-4 rounded-2xl bg-white px-4 py-3"><dt>Video made on Pro</dt><dd className="font-bold text-money">{nairaExact(Math.round(p.proRevenuePerVideoNgn * p.creatorSharePercent) / 100)} to you</dd></div>
-          <div className="flex justify-between gap-4 rounded-2xl bg-white px-4 py-3"><dt>Your style used 1,000× a month</dt><dd className="font-bold text-money">≈ {naira(Math.round(p.adRevenuePerViewNgn * p.creatorSharePercent / 100 * 1000))}</dd></div>
-        </dl>
-      </section>
     </div>
   );
 }

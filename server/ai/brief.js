@@ -9,6 +9,7 @@ import { geminiGenerate } from '../engine/gemini.js';
 import { validatePlan } from '../engine/validate.js';
 import { WANT_IDS } from './cinema/compose.js';
 import { MOTION_WANTS } from './motion/compose.js';
+import { TEMPLATE_IDS } from './pieces/index.js';
 
 const PHONE_RE = /(\+?234[\s-]?|0)[789][01]\d[\s-]?\d{3}[\s-]?\d{4}/;
 const URL_RE = /\b((?:https?:\/\/)?(?:www\.)?[a-z0-9-]+\.(?:com|ng|com\.ng|space|app|io|co|org|net|store|shop)(?:\/\S*)?)\b/i;
@@ -37,6 +38,11 @@ export function cleanBrief(b = {}) {
     flyerType: (Array.isArray(b.flyerType) ? list(b.flyerType) : b.flyerType ? [str(b.flyerType, 60)] : []).map((x) => str(x, 60)).filter(Boolean).slice(0, 3), offer: str(b.offer, 60), when: str(b.when, 120), layout: ['photo', 'type', 'price', 'auto'].includes(b.layout) ? b.layout : undefined,
     extra: str(b.extra, 3000), done: !!b.done, mode: ['steps', 'paste'].includes(b.mode) ? b.mode : undefined, pasted: b.pasted ? true : undefined, pasteText: str(b.pasteText, 6000),
     colorMode: ['style', 'logo', 'own'].includes(b.colorMode) ? b.colorMode : undefined, picturesDone: b.picturesDone ? true : undefined,
+    // signature templates (After Effects-style recipes); 'auto' or empty means the library mixes its own film
+    template: b.template === 'auto' || TEMPLATE_IDS.includes(b.template) ? b.template : undefined,
+    intensity: ['auto', 'elegant', 'aggressive', 'mechanical', 'fluid'].includes(b.intensity) ? b.intensity : undefined,
+    soundStyle: ['beat', 'cinematic', 'ambient', 'none'].includes(b.soundStyle) ? b.soundStyle : undefined,
+    quality: ['preview', 'premium', 'max'].includes(b.quality) ? b.quality : undefined,
   };
   // optional questions the user skipped (so they are not asked again)
   for (const k of ['features', 'products', 'contact', 'pictures', 'extra', 'scenes']) if (b[`${k}Skipped`] !== undefined) out[`${k}Skipped`] = !!b[`${k}Skipped`];

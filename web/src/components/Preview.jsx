@@ -3,6 +3,7 @@
 // script seeks the paused GSAP timeline every frame, exactly like the render engine does,
 // so what you scrub here is what ends up in the MP4.
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { ASPECTS, clock } from '../lib.jsx';
 
 const BRIDGE = `<script>(function(){
@@ -133,7 +134,7 @@ export function LivePreview({ html, aspect = '9:16', autoPlay = true, maxWidth =
           } else if (!mu.paused) mu.pause();
         }
         lastT.current = m.t;
-        if (wasPlaying.current && !m.playing && m.d > 0 && m.t >= m.d - 0.05) onEndedRef.current?.();   // played to the end
+        if (!still && wasPlaying.current && !m.playing && m.d > 1 && m.t >= m.d - 0.05) onEndedRef.current?.();   // played to the end
         wasPlaying.current = m.playing;
         setT(m.t); setD(m.d); setPlaying(m.playing);
       }
@@ -202,6 +203,21 @@ export function VideoPhone({ src, aspect = '9:16', maxWidth = 320, poster, autoP
 // Full screen: the flyer (or video) as big as the screen allows, sharp, with every detail readable.
 // It asks the browser for real full screen (phones hide their bars; wide videos turn the phone sideways where allowed),
 // and falls back to a full-window overlay where the browser says no (iPhone Safari).
+const fsEl = () => document.fullscreenElement || document.webkitFullscreenElement || null;
+/** Call this straight inside the click (Safari only allows full screen there), then show <FullView>. */
+export function goFull(aspect = '9:16') {
+  if (fsEl()) return;
+  const el = document.documentElement;
+  const req = el.requestFullscreen || el.webkitRequestFullscreen;
+  if (!req) return;   // iPhone: FullView still covers the whole window
+  const a = ASPECTS[aspect] || ASPECTS['9:16'];
+  try {
+    const p = req.call(el, { navigationUI: 'hide' });
+    const after = () => { if (a.w > a.h) screen.orientation?.lock?.('landscape').catch(() => {}); };
+    if (p && p.then) p.then(after).catch(() => {}); else after();
+  } catch { /* not allowed here */ }
+}
+
 export function FullView({ html, aspect = '9:16', still = false, onClose }) {
   const rootRef = useRef(null);
   const closeRef = useRef(onClose);
@@ -215,11 +231,11 @@ export function FullView({ html, aspect = '9:16', still = false, onClose }) {
     window.addEventListener('resize', fit); window.visualViewport?.addEventListener('resize', fit); window.addEventListener('keydown', key);
     const prev = document.body.style.overflow; document.body.style.overflow = 'hidden';
     // real full screen (still allowed: the click that opened this is a fresh user gesture)
-    const el = rootRef.current;
-    let entered = false;
-    const onFs = () => { if (entered && !document.fullscreenElement && !document.webkitFullscreenElement) closeRef.current?.(); fit(); };
+    const el = document.documentElement;
+    let entered = !!fsEl();
+    const onFs = () => { if (fsEl()) entered = true; else if (entered) closeRef.current?.(); fit(); };
     document.addEventListener('fullscreenchange', onFs); document.addEventListener('webkitfullscreenchange', onFs);
-    const req = el?.requestFullscreen || el?.webkitRequestFullscreen;
+    const req = !entered && (el.requestFullscreen || el.webkitRequestFullscreen);
     if (req) {
       try {
         const p = req.call(el, { navigationUI: 'hide' });
@@ -238,14 +254,17 @@ export function FullView({ html, aspect = '9:16', still = false, onClose }) {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const chrome = still ? 24 : 96;   // room for the play bar under a video
   const width = Math.max(120, Math.floor(Math.min(box.w - 16, (box.h - chrome - 16) * (a.w / a.h))));
-  return (
+  return createPortal(
     <div ref={rootRef} className="fullview fixed inset-0 z-[80] flex flex-col items-center justify-center bg-black p-2" role="dialog" aria-modal="true" aria-label="Full screen" onClick={() => closeRef.current?.()}>
       <button type="button" onClick={(e) => { e.stopPropagation(); closeRef.current?.(); }} className="absolute right-3 top-[max(12px,env(safe-area-inset-top))] z-10 grid size-11 place-items-center rounded-full bg-white/15 text-white backdrop-blur hover:bg-white/25" aria-label="Close full screen">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M6 6l12 12M18 6 6 18" /></svg>
       </button>
       <div onClick={(e) => e.stopPropagation()} style={{ width, maxWidth: '100%' }}>
-        <LivePreview html={html} aspect={aspect} maxWidth={width} exact still={still} autoPlay={!still} />
+        {html
+          ? <LivePreview html={html} aspect={aspect} maxWidth={width} exact still={still} autoPlay={!still} />
+          : <div className="grid place-items-center text-sm text-white/70" style={{ aspectRatio: `${a.w} / ${a.h}` }}>Loading…</div>}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

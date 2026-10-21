@@ -14,6 +14,7 @@ import { isFlyer, editFlyer } from './flyer.js';
 import { THEMES } from './themes.js';
 import { directCinema, cinemaEdit, isCinema, readCinema, CINEMA_ASPECTS } from './cinema/index.js';
 import { directMotion, motionEdit, motionOfflineEdit, isMotion, readMotion, MOTION_ASPECTS } from './motion/index.js';
+import { piecesFilm, piecesEdit, isPieces, PIECES_ASPECTS, isTemplateBrief } from './pieces/index.js';
 
 // 'director' (default): Gemini directs the shots, our motion engine animates them (fast, always renders).
 // 'html': Gemini writes the whole HTML/GSAP file itself (slower, experimental).
@@ -128,6 +129,16 @@ export async function generateCode({ plan, style, assets, brief = null, previous
   let planWithAssets = enrichPlan(plan, assets);
   // Every video size is made by the Motion engine (Apple-style product films): the AI directs, or the rule-based composer without a key
   const motion = CODE_MODE !== 'html' && process.env.ANIMORA_ENGINE !== 'cinema' && MOTION_ASPECTS.includes(planWithAssets.aspect_ratio || '9:16');
+  // Vertical videos are spelled from the premium motion library: a different mix of pieces for every business and every Regenerate.
+  // ANIMORA_ENGINE=motion (or cinema) switches back to the older engines.
+  const pieces = CODE_MODE !== 'html' && !['motion', 'cinema'].includes(process.env.ANIMORA_ENGINE) && (PIECES_ASPECTS.includes(planWithAssets.aspect_ratio || '9:16') || (isTemplateBrief(brief) && ['16:9', '1:1', '4:5'].includes(planWithAssets.aspect_ratio)));
+  if (pieces) {
+    try {
+      onStatus?.('Building your film');
+      const r = piecesFilm({ plan: planWithAssets, brief: brief || {}, assets: planWithAssets.assets, style, themeColors: THEMES[themeKey]?.colors || {}, salt: previous ? String(Date.now()) : '' });
+      return { html: r.html, source: 'template', problems: [] };
+    } catch (e) { console.warn('[pieces] failed, using Motion:', e.message); }
+  }
   if (motion) {
     try {
       onStatus?.(config.useGemini ? 'Directing your film' : 'Building animation');
@@ -183,11 +194,16 @@ export async function generateCode({ plan, style, assets, brief = null, previous
 
 /** Plain-words edit. Returns { html, source, summary } */
 export async function editCode({ html, instruction, aspectRatio, duration, plan = null, assets = [], onStatus }) {
-  if (config.useGemini && !isMotion(html)) assets = await describeAssets(assets, loadImage);
+  if (config.useGemini && !isMotion(html) && !isPieces(html)) assets = await describeAssets(assets, loadImage);
   if (isFlyer(html)) {
     if (!config.useGemini) return { html, source: 'offline', unchanged: true, summary: 'Flyer changes need the AI, which is off right now.' };
     try { const r = await editFlyer({ html, instruction, assets }); return { html: r.html, source: 'gemini', summary: r.summary }; }
     catch (e) { console.warn('[ai] flyer edit failed:', e.message); return { html, source: 'offline', unchanged: true, summary: `I couldn't change the flyer (${aiReason(e)}). Try again.` }; }
+  }
+  if (isPieces(html)) {
+    try { const r = await piecesEdit({ html, instruction, useAi: !!config.useGemini }); if (r) return { html: r.html, source: config.useGemini ? 'gemini' : 'offline', summary: r.summary }; }
+    catch (e) { console.warn('[pieces] edit failed:', e.message); }
+    return { html, source: 'offline', unchanged: true, summary: config.useGemini ? "I couldn't make that change just now. Please try again in a moment." : 'Without the AI I can change the colour ("make it blue"), dark or light, the pace ("make it calmer") or give a fresh mix ("try a different one").' };
   }
   if (isMotion(html)) {
     if (config.useGemini) {

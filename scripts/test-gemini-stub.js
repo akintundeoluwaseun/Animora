@@ -62,7 +62,7 @@ ok('busy model falls back to the next model', b2.source === 'gemini' && /gemini/
 
 // 4. Gemini fully down -> rule-based arrangement, with a notice
 script = Array(12).fill(0).map(() => new Error('overloaded'));
-const f = await generateCode({ plan, style: { palette: { theme: 'luxe' } }, assets: [] });
+const f = await generateCode({ plan: { ...plan, aspect_ratio: '16:9' }, style: { palette: { theme: 'luxe' } }, assets: [] });
 ok('falls back to the motion engine rules', f.source === 'template' && f.html.includes('window.__timeline') && !!f.notice);
 
 // 5. Edit by prompt on a directed video: beats + colours change

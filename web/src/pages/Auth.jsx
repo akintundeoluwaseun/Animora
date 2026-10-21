@@ -43,7 +43,7 @@ export function Login() {
       <div className="mt-6 rounded-2xl bg-lilac p-4 text-sm">
         <p className="font-semibold">Demo accounts</p>
         <div className="mt-2 flex flex-wrap gap-2">
-          {[['demo', 'Business (Free)'], ['pro', 'Business (Pro)'], ['creator', 'Creator']].map(([w, l]) => (
+          {[['demo', 'Business (Free)'], ['pro', 'Business (Pro)']].map(([w, l]) => (
             <button key={w} type="button" onClick={() => demo(w)} className="rounded-full bg-white px-3 py-1.5 font-semibold hover:bg-lilac-deep">{l}</button>
           ))}
         </div>
@@ -54,12 +54,11 @@ export function Login() {
 
 export function Signup() {
   const { signup, user } = useAuth();
-  const [params] = useSearchParams();
-  const [role, setRole] = useState(params.get('role') === 'creator' ? 'creator' : 'user');
+  const role = 'user';
   const [f, setF] = useState({ name: '', businessName: '', email: '', password: '' });
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
-  if (user) return <Navigate to={user.role === 'creator' ? '/creator' : '/videos?new=1'} replace />;
+  if (user) return <Navigate to="/videos" replace />;
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
 
   const submit = async (e) => {
@@ -73,13 +72,6 @@ export function Signup() {
   return (
     <Shell title="Make your first video ad" sub="Free forever with a short ad before each video. No card needed."
       foot={<>Already have an account? <Link className="font-semibold text-ink underline" to="/login">Log in</Link></>}>
-      <div className="mb-6 grid grid-cols-2 gap-2 rounded-2xl bg-lilac p-1.5" role="radiogroup" aria-label="Account type">
-        {[['user', 'I run a business'], ['creator', "I'm a designer"]].map(([v, l]) => (
-          <button key={v} type="button" role="radio" aria-checked={role === v} onClick={() => setRole(v)}
-            className={`rounded-xl py-2.5 text-sm font-semibold ${role === v ? 'bg-white shadow-sm' : 'text-ink-soft'}`}>{l}</button>
-        ))}
-      </div>
-      {role === 'creator' && <p className="-mt-2 mb-5 text-sm text-ink-soft">Upload animation styles. Every video made with your style pays you 30% of what it earns.</p>}
       <form onSubmit={submit} className="space-y-4">
         <Alert>{error}</Alert>
         <Field label="Your name"><input className={inputCls} autoComplete="name" required value={f.name} onChange={set('name')} /></Field>

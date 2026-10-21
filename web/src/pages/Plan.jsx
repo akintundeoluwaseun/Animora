@@ -36,7 +36,23 @@ const SCENE_OPTIONS = [
 ];
 
 // The questions are grouped so people always know where they are
-const GROUP_OF = { mode: 'Start', paste: 'Start', flyerType: 'Your business', offer: 'Your message', when: 'Your message', layout: 'Look and feel', name: 'Your business', category: 'Your business', goal: 'Your business', headline: 'Your message', features: 'Your message', products: 'Your message', cta: 'Your message', contact: 'Your message', aspect: 'Format', duration: 'Format', pictures: 'Look and feel', colors: 'Look and feel', style: 'Look and feel', scenes: 'Look and feel', voiceover: 'Finish', sound: 'Finish', extra: 'Finish' };
+// signature templates (After Effects-style recipes, see server/ai/motion/browser/signature.js)
+const TEMPLATE_OPTS = [
+  { v: 'auto', l: 'Mix my own film', d: 'A new mix of scenes made for your business' },
+  { v: 'type-reactor', l: 'Kinetic Typography', d: 'Big words slam in to the beat' },
+  { v: 'luxury-product', l: 'Luxury Product', d: 'Rim light, slow orbit, gold type' },
+  { v: 'hud-tech', l: 'Futuristic HUD', d: 'Wireframes, data panels, glowing emblem' },
+  { v: 'liquid-chrome', l: 'Liquid Chrome', d: 'Melting metal shapes and chrome type' },
+  { v: 'sports-hype', l: 'Sports Hype', d: 'Fast cuts, impact frames, freeze frame' },
+  { v: 'swiss-editorial', l: 'Swiss Editorial', d: 'Clean grid, bold type, masked photos' },
+  { v: 'visualizer', l: 'Music Visualizer', d: 'Spectrum ring and bars on a steady beat' },
+  { v: 'cinematic-logo', l: 'Cinematic Logo', d: 'Light traces your logo, then a burst' },
+];
+const INTENSITY_OPTS = [
+  { v: 'auto', l: "The template's own feel" }, { v: 'elegant', l: 'Elegant', d: 'Smooth and calm' }, { v: 'aggressive', l: 'Aggressive', d: 'Fast, punchy cuts' },
+  { v: 'mechanical', l: 'Mechanical', d: 'Precise, techy moves' }, { v: 'fluid', l: 'Fluid', d: 'Flowing, liquid moves' },
+];
+const GROUP_OF = { template: 'Look and feel', intensity: 'Look and feel', mode: 'Start', paste: 'Start', flyerType: 'Your business', offer: 'Your message', when: 'Your message', layout: 'Look and feel', name: 'Your business', category: 'Your business', goal: 'Your business', headline: 'Your message', features: 'Your message', products: 'Your message', cta: 'Your message', contact: 'Your message', aspect: 'Format', duration: 'Format', pictures: 'Look and feel', colors: 'Look and feel', style: 'Look and feel', scenes: 'Look and feel', voiceover: 'Finish', sound: 'Finish', extra: 'Finish' };
 
 const MAX_PICS = 10;
 
@@ -88,7 +104,9 @@ const QUESTIONS = [
   { id: 'pictures', type: 'upload', optional: true, ask: () => `Add your logo and product photos if you have them (up to ${MAX_PICS}). Both are optional. You can also paste a picture with Ctrl+V.` },
   { id: 'colors', type: 'colors', ask: () => 'Which colours should the video use?' },
   { id: 'style', type: 'style', ask: () => 'Pick a look for your video, or let me choose one that fits.' },
-  { id: 'scenes', type: 'scenes', ask: () => 'Which kinds of scenes would you like in your video?', hint: 'Pick any you love. Not sure? Let the AI choose what suits your business best.' },
+  { id: 'template', type: 'single', options: TEMPLATE_OPTS, ask: () => 'Want a signature motion template, or a film mixed just for you?' },
+  { id: 'intensity', type: 'single', show: (b) => !!b.template && b.template !== 'auto', options: INTENSITY_OPTS, ask: () => 'How should it move?' },
+  { id: 'scenes', type: 'scenes', show: (b) => !b.template || b.template === 'auto', ask: () => 'Which kinds of scenes would you like in your video?', hint: 'Pick any you love. Not sure? Let the AI choose what suits your business best.' },
   { id: 'voiceover', type: 'single', options: [{ v: 'yes', l: 'Yes, write me a script', d: 'For ElevenLabs, CapCut and other voice apps' }, { v: 'no', l: 'No, just on-screen text' }], ask: () => 'Do you want a narration script for a voice-over app?' },
   { id: 'sound', type: 'sound', ask: () => 'What sound should the video have?' },
   { id: 'extra', type: 'long', optional: true, chips: EXTRA_CHIPS, ask: () => 'Last one: any other special instructions? Anything goes. You can paste pictures here too.', placeholder: 'e.g. "Start by zooming into the logo of the chatbot, then show the app screen"', done: true },
@@ -162,6 +180,8 @@ const label = (q, v, b, styles) => {
   if (q.id === 'colors') return v === 'style' ? "The style's colours" : v === 'logo' ? 'Matched to my logo' : 'My own colours';
   if (q.id === 'pictures') return `${v} picture${v === 1 ? '' : 's'}`;
   if (q.id === 'flyerType') return [].concat(v).map((x) => FLYER_TYPES.find((o) => o.v === x)?.l || x).join(', ');
+  if (q.id === 'template') return TEMPLATE_OPTS.find((o) => o.v === v)?.l || v;
+  if (q.id === 'intensity') return INTENSITY_OPTS.find((o) => o.v === v)?.l || v;
   if (q.id === 'layout') return FLYER_LAYOUTS.find((o) => o.v === v)?.l || v;
   if (q.id === 'scenes') return v === 'auto' ? 'Let the AI choose' : (Array.isArray(v) ? v : []).map((id) => SCENE_OPTIONS.find((o) => o.id === id)?.t || id).join(', ');
   return Array.isArray(v) ? v.join(', ') : String(v);
