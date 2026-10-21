@@ -5,10 +5,9 @@ import { announceKind } from '../components/Shell.jsx';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api, ASPECTS, duration, shrinkImage, imageLook } from '../lib.jsx';
-import { Alert, Button, PageLoader, Spinner, Steps } from '../components/ui.jsx';
+import { Alert, Button, PageLoader, Spinner } from '../components/ui.jsx';
 import MicButton from '../components/MicButton.jsx';
 import { StylePicker } from './Dashboard.jsx';
-import { KindBadge } from './Dashboard.jsx';
 
 // Which kinds of scenes the owner can ask for (ids match server/ai/motion/compose.js MOTION_WANTS)
 const SCENE_OPTIONS = [
@@ -266,7 +265,7 @@ export default function Plan() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [project, setProject] = useState(null);
-  useEffect(() => { if (project?.kind || project) announceKind(project.kind || 'video'); }, [project?.kind, !!project]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (project) announceKind(project.kind || 'video', project); }, [project?.kind, project?.title, project?.brief?.name, !!project?.plan, !!project?.code, !!project]); // eslint-disable-line react-hooks/exhaustive-deps
   const [styles, setStyles] = useState([]);
   const [limits, setLimits] = useState({ minSeconds: 15, maxSeconds: 60 });
   const [b, setB] = useState({});
@@ -294,6 +293,19 @@ export default function Plan() {
   const visible = QS;
   const what = project?.kind === 'flyer' ? 'flyer' : 'video';
   const q = visible[step];
+  // nothing answered yet: show what is being made, and let them swap video <-> flyer
+  const fresh = !!project && !project.plan && !pics.length && !Object.entries(b).some(([k, v]) => !/Skipped$/.test(k) && v !== undefined && v !== '' && !(Array.isArray(v) && !v.length));
+  const [switching, setSwitching] = useState(false);
+  const switchKind = async () => {
+    const other = what === 'flyer' ? 'video' : 'flyer';
+    setSwitching(true);
+    try {
+      const { project: next } = await api('/projects', { method: 'POST', body: { title: other === 'flyer' ? 'New flyer' : 'New video', kind: other } });
+      api(`/projects/${id}`, { method: 'DELETE' }).catch(() => {});
+      announceKind(other);
+      navigate(`/p/${next.id}/plan`, { replace: true });
+    } catch (e) { setError(e.message); setSwitching(false); }
+  };
 
   // load project + styles, resume at the first unanswered question
   useEffect(() => {
@@ -464,10 +476,6 @@ export default function Plan() {
 
   return (
     <div className="wiz">
-      <div className="mx-auto hidden max-w-[1180px] flex-wrap items-center justify-between gap-3 px-6 pt-6 sm:flex sm:px-10">
-        <div className="flex min-w-0 items-center gap-3"><KindBadge kind={project.kind} className="shrink-0" /><h1 className="truncate text-xl font-bold tracking-[-0.03em] sm:text-2xl">{b.name || project.title}</h1></div>
-        {project.kind !== 'flyer' && <Steps current="plan" projectId={id} hasPlan={!!project.plan} hasCode={!!project.code} />}
-      </div>
 
       <div className="wiz-grid">
         {/* left: where you are */}
@@ -494,6 +502,15 @@ export default function Plan() {
 
         {/* centre: one question at a time */}
         <section className="wiz-main" aria-label="Question">
+          {fresh && (
+            <div className={`wiz-kind ${what === 'flyer' ? 'is-flyer' : 'is-video'}`}>
+              <span className="wiz-kind-icon" aria-hidden="true">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">{what === 'flyer' ? <path d="M5 3h14v18H5zM8 15l3-3 2 2 3-3M9 7.5h.01" /> : <path d="M4 5h16v14H4zM10 9l5 3-5 3z" />}</svg>
+              </span>
+              <span className="min-w-0 flex-1 leading-tight"><b>{what === 'flyer' ? 'New flyer' : 'New video ad'}</b><small>{what === 'flyer' ? 'A still design to post or print' : 'A motion ad you download as an MP4'}</small></span>
+              <button type="button" onClick={switchKind} disabled={switching} className="wiz-kind-switch">{switching ? 'Switching…' : what === 'flyer' ? 'Make a video instead' : 'Make a flyer instead'}</button>
+            </div>
+          )}
           <div className="wiz-meta">
             <div className="wiz-track" aria-hidden="true"><div style={{ width: `${Math.round((pos / Math.max(1, shownQs.length)) * 100)}%` }} /></div>
             <p>{finished ? 'All done' : `${group} · ${pos + 1} of ${shownQs.length}`}</p>

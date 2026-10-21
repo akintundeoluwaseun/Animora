@@ -10,6 +10,23 @@ const STEPS = [
   ['Download the MP4', 'Watch the preview, change anything in plain words, then download it for WhatsApp, TikTok or YouTube.'],
 ];
 
+// Two doors, each says exactly what it makes and goes straight there.
+function StartCard({ kind }) {
+  const flyer = kind === 'flyer';
+  return (
+    <Link to={`/new/${kind}`} className={`press group flex items-center gap-3.5 rounded-2xl p-3.5 pr-4 transition-colors ${flyer ? 'bg-white/[0.06] ring-1 ring-white/12 hover:bg-white/[0.1]' : 'bg-white text-ink hover:bg-white/90'}`}>
+      <span className={`grid size-12 shrink-0 place-items-center rounded-xl text-white ${flyer ? 'bg-flyer' : 'bg-video'}`}>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{flyer ? <path d="M5 3h14v18H5zM8 15l3-3 2 2 3-3M9 7.5h.01" /> : <path d="M4 5h16v14H4zM10 9l5 3-5 3z" />}</svg>
+      </span>
+      <span className="min-w-0 flex-1 leading-tight">
+        <b className="block text-[17px] font-semibold tracking-[-0.02em]">{flyer ? 'Make a flyer' : 'Make a video'}</b>
+        <span className={`mt-0.5 block text-[13px] ${flyer ? 'text-white/55' : 'text-ink-mute'}`}>{flyer ? 'A still design to post or print' : 'Motion ad, downloads as MP4'}</span>
+      </span>
+      <span aria-hidden="true" className={`text-lg transition-transform group-hover:translate-x-0.5 ${flyer ? 'text-white/50' : 'text-ink-mute'}`}>→</span>
+    </Link>
+  );
+}
+
 export default function Home() {
   const [styles, setStyles] = useState([]);
   const [pricing, setPricing] = useState(null);
@@ -28,12 +45,13 @@ export default function Home() {
           <div>
             <h1 className="max-w-[14ch] text-[2.75rem] font-bold leading-[1] tracking-[-0.045em] sm:text-[4.25rem]">Motion-design video ads for your business.</h1>
             <p className="mt-6 max-w-[46ch] text-lg leading-relaxed text-white/65">
-              Tell Animora about your business. Its AI director plans every shot, and you download a finished MP4 in a few minutes.
+              Tell Animora about your business. Its AI director plans every shot, and you download a finished MP4 in a few minutes. Need something to post or print? It designs flyers too.
             </p>
-            <div className="mt-9 flex flex-wrap items-center gap-3">
-              <Button as={Link} to="/videos?new=1" size="lg">Make a video</Button>
-              <Button as={Link} to="/styles" variant="glass" size="lg">Browse styles</Button>
+            <div className="mt-9 grid max-w-[520px] gap-3 sm:grid-cols-2">
+              <StartCard kind="video" />
+              <StartCard kind="flyer" />
             </div>
+            <Link to="/styles" className="mt-5 inline-flex items-center gap-1.5 text-[15px] font-semibold text-white/60 hover:text-white">Browse all the styles <span aria-hidden="true">→</span></Link>
           </div>
           <figure className="mx-auto w-full max-w-[380px]" aria-label="Frames from videos made with Animora">
             <div className="ring-stage" aria-hidden="true">
@@ -95,7 +113,8 @@ export default function Home() {
           <p className="max-w-[40ch] text-lg text-ink-soft">Free with a short ad before each video, or {naira(pricing?.proPriceNgn || 5000)} a month for {pricing?.proVideosPerMonth || 30} ad-free videos.</p>
           <div className="flex gap-3">
             <Button as={Link} to="/pricing" variant="outline">See pricing</Button>
-            <Button as={Link} to="/videos?new=1" variant="dark">Make a video</Button>
+            <Button as={Link} to="/new/flyer" variant="outline">Make a flyer</Button>
+            <Button as={Link} to="/new/video" variant="dark">Make a video</Button>
           </div>
         </div>
       </section>

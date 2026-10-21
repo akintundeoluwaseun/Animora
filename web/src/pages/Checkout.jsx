@@ -47,7 +47,7 @@ export default function Checkout() {
         <h1 className="mt-6 text-3xl font-extrabold">You're on Pro</h1>
         <p className="mt-2 text-ink-soft">{pricing.proVideosPerMonth} ad-free videos up to {pricing.proMaxSeconds / 60} minutes, until {new Date(user.planRenewsAt).toLocaleDateString('en-NG', { day: 'numeric', month: 'long', year: 'numeric' })}.</p>
         <p className="mt-1 text-sm text-ink-mute">Reference {reference}</p>
-        <Button as={Link} to="/videos?new=1" size="lg" className="mt-8">Make a video</Button>
+        <Button as={Link} to="/new/video" size="lg" className="mt-8">Make a video</Button>
       </div>
     );
   }

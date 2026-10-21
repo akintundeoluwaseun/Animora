@@ -150,7 +150,7 @@ button:disabled { cursor: not-allowed; }
 
 /* ================= Wizard form (Plan page) ================= */
 @theme { --color-video: #4F46E5; --color-video-soft: #ECEBFF; --color-flyer: #F2691B; --color-flyer-soft: #FFEBDD; }
-.wiz { min-height: calc(100vh - 3rem); padding-bottom: 5rem; }
+.wiz { min-height: calc(100vh - 3.7rem); padding-bottom: 5rem; }
 .wiz-grid { display: grid; gap: 1.25rem; max-width: 1180px; margin: 0 auto; padding: 0 1rem; grid-template-columns: minmax(0, 1fr); }
 @media (min-width: 640px) { .wiz-grid { padding: 1.25rem 2.5rem 0; } }
 @media (min-width: 1024px) { .wiz-grid { grid-template-columns: 220px minmax(0, 1fr) 300px; gap: 2rem; align-items: start; } }
@@ -218,3 +218,15 @@ button:disabled { cursor: not-allowed; }
 /* phone dock: the Create button carries both kinds' colours */
 .dock-create { background: linear-gradient(120deg, var(--color-video) 0%, #8B46E8 52%, var(--color-flyer) 100%); box-shadow: 0 10px 22px -10px rgba(79, 70, 229, .7), inset 0 1px 0 rgba(255, 255, 255, .25); }
 .dock-create:active { transform: scale(.96); }
+
+/* wizard: what you are making, on the first question */
+.wiz-kind { display: flex; align-items: center; gap: .85rem; margin-bottom: 1rem; padding: .8rem .9rem; border-radius: 20px; border: 1.5px solid; }
+.wiz-kind.is-video { background: var(--color-video-soft); border-color: color-mix(in srgb, var(--color-video) 28%, transparent); }
+.wiz-kind.is-flyer { background: var(--color-flyer-soft); border-color: color-mix(in srgb, var(--color-flyer) 30%, transparent); }
+.wiz-kind-icon { display: grid; place-items: center; width: 2.6rem; height: 2.6rem; flex: none; border-radius: 12px; color: #fff; }
+.is-video .wiz-kind-icon { background: var(--color-video); } .is-flyer .wiz-kind-icon { background: var(--color-flyer); }
+.wiz-kind b { display: block; font-size: 1rem; letter-spacing: -.02em; }
+.wiz-kind small { display: block; margin-top: .1rem; font-size: .8rem; color: var(--color-ink-mute); }
+.wiz-kind-switch { flex: none; font-size: .8rem; font-weight: 700; padding: .5rem .8rem; border-radius: 999px; background: #fff; border: 1px solid rgba(20,17,43,.12); color: var(--color-ink-soft); }
+.wiz-kind-switch:hover { color: var(--color-ink); border-color: rgba(20,17,43,.3); }
+@media (max-width: 420px) { .wiz-kind { flex-wrap: wrap; } .wiz-kind-switch { width: 100%; } }

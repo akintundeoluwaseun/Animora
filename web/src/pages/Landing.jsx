@@ -15,7 +15,7 @@ export default function Landing() {
     api('/pricing').then((r) => setPricing(r.pricing)).catch(() => {});
   }, []);
   const hero = styles.find((s) => s.slug === 'naija-bold') || styles[0];
-  const start = user ? '/dashboard?new=1' : '/signup';
+  const start = user ? '/new/video' : '/signup';
 
   return (
     <div>

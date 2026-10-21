@@ -15,6 +15,7 @@ function Keyed({ el: Page }) { const { id } = useParams(); return <Page key={id}
 const Dashboard = lazy(() => import('./pages/Dashboard.jsx'));
 const Styles = lazy(() => import('./pages/Styles.jsx'));
 const Plan = lazy(() => import('./pages/Plan.jsx'));
+const NewProject = lazy(() => import('./pages/NewProject.jsx'));
 const Studio = lazy(() => import('./pages/Studio.jsx'));
 const Render = lazy(() => import('./pages/Render.jsx'));
 const Pricing = lazy(() => import('./pages/Pricing.jsx'));
@@ -84,6 +85,7 @@ function App() {
               <Route path="/pricing" element={<Pricing />} />
               <Route path="/dashboard" element={<DashboardRedirect />} />
               {/* each project gets a fresh page, so a flyer never shows the video's buttons (or the other way round) */}
+              <Route path="/new/:kind" element={<Private><NewProject /></Private>} />
               <Route path="/p/:id/plan" element={<Private><Keyed el={Plan} /></Private>} />
               <Route path="/p/:id/studio" element={<Private><Keyed el={Studio} /></Private>} />
               <Route path="/p/:id/render" element={<Private><Keyed el={Render} /></Private>} />

@@ -35,7 +35,7 @@ export default function Pricing() {
             <Feature>HD MP4 for WhatsApp, Instagram, TikTok</Feature>
             <Feature off>1–5 minute videos</Feature>
           </ul>
-          <Button as={Link} to={user ? '/videos?new=1' : '/signup'} variant="outline" size="lg" className="mt-8 w-full">{user ? 'Make a video' : 'Start free'}</Button>
+          <Button as={Link} to={user ? '/new/video' : '/signup'} variant="outline" size="lg" className="mt-8 w-full">{user ? 'Make a video' : 'Start free'}</Button>
         </section>
 
         <section className="stage p-7">

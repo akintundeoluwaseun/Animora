@@ -9,11 +9,14 @@ import { useInstall } from './InstallApp.jsx';
 import { Logo, Modal, PlanBadge, DeveloperCard } from './ui.jsx';
 import { creditsLeft } from './BuyCredits.jsx';
 
-export function modeFor(pathname) {
-  if (pathname === '/' || pathname === '/pricing') return 'site';
-  if (pathname.startsWith('/p/')) return 'focus';
+export function modeFor(pathname, signedIn = false) {
+  if (pathname === '/') return 'site';
+  if (pathname === '/pricing') return signedIn ? 'app' : 'site';   // signed in: Pricing stays inside the app
+  if (pathname.startsWith('/p/') || pathname.startsWith('/new/')) return 'focus';
   return 'app';
 }
+/** The one place that starts a video or a flyer. */
+export const newPath = (kind) => `/new/${kind === 'flyer' ? 'flyer' : 'video'}`;
 
 const P = {
   videos: <path d="M4 5h16v14H4zM10 9l5 3-5 3z" />,
@@ -30,7 +33,7 @@ const Icon = ({ k, size = 20 }) => <svg width={size} height={size} viewBox="0 0 
 // "What do you want to make?" lives in one place, reachable from every screen.
 function CreateSheet({ open, onClose }) {
   const navigate = useNavigate();
-  const go = (kind) => { onClose(); navigate(`/${kind === 'flyer' ? 'flyers' : 'videos'}?new=${kind}`); };
+  const go = (kind) => { onClose(); navigate(newPath(kind)); };
   const items = [
     ['video', 'Video ad', 'Motion graphics as an MP4 for WhatsApp, TikTok and YouTube', 'videos'],
     ['flyer', 'Flyer', 'A still design: a picture to post or a PDF to print', 'flyers'],
@@ -58,6 +61,7 @@ function useCreate() {
 
 // ---------------------------------------------------------------- site (marketing)
 function SiteBar({ onCreate }) {
+  const { user } = useAuth();
   const [solid, setSolid] = useState(false);
   useEffect(() => {
     const on = () => setSolid(window.scrollY > 24);
@@ -72,11 +76,11 @@ function SiteBar({ onCreate }) {
         <nav className="ml-8 hidden items-center gap-1 sm:flex" aria-label="Main">
           <NavLink to="/styles" className={link}>Styles</NavLink>
           <NavLink to="/pricing" className={link}>Pricing</NavLink>
-          <NavLink to="/videos" className={link}>My work</NavLink>
+          {!user && <NavLink to="/videos" className={link}>My work</NavLink>}
         </nav>
         <div className="ml-auto flex items-center gap-2">
-          <Link to="/videos" className="hidden rounded-lg px-3 py-2 text-[15px] font-medium text-white/70 hover:text-white sm:block">Open library</Link>
-          <button onClick={onCreate} className="press h-10 rounded-[10px] bg-white px-4 text-[15px] font-semibold text-ink hover:bg-white/90">Make a video</button>
+          {user && <Link to={lastLib()} className="rounded-lg px-3 py-2 text-[15px] font-medium text-white/70 hover:text-white">My work</Link>}
+          <button onClick={onCreate} className="press flex h-10 items-center gap-1.5 rounded-[10px] bg-white px-4 text-[15px] font-semibold text-ink hover:bg-white/90"><Icon k="plus" size={17} />Create</button>
         </div>
       </div>
     </header>
@@ -147,7 +151,7 @@ function Studio({ kind, to, label, sub, icon }) {
         <span className={`grid size-10 place-items-center rounded-xl text-white ${c.solid}`}><Icon k={icon} size={20} /></span>
         <span className="min-w-0 leading-tight"><b className="block text-[15px] tracking-[-0.02em]">{label}</b><span className="block truncate text-xs text-ink-mute">{sub}</span></span>
       </Link>
-      <button onClick={() => navigate(`${to}?new=${kind}`)} className={`press flex h-9 w-full items-center justify-center gap-1.5 border-t border-ink/8 text-[13px] font-semibold ${c.text} hover:${c.soft}`}>
+      <button onClick={() => navigate(newPath(kind))} className={`press flex h-9 w-full items-center justify-center gap-1.5 border-t border-ink/8 text-[13px] font-semibold ${c.text} hover:${c.soft}`}>
         <Icon k="plus" size={15} />New {v ? 'video' : 'flyer'}
       </button>
     </div>
@@ -189,7 +193,13 @@ function Rail({ onCreate }) {
 // Remember which library you came from, so "back" from a project goes to Videos or Flyers correctly.
 const LIB_KEY = 'animora.lib';
 const rememberLib = (p) => { try { if (p === '/videos' || p === '/flyers') sessionStorage.setItem(LIB_KEY, p); } catch { /* private mode */ } };
-export function announceKind(kind) { const p = kind === 'flyer' ? '/flyers' : '/videos'; rememberLib(p); window.dispatchEvent(new CustomEvent('animora:kind', { detail: p })); }
+let lastProject = null;
+/** Project pages say what they are, so the top bar shows the right colour, name and steps. */
+export function announceKind(kind, project = null) {
+  const p = kind === 'flyer' ? '/flyers' : '/videos'; rememberLib(p);
+  lastProject = project ? { id: project.id, kind: kind === 'flyer' ? 'flyer' : 'video', title: project.brief?.name || project.title || '', hasPlan: !!project.plan, hasCode: !!project.code } : null;
+  window.dispatchEvent(new CustomEvent('animora:kind', { detail: { lib: p, project: lastProject } }));
+}
 const lastLib = () => { try { return sessionStorage.getItem(LIB_KEY) || '/videos'; } catch { return '/videos'; } };
 
 // A floating dock: five even slots. Videos and Flyers light up in their own colour, Create is raised in the middle.
@@ -295,19 +305,47 @@ function AppTopBar() {   // phones only: logo, the library you're in, videos lef
 // ---------------------------------------------------------------- focus (editing a project)
 function FocusBar() {
   const navigate = useNavigate();
-  const { state } = useLocation();
+  const { pathname } = useLocation();
   const [back, setBack] = useState(lastLib);
-  useEffect(() => { const on = (e) => setBack(e.detail); window.addEventListener('animora:kind', on); return () => window.removeEventListener('animora:kind', on); }, []);
-  const flyer = back === '/flyers';
+  const [proj, setProj] = useState(lastProject);
+  useEffect(() => { const on = (e) => { setBack(e.detail.lib); setProj(e.detail.project); }; window.addEventListener('animora:kind', on); return () => window.removeEventListener('animora:kind', on); }, []);
+  const starting = pathname.startsWith('/new/');
+  const flyer = starting ? pathname === '/new/flyer' : back === '/flyers';
+  const id = pathname.split('/')[2];
+  const p = proj && proj.id === id ? proj : null;
+  const here = pathname.endsWith('/render') ? 'render' : pathname.endsWith('/studio') ? 'studio' : 'plan';
+  const steps = flyer
+    ? [['plan', 'Answers', true], ['studio', 'Design', p?.hasCode]]
+    : [['plan', 'Answers', true], ['studio', 'Preview', p?.hasPlan], ['render', 'Download', p?.hasCode]];
+  const at = steps.findIndex(([k]) => k === here);
+  const tone = flyer ? { text: 'text-flyer', soft: 'hover:bg-flyer-soft', solid: 'bg-flyer', chip: 'bg-flyer-soft text-flyer', bar: 'bg-flyer' } : { text: 'text-video', soft: 'hover:bg-video-soft', solid: 'bg-video', chip: 'bg-video-soft text-video', bar: 'bg-video' };
   return (
-    <header className="sticky top-0 z-30 border-b border-ink/8 bg-white/90 pt-[env(safe-area-inset-top)] backdrop-blur-xl">
-      <div className="flex h-12 items-center gap-2 px-2 sm:gap-3 sm:px-5">
-        <button onClick={() => navigate(back)} className={`press flex h-10 items-center gap-1 rounded-full pl-1.5 pr-3.5 text-[14px] font-semibold ${flyer ? 'text-flyer hover:bg-flyer-soft' : 'text-video hover:bg-video-soft'}`} aria-label={flyer ? 'Back to my flyers' : 'Back to my videos'}>
-          <Icon k="back" size={20} />{flyer ? 'Flyers' : 'Videos'}
+    <header className="focus-bar sticky top-0 z-30 border-b border-ink/8 bg-white/92 pt-[env(safe-area-inset-top)] backdrop-blur-xl">
+      <div className={`h-[3px] ${tone.bar}`} aria-hidden="true" />
+      <div className="flex h-14 items-center gap-2 px-2 sm:gap-3 sm:px-5">
+        <button onClick={() => navigate(flyer ? '/flyers' : '/videos')} className={`press flex h-10 shrink-0 items-center gap-1 rounded-full pl-1.5 pr-3 text-[14px] font-semibold ${tone.text} ${tone.soft}`} aria-label={flyer ? 'Back to my flyers' : 'Back to my videos'}>
+          <Icon k="back" size={20} /><span className="hidden min-[400px]:inline">{flyer ? 'Flyers' : 'Videos'}</span>
         </button>
-        <span className="hidden h-5 w-px bg-ink/12 sm:block" aria-hidden="true" />
-        <span className="hidden sm:block"><Logo /></span>
-        {state?.hint && <span className="ml-auto truncate text-sm text-ink-mute">{state.hint}</span>}
+        <span className="h-6 w-px shrink-0 bg-ink/10" aria-hidden="true" />
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <span className={`flex shrink-0 items-center gap-1 rounded-full p-1.5 text-[11.5px] font-bold sm:px-2 sm:py-1 ${tone.chip}`} title={flyer ? 'Flyer' : 'Video ad'}><Icon k={flyer ? 'flyers' : 'videos'} size={14} /><span className="hidden sm:inline">{flyer ? 'Flyer' : 'Video ad'}</span></span>
+          <b className="truncate text-[15px] font-semibold tracking-[-0.01em]">{starting ? (flyer ? 'New flyer' : 'New video') : p?.title || ' '}</b>
+        </div>
+        {!starting && (
+          <ol className="flex shrink-0 items-center gap-1" aria-label="Steps">
+            {steps.map(([k, label, ok], i) => {
+              const cur = i === at, done = i < at;
+              const inner = <><span className={`grid size-6 place-items-center rounded-full text-[11px] font-bold ${cur ? `${tone.solid} text-white` : done ? 'bg-ink text-white' : 'bg-ink/8 text-ink-mute'}`}>{done ? '✓' : i + 1}</span><span className={cur ? 'hidden min-[420px]:inline' : 'hidden md:inline'}>{label}</span></>;
+              const cls = `flex items-center gap-1.5 rounded-full px-1.5 py-1 text-[13px] font-semibold sm:px-2 ${cur ? 'text-ink' : 'text-ink-mute'}`;
+              return (
+                <li key={k} className="flex items-center gap-1">
+                  {i > 0 && <span className={`h-0.5 w-2 rounded-full sm:w-4 ${i <= at ? 'bg-ink/50' : 'bg-ink/12'}`} aria-hidden="true" />}
+                  {ok && !cur ? <Link to={`/p/${id}/${k}`} className={`${cls} hover:bg-ink/5 hover:text-ink`}>{inner}</Link> : <span className={cls} aria-current={cur ? 'step' : undefined}>{inner}</span>}
+                </li>
+              );
+            })}
+          </ol>
+        )}
       </div>
     </header>
   );
@@ -316,11 +354,11 @@ function FocusBar() {
 // ---------------------------------------------------------------- the shell
 export default function Shell({ children }) {
   const { pathname } = useLocation();
-  const mode = modeFor(pathname);
+  const { user } = useAuth();
+  const mode = modeFor(pathname, !!user);
   useEffect(() => { rememberLib(pathname); }, [pathname]);
   const create = useCreate();
-  const { user } = useAuth();
-  void user; void naira;
+  void naira;
   return (
     <div className={`app ${mode === 'app' ? 'lg:grid lg:grid-cols-[236px_minmax(0,1fr)]' : ''} ${mode === 'site' ? 'bg-white' : ''}`}>
       {mode === 'site' && <SiteBar onCreate={create.show} />}

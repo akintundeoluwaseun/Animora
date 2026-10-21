@@ -6,6 +6,7 @@ import { Alert, Button, Empty, Modal, PageLoader, PlanBadge, Spinner } from '../
 import BuyCredits, { creditsLeft } from '../components/BuyCredits.jsx';
 import { FullView } from '../components/Preview.jsx';
 import { downloadVideo } from '../lib/videoFile.js';
+import { newPath } from '../components/Shell.jsx';
 
 // A style card: shows the poster, plays the preview while hovered or focused.
 export function StyleCard({ s, selected, onPick }) {
@@ -53,42 +54,6 @@ export function StylePicker({ value, onPick }) {
 }
 
 // New: pick a video or a flyer, then the guided questions start (the style comes later).
-function NewThing({ open, kind, onPick, onClose }) {
-  const navigate = useNavigate();
-  const [error, setError] = useState('');
-  useEffect(() => {
-    if (!open || !kind) return;
-    setError('');
-    api('/projects', { method: 'POST', body: { title: kind === 'flyer' ? 'New flyer' : 'New video', kind } })
-      .then(({ project }) => navigate(`/p/${project.id}/plan`, { replace: true }))
-      .catch((e) => setError(e.message));
-  }, [open, kind]); // eslint-disable-line react-hooks/exhaustive-deps
-  if (!open) return null;
-  return (
-    <Modal open={open} onClose={onClose} label="What do you want to make?">
-      {error ? <Alert>{error}</Alert> : kind ? (
-        <div className="py-10 text-center"><Spinner className="mx-auto size-8" /><p className="mt-3 text-ink-soft">Starting your {kind}…</p></div>
-      ) : (
-        <>
-          <h2 className="text-xl font-bold">What do you want to make?</h2>
-          <div className="mt-4 grid grid-cols-2 gap-3">
-            {[['video', 'Video ad', 'Motion graphics with music, as an MP4'], ['flyer', 'Flyer', 'A still design: picture to post, or PDF to print']].map(([k, l, d]) => (
-              <button key={k} type="button" onClick={() => onPick(k)} className="press rounded-[14px] border border-ink/12 bg-white p-4 text-left hover:border-ink/40">
-                <span className="grid size-10 place-items-center rounded-full bg-danfo text-white" aria-hidden="true">
-                  {k === 'video'
-                    ? <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M5 3v10l8-5z" /></svg>
-                    : <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="3" y="2" width="10" height="12" rx="1.5" /><path d="M5.5 6h5M5.5 9h3" /></svg>}
-                </span>
-                <span className="mt-3 block font-semibold text-ink">{l}</span>
-                <span className="mt-0.5 block text-sm leading-snug text-ink-mute">{d}</span>
-              </button>
-            ))}
-          </div>
-        </>
-      )}
-    </Modal>
-  );
-}
 
 // "Link another device": the same private videos and bought videos on your phone and your computer (no sign-in).
 // One device shows a 6-digit code; the other types it in. The long private link still works as a backup.
@@ -167,16 +132,80 @@ export function KindBadge({ kind, className = '' }) {
   );
 }
 
-// Download straight from the list: fetches the MP4 in parts (like the Download MP4 button), shows progress.
-function DashDownload({ renderId, title }) {
+// The ⋯ menu on a tile: make the MP4, make it and download it, download the last one, edit, delete.
+const MI = {
+  play: <path d="M7 4.5v15l12-7.5z" />, down: <path d="M12 4v11M7 10.5l5 5 5-5M5 20h14" />, edit: <path d="M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4" />,
+  trash: <path d="M5 7h14M10 7V4.5h4V7M7 7l1 13h8l1-13M10.5 11v5.5M13.5 11v5.5" />, full: <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />, more: <path d="M5 12h.01M12 12h.01M19 12h.01" />,
+};
+const MIcon = ({ k }) => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={k === 'more' ? 3.2 : 1.9} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{MI[k]}</svg>;
+function TileMenu({ p, onDelete, onFull }) {
+  const [open, setOpen] = useState(false);
   const [pct, setPct] = useState(null);
-  const [failed, setFailed] = useState(false);
-  const go = async () => {
-    setPct(0); setFailed(false);
-    try { const { render } = await api(`/renders/${renderId}`); await downloadVideo(render, title, setPct); }
-    catch { setFailed(true); } finally { setPct(null); }
+  const ref = useRef(null);
+  const navigate = useNavigate();
+  useEffect(() => {
+    if (!open) return undefined;
+    const off = (e) => { if (!ref.current?.contains(e.target) && !e.target.closest?.('[role="dialog"]')) setOpen(false); };
+    const key = (e) => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('pointerdown', off); window.addEventListener('keydown', key);
+    return () => { document.removeEventListener('pointerdown', off); window.removeEventListener('keydown', key); };
+  }, [open]);
+  const flyer = p.kind === 'flyer';
+  const phone = typeof window !== 'undefined' && window.matchMedia('(max-width: 639px)').matches;
+  const designed = p.status !== 'planning';
+  const done = p.last_render?.status === 'done';
+  const busy = ['queued', 'rendering'].includes(p.last_render?.status);
+  const go = (to) => { setOpen(false); navigate(to); };
+  const download = async () => {
+    setOpen(false); setPct(0);
+    try { const { render } = await api(`/renders/${p.last_render.id}`); if (render) await downloadVideo(render, p.title, setPct); else navigate(`/p/${p.id}/render?new=1&download=1`); }
+    catch { navigate(`/p/${p.id}/render`); } finally { setPct(null); }
   };
-  return <button type="button" onClick={go} disabled={pct != null} className="font-semibold text-money hover:underline disabled:opacity-70">{pct != null ? `Saving ${Math.round(pct * 100)}%` : failed ? 'Try again' : 'Download'}</button>;
+  const items = flyer
+    ? [designed && ['Open flyer', 'edit', () => go(`/p/${p.id}/studio`)], designed && ['Full screen', 'full', () => { setOpen(false); onFull(p); }], !designed && ['Continue', 'edit', () => go(`/p/${p.id}/plan`)]]
+    : designed
+      ? [busy ? ['See progress', 'play', () => go(`/p/${p.id}/render`)] : ['Generate video', 'play', () => go(`/p/${p.id}/render?new=1`)],
+        !busy && ['Generate & download', 'down', () => go(`/p/${p.id}/render?new=1&download=1`)],
+        done && ['Download MP4', 'down', download],
+        ['Edit video', 'edit', () => go(`/p/${p.id}/studio`)]]
+      : [['Continue planning', 'edit', () => go(`/p/${p.id}/plan`)]];
+  return (
+    <div ref={ref} className="relative ml-auto">
+      <button type="button" onClick={() => setOpen((o) => !o)} aria-haspopup="menu" aria-expanded={open} aria-label={`More for ${p.title}`}
+        className={`press grid size-9 place-items-center rounded-full ${open ? 'bg-ink text-white' : 'text-ink-soft hover:bg-ink/8 hover:text-ink'}`}>
+        {pct != null ? <span className="text-[11px] font-bold tabular-nums">{Math.round(pct * 100)}%</span> : <MIcon k="more" />}
+      </button>
+      {open && phone && (
+        <Modal open onClose={() => setOpen(false)} label={`${p.title}: options`}>
+          <div className="mx-auto -mt-2 mb-4 h-1.5 w-10 rounded-full bg-ink/12" aria-hidden="true" />
+          <p className="mb-3 truncate px-1 text-[17px] font-bold tracking-[-0.02em]">{p.title}</p>
+          <div className="flex flex-col gap-1" role="menu">
+            {items.filter(Boolean).map(([label, icon, fn]) => (
+              <button key={label} role="menuitem" type="button" onClick={fn} className="press flex items-center gap-3.5 rounded-2xl px-3 py-3.5 text-left text-[16px] font-semibold hover:bg-ink/5">
+                <span className={`grid size-10 place-items-center rounded-xl ${flyer ? 'bg-flyer-soft text-flyer' : 'bg-video-soft text-video'}`}><MIcon k={icon} /></span>{label}
+              </button>
+            ))}
+            <button role="menuitem" type="button" onClick={() => { setOpen(false); onDelete(p); }} className="press flex items-center gap-3.5 rounded-2xl px-3 py-3.5 text-left text-[16px] font-semibold text-alert hover:bg-alert/8">
+              <span className="grid size-10 place-items-center rounded-xl bg-alert/10"><MIcon k="trash" /></span>Delete
+            </button>
+          </div>
+        </Modal>
+      )}
+      {open && !phone && (
+        <div role="menu" className="tile-menu absolute right-0 top-10 z-30 w-56 overflow-hidden rounded-2xl border border-ink/10 bg-white p-1.5 shadow-[0_18px_44px_-12px_rgba(20,18,40,.35)]">
+          {items.filter(Boolean).map(([label, icon, fn]) => (
+            <button key={label} role="menuitem" type="button" onClick={fn} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[14.5px] font-semibold text-ink hover:bg-ink/5">
+              <span className={flyer ? 'text-flyer' : 'text-video'}><MIcon k={icon} /></span>{label}
+            </button>
+          ))}
+          <div className="my-1 h-px bg-ink/8" />
+          <button role="menuitem" type="button" onClick={() => { setOpen(false); onDelete(p); }} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[14.5px] font-semibold text-alert hover:bg-alert/8">
+            <MIcon k="trash" />Delete
+          </button>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function nextStep(p) {
@@ -188,6 +217,7 @@ function nextStep(p) {
 export default function Dashboard({ kind = 'video' }) {   // /videos shows videos, /flyers shows flyers
   const { user, refresh } = useAuth();
   const [params, setParams] = useSearchParams();
+  const navigate = useNavigate();
   const [projects, setProjects] = useState(null);
   const [pricing, setPricing] = useState(null);
   const [error, setError] = useState('');
@@ -201,9 +231,10 @@ export default function Dashboard({ kind = 'video' }) {   // /videos shows video
       refresh();
     }).catch((e) => setPaidMsg(e.message)).finally(() => setParams({}, { replace: true }));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // old "new" links (/videos?new=1, /flyers?new=flyer) start the project straight away
   const newParam = params.get('new');
-  const newOpen = !!newParam;
-  const newKind = newParam === 'video' || newParam === 'flyer' ? newParam : null;
+  useEffect(() => { if (newParam) navigate(newPath(newParam === 'video' || newParam === 'flyer' ? newParam : kind), { replace: true }); }, [newParam]); // eslint-disable-line react-hooks/exhaustive-deps
+  const startNew = () => navigate(newPath(kind));
 
   const [full, setFull] = useState(null);   // { html, aspect } of the flyer shown full screen
   const openFull = async (p) => { try { const { project } = await api(`/projects/${p.id}`); if (project.code) setFull({ html: project.code, aspect: project.aspectRatio }); } catch (e) { setError(e.message); } };
@@ -248,14 +279,13 @@ export default function Dashboard({ kind = 'video' }) {   // /videos shows video
     <div className="mx-auto max-w-[1180px] px-5 py-8 sm:px-10 sm:py-10">
       <div className={`mb-6 h-1.5 w-16 rounded-full ${kind === 'flyer' ? 'bg-flyer' : 'bg-video'}`} aria-hidden="true" />
       {full && <FullView html={full.html} aspect={full.aspect} still onClose={() => setFull(null)} />}
-      <NewThing open={newOpen} kind={newKind} onPick={(k) => setParams({ new: k })} onClose={() => setParams({})} />
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className={`text-3xl font-bold tracking-[-0.045em] sm:text-4xl ${kind === 'flyer' ? 'text-flyer' : 'text-video'}`}>{kind === 'flyer' ? 'Your flyers' : 'Your videos'}</h1>
           <p className="mt-1 text-sm text-ink-mute">{projects ? `${projects.length} ${kind === 'flyer' ? 'flyer' : 'video'}${projects.length === 1 ? '' : 's'}` : '\u00a0'}</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <Button className={kind === 'flyer' ? '!bg-flyer hover:!bg-flyer' : '!bg-video hover:!bg-video'} onClick={() => setParams({ new: kind })}><svg width="16" height="16" viewBox="0 0 14 14" aria-hidden="true"><path d="M7 1v12M1 7h12" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" /></svg>New {kind === 'flyer' ? 'flyer' : 'video'}</Button>
+          <Button className={kind === 'flyer' ? '!bg-flyer hover:!bg-flyer' : '!bg-video hover:!bg-video'} onClick={startNew}><svg width="16" height="16" viewBox="0 0 14 14" aria-hidden="true"><path d="M7 1v12M1 7h12" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" /></svg>New {kind === 'flyer' ? 'flyer' : 'video'}</Button>
         </div>
       </div>
       <div className="mt-5 flex flex-wrap items-center gap-x-6 gap-y-2 border-y border-ink/8 py-3 text-sm">
@@ -276,7 +306,7 @@ export default function Dashboard({ kind = 'video' }) {   // /videos shows video
       {!projects ? <PageLoader /> : (
         <ul className="grid grid-cols-2 gap-x-5 gap-y-8 sm:grid-cols-3 lg:grid-cols-4">
           <li>
-            <button onClick={() => setParams({ new: kind })} className="press group grid aspect-[9/14] w-full place-items-center rounded-xl border border-dashed border-ink/20 bg-white text-ink-soft hover:border-ink/40 hover:text-ink">
+            <button onClick={startNew} className="press group grid aspect-[9/14] w-full place-items-center rounded-xl border border-dashed border-ink/20 bg-white text-ink-soft hover:border-ink/40 hover:text-ink">
               <span className="flex flex-col items-center gap-3">
                 <span className={`grid size-12 place-items-center rounded-full text-white ${kind === 'flyer' ? 'bg-flyer' : 'bg-video'}`}><svg width="16" height="16" viewBox="0 0 14 14" aria-hidden="true"><path d="M7 1v12M1 7h12" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" /></svg></span>
                 <span className="font-semibold">{kind === 'flyer' ? 'New flyer' : 'New video'}</span>
@@ -307,10 +337,9 @@ export default function Dashboard({ kind = 'video' }) {   // /videos shows video
                   </div>
                   <p className="mt-3 line-clamp-2 font-semibold leading-snug tracking-[-0.01em]">{p.title}</p>
                 </Link>
-                <div className="mt-1 flex items-center gap-3 text-sm text-ink-mute">
+                <div className="mt-1 flex items-center gap-2 text-sm text-ink-mute">
                   <span>{p.kind === 'flyer' ? 'Flyer' : duration(p.duration_seconds)}, {p.aspect_ratio}, {ago(p.updated_at)}</span>
-                  {p.last_render?.status === 'done' && <DashDownload projectId={p.id} renderId={p.last_render.id} title={p.title} />}
-                  <button onClick={() => remove(p)} className="ml-auto font-semibold text-ink-mute hover:text-alert focus:opacity-100 sm:opacity-0 sm:group-hover:opacity-100" aria-label={`Delete ${p.title}`}>Delete</button>
+                  <TileMenu p={p} onDelete={remove} onFull={openFull} />
                 </div>
               </li>
             );

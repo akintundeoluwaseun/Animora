@@ -4,7 +4,7 @@ import { publicMessage } from '../lib/errors.js';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { api, ASPECTS, duration, shrinkImage } from '../lib.jsx';
-import { Alert, Button, Modal, PageLoader, Spinner, Steps } from '../components/ui.jsx';
+import { Alert, Button, Modal, PageLoader, Spinner } from '../components/ui.jsx';
 import MicButton from '../components/MicButton.jsx';
 import { FullView, LivePreview } from '../components/Preview.jsx';
 import VoicePanel from '../components/VoicePanel.jsx';
@@ -273,7 +273,7 @@ export default function Studio() {
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const [project, setProject] = useState(null);
-  useEffect(() => { if (project?.kind || project) announceKind(project.kind || 'video'); }, [project?.kind, !!project]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (project) announceKind(project.kind || 'video', project); }, [project?.kind, project?.title, !!project?.plan, !!project?.code, !!project]); // eslint-disable-line react-hooks/exhaustive-deps
   const [canRender, setCanRender] = useState(true);
   useEffect(() => { api('/status').then((st) => setCanRender(st.render !== false)).catch(() => {}); }, []);
   const [tab, setTab] = useState('edit');
@@ -372,7 +372,6 @@ export default function Studio() {
           <p className="text-sm text-ink-mute">{flyer ? 'Flyer' : duration(project.durationSeconds)} · {ASPECTS[project.aspectRatio]?.label}</p>
         </div>
         <div className="flex items-center gap-3">
-          {!flyer && <Steps current="studio" projectId={id} hasPlan hasCode={!!project.code} />}
           {project.code && <span className="hidden lg:block">{flyer ? <FlyerDownload project={project} /> : canRender ? <Button onClick={() => navigate(`/p/${id}/render?new=1`)}>{project.status === 'rendered' ? 'Render video again' : 'Generate Video'}</Button> : <DownloadVideo project={project} />}</span>}
         </div>
       </div>

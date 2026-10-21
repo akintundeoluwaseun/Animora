@@ -4,7 +4,7 @@ import { publicMessage } from '../lib/errors.js';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { api, ASPECTS, clock, duration, naira, useAuth, usePolling } from '../lib.jsx';
-import { Alert, Button, Modal, PageLoader, Spinner, Steps } from '../components/ui.jsx';
+import { Alert, Button, Modal, PageLoader, Spinner } from '../components/ui.jsx';
 import { VideoPhone } from '../components/Preview.jsx';
 import { downloadVideo, fetchVideo } from '../lib/videoFile.js';
 
@@ -114,7 +114,7 @@ export default function Render() {
   const [params, setParams] = useSearchParams();
   const { refresh } = useAuth();
   const [project, setProject] = useState(null);
-  useEffect(() => { if (project?.kind || project) announceKind(project.kind || 'video'); }, [project?.kind, !!project]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (project) announceKind(project.kind || 'video', project); }, [project?.kind, project?.title, !!project?.plan, !!project?.code, !!project]); // eslint-disable-line react-hooks/exhaustive-deps
   const [check, setCheck] = useState(null);
   const [render, setRender] = useState(null);
   const [script, setScript] = useState(null);
@@ -147,6 +147,13 @@ export default function Render() {
   }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const active = render && ['queued', 'rendering'].includes(render.status);
+  // "Generate & download" from the library: save the MP4 as soon as it is ready
+  const autoDl = useRef(false);
+  useEffect(() => {
+    if (params.get('download') !== '1' || autoDl.current || render?.status !== 'done' || !render.videoUrl) return;
+    autoDl.current = true;
+    downloadVideo(render, project?.title || 'video', () => {}).catch(() => {});
+  }, [render?.status]); // eslint-disable-line react-hooks/exhaustive-deps
   const autoStart = useRef(false);
   useEffect(() => { if (autoStart.current && check && !render && !busy) { autoStart.current = false; start(); } });   // "Generate Video" in the editor starts straight away
   usePolling(async () => {
@@ -189,7 +196,6 @@ export default function Render() {
     <div className="mx-auto max-w-6xl px-4 py-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="truncate text-xl font-extrabold sm:text-2xl">{project.title}</h1>
-        <Steps current="render" projectId={id} hasPlan={!!project.plan} hasCode={!!project.code} />
       </div>
       {error && <div className="mt-4"><Alert onClose={() => setError('')}>{error}</Alert></div>}
 
@@ -218,7 +224,7 @@ export default function Render() {
               {!canShare && <p className="mt-2 text-sm text-ink-mute">Sharing isn't supported on this device. Download the MP4, then post it from your gallery.</p>}
               <div className="mt-10 flex flex-wrap gap-3 border-t border-ink/10 pt-6">
                 <Button as={Link} to={`/p/${id}/studio`} variant="ghost">Edit and render again</Button>
-                <Button as={Link} to="/videos?new=1" variant="ghost">Make another video</Button>
+                <Button as={Link} to="/new/video" variant="ghost">Make another video</Button>
               </div>
             </div>
           </div>

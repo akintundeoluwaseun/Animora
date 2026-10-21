@@ -105,8 +105,8 @@ export function Nav() {
   useEffect(() => { api('/status').then(setStatus).catch(() => {}); }, []);
   const links = [['/', 'Home', 'home'], ['/videos', 'My videos', 'videos'], ['/flyers', 'My flyers', 'flyers'], ['/styles', 'Styles', 'styles'], ['/pricing', 'Pricing', 'pricing']];
   const railLink = () => ({ isActive }) => `rail-link ${isActive ? 'is-active' : ''}`;
-  const newVideo = () => { setOpen(false); navigate('/videos?new=video'); };
-  const newFlyer = () => { setOpen(false); navigate('/flyers?new=flyer'); };
+  const newVideo = () => { setOpen(false); navigate('/new/video'); };
+  const newFlyer = () => { setOpen(false); navigate('/new/flyer'); };
   return (
     <>
       <aside className="rail" aria-label="Main">
