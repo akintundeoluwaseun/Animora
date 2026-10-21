@@ -916,8 +916,14 @@
         prev = Lr; prevPiece = piece; return;
       }
       const pool = TRANSITIONS[energy].filter((x) => x !== lastTrans);
-      const trName = sc.trans || ctx.pick('trans' + i, pool); lastTrans = trName;
+      const trName = sc.trans || ctx.pick('trans' + i, pool);
       const tr = P[trName];
+      // a film that would run past the length asked for loses a middle scene (the closing scene always stays)
+      if (cfg.target && i < cfg.scenes.length - 1) {
+        const ls = cfg.scenes[cfg.scenes.length - 1], endD = (ls.data && ls.data.dur) || P[ls.piece].dur;
+        if ((t - 0.12) + tr.dur * 0.45 + pdur + endD + 0.55 + 0.3 > cfg.target + 0.2) return;
+      }
+      lastTrans = trName;
       const ts = t - 0.12;                                    // overlap the end of the last scene a little
       const Lr = layer(ctx, kind, ts, ts + tr.dur + pdur + 1.2);
       Lr.style.visibility = 'hidden';
@@ -926,7 +932,9 @@
       prev = Lr; prevPiece = piece;
     });
     void prevPiece;
-    return finishUp(ctx, t + 0.3, cfg);
+    // land on the exact length asked for: a small gap is a calm hold on the closing card (never a stretched scene)
+    const endAt = t + 0.3, gap = cfg.target ? cfg.target - endAt : 0;
+    return finishUp(ctx, gap > 0.05 && gap <= 4 ? cfg.target : endAt, cfg);
   };
   // demo of one piece (with a plain frame either side for a transition)
   window.PIECE_DEMO = function (cfg, stageEl) {

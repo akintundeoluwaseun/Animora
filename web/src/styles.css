@@ -207,6 +207,9 @@ button:disabled { cursor: not-allowed; }
 .wiz-drop { border: 1.5px dashed rgba(20,17,43,.2); background: #FAF9FE; border-radius: 20px; padding: 1.1rem; }
 .wiz-actions { display: flex; align-items: center; gap: .75rem; margin-top: 2rem; padding-top: 1.25rem; border-top: 1px solid rgba(20,17,43,.07); }
 .wiz-back, .wiz-skip { font-size: .9rem; font-weight: 650; color: var(--color-ink-mute); padding: .5rem .7rem; border-radius: 10px; }
+.wiz-now { font-size: .9rem; font-weight: 700; color: var(--color-ink); padding: .5rem 1rem; border-radius: 999px; border: 1.5px solid rgba(20, 17, 43, .22); background: #fff; }
+.wiz-now:hover:not(:disabled) { border-color: var(--color-ink); }
+.wiz-now:disabled { opacity: .5; }
 .wiz-back:hover:not(:disabled), .wiz-skip:hover { background: var(--color-lilac); color: var(--color-ink); }
 .wiz-back:disabled { opacity: .35; cursor: default; }
 /* option cards */

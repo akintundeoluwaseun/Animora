@@ -45,7 +45,7 @@ export function cleanBrief(b = {}) {
     quality: ['preview', 'premium', 'max'].includes(b.quality) ? b.quality : undefined,
   };
   // optional questions the user skipped (so they are not asked again)
-  for (const k of ['features', 'products', 'contact', 'pictures', 'extra', 'scenes']) if (b[`${k}Skipped`] !== undefined) out[`${k}Skipped`] = !!b[`${k}Skipped`];
+  for (const k of ['features', 'products', 'contact', 'pictures', 'extra', 'scenes', 'category', 'goal', 'headline', 'cta', 'aspect', 'duration', 'colors', 'style', 'template', 'intensity', 'voiceover', 'sound', 'flyerType', 'layout', 'offer', 'when']) if (b[`${k}Skipped`] !== undefined) out[`${k}Skipped`] = !!b[`${k}Skipped`];
   if (out.headlines.length) out.headline = out.headlines[0]; else delete out.headlines;
   if (out.ctas.length) out.cta = str(out.ctas[0], 60); else delete out.ctas;
   if (out.goals.length) out.goal = str(out.goals.join(' + '), 200); else delete out.goals;

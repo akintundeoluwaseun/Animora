@@ -39,44 +39,15 @@ function Generating({ message, startedAt, pushOn, flyer }) {
   );
 }
 
-// After the person watches to the end (or the flyer is ready): happy with it, or tell the AI what to change.
-function Feedback({ open, project, onClose, onUpdate, onHappy }) {
-  const [text, setText] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-  const flyer = project.kind === 'flyer';
-  const chips = flyer ? ['Make the headline bigger', 'Try a different layout', 'Use my photos more'] : ['Make it slower and calmer', 'Make the text bigger', 'Show my logo more', 'Change the ending'];
-  const send = async () => {
-    const msg = text.trim(); if (!msg || busy) return;
-    setBusy(true); setError('');
-    try { const r = await api(`/projects/${project.id}/edit`, { method: 'POST', body: { instruction: msg } }); onUpdate(r.project); setText(''); onClose(); }
-    catch (e) { setError(e.message); } finally { setBusy(false); }
-  };
+// When something is ready: a small corner note, never a full-screen box. It fades by itself.
+function Feedback({ open, onClose }) {
+  useEffect(() => { if (!open) return undefined; const t = setTimeout(onClose, 9000); return () => clearTimeout(t); }, [open, onClose]);
+  if (!open) return null;
   return (
-    <Modal open={open} onClose={() => !busy && onClose()} label="How is it?">
-      {busy ? (
-        <div className="py-8 text-center"><Spinner className="mx-auto size-8" /><p className="mt-3 font-semibold">Changing your {flyer ? 'flyer' : 'video'}…</p><p className="mt-1 text-sm text-ink-mute">Animora is working on your change. This takes about 20 to 60 seconds.</p></div>
-      ) : (
-        <>
-          <h2 className="text-xl font-bold">How is it?</h2>
-          <p className="mt-1 text-sm text-ink-soft">Not quite right? Tell Animora what to change, in your own words. Say everything at once; it does all of it in one go.</p>
-          <div className="mt-4 flex items-start gap-2">
-            <textarea value={text} onChange={(e) => setText(e.target.value)} rows={3} autoFocus aria-label="What should change?"
-              placeholder={flyer ? 'e.g. "Put the prices in big circles and use my second photo"' : 'e.g. "Slow down the start, make the logo bigger, and end with my phone number"'}
-              className="min-w-0 flex-1 resize-none rounded-[12px] border border-ink/15 bg-white px-3 py-2.5 text-[15px] text-ink outline-none focus:border-ink/40" />
-            <MicButton onText={(t) => setText((x) => `${x ? `${x.trim()} ` : ''}${t}`)} />
-          </div>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {chips.map((c) => <button key={c} type="button" className="chip press !px-3 !py-1.5 !text-xs" onClick={() => setText((x) => (x ? `${x.trim()}. ${c}` : c))}>{c}</button>)}
-          </div>
-          {error && <p className="mt-3 text-sm text-alert" role="alert">{publicMessage(error)}</p>}
-          <div className="mt-5 flex gap-2">
-            <Button variant="ghost" className="flex-1" onClick={onHappy}>{flyer ? 'Looks good' : 'Looks good, make the MP4'}</Button>
-            <Button className="flex-1" onClick={send} disabled={!text.trim()}>Make the change</Button>
-          </div>
-        </>
-      )}
-    </Modal>
+    <div role="status" className="fixed bottom-4 left-1/2 z-40 flex w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 items-center gap-3 rounded-[14px] bg-ink px-4 py-3 text-sm text-white shadow-lg">
+      <p className="min-w-0 flex-1">Ready. If you have any edits, go down and tell me what to change.</p>
+      <button type="button" onClick={onClose} aria-label="Close" className="shrink-0 rounded-full px-2 py-1 text-white/70 hover:text-white">&#10005;</button>
+    </div>
   );
 }
 
@@ -376,9 +347,7 @@ export default function Studio() {
         </div>
       </div>
       <BuyCredits open={needBuy} onClose={() => setNeedBuy(false)} reason="You've used your free videos" />
-      <Feedback open={askOpen} project={project} onClose={() => setAskOpen(false)}
-        onUpdate={(p) => { setProject(p); setTab('edit'); setNotice('Done. Your change is in the preview. Watch it again, or keep editing below.'); }}
-        onHappy={() => { setAskOpen(false); if (!flyer && canRender) navigate(`/p/${id}/render?new=1`); }} />
+      <Feedback open={askOpen} onClose={() => setAskOpen(false)} />
       {error && <div className="mt-4"><Alert onClose={() => setError('')}>{error}</Alert></div>}
       {notice && <div className="mt-4"><Alert kind="warn" onClose={() => setNotice('')}>{publicMessage(notice)}</Alert></div>}
 

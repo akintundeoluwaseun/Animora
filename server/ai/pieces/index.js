@@ -19,6 +19,7 @@ export const TEMPLATE_IDS = ['type-reactor', 'luxury-product', 'hud-tech', 'liqu
 const TPL_SIZES = { '9:16': [1080, 1920], '16:9': [1920, 1080], '1:1': [1080, 1080], '4:5': [1080, 1350] };
 export const isTemplateBrief = (brief) => TEMPLATE_IDS.includes(brief?.template);
 const DUR = { 'open-depth': 3.8, 'open-sweep': 3.6, 'open-split': 3.4, 'open-shapes': 3.8, 'open-light': 3.8, title: 3.6, 'text-cascade': 3.2, 'text-slot': 4.2, 'text-marquee': 3.8, 'text-stack': 3.6, 'photo-depth': 3.8, 'photo-pop': 4.0, 'photo-split': 4.0, 'photo-phone': 4.2, 'photo-cinema': 4.0, 'info-price': 3.6, 'info-checks': 3.8, 'info-stat': 3.6, 'info-quote': 4.2, 'info-tiles': 3.8, 'info-countdown': 4.0, 'info-location': 3.8, 'info-compare': 3.8, 'end-particles': 4.2, 'end-press': 4.2, 'end-draw': 4.0, 'end-glass': 4.0 };
+const OVERLAP = 0.5;   // what a scene spends on its transition, on average (measured)
 const DARK_ONLY = new Set(['photo-depth', 'photo-cinema', 'open-light', 'end-glass']);
 
 export const isPieces = (html) => /window\.PIECES_FILM = /.test(String(html || ''));
@@ -54,7 +55,7 @@ export function composePieces({ facts: f, duration = 24, seed = 1, energy = 'med
   const opener = pick(['open-depth', 'open-sweep', 'open-split', 'open-shapes', 'open-light', 'title', 'title']);
   scenes.push({ piece: opener, data: opener === 'open-sweep' || opener === 'open-shapes' || opener === 'open-light' ? { headline: f.name, sub: f.category || f.sub } : opener === 'open-split' ? { headline: (words[0] || f.name) + '|' + (words[1] || ''), sub: f.name } : opener === 'open-depth' ? { headline: split2(head), words: f.features, sub: f.name } : { kicker: f.category || f.name, headline: split2(head), key, sub: f.sub } });
   const middle = [];
-  f.photos.slice(0, 2).forEach((img, i) => { const p = pick(i ? ['photo-pop', 'photo-split', 'photo-phone'] : ['photo-depth', 'photo-cinema', 'photo-pop', 'photo-phone']); middle.push({ piece: p, data: p === 'photo-depth' ? { img, tag: f.category || f.name, headline: f.sub || head } : p === 'photo-pop' ? { img, callouts: [f.features[0], f.features[1], f.priced ? `${f.priced.title} ${f.priced.price}` : f.features[2]].filter(Boolean) } : p === 'photo-split' ? { img, headline: head } : p === 'photo-phone' ? { img, headline: head, title: f.name, subtitle: f.category, price: f.priced?.price || '', cta: f.cta.split(' ')[0] } : { img, kicker: f.category, headline: head } }); });
+  f.photos.slice(0, Math.max(2, Math.min(5, Math.round(duration / 9)))).forEach((img, i) => { const p = pick(i ? ['photo-pop', 'photo-split', 'photo-phone'] : ['photo-depth', 'photo-cinema', 'photo-pop', 'photo-phone']); middle.push({ piece: p, data: p === 'photo-depth' ? { img, tag: f.category || f.name, headline: f.sub || head } : p === 'photo-pop' ? { img, callouts: [f.features[0], f.features[1], f.priced ? `${f.priced.title} ${f.priced.price}` : f.features[2]].filter(Boolean) } : p === 'photo-split' ? { img, headline: head } : p === 'photo-phone' ? { img, headline: head, title: f.name, subtitle: f.category, price: f.priced?.price || '', cta: f.cta.split(' ')[0] } : { img, kicker: f.category, headline: head } }); });
   if (f.offer || f.priced) middle.push({ piece: 'info-price', kind: 'brand', data: { label: f.offer && !/\d/.test(f.offer) ? f.offer : f.priced?.title || 'Now', old: '', price: /\d/.test(f.offer) ? f.offer : f.priced?.price, note: f.priced && /\d/.test(f.offer) ? f.priced.title : '' } });
   if (f.when) middle.push({ piece: 'info-countdown', data: { kicker: 'Coming up', date: f.when, days: 3, hours: 12, mins: 45 } });
   if (f.features.length >= 3) middle.push(pick([{ piece: 'info-checks', data: { headline: `Why ${f.name}`, items: f.features } }, { piece: 'info-tiles', data: { headline: `${f.name} gives you`, items: f.features } }]));
@@ -67,10 +68,38 @@ export function composePieces({ facts: f, duration = 24, seed = 1, energy = 'med
   const ending = f.phone ? pick(['end-press', 'end-glass', 'end-press', 'end-particles', 'end-draw']) : pick(['end-particles', 'end-draw', 'end-glass']);
   const end = { piece: ending, data: ending === 'end-press' ? { headline: f.sub ? f.sub.split('.')[0] + '.' : head, cta: f.cta, phone: f.phone, where: [f.name, f.place].filter(Boolean).join(' · ') } : ending === 'end-glass' ? { name: f.name, line: f.sub || head, cta: f.cta, phone: f.phone } : { mono: f.mono, name: f.name, tagline: f.place || f.category, logo: ending === 'end-particles' ? f.logo : undefined } };
   // fit the length: keep the opener and the ending, take as many middle scenes as the duration allows
-  let total = DUR[opener] + DUR[ending]; const keep = [];
-  for (const m of middle) { if (total + DUR[m.piece] > duration + 0.5) continue; keep.push(m); total += DUR[m.piece]; }
-  while (total < duration - 3) { const t = pick([{ piece: 'title', data: { kicker: f.name, headline: split2(f.heads[keep.length % Math.max(1, f.heads.length)] || head), key, sub: '' } }, { piece: 'text-cascade', data: { headline: split2(head), key, sub: f.sub } }]); keep.push(t); total += DUR[t.piece]; }
-  return { scenes: [scenes[0], ...shuffle(keep), end], energy };
+  const cost = (p) => (DUR[p] || 3.8) + OVERLAP; let total = cost(opener) + cost(ending); const keep = [];
+  for (const m of middle) { if (total + cost(m.piece) > duration + 0.2) continue; keep.push(m); total += cost(m.piece); }
+  // Long films: every extra scene is a DIFFERENT piece with DIFFERENT words from the owner's own details, never the same two scenes again.
+  const lines = [...new Set([...f.heads, ...f.features, ...f.products.map((p) => p.title), f.sub, f.cta, f.category].map((x) => str(x, 60)).filter((x) => x && x.length > 2))];
+  const L = (i) => lines[i % Math.max(1, lines.length)] || head;
+  const keyOf = (t) => String(t).split(/\s+/).sort((a, b) => b.length - a.length)[0] || '';
+  const uniqWords = [...new Set(lines.join(' ').split(/\s+/).map((w) => w.replace(/[^\p{L}\p{N}'-]/gu, '')).filter((w) => w.length >= 3))];
+  const wordsAt = (i, n) => Array.from({ length: n }, (_, k) => uniqWords[(i * 2 + k) % Math.max(1, uniqWords.length)] || f.name);
+  const leads = ['Always', 'Simply', 'Truly', 'Just'];
+  const FILL = [
+    { piece: 'text-cascade', data: (i) => ({ headline: split2(L(i)), key: keyOf(L(i)), sub: '' }) },
+    { piece: 'title', data: (i) => ({ kicker: f.category || f.name, headline: split2(L(i + 1)), key: keyOf(L(i + 1)), sub: '' }) },
+    { piece: 'text-stack', data: (i) => ({ word: keyOf(L(i)), tag: f.name }) },
+    { piece: 'text-marquee', data: (i) => ({ words: wordsAt(i, 5).map((w) => w.toUpperCase()), brand: f.name }) },
+    { piece: 'text-slot', ok: () => uniqWords.length >= 2, data: (i) => ({ lead: leads[i % leads.length], words: wordsAt(i, 3) }) },
+    { piece: 'open-sweep', data: (i) => ({ headline: f.name, sub: L(i) }) },
+    { piece: 'open-split', ok: () => uniqWords.length >= 2, data: (i) => ({ headline: wordsAt(i, 2).join('|'), sub: f.name }) },
+    { piece: 'open-shapes', data: (i) => ({ headline: f.name, sub: L(i + 2) }) },
+    { piece: 'open-light', data: (i) => ({ headline: L(i + 1), sub: f.name }) },
+  ].filter((x) => !x.ok || x.ok());
+  const cycle = () => { const c = shuffle(FILL.slice()); return c; };
+  let fillQ = cycle(), fi = 0, lastPiece = keep.length ? keep[keep.length - 1].piece : opener;
+  while (total + cost('title') <= duration + 0.2 && fi < 60) {
+    if (!fillQ.length) fillQ = cycle();
+    let k = fillQ.findIndex((x) => x.piece !== lastPiece && !keep.slice(-2).some((m) => m.piece === x.piece)); if (k < 0) k = fillQ.findIndex((x) => x.piece !== lastPiece); if (k < 0) { fillQ = cycle(); continue; }
+    const x = fillQ.splice(k, 1)[0]; if (total + cost(x.piece) > duration + 0.2) break;
+    keep.push({ piece: x.piece, data: x.data(fi) }); total += cost(x.piece); lastPiece = x.piece; fi++;
+  }
+  // no scene twice in a row, and never the same piece as the opener or the ending right next to it
+  const ordered = shuffle(keep.slice());
+  for (let a = 1; a < ordered.length; a++) if (ordered[a].piece === ordered[a - 1].piece) { const b = ordered.findIndex((m, x) => x > a && m.piece !== ordered[a - 1].piece && (ordered[x + 1] ? ordered[x + 1].piece !== ordered[a].piece : true)); if (b > 0) [ordered[a], ordered[b]] = [ordered[b], ordered[a]]; }
+  return { scenes: [scenes[0], ...ordered, end], energy };
 }
 
 export function piecesFilm({ plan = {}, brief = {}, assets = [], style = null, themeColors = {}, salt = '' }) {
@@ -85,12 +114,14 @@ export function piecesFilm({ plan = {}, brief = {}, assets = [], style = null, t
   const facts = factsOf(plan, brief, assets);
   const seed = hashStr(`${facts.name}|${salt}`) % 2147483647 || 7;
   const duration = Math.max(10, Math.round(Number(plan.duration_seconds) || 24));
+  // Every business and every Regenerate gets its own colour play, not just a new scene order (the chosen style keeps its fonts and mood).
+  { const rv = mulberry(seed + 7); if (rv() < 0.5 && !plan.style?.colors?.primary && look.A2 && HEX.test(look.A2)) { const t = look.A; look.A = look.A2; look.A2 = t; } if (rv() < 0.3) look.upper = !look.upper; }
   const comp = composePieces({ facts, duration, seed, energy: look0.energy || 'medium' });
   const r = mulberry(seed + 99), kinds = look.dark ? ['dark', 'dark', 'brand', 'light'] : ['light', 'light', 'brand', 'dark'];
   comp.scenes.forEach((s, i) => { if (!s.kind) s.kind = DARK_ONLY.has(s.piece) ? 'dark' : i === 0 ? (look.dark ? 'dark' : 'light') : kinds[Math.floor(r() * kinds.length)]; if (s.kind === 'light' && lum(A) > 0.4) s.kind = 'dark'; });
   const sound = plan.sound || (plan.sfx === false ? 'none' : 'sfx');
   const music = sound === 'own' && plan.music_url ? { url: plan.music_url } : sound === 'piano' || sound === 'soft' ? { url: `/music/${sound}.mp3`, builtin: sound } : null;
-  const cfg = { W, H, seed, look, energy: comp.energy, scenes: comp.scenes, sound: sound === 'none' ? 'none' : 'on', brand: facts.name, logo: facts.logo };
+  const cfg = { target: duration, W, H, seed, look, energy: comp.energy, scenes: comp.scenes, sound: sound === 'none' ? 'none' : 'on', brand: facts.name, logo: facts.logo };
   return { html: piecesHtml(cfg, music), data: cfg };
 }
 
@@ -99,7 +130,7 @@ export function templateFilm({ plan = {}, brief = {}, assets = [], themeColors =
   const aspect = TPL_SIZES[plan.aspect_ratio] ? plan.aspect_ratio : '9:16', [W, H] = TPL_SIZES[aspect];
   const f = factsOf(plan, brief, assets);
   const seed = hashStr(`${f.name}|${brief.template}|${salt}`) % 2147483647 || 7;
-  const want = Number(plan.duration_seconds || brief.duration) || 15, duration = [6, 15, 30].reduce((a, b) => (Math.abs(b - want) < Math.abs(a - want) ? b : a));
+  const want = Number(plan.duration_seconds || brief.duration) || 15, duration = Math.max(6, Math.min(120, Math.round(want)));
   // the owner's own colours win; otherwise the template keeps its house colours
   const own = { ...(brief.colorMode && brief.colorMode !== 'style' ? brief.colors || {} : {}), ...(plan.style?.colors && brief.colorMode && brief.colorMode !== 'style' ? plan.style.colors : {}) };
   const colors = HEX.test(own.primary || '') ? { A: own.primary, A2: HEX.test(own.secondary || '') ? own.secondary : undefined } : undefined;
@@ -116,7 +147,7 @@ const TPL_FONTS = { 'type-reactor': ["'Anton'", "'Inter'"], 'luxury-product': ["
 export function piecesHtml(cfg, music = null) {
   const fams = [cfg.look.display, cfg.look.ui].map((f) => String(f).split("'")[1]).filter(Boolean);
   const fontLink = fontsUrl(fams) || `https://fonts.googleapis.com/css2?${fams.map((f) => `family=${f.replace(/ /g, '+')}:wght@400;500;600;700;800`).join('&')}&display=block`;
-  const est = cfg.template ? cfg.template.duration : Math.round(cfg.scenes.reduce((a, s) => a + (DUR[s.piece] || 3.8), 0) * 0.95);
+  const est = cfg.template ? cfg.template.duration : cfg.target ? Math.round(cfg.target) : Math.round(cfg.scenes.reduce((a, s) => a + (DUR[s.piece] || 3.8), 0) * 0.95);
   return `<!DOCTYPE html>
 <html lang="en">
 <head>

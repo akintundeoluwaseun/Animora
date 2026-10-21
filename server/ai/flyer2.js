@@ -182,7 +182,7 @@ export function flyerHtml2(data) {
       <section class="ev">${day ? `<div class="date"><b>${esc(day)}</b><span>${esc(mon)}</span>${when?.weekday ? `<i>${esc(when.weekday)}</i>` : ''}</div>` : ''}<div class="ev-t">${h1()}${sub}</div></section>
       ${hero ? `<div class="ev-photo"><img src="${esc(hero)}" crossorigin="anonymous" alt=""></div>` : ''}
       <ul class="ev-info">${when?.time ? `<li>${ic('clock', Math.round(40 * U), ACC)}<span>${esc(when.time)}</span></li>` : ''}${when?.place ? `<li>${ic('pin', Math.round(40 * U), ACC)}<span>${esc(when.place)}</span></li>` : ''}${(data.features || []).slice(0, 3).map((f, i) => `<li>${ic(glyphFor(f, i), Math.round(40 * U), ACC)}<span>${esc(f)}</span></li>`).join('')}</ul>
-      <footer class="ticket"><div class="t-l"><span class="lbl">${esc(offer ? 'Tickets' : 'Entry')}</span><b>${esc(offer || 'Free')}</b></div><div class="t-r">${cta()}${contactList('small')}</div></footer></div>`;
+      <footer class="ticket"><div class="t-l"><span class="lbl">${esc(offer ? (/%|off|save|sale|discount/i.test(offer) ? 'Special' : (/\d/.test(offer) ? 'From' : 'Offer')) : 'Entry')}</span><b>${esc(offer || 'Free')}</b></div><div class="t-r">${cta()}${contactList('small')}</div></footer></div>`;
   } else if (L === 'menu') {
     const list = items.slice(0, tall ? 8 : 6);
     body = `<div class="pf menu">
@@ -292,6 +292,9 @@ ${treat}
 .band { position:relative; flex:none; margin:auto ${n(-120)} 0; transform:rotate(-4deg); background:#111; color:#fff; font-family:${display}; font-weight:${look.dw || 800}; font-size:${n(44)}; padding:${n(16)} 0; white-space:nowrap; overflow:hidden; ${look.upper ? '' : 'text-transform:uppercase;'} letter-spacing:.04em; }
 .foot.strip { position:absolute; left:0; right:0; bottom:0; margin:0; background:#fff; color:#111; padding:${n(30)} ${n(68)} ${n(36)}; flex-wrap:nowrap; }
 .pf.price { padding-bottom:${n(220)}; gap:${n(tall ? 34 : 18)}; }
+.price h1 { line-height:1.14; } .price h1 em { display:inline-block; margin-top:${n(10)}; padding:${n(2)} ${n(22)} ${n(8)}; line-height:1.05; }
+.pf.price::before { content:''; position:absolute; inset:0; pointer-events:none; background:radial-gradient(circle at 12% 88%, rgba(255,255,255,.16) 0 ${n(180)}, transparent ${n(182)}), radial-gradient(circle at 92% 30%, rgba(0,0,0,.10) 0 ${n(240)}, transparent ${n(242)}), radial-gradient(circle at 80% 92%, rgba(255,255,255,.12) 0 ${n(110)}, transparent ${n(112)}); }
+.price > * { position:relative; }
 .foot.strip .contacts svg { color:${AL}; }
 /* event */
 .ev { display:flex; gap:${n(40)}; align-items:flex-start; position:relative; z-index:2; }

@@ -473,10 +473,13 @@
   function dataFor(beat, f, i) {
     const head = f.headline || f.brand, lines = String(head).includes('|') ? head : head.split(/\s+/).length > 2 ? head.split(/\s+/).slice(0, Math.ceil(head.split(/\s+/).length / 2)).join(' ') + '|' + head.split(/\s+/).slice(Math.ceil(head.split(/\s+/).length / 2)).join(' ') : head;
     const words = [...(f.words || []), f.brand].filter(Boolean);
+    // every line the owner gave us, once each (long films walk through them instead of repeating one)
+    const pool = [...(f.points || []), ...String(head).replace('|', ' ').split(/\s+/).filter((w) => w.length >= 4), f.sub, f.cta].map((x) => String(x || '').trim()).filter((x, k, a) => x && a.indexOf(x) === k);
+    const nth = (k) => (pool.length ? pool[k % pool.length] : head);
     return ({
-      'tr-words': { text: i ? (f.points?.[i % Math.max(1, f.points.length)] || head) : head }, 'tr-split': { word: (f.words?.[i % Math.max(1, f.words?.length || 1)] || f.points?.[0] || f.brand || '').split(/\s+/)[0], tag: f.brand }, 'tr-final': { headline: lines },
-      'lux-reveal': { img: f.img, mono: f.mono, kicker: f.brand }, 'lux-orbit': { img: f.img, mono: f.mono, brand: f.brand }, 'lux-macro': { img: f.img, benefit: f.points?.[i % Math.max(1, f.points?.length || 1)] || f.sub }, 'lux-lockup': { brand: f.brand, benefit: f.sub, cta: f.cta },
-      'hud-boot': {}, 'hud-panels': { headline: i % 2 ? (f.points?.[0] || head) : head, tag: f.brand, metric: (f.points?.[1] || 'SYSTEM READY').toUpperCase() }, 'hud-emblem': { mono: f.mono, logo: f.logo, brand: f.brand },
+      'tr-words': { text: i ? nth(i - 1) : head }, 'tr-split': { word: (nth(i + 1) || f.brand || '').split(/\s+/)[0], tag: f.brand }, 'tr-final': { headline: lines },
+      'lux-reveal': { img: f.img, mono: f.mono, kicker: f.brand }, 'lux-orbit': { img: f.img, mono: f.mono, brand: f.brand }, 'lux-macro': { img: f.img, benefit: nth(i) || f.sub }, 'lux-lockup': { brand: f.brand, benefit: f.sub, cta: f.cta },
+      'hud-boot': {}, 'hud-panels': { headline: i % 2 ? nth(i) : head, tag: f.brand, metric: (nth(i + 1) || 'SYSTEM READY').toUpperCase() }, 'hud-emblem': { mono: f.mono, logo: f.logo, brand: f.brand },
       'chrome-emerge': {}, 'chrome-ribbons': {}, 'chrome-type': { headline: f.brand, sub: f.sub },
       'sport-cuts': { img: f.img }, 'sport-impact': { img: f.img, headline: lines, sub: f.sub }, 'sport-freeze': { img: f.img, headline: f.brand, sub: f.cta },
       'swiss-grid': { headline: lines, kicker: f.sub, date: f.date, place: f.place }, 'swiss-photo': { img: f.img, word: words[i % words.length] }, 'swiss-poster': { brand: f.brand, line: f.sub, cta: f.cta, contact: f.contact },
@@ -487,11 +490,14 @@
 
   /** cfg = { template, W, H, seed, duration: 6|15|30, intensity, sound, quality, bpm, colors:{A,A2}, fields:{ brand, headline, sub, cta, points[], img, logo, mono, date, place, contact } } */
   window.TEMPLATE_RECIPE = function (cfg) {
-    const tp = T[cfg.template] || T['type-reactor'], dur = [6, 15, 30].reduce((a, b) => (Math.abs(b - (cfg.duration || 15)) < Math.abs(a - (cfg.duration || 15)) ? b : a));
+    const tp = T[cfg.template] || T['type-reactor'], dur = Math.max(5, Math.min(120, Number(cfg.duration) || 15));
     const intensity = cfg.intensity || tp.intensity, sound = cfg.sound || tp.sound, f = cfg.fields || {};
     const q = (x) => `'${x}', 'Inter', system-ui, sans-serif`, L0 = tp.look;
     const look = { display: q(cfg.font || L0.display), dw: L0.dw, ui: q(L0.ui), upper: !!L0.upper, A: cfg.colors?.A || L0.A, A2: cfg.colors?.A2 || L0.A2, dark: L0.dark, bg: L0.dark ? L0.bg : '#0B0B0D', bgLight: L0.dark ? '#F3F2F7' : L0.bg };
-    const beats = tp.beats[dur], pool = (tp.trans.concat(POOLS[intensity] || [])).filter((x, i, a) => a.indexOf(x) === i);
+    // the three tuned recipes (6 / 15 / 30 s) are used as they are; any other length gets a fresh run of the template's own beats
+    const beats = tp.beats[dur] || (() => { const b30 = tp.beats[30], first = b30[0], last = b30[b30.length - 1], mid = b30.length > 2 ? b30.slice(1, -1) : [first];
+      const n = Math.max(2, Math.min(40, Math.round(dur / 3.8))), out = [first]; for (let k = 0; k < n - 2; k++) out.push(mid[k % mid.length]); out.push(last); return out; })();
+    const pool = (tp.trans.concat(POOLS[intensity] || [])).filter((x, i, a) => a.indexOf(x) === i);
     const bpm = cfg.bpm || 100, beat = 60 / bpm;
     // fit the beats into the chosen length; with a beat soundtrack every cut lands on a beat
     const heavy = (b) => b === 'tr-final' || b.endsWith('lockup') || b.endsWith('emblem') || b === 'logo-burst' || b === 'swiss-poster';
@@ -499,7 +505,7 @@
     const r = (() => { let a = (cfg.seed || 7) | 0; return () => { a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; })();
     let last = null;
     const scenes = beats.map((b, i) => { let dd = per * (heavy(b) ? 1.2 : 1); if (sound === 'beat') dd = Math.max(2 * beat, Math.round(dd / beat) * beat); const p = pool.filter((x) => x !== last); const tr = p[Math.floor(r() * p.length)]; last = tr; return { piece: b, kind: tp.look.dark ? 'dark' : 'light', bg: 'plain', cam: intensity === 'elegant' ? 'push' : intensity === 'fluid' ? 'drift' : 'push', trans: i ? tr : undefined, data: { ...dataFor(b, { ...f, bpm }, i), dur: +dd.toFixed(2) } }; });
-    return { W: cfg.W || 1080, H: cfg.H || 1920, seed: cfg.seed || 7, look, scenes, energy: intensity === 'aggressive' ? 'high' : intensity === 'elegant' ? 'calm' : 'medium', intensity, quality: cfg.quality || 'premium', sound, leak: tp.look.dark };
+    return { target: dur, W: cfg.W || 1080, H: cfg.H || 1920, seed: cfg.seed || 7, look, scenes, energy: intensity === 'aggressive' ? 'high' : intensity === 'elegant' ? 'calm' : 'medium', intensity, quality: cfg.quality || 'premium', sound, leak: tp.look.dark };
   };
   // build a template film into a stage element; sound profile shapes the cues
   window.TEMPLATE_FILM = function (cfg, stageEl) {
