@@ -185,39 +185,109 @@ function Rail({ onCreate }) {
   );
 }
 
+// ---------------------------------------------------------------- phones
+// Remember which library you came from, so "back" from a project goes to Videos or Flyers correctly.
+const LIB_KEY = 'animora.lib';
+const rememberLib = (p) => { try { if (p === '/videos' || p === '/flyers') sessionStorage.setItem(LIB_KEY, p); } catch { /* private mode */ } };
+export function announceKind(kind) { const p = kind === 'flyer' ? '/flyers' : '/videos'; rememberLib(p); window.dispatchEvent(new CustomEvent('animora:kind', { detail: p })); }
+const lastLib = () => { try { return sessionStorage.getItem(LIB_KEY) || '/videos'; } catch { return '/videos'; } };
+
+// A floating dock: five even slots. Videos and Flyers light up in their own colour, Create is raised in the middle.
 function BottomTabs({ onCreate }) {
-  const [more, setMore] = useState(false);
-  const tab = ({ isActive }) => `flex flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[11px] font-medium ${isActive ? 'text-ink' : 'text-ink-mute'}`;
+  const [me, setMe] = useState(false);
+  const { pathname } = useLocation();
+  const on = (to) => pathname.startsWith(to);
+  const Slot = ({ to, label, icon, tone, onClick, active }) => {
+    const inner = (
+      <>
+        <span className={`grid h-8 w-12 place-items-center rounded-full transition-colors duration-200 ${active ? tone.on : tone.idle}`}><Icon k={icon} size={20} /></span>
+        <span className={`text-[11.5px] font-semibold leading-none ${active ? tone.text : 'text-ink-mute'}`}>{label}</span>
+      </>
+    );
+    const cls = 'press flex min-w-0 flex-col items-center justify-center gap-1 py-1.5';
+    return to ? <NavLink to={to} className={cls} aria-current={active ? 'page' : undefined}>{inner}</NavLink> : <button type="button" onClick={onClick} className={cls} aria-label={label === 'Me' ? 'Me: account, credits and more' : label}>{inner}</button>;
+  };
+  const T = {
+    video: { on: 'bg-video text-white', idle: 'text-video', text: 'text-video' },
+    flyer: { on: 'bg-flyer text-white', idle: 'text-flyer', text: 'text-flyer' },
+    plain: { on: 'bg-ink text-white', idle: 'text-ink-soft', text: 'text-ink' },
+  };
   return (
     <>
-      <nav className="fixed inset-x-0 bottom-0 z-40 flex items-end border-t border-ink/10 bg-white/92 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl lg:hidden" aria-label="Main">
-        <NavLink to="/videos" className={({ isActive }) => `${tab({ isActive: false })} ${isActive ? '!text-video' : ''}`}><span className="grid size-8 place-items-center rounded-lg bg-video-soft text-video"><Icon k="videos" size={18} /></span>Videos</NavLink>
-        <NavLink to="/flyers" className={({ isActive }) => `${tab({ isActive: false })} ${isActive ? '!text-flyer' : ''}`}><span className="grid size-8 place-items-center rounded-lg bg-flyer-soft text-flyer"><Icon k="flyers" size={18} /></span>Flyers</NavLink>
-        <div className="flex flex-1 justify-center">
-          <button onClick={onCreate} aria-label="Create" className="press -mt-5 grid size-14 place-items-center rounded-full bg-danfo text-white shadow-[0_10px_24px_-8px_var(--color-danfo)]"><Icon k="plus" size={26} /></button>
+      <nav className="dock fixed inset-x-3 bottom-[max(10px,env(safe-area-inset-bottom))] z-40 lg:hidden" aria-label="Main">
+        <div className="grid grid-cols-5 items-end rounded-[26px] border border-ink/8 bg-white/94 px-1 pb-1 pt-1.5 shadow-[0_18px_40px_-14px_rgba(20,18,40,.35)] backdrop-blur-xl">
+          <Slot to="/videos" label="Videos" icon="videos" tone={T.video} active={on('/videos')} />
+          <Slot to="/flyers" label="Flyers" icon="flyers" tone={T.flyer} active={on('/flyers')} />
+          <button type="button" onClick={onCreate} aria-label="Create a video or flyer" className="press flex flex-col items-center gap-1 pb-1.5">
+            <span className="dock-create -mt-6 grid size-14 place-items-center rounded-full text-white ring-4 ring-white"><Icon k="plus" size={26} /></span>
+            <span className="text-[11.5px] font-bold leading-none text-ink">Create</span>
+          </button>
+          <Slot to="/styles" label="Styles" icon="styles" tone={T.plain} active={on('/styles')} />
+          <Slot label="Me" icon="user" tone={T.plain} active={me} onClick={() => setMe(true)} />
         </div>
-        <NavLink to="/styles" className={tab}><Icon k="styles" />Styles</NavLink>
-        <button onClick={() => setMore(true)} className="flex flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[11px] font-medium text-ink-mute"><Icon k="more" />More</button>
       </nav>
-      <Modal open={more} onClose={() => setMore(false)} label="More">
-        <div className="flex flex-col gap-1" onClick={() => setMore(false)}>
-          <Link to="/pricing" className="flex items-center gap-3 rounded-xl px-3 py-3 font-medium hover:bg-ink/5"><Icon k="pricing" />Pricing</Link>
-          <Link to="/" className="flex items-center gap-3 rounded-xl px-3 py-3 font-medium hover:bg-ink/5"><Icon k="styles" />About Animora</Link>
-        </div>
-        <div className="mt-4"><Account /></div>
-        <div className="mt-4"><DeveloperCard /></div>
-      </Modal>
+      <MeSheet open={me} onClose={() => setMe(false)} />
     </>
   );
 }
 
-function AppTopBar() {   // phones only: logo plus videos-left
+// "Me": credits, plan, the rest of the app, sign out.
+function MeSheet({ open, onClose }) {
   const { user } = useAuth();
+  const inst = useInstall();
   const left = user ? creditsLeft(user) : null;
+  const Row = ({ to, icon, children, sub }) => (
+    <Link to={to} onClick={onClose} className="press flex items-center gap-3.5 rounded-2xl px-3 py-3.5 hover:bg-ink/5">
+      <span className="grid size-10 place-items-center rounded-xl bg-ink/[0.05] text-ink-soft"><Icon k={icon} size={19} /></span>
+      <span className="min-w-0 flex-1 leading-tight"><b className="block text-[15.5px] font-semibold">{children}</b>{sub && <span className="block text-[13px] text-ink-mute">{sub}</span>}</span>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="text-ink-mute" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
+    </Link>
+  );
   return (
-    <header className="sticky top-0 z-30 flex h-14 items-center border-b border-ink/8 bg-white/90 px-4 backdrop-blur-xl lg:hidden">
-      <Logo />
-      {left !== null && <span className="ml-auto rounded-full border border-ink/10 px-3 py-1 text-sm"><b className="tabular-nums">{left}</b> left</span>}
+    <Modal open={open} onClose={onClose} label="Me">
+      <div className="mx-auto -mt-2 mb-4 h-1.5 w-10 rounded-full bg-ink/12 sm:hidden" aria-hidden="true" />
+      {user && (
+        <div className="flex items-center gap-3">
+          <span className="grid size-12 place-items-center rounded-full bg-gradient-to-br from-video to-flyer text-lg font-bold text-white">{String(user.name || 'You').trim().charAt(0).toUpperCase()}</span>
+          <div className="min-w-0 flex-1 leading-tight"><b className="block truncate text-lg tracking-[-0.02em]">{user.testMode ? 'Welcome' : user.name}</b><span className="mt-0.5 inline-block"><PlanBadge plan={user.plan} /></span></div>
+        </div>
+      )}
+      {left !== null && (
+        <div className="mt-5 grid grid-cols-2 gap-2.5">
+          <Link to="/videos" onClick={onClose} className="rounded-2xl bg-video-soft p-4"><b className="block text-3xl tabular-nums tracking-[-0.04em] text-video">{left}</b><span className="text-[13px] font-semibold text-ink-soft">videos left</span></Link>
+          <Link to="/pricing" onClick={onClose} className="rounded-2xl bg-ink p-4 text-white"><b className="block text-[15px]">Get more</b><span className="text-[13px] text-white/65">Buy a pack or go Pro</span></Link>
+        </div>
+      )}
+      <div className="mt-4 flex flex-col">
+        <Row to="/videos" icon="videos" sub="Motion ads you made">My videos</Row>
+        <Row to="/flyers" icon="flyers" sub="Posters and still designs">My flyers</Row>
+        <Row to="/styles" icon="styles" sub="Looks to start from">Styles</Row>
+        <Row to="/pricing" icon="pricing" sub="Plans and video packs">Pricing</Row>
+        <Row to="/" icon="more" sub="What Animora does">About Animora</Row>
+      </div>
+      {inst.can && <button onClick={() => { inst.install(); onClose(); }} className="press mt-3 flex w-full items-center justify-center gap-2 rounded-2xl border border-ink/12 py-3.5 text-[15px] font-semibold">Install the app on this phone</button>}
+      <div className="mt-4"><Account /></div>
+      <div className="mt-4"><DeveloperCard /></div>
+    </Modal>
+  );
+}
+
+function AppTopBar() {   // phones only: logo, the library you're in, videos left
+  const { user } = useAuth();
+  const { pathname } = useLocation();
+  const left = user ? creditsLeft(user) : null;
+  const kind = pathname.startsWith('/flyers') ? 'flyer' : pathname.startsWith('/videos') ? 'video' : null;
+  return (
+    <header className="sticky top-0 z-30 border-b border-ink/8 bg-white/88 pt-[env(safe-area-inset-top)] backdrop-blur-xl lg:hidden">
+      <div className="flex h-14 items-center gap-2 px-4">
+        <Logo />
+        {kind && <span className={`ml-1 rounded-full px-2.5 py-1 text-[12px] font-bold ${kind === 'flyer' ? 'bg-flyer-soft text-flyer' : 'bg-video-soft text-video'}`}>{kind === 'flyer' ? 'Flyers' : 'Videos'}</span>}
+        {left !== null && (
+          <Link to="/pricing" className="press ml-auto flex items-center gap-1.5 rounded-full border border-ink/10 bg-white px-3 py-1.5 text-[13px] font-semibold text-ink-soft">
+            <span className="size-2 rounded-full bg-money" aria-hidden="true" /><b className="tabular-nums text-ink">{left}</b> left
+          </Link>
+        )}
+      </div>
     </header>
   );
 }
@@ -226,14 +296,19 @@ function AppTopBar() {   // phones only: logo plus videos-left
 function FocusBar() {
   const navigate = useNavigate();
   const { state } = useLocation();
+  const [back, setBack] = useState(lastLib);
+  useEffect(() => { const on = (e) => setBack(e.detail); window.addEventListener('animora:kind', on); return () => window.removeEventListener('animora:kind', on); }, []);
+  const flyer = back === '/flyers';
   return (
-    <header className="sticky top-0 z-30 flex h-12 items-center gap-3 border-b border-ink/8 bg-white/90 px-3 backdrop-blur-xl sm:px-5">
-      <button onClick={() => navigate('/videos')} className="press flex h-9 items-center gap-1.5 rounded-lg px-2.5 text-sm font-semibold text-ink-soft hover:bg-ink/5 hover:text-ink" aria-label="Back to library">
-        <Icon k="back" size={18} />Library
-      </button>
-      <span className="h-5 w-px bg-ink/12" aria-hidden="true" />
-      <Logo />
-      {state?.hint && <span className="ml-auto text-sm text-ink-mute">{state.hint}</span>}
+    <header className="sticky top-0 z-30 border-b border-ink/8 bg-white/90 pt-[env(safe-area-inset-top)] backdrop-blur-xl">
+      <div className="flex h-12 items-center gap-2 px-2 sm:gap-3 sm:px-5">
+        <button onClick={() => navigate(back)} className={`press flex h-10 items-center gap-1 rounded-full pl-1.5 pr-3.5 text-[14px] font-semibold ${flyer ? 'text-flyer hover:bg-flyer-soft' : 'text-video hover:bg-video-soft'}`} aria-label={flyer ? 'Back to my flyers' : 'Back to my videos'}>
+          <Icon k="back" size={20} />{flyer ? 'Flyers' : 'Videos'}
+        </button>
+        <span className="hidden h-5 w-px bg-ink/12 sm:block" aria-hidden="true" />
+        <span className="hidden sm:block"><Logo /></span>
+        {state?.hint && <span className="ml-auto truncate text-sm text-ink-mute">{state.hint}</span>}
+      </div>
     </header>
   );
 }
@@ -242,6 +317,7 @@ function FocusBar() {
 export default function Shell({ children }) {
   const { pathname } = useLocation();
   const mode = modeFor(pathname);
+  useEffect(() => { rememberLib(pathname); }, [pathname]);
   const create = useCreate();
   const { user } = useAuth();
   void user; void naira;
@@ -250,7 +326,7 @@ export default function Shell({ children }) {
       {mode === 'site' && <SiteBar onCreate={create.show} />}
       {mode === 'app' && <><Rail onCreate={create.show} /><AppTopBar /></>}
       {mode === 'focus' && <FocusBar />}
-      <main className={`app-main ${mode === 'app' ? 'pb-28 lg:pb-12' : ''}`}>{children}</main>
+      <main className={`app-main ${mode === 'app' ? 'pb-32 lg:pb-12' : ''}`}>{children}</main>
       {mode === 'site' && <SiteFooter />}
       {mode === 'app' && <BottomTabs onCreate={create.show} />}
       <CreateSheet open={create.open} onClose={create.hide} />

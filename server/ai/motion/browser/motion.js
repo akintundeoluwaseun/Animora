@@ -8,7 +8,11 @@
   const PORTRAIT = H > W * 1.2, WIDE = W > H * 1.2;
   const tl = gsap.timeline({ paused: true, defaults: { ease: 'expo.out' } });
   // springy eases overshoot; a blur below zero is invalid CSS and would stick. Blur always gets its own smooth ease.
-  const _fromTo = tl.fromTo.bind(tl);
+  // never insert at a negative time: GSAP would shift the WHOLE timeline later (once per insert)
+  const pos0 = (p) => (typeof p === 'number' && p < 0 ? 0 : p);
+  { const _to = tl.to.bind(tl), _set = tl.set.bind(tl); tl.to = (t, v, p) => _to(t, v, pos0(p)); tl.set = (t, v, p) => _set(t, v, pos0(p)); }
+  const _fromTo0 = tl.fromTo.bind(tl);
+  const _fromTo = (t, a, b, p) => _fromTo0(t, a, b, pos0(p));
   tl.fromTo = (t, from, to, pos) => {
     if (to && to.filter !== undefined && /back|elastic|bounce/.test(String(to.ease || ''))) {
       const f = Object.assign({}, from), v = Object.assign({}, to);
@@ -34,10 +38,22 @@
   const ACC = /^#[0-9a-f]{3,6}$/i.test(D.accent || '') ? D.accent : '#2F6BFF';
   let A_L = ACC; for (let i = 0; i < 12 && lum(A_L) > 0.3; i++) A_L = mix(A_L, '#000000', 0.12);          // readable on white
   let A_D = ACC; for (let i = 0; i < 12 && lum(A_D) < 0.2; i++) A_D = mix(A_D, '#FFFFFF', 0.14);          // readable on black
-  const A2 = /^#[0-9a-f]{3,6}$/i.test(D.accent2 || '') ? D.accent2 : mix(ACC, '#FFFFFF', 0.35);
+  const LOOK = Object.assign({ theme: 'light', text: 'plain', deco: 'none', energy: 'medium' }, D.look || {});
+  const A2 = /^#[0-9a-f]{3,6}$/i.test(D.accent2 || LOOK.accent2 || '') ? (D.accent2 || LOOK.accent2) : mix(ACC, '#FFFFFF', 0.35);
+  const DISPLAY = `'${LOOK.display || D.font || 'Inter'}', '${D.font || 'Inter'}', 'Inter', system-ui, sans-serif`;
+  const DW = LOOK.dw || 650;
+  // the style's own background tints its base stage (never muddy: dark stays deep, light stays clean)
+  const TINT = /^#[0-9a-f]{6}$/i.test(LOOK.bg || '') ? LOOK.bg : null;
   const BRAND_DARK = lum(ACC) < 0.42;            // white text on the brand colour?
   const root = document.documentElement;
-  Object.entries({ W: W + 'px', H: H + 'px', u: U + 'px', font: `'${D.font || 'Inter'}'`, a1: ACC, a1l: mix(ACC, '#FFFFFF', 0.22), a1d: mix(ACC, '#000000', 0.32) }).forEach(([k, v]) => root.style.setProperty('--' + k, v));
+  Object.entries({ W: W + 'px', H: H + 'px', u: U + 'px', font: `'${LOOK.ui || D.font || 'Inter'}'`, a1: ACC, a1l: mix(ACC, '#FFFFFF', 0.22), a1d: mix(ACC, '#000000', 0.32) }).forEach(([k, v]) => root.style.setProperty('--' + k, v));
+  if (TINT && LOOK.theme === 'dark' && lum(TINT) < 0.2) {
+    const d0 = mix(TINT, '#000000', 0.15);
+    root.style.setProperty('--d1', mix(d0, '#FFFFFF', 0.07)); root.style.setProperty('--d2', d0); root.style.setProperty('--d3', mix(TINT, '#000000', 0.75));
+  }
+  if (TINT && LOOK.theme === 'light' && lum(TINT) > 0.55) {
+    root.style.setProperty('--l1', mix(TINT, '#FFFFFF', 0.55)); root.style.setProperty('--l2', TINT); root.style.setProperty('--l3', mix(TINT, '#000000', 0.08)); root.style.setProperty('--l4', mix(TINT, '#000000', 0.14));
+  }
   const inkOf = (bg) => (bg === 'light' ? '#111114' : bg === 'brand' ? (BRAND_DARK ? '#FFFFFF' : '#111114') : '#F5F5F7');
   const muteOf = (bg) => (bg === 'light' ? '#86868F' : bg === 'brand' ? (BRAND_DARK ? 'rgba(255,255,255,.72)' : 'rgba(0,0,0,.55)') : '#9B9BA5');
   const accOf = (bg) => (bg === 'light' ? A_L : bg === 'brand' ? (BRAND_DARK ? '#FFFFFF' : '#111114') : A_D);
@@ -122,13 +138,50 @@
     const words = String(text).trim().split(/\s+/).filter(Boolean);
     const acc = opts.accent || new Set();
     const items = words.map((w, i) => el('span', 'w', row, esc(w), { marginRight: i < words.length - 1 ? '0.25em' : '0', color: acc.has(i + (opts.offset || 0)) ? opts.accColor : null }));
+    const head = !opts.plain && (opts.head || !opts.weight || opts.weight >= 650);
+    dressRow(row, items, acc, opts.offset || 0, opts.bg, head);
     if (opts.fit !== false) fitFont(row, opts.maxW || maxTextW(), N(40));
     return { row, items, words };
+  }
+  // The style's typography: display font, case, spacing, and a treatment for the words that matter.
+  const SCALE = { condensed: 1.28, sport: 1.12, spaced: 0.8, outline: 0.92, serif: 1.06, sticker: 1.0, neon: 0.9 };
+  function dressText(node, bg) {   // a single big text element (price, slam word, labels)
+    node.style.fontFamily = DISPLAY; node.style.fontWeight = String(DW);
+    if (LOOK.upper) node.style.textTransform = 'uppercase';
+    const t = LOOK.text;
+    if (t === 'spaced') node.style.letterSpacing = '0.1em';
+    else if (t === 'condensed') { node.style.letterSpacing = '0'; node.style.lineHeight = '0.95'; }
+    else if (t === 'outline' || t === 'sport' || t === 'neon') node.style.letterSpacing = '0.01em';
+    else if (t === 'serif') node.style.letterSpacing = '-0.02em';
+    if (t === 'sport') { node.style.fontStyle = 'italic'; }
+    if (t === 'neon') node.style.textShadow = neonShadow(bg);
+    if (t === 'outline') outlineIt(node);
+    if (t === 'glow' && bg !== 'light') node.style.textShadow = `0 0 ${N(24)}px ${rgba(A_D, 0.55)}, 0 0 ${N(60)}px ${rgba(A_D, 0.35)}`;
+    const k = SCALE[t]; if (k && node.style.fontSize) node.style.fontSize = parseFloat(node.style.fontSize) * k + 'px';
+  }
+  const neonShadow = (bg) => `0 0 ${N(6)}px rgba(255,255,255,.65), 0 0 ${N(22)}px ${rgba(bg === 'light' ? A_L : A_D, 0.85)}, 0 0 ${N(60)}px ${rgba(bg === 'light' ? A_L : A_D, 0.5)}, ${-N(3)}px 0 rgba(255,40,120,.35), ${N(3)}px 0 rgba(0,229,255,.35)`;
+  function outlineIt(n) { n.style.webkitTextStroke = `${N(5)}px #111`; n.style.paintOrder = 'stroke fill'; n.style.textShadow = `${N(7)}px ${N(8)}px 0 #111`; }
+  function dressRow(row, items, acc, offset, bg, head) {
+    row.style.fontFamily = head ? DISPLAY : row.style.fontFamily;
+    if (!head) return;
+    row.style.fontWeight = String(DW);
+    dressText(row, bg);
+    const t = LOOK.text;
+    items.forEach((it, i) => {
+      const hot = acc.has(i + offset);
+      if (t === 'sport') gsap.set(it, { skewX: -8 });
+      if (t === 'outline') { it.style.color = hot ? ACC : '#FFFFFF'; }
+      if (!hot) return;
+      if (t === 'marker') Object.assign(it.style, { background: ACC, color: BRAND_DARK ? '#FFFFFF' : '#111111', padding: '0 0.16em', borderRadius: '0.12em', boxDecorationBreak: 'clone' });
+      else if (t === 'sticker') { Object.assign(it.style, { background: A2, color: lum(A2) > 0.45 ? '#111' : '#fff', padding: '0.02em 0.28em', borderRadius: '0.34em', boxShadow: `0 ${N(10)}px ${N(22)}px ${rgba(A2, 0.35)}` }); gsap.set(it, { rotation: -3 }); }
+      else if (t === 'gradient') Object.assign(it.style, { backgroundImage: `linear-gradient(90deg, ${A_D}, ${A2})`, WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' });
+      else if (t === 'serif') it.style.fontStyle = 'italic';
+    });
   }
   // the brand name beside its icon; long names wrap onto two lines instead of shrinking to nothing
   function nameBlock(wrap, text, sizePx, color, maxW) {
     const long = String(text).length > 22;
-    const name = el('div', '', wrap, esc(text), { fontSize: (long ? sizePx * 0.72 : sizePx) + 'px', fontWeight: 700, letterSpacing: '-0.04em', whiteSpace: long ? 'normal' : 'nowrap', color, lineHeight: long ? 1.04 : 1.15, maxWidth: long ? maxW + 'px' : 'none', textAlign: 'left' });
+    const name = el('div', '', wrap, esc(text), { fontFamily: DISPLAY, textTransform: LOOK.upper ? 'uppercase' : 'none', fontSize: (long ? sizePx * 0.72 : sizePx) + 'px', fontWeight: DW, letterSpacing: '-0.04em', whiteSpace: long ? 'normal' : 'nowrap', color, lineHeight: long ? 1.04 : 1.15, maxWidth: long ? maxW + 'px' : 'none', textAlign: 'left' });
     if (long) { name.style.width = Math.min(maxW, name.offsetWidth) + 'px'; let fs = parseFloat(name.style.fontSize); for (let i = 0; i < 12 && name.offsetHeight > fs * 2.3; i++) { fs *= 0.92; name.style.fontSize = fs + 'px'; } }
     else fitFont(name, maxW, N(36));
     return name;
@@ -181,7 +234,14 @@
       const per = clamp((t1 - t0 - 0.6) / words.length, 0.32, 0.6);
       words.forEach((w, i) => {
         const big = el('div', '', s, esc(w), { position: 'absolute', fontSize: px(o.size || 210), fontWeight: 750, letterSpacing: '-0.05em', color: acc.has(i) ? accOf(bg) : 'inherit', whiteSpace: 'nowrap' });
+        dressText(big, bg);
+        if (acc.has(i) && LOOK.text === 'marker') Object.assign(big.style, { background: ACC, color: BRAND_DARK ? '#fff' : '#111', padding: '0 0.14em', borderRadius: '0.1em' });
+        if (acc.has(i) && LOOK.text === 'sticker') Object.assign(big.style, { background: A2, color: lum(A2) > 0.45 ? '#111' : '#fff', padding: '0 0.24em', borderRadius: '0.3em' });
+        if (LOOK.text === 'outline') big.style.color = acc.has(i) ? ACC : '#FFFFFF';
+        if (acc.has(i) && LOOK.text === 'gradient') Object.assign(big.style, { backgroundImage: `linear-gradient(90deg, ${A_D}, ${A2})`, WebkitBackgroundClip: 'text', color: 'transparent' });
         fitFont(big, maxTextW(), N(60));
+        if (LOOK.text === 'sport') gsap.set(big, { skewX: -8 });
+        if (LOOK.text === 'sticker' && acc.has(i)) gsap.set(big, { rotation: -4 });
         const a = t0 + 0.05 + i * per, last = i === words.length - 1;
         tl.fromTo(big, { opacity: 0, scale: 1.35, filter: blur(16) }, { opacity: 1, scale: 1, filter: blur(0), duration: 0.42, ease: 'expo.out' }, a);
         if (!last) tl.to(big, { opacity: 0, scale: 0.86, filter: blur(10), duration: 0.18, ease: 'power2.in' }, a + per - 0.14);
@@ -192,7 +252,7 @@
     const box = el('div', 'col', s, '', { gap: px(size * 0.12) });
     const per = clamp((t1 - t0 - 1.1) / Math.max(1, total), 0.12, 0.3);
     let at = t0 + 0.1, offset = 0;
-    const rows = lines.map((line, li) => { const r = wordsRow(box, line, li > 0 && o.small ? size * 0.62 : size, { accent: acc, offset, accColor: accOf(bg), weight: o.weight || (o.mode === 'glow' ? 600 : 650) }); offset += r.words.length; return r; });
+    const rows = lines.map((line, li) => { const r = wordsRow(box, line, li > 0 && o.small ? size * 0.62 : size, { accent: acc, offset, accColor: accOf(bg), bg, head: true, weight: o.weight || (o.mode === 'glow' ? 600 : 650) }); offset += r.words.length; return r; });
     if (rows.length > 1) {   // keep the visible lines centred vertically as later lines arrive
       const hs = rows.map((r) => r.row.offsetHeight + size * U * 0.12);
       const restY = (i) => hs.slice(i + 1).reduce((a, b) => a + b, 0) / 2;
@@ -244,7 +304,7 @@
       after = t0 + 1.6;
     }
     if (o.tagline) {
-      const tg = wordsRow(s, o.tagline, o.tagSize || 54, { weight: 550, accent: new Set([].concat(o.accent || [])), accColor: accOf(bg), color: mode === 'solo' ? ink : muteOf(bg) });
+      const tg = wordsRow(s, o.tagline, o.tagSize || 54, { weight: 550, accent: new Set([].concat(o.accent || [])), accColor: accOf(bg), bg, color: mode === 'solo' ? ink : muteOf(bg) });
       tg.row.style.marginTop = px(mode === 'solo' ? 60 : 44); tg.row.style.color = mode === 'solo' ? ink : muteOf(bg);
       buildRow(tg.row, tg.items, Math.min(after, t1 - 1.2), 0.12, { blur: 6 });
     }
@@ -269,14 +329,14 @@
       tl.fromTo(n, { y: -N(320), opacity: 0, scale: 0.9, filter: blur(16) }, { y: 0, opacity: 1, scale: 1, filter: blur(0), duration: 0.95, ease: 'back.out(1.35)' }, a);
       sfx(a + 0.1, 'chime', 0.45);
     });
-    if (o.lead) { const l = wordsRow(s, o.lead, 76, { accent: new Set([].concat(o.accent || [])), accColor: accOf(bg) }); l.row.style.marginTop = px(70); buildRow(l.row, l.items, t0 + 0.4 + items.length * 0.75, 0.16); }
+    if (o.lead) { const l = wordsRow(s, o.lead, 76, { accent: new Set([].concat(o.accent || [])), accColor: accOf(bg), bg }); l.row.style.marginTop = px(70); buildRow(l.row, l.items, t0 + 0.4 + items.length * 0.75, 0.16); }
     float(stack, t0 + 1, t1, 12);
   };
 
   // STACK: pastel cards that stack up (features, services, products)
   B.stack = (s, o, t0, t1, bg) => {
     const items = [].concat(o.items || []).filter((x) => x && x.t).slice(0, 4);
-    if (o.title) { const tt = wordsRow(s, o.title, 76, { weight: 700, accent: new Set([].concat(o.accent || [])), accColor: accOf(bg) }); tt.row.style.marginBottom = px(56); buildRow(tt.row, tt.items, t0 + 0.05, 0.14); }
+    if (o.title) { const tt = wordsRow(s, o.title, 76, { weight: 700, accent: new Set([].concat(o.accent || [])), accColor: accOf(bg), bg }); tt.row.style.marginBottom = px(56); buildRow(tt.row, tt.items, t0 + 0.05, 0.14); }
     const w = Math.min(W * (PORTRAIT ? 0.86 : 0.56), N(920));
     const col = el('div', 'col', s, '', { gap: px(26) });
     const off = Math.floor(R(0, PASTEL.length));
@@ -298,7 +358,7 @@
   // TOGGLES: an iOS settings card where each strength switches on
   B.toggles = (s, o, t0, t1, bg) => {
     const items = [].concat(o.items || []).filter(Boolean).slice(0, 5);
-    if (o.title) { const tt = wordsRow(s, o.title, 72, { weight: 700, accent: new Set([].concat(o.accent || [])), accColor: accOf(bg) }); tt.row.style.marginBottom = px(56); buildRow(tt.row, tt.items, t0 + 0.05, 0.14); }
+    if (o.title) { const tt = wordsRow(s, o.title, 72, { weight: 700, accent: new Set([].concat(o.accent || [])), accColor: accOf(bg), bg }); tt.row.style.marginBottom = px(56); buildRow(tt.row, tt.items, t0 + 0.05, 0.14); }
     const w = Math.min(W * (PORTRAIT ? 0.84 : 0.56), N(880));
     const card = el('div', 'card', s, '', { width: w + 'px', padding: `${N(10)}px ${N(40)}px` });
     if (bg !== 'light') Object.assign(card.style, { background: '#1C1C21', boxShadow: '0 0 0 1px rgba(255,255,255,.07)' });
@@ -320,7 +380,7 @@
   // SWAP: a pill whose words roll through a list; earlier pills stack behind (Send money / Receive fast / Save smart)
   B.swap = (s, o, t0, t1, bg) => {
     const words = [].concat(o.items || []).filter(Boolean).slice(0, 5);
-    if (o.lead) { const tt = wordsRow(s, o.lead, 76, { weight: 700, accent: new Set([].concat(o.accent || [])), accColor: accOf(bg) }); tt.row.style.marginBottom = px(70); buildRow(tt.row, tt.items, t0 + 0.05, 0.14); }
+    if (o.lead) { const tt = wordsRow(s, o.lead, 76, { weight: 700, accent: new Set([].concat(o.accent || [])), accColor: accOf(bg), bg }); tt.row.style.marginBottom = px(70); buildRow(tt.row, tt.items, t0 + 0.05, 0.14); }
     const depthMax = Math.min(2, words.length - 1);
     const box = el('div', '', s, '', { position: 'relative', width: '100%', height: N(140 + 92 * depthMax) + 'px', display: 'flex', justifyContent: 'center' });
     const step = clamp((t1 - t0 - 1.6) / Math.max(1, words.length), 0.5, 1.0);
@@ -404,7 +464,7 @@
     tl.fromTo(sh, { scale: 0.2, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.7, ease: 'power3.in' }, pa);
     sfx(pa + 0.7, 'impact', 0.5);
     for (let k = 0; k < 2; k++) { const ring = el('div', '', pinBox, '', { position: 'absolute', left: '50%', bottom: px(-30), width: px(180), height: px(70), marginLeft: px(-90), borderRadius: '50%', border: `${N(4)}px solid #E33A41` }); tl.fromTo(ring, { scale: 0.2, opacity: 0.8 }, { scale: 2.2, opacity: 0, duration: 1.4, ease: 'power2.out' }, pa + 0.75 + k * 0.45); }
-    if (o.label) { const lab = el('div', '', s, esc(o.label), { position: 'absolute', top: PORTRAIT ? '22%' : '14%', fontSize: px(o.labelSize || 150), fontWeight: 750, letterSpacing: '-0.05em', color: '#111114', whiteSpace: 'nowrap', textShadow: `0 0 ${N(40)}px rgba(238,235,228,.9)` }); fitFont(lab, maxTextW()); tl.fromTo(lab, { opacity: 0, scale: 1.25, filter: blur(18) }, { opacity: 1, scale: 1, filter: blur(0), duration: 0.9 }, t0 + 0.2); }
+    if (o.label) { const lab = el('div', '', s, esc(o.label), { position: 'absolute', top: PORTRAIT ? '22%' : '14%', fontSize: px(o.labelSize || 150), fontWeight: 750, letterSpacing: '-0.05em', color: '#111114', whiteSpace: 'nowrap', textShadow: `0 0 ${N(40)}px rgba(238,235,228,.9)` }); dressText(lab, 'light'); if (LOOK.text === 'neon') lab.style.textShadow = `0 0 ${N(40)}px rgba(238,235,228,.9)`; fitFont(lab, maxTextW()); tl.fromTo(lab, { opacity: 0, scale: 1.25, filter: blur(18) }, { opacity: 1, scale: 1, filter: blur(0), duration: 0.9 }, t0 + 0.2); }
     if (o.address) {
       const card = el('div', 'card', s, '', { position: 'absolute', bottom: PORTRAIT ? '17%' : '10%', display: 'flex', alignItems: 'center', gap: px(26), padding: `${N(30)}px ${N(44)}px ${N(30)}px ${N(30)}px`, maxWidth: W * 0.88 + 'px' });
       el('div', 'squircle', card, glyph('pin', 50, '#fff', 2.2), { width: px(92), height: px(92), background: 'linear-gradient(160deg,#FF6A6F,#D92B33)', flex: '0 0 auto' });
@@ -454,7 +514,11 @@
     if (o.label) { const l = el('div', '', s, esc(o.label), { fontSize: px(54), fontWeight: 600, color: muteOf(bg), letterSpacing: '-0.02em', marginBottom: px(10) }); tl.fromTo(l, { opacity: 0, y: N(20), filter: blur(8) }, { opacity: 1, y: 0, filter: blur(0), duration: 0.7 }, t0 + 0.1); }
     if (o.old) { const old = el('div', 'tnum', s, esc(o.old), { fontSize: px(70), fontWeight: 600, color: muteOf(bg), position: 'relative' }); const strike = el('div', '', old, '', { position: 'absolute', left: '-4%', right: '-4%', top: '52%', height: px(7), background: '#FF3B30', transformOrigin: '0 50%', borderRadius: px(4) }); tl.fromTo(old, { opacity: 0 }, { opacity: 1, duration: 0.4 }, t0 + 0.2); tl.fromTo(strike, { scaleX: 0 }, { scaleX: 1, duration: 0.45, ease: 'power3.inOut' }, t0 + 0.55); }
     const od = odometer(s, o.value, o.size || (PORTRAIT ? 250 : 220), accOf(bg));
-    fitFont(od.box, maxTextW());
+    od.box.style.fontFamily = DISPLAY; od.box.style.fontWeight = String(Math.max(DW, 400));
+    if (LOOK.text === 'neon') od.box.style.textShadow = neonShadow(bg);
+    if (LOOK.text === 'outline') { outlineIt(od.box); od.box.style.color = bg === 'brand' ? '#FFFFFF' : ACC; }
+    if (LOOK.text === 'sport') { od.box.style.fontStyle = 'italic'; }
+    fitFont(od.box, maxTextW() * (['neon', 'sport', 'outline'].includes(LOOK.text) ? 0.86 : 1));
     tl.fromTo(od.box, { scale: 0.85, filter: blur(12), opacity: 0 }, { scale: 1, filter: blur(0), opacity: 1, duration: 0.9 }, t0 + 0.3);
     od.play(t0 + 0.3); sfx(t0 + 0.35, 'whoosh', 0.35); sfx(t0 + 1.6, 'pop', 0.6);
     if (o.sub) { const sub = wordsRow(s, o.sub, 56, { weight: 600 }); sub.row.style.marginTop = px(30); buildRow(sub.row, sub.items, t0 + 1.1, 0.12); }
@@ -488,7 +552,7 @@
       const lines = [].concat(o.lines || o.text);
       const box = el('div', 'col', s, '', { position: 'absolute', bottom: PORTRAIT ? '11%' : '7%', left: 0, right: 0 });
       let at = t0 + 0.7;
-      let off = 0; lines.slice(0, 2).forEach((L, li) => { const r = wordsRow(box, L, li ? 54 : 92, { accent: new Set([].concat(o.accent || [])), offset: off, accColor: accOf(bg), weight: li ? 550 : 700 }); off += r.words.length; if (li) r.row.style.color = muteOf(bg); at = buildRow(r.row, r.items, at, 0.12) - 0.4; });
+      let off = 0; lines.slice(0, 2).forEach((L, li) => { const r = wordsRow(box, L, li ? 54 : 92, { accent: new Set([].concat(o.accent || [])), offset: off, accColor: accOf(bg), bg, weight: li ? 550 : 700 }); off += r.words.length; if (li) r.row.style.color = muteOf(bg); at = buildRow(r.row, r.items, at, 0.12) - 0.4; });
     }
   };
 
@@ -513,7 +577,7 @@
     const words = String(o.text || '').split(/\s+/).filter(Boolean);
     const hot = [].concat(o.hot || [words.length - 1]).filter((i) => i >= 0 && i < words.length);
     const lo = Math.min(...hot), hi = Math.max(...hot);
-    const row = el('div', 'row', s, '', { fontSize: px(o.size || 92), fontWeight: 650, letterSpacing: '-0.035em', position: 'relative' });
+    const row = el('div', 'row', s, '', { fontSize: px(o.size || 92), fontWeight: 650, letterSpacing: '-0.035em', position: 'relative', fontFamily: DISPLAY }); if (LOOK.upper) row.style.textTransform = 'uppercase'; row.style.fontWeight = String(DW);
     const spans = words.map((w, i) => el('span', 'w', row, esc(w), { marginRight: i < words.length - 1 ? '0.25em' : '0', position: 'relative', zIndex: 2 }));
     fitFont(row, maxTextW(), N(40));
     tl.fromTo(row, { opacity: 0, y: N(30), filter: blur(10) }, { opacity: 1, y: 0, filter: blur(0), duration: 0.8 }, t0 + 0.1);
@@ -570,7 +634,7 @@
 
   // BUTTON: the call to action as a real button; a cursor glides in and presses it
   B.button = (s, o, t0, t1, bg) => {
-    if (o.lead) { const tt = wordsRow(s, o.lead, 80, { weight: 700, accent: new Set([].concat(o.accent || [])), accColor: accOf(bg) }); tt.row.style.marginBottom = px(80); buildRow(tt.row, tt.items, t0 + 0.05, 0.14); }
+    if (o.lead) { const tt = wordsRow(s, o.lead, 80, { weight: 700, accent: new Set([].concat(o.accent || [])), accColor: accOf(bg), bg }); tt.row.style.marginBottom = px(80); buildRow(tt.row, tt.items, t0 + 0.05, 0.14); }
     const onBrand = bg === 'brand';
     const btn = el('div', 'pill', s, '', { height: px(150), padding: `0 ${N(84)}px`, gap: px(22), justifyContent: 'center', fontSize: px(56), fontWeight: 650, letterSpacing: '-0.025em', color: onBrand ? A_L : (BRAND_DARK ? '#fff' : '#111'), background: onBrand ? '#FFFFFF' : `linear-gradient(180deg, ${mix(ACC, '#FFFFFF', 0.16)}, ${ACC})`, boxShadow: onBrand ? '0 30px 60px rgba(0,0,0,.25)' : `inset 0 ${N(2)}px 0 rgba(255,255,255,.35), 0 ${N(26)}px ${N(56)}px ${rgba(ACC, 0.4)}`, position: 'relative', overflow: 'hidden', whiteSpace: 'nowrap' });
     if (o.glyph) el('div', '', btn, glyph(o.glyph, 56, 'currentColor', 2.3), { display: 'grid' });
@@ -619,7 +683,7 @@
   // STEPS: three cards joined by a glowing line that draws through them (how it works)
   B.steps = (s, o, t0, t1, bg) => {
     const items = [].concat(o.items || []).filter((x) => x && x.t).slice(0, 4);
-    if (o.title) { const tt = wordsRow(s, o.title, 76, { weight: 700, accent: new Set([].concat(o.accent || [])), accColor: accOf(bg) }); tt.row.style.marginBottom = px(70); buildRow(tt.row, tt.items, t0 + 0.05, 0.14); }
+    if (o.title) { const tt = wordsRow(s, o.title, 76, { weight: 700, accent: new Set([].concat(o.accent || [])), accColor: accOf(bg), bg }); tt.row.style.marginBottom = px(70); buildRow(tt.row, tt.items, t0 + 0.05, 0.14); }
     const vertical = PORTRAIT;
     const wrap = el('div', '', s, '', { position: 'relative', display: 'flex', flexDirection: vertical ? 'column' : 'row', gap: px(vertical ? 70 : 60), alignItems: 'center' });
     const dark = bg !== 'light';
@@ -676,7 +740,7 @@
     tl.fromTo(cube, { rotation: -20, scale: 0.6 }, { rotation: 18, scale: 1, duration: 1.6, ease: 'expo.out' }, t0 + 0.2);
     od.play(t0 + 0.35); sfx(t0 + 0.15, 'whoosh', 0.4); sfx(t0 + 1.5, 'pop', 0.5);
     float(card, t0 + 1.2, t1, 14);
-    if (o.lead) { const l = wordsRow(s, o.lead, 64, { weight: 600, accent: new Set([].concat(o.accent || [])), accColor: accOf(bg) }); l.row.style.marginTop = px(70); buildRow(l.row, l.items, t0 + 0.9, 0.13); }
+    if (o.lead) { const l = wordsRow(s, o.lead, 64, { weight: 600, accent: new Set([].concat(o.accent || [])), accColor: accOf(bg), bg }); l.row.style.marginTop = px(70); buildRow(l.row, l.items, t0 + 0.9, 0.13); }
   };
 
   // QUOTE: a customer's words with five stars (only when the owner gave a real review)
@@ -727,7 +791,7 @@
     const per = clamp((t1 - t0 - 1.4) / 3, 0.38, 0.6);
     tl.fromTo(ringSvg.querySelector('.arc'), { attr: { 'stroke-dashoffset': 1571 } }, { attr: { 'stroke-dashoffset': 0 }, duration: per * 3, ease: 'none' }, t0 + 0.1);
     nums.forEach((n, i) => {
-      const d = el('div', 'tnum', s, n, { position: 'absolute', fontSize: px(300), fontWeight: 750, letterSpacing: '-0.05em' });
+      const d = el('div', 'tnum', s, n, { position: 'absolute', fontSize: px(300), fontWeight: 750, letterSpacing: '-0.05em' }); dressText(d, bg);
       const a = t0 + 0.1 + i * per;
       tl.fromTo(d, { opacity: 0, scale: 1.6, filter: blur(20) }, { opacity: 1, scale: 1, filter: blur(0), duration: per * 0.6, ease: 'expo.out' }, a);
       tl.to(d, { opacity: 0, scale: 0.7, filter: blur(12), duration: per * 0.35, ease: 'power2.in' }, a + per * 0.65);
@@ -735,7 +799,7 @@
     });
     const ra = t0 + 0.1 + per * 3;
     tl.to(ringSvg, { scale: 2.4, opacity: 0, duration: 0.6, ease: 'power3.in' }, ra - 0.1);
-    const word = el('div', '', s, esc(o.reveal || 'Now open'), { position: 'absolute', fontSize: px(150), fontWeight: 750, letterSpacing: '-0.05em', color: accOf(bg), whiteSpace: 'nowrap' });
+    const word = el('div', '', s, esc(o.reveal || 'Now open'), { position: 'absolute', fontSize: px(150), fontWeight: 750, letterSpacing: '-0.05em', color: accOf(bg), whiteSpace: 'nowrap' }); dressText(word, bg); if (LOOK.text === 'outline') word.style.color = ACC;
     fitFont(word, maxTextW());
     tl.fromTo(word, { opacity: 0, scale: 0.6, filter: blur(20) }, { opacity: 1, scale: 1, filter: blur(0), duration: 0.8, ease: 'back.out(1.6)' }, ra);
     sfx(ra, 'impact', 0.7);
@@ -758,7 +822,7 @@
     tl.fromTo(tile, { rotationY: -100, opacity: 0 }, { rotationY: 0, opacity: 1, duration: 0.9, ease: 'back.out(1.4)' }, t0 + 0.45);
     sfx(t0 + 0.5, 'pop', 0.6);
     rs.forEach((r, i) => tl.fromTo(r, { opacity: 0, x: N(30) }, { opacity: 1, x: 0, duration: 0.6 }, t0 + 0.9 + i * 0.18));
-    if (o.lead) { const l = wordsRow(s, o.lead, 80, { weight: 700, accent: new Set([].concat(o.accent || [])), accColor: accOf(bg) }); l.row.style.order = '-1'; l.row.style.marginBottom = px(70); buildRow(l.row, l.items, t0 + 0.05, 0.14); }
+    if (o.lead) { const l = wordsRow(s, o.lead, 80, { weight: 700, accent: new Set([].concat(o.accent || [])), accColor: accOf(bg), bg }); l.row.style.order = '-1'; l.row.style.marginBottom = px(70); buildRow(l.row, l.items, t0 + 0.05, 0.14); }
   };
 
   // CHAT: a WhatsApp-style chat; the customer asks, the business answers (typing dots first)
@@ -797,6 +861,9 @@
   // ================================================================ ambience: depth behind each beat
   function ambience(wrap, bg, t0, t1, i) {
     const amb = el('div', 'layer', wrap, '', { pointerEvents: 'none', overflow: 'hidden' });
+    const dk = LOOK.deco;
+    if (dk && DECO[dk] && (bg === LOOK.theme || DECO_ANYWHERE.has(dk))) { try { DECO[dk](amb, bg, t0, t1, i); } catch (e) { console.error('deco ' + dk + ': ' + e.message); } }
+    if (dk && dk !== 'none' && bg === 'light' && LOOK.theme === 'light') return;   // the style's own world replaces the default light sweep
     const dur = Math.max(0.6, t1 - t0 + 0.4);
     if (bg === 'brand') {
       // glossy 3D orbs drifting in depth (the brand colour, lit from the top left)
@@ -805,21 +872,201 @@
         const sz = N(size);
         const o = el('div', '', amb, '', { position: 'absolute', left: x * W - sz / 2 + 'px', top: y * H - sz / 2 + 'px', width: sz + 'px', height: sz + 'px', borderRadius: '50%', background: `radial-gradient(circle at 32% 28%, rgba(255,255,255,.75) 0%, ${mix(ACC, '#FFFFFF', 0.35)} 16%, ${ACC} 48%, ${mix(ACC, '#000000', 0.45)} 100%)`, boxShadow: `0 ${N(40)}px ${N(80)}px ${rgba(mix(ACC, '#000', 0.6), 0.35)}`, filter: b ? blur(b) : 'none', opacity: b ? 0.7 : 0.95 });
         const dir = k % 2 ? -1 : 1;
-        tl.fromTo(o, { y: N(80) * dir, x: N(30) * dir, scale: 0.6, rotation: 0 }, { y: -N(90) * dir, x: -N(30) * dir, scale: 1, rotation: 40 * dir, duration: dur, ease: 'sine.out', immediateRender: false }, t0 - 0.2);
+        tl.fromTo(o, { y: N(80) * dir, x: N(30) * dir, scale: 0.6, rotation: 0 }, { y: -N(90) * dir, x: -N(30) * dir, scale: 1, rotation: 40 * dir, duration: dur, ease: 'sine.out', immediateRender: false }, Math.max(0, t0 - 0.2));
       });
     } else if (bg === 'dark') {
       // a soft light from above and a faint haze of the brand colour below
       const cone = el('div', '', amb, '', { position: 'absolute', left: '50%', top: '-20%', width: W * 1.4 + 'px', height: H * 0.9 + 'px', marginLeft: -W * 0.7 + 'px', background: 'radial-gradient(ellipse 50% 60% at 50% 0%, rgba(255,255,255,.10), transparent 70%)' });
       const haze = el('div', '', amb, '', { position: 'absolute', left: '50%', bottom: '-30%', width: W * 1.2 + 'px', height: H * 0.6 + 'px', marginLeft: -W * 0.6 + 'px', background: `radial-gradient(ellipse 50% 50% at 50% 50%, ${rgba(ACC, 0.16)}, transparent 70%)` });
-      tl.fromTo(cone, { x: -N(60) }, { x: N(60), duration: dur, ease: 'sine.inOut', immediateRender: false }, t0 - 0.2);
-      tl.fromTo(haze, { opacity: 0.6, scale: 0.9 }, { opacity: 1, scale: 1.1, duration: dur, ease: 'sine.inOut', immediateRender: false }, t0 - 0.2);
+      tl.fromTo(cone, { x: -N(60) }, { x: N(60), duration: dur, ease: 'sine.inOut', immediateRender: false }, Math.max(0, t0 - 0.2));
+      tl.fromTo(haze, { opacity: 0.6, scale: 0.9 }, { opacity: 1, scale: 1.1, duration: dur, ease: 'sine.inOut', immediateRender: false }, Math.max(0, t0 - 0.2));
     } else {
       // light: a slow sweep of light across the floor
       const sweep = el('div', '', amb, '', { position: 'absolute', left: 0, top: 0, width: '60%', height: '100%', background: 'linear-gradient(100deg, transparent 0%, rgba(255,255,255,.55) 50%, transparent 100%)', opacity: 0.6 });
-      tl.fromTo(sweep, { xPercent: -120 }, { xPercent: 220, duration: dur * 1.2, ease: 'none', immediateRender: false }, t0 - 0.2);
-      if (i % 3 === 1) { const tint = el('div', '', amb, '', { position: 'absolute', right: '-20%', top: '-15%', width: W * 0.9 + 'px', height: W * 0.9 + 'px', borderRadius: '50%', background: `radial-gradient(circle, ${rgba(ACC, 0.09)}, transparent 65%)` }); tl.fromTo(tint, { x: 0, y: 0 }, { x: -N(80), y: N(60), duration: dur, ease: 'sine.inOut', immediateRender: false }, t0 - 0.2); }
+      tl.fromTo(sweep, { xPercent: -120 }, { xPercent: 220, duration: dur * 1.2, ease: 'none', immediateRender: false }, Math.max(0, t0 - 0.2));
+      if (i % 3 === 1) { const tint = el('div', '', amb, '', { position: 'absolute', right: '-20%', top: '-15%', width: W * 0.9 + 'px', height: W * 0.9 + 'px', borderRadius: '50%', background: `radial-gradient(circle, ${rgba(ACC, 0.09)}, transparent 65%)` }); tl.fromTo(tint, { x: 0, y: 0 }, { x: -N(80), y: N(60), duration: dur, ease: 'sine.inOut', immediateRender: false }, Math.max(0, t0 - 0.2)); }
     }
   }
+
+  // ================================================================ DECO: each style's own animated world behind the beats
+  const DECO = {};
+  const dlay = (amb, css) => el('div', '', amb, '', Object.assign({ position: 'absolute', pointerEvents: 'none' }, css));
+  const life = (t0, t1) => Math.max(0.6, t1 - t0 + 0.5);
+  DECO.sunburst = (amb, bg, t0, t1) => {
+    const S = Math.max(W, H) * 2.4;
+    const r = dlay(amb, { left: '50%', top: '46%', width: S + 'px', height: S + 'px', marginLeft: -S / 2 + 'px', marginTop: -S / 2 + 'px', background: `repeating-conic-gradient(from 0deg, ${rgba(bg === 'light' ? A_L : A2, bg === 'brand' ? 0.16 : 0.13)} 0deg 7deg, transparent 7deg 18deg)`, WebkitMaskImage: 'radial-gradient(circle, #000 0%, transparent 42%)', maskImage: 'radial-gradient(circle, #000 0%, transparent 42%)' });
+    tl.fromTo(r, { rotation: 0, scale: 0.9 }, { rotation: 28, scale: 1.05, duration: life(t0, t1), ease: 'none', immediateRender: false }, Math.max(0, t0 - 0.2));
+  };
+  DECO.golddust = (amb, bg, t0, t1) => {
+    const gold = bg === 'light' ? A_L : mix(ACC, '#FFFFFF', 0.2);
+    for (let k = 0; k < 30; k++) {
+      const sz = N(R(3, 10)), x = R(0, W), y = R(H * 0.1, H * 1.05);
+      const p = dlay(amb, { left: x + 'px', top: y + 'px', width: sz + 'px', height: sz + 'px', borderRadius: '50%', background: gold, boxShadow: `0 0 ${N(12)}px ${rgba(gold, 0.9)}` });
+      tl.fromTo(p, { y: 0, opacity: 0 }, { y: -N(R(160, 520)), opacity: R(0.35, 0.95), duration: life(t0, t1), ease: 'sine.out', immediateRender: false }, Math.max(0, t0 - 0.2));
+    }
+    const fr = dlay(amb, { left: '5%', right: '5%', top: PORTRAIT ? '4%' : '6%', bottom: PORTRAIT ? '4%' : '6%', border: `${N(2)}px solid ${rgba(gold, 0.35)}`, borderRadius: px(6) });
+    tl.fromTo(fr, { opacity: 0, scale: 1.04 }, { opacity: 1, scale: 1, duration: 1.2, ease: 'power2.out', immediateRender: false }, t0);
+  };
+  DECO.dotgrid = (amb, bg, t0, t1) => {
+    const d = dlay(amb, { inset: '-10%', backgroundImage: `radial-gradient(${bg === 'light' ? 'rgba(17,17,20,.13)' : 'rgba(255,255,255,.12)'} ${N(2.4)}px, transparent ${N(3)}px)`, backgroundSize: `${N(48)}px ${N(48)}px`, WebkitMaskImage: 'radial-gradient(ellipse 70% 60% at 50% 50%, #000, transparent)', maskImage: 'radial-gradient(ellipse 70% 60% at 50% 50%, #000, transparent)' });
+    tl.fromTo(d, { x: 0, y: 0 }, { x: -N(48), y: -N(96), duration: life(t0, t1), ease: 'none', immediateRender: false }, Math.max(0, t0 - 0.2));
+  };
+  DECO.neongrid = (amb, bg, t0, t1) => {
+    if (bg === 'light') return DECO.dotgrid(amb, bg, t0, t1);
+    const c = bg === 'brand' ? '#FFFFFF' : A_D;
+    const g = dlay(amb, { left: '-50%', right: '-50%', bottom: '-4%', height: '46%', transform: `perspective(${N(700)}px) rotateX(66deg)`, transformOrigin: '50% 100%', backgroundImage: `linear-gradient(${rgba(c, 0.55)} ${N(3)}px, transparent ${N(3)}px), linear-gradient(90deg, ${rgba(c, 0.55)} ${N(3)}px, transparent ${N(3)}px)`, backgroundSize: `${N(120)}px ${N(120)}px`, WebkitMaskImage: 'linear-gradient(to top, #000 25%, transparent 92%)', maskImage: 'linear-gradient(to top, #000 25%, transparent 92%)' });
+    tl.fromTo(g, { backgroundPosition: '0px 0px' }, { backgroundPosition: `0px ${N(120) * 4}px`, duration: life(t0, t1), ease: 'none', immediateRender: false }, Math.max(0, t0 - 0.2));
+    dlay(amb, { left: 0, right: 0, top: '52%', height: px(4), background: `linear-gradient(90deg, transparent, ${rgba(c, 0.9)}, transparent)`, boxShadow: `0 0 ${N(30)}px ${N(6)}px ${rgba(c, 0.45)}` });
+    dlay(amb, { inset: 0, backgroundImage: `repeating-linear-gradient(0deg, rgba(255,255,255,.035) 0 ${N(2)}px, transparent ${N(2)}px ${N(6)}px)` });
+    const sun = dlay(amb, { left: '50%', top: '30%', width: px(520), height: px(520), marginLeft: px(-260), borderRadius: '50%', background: `linear-gradient(180deg, ${A2}, ${ACC})`, opacity: 0.22, WebkitMaskImage: `repeating-linear-gradient(180deg, #000 0 ${N(26)}px, transparent ${N(26)}px ${N(34)}px)`, maskImage: `repeating-linear-gradient(180deg, #000 0 ${N(26)}px, transparent ${N(26)}px ${N(34)}px)` });
+    tl.fromTo(sun, { y: N(40) }, { y: -N(30), duration: life(t0, t1), ease: 'sine.inOut', immediateRender: false }, Math.max(0, t0 - 0.2));
+  };
+  DECO.tape = (amb, bg, t0, t1) => {
+    const word = (String(D.brand || 'NEW DROP').toUpperCase() + '  ✦  ').repeat(10);
+    [[PORTRAIT ? 0.1 : 0.12, -7, 1], [PORTRAIT ? 0.88 : 0.86, 6, -1]].forEach(([y, rot, dir]) => {
+      const band = dlay(amb, { left: '-30%', width: '160%', top: y * H + 'px', height: px(92), marginTop: px(-46), background: ACC, color: lum(ACC) > 0.45 ? '#0A0A0A' : '#FFFFFF', fontFamily: DISPLAY, fontWeight: DW, fontSize: px(52), lineHeight: N(92) + 'px', whiteSpace: 'nowrap', overflow: 'hidden', transform: `rotate(${rot}deg)`, boxShadow: `0 ${N(14)}px ${N(30)}px rgba(0,0,0,.35)` });
+      const inner = el('div', '', band, esc(word), { display: 'inline-block', letterSpacing: '0.02em' });
+      tl.fromTo(inner, { x: dir > 0 ? 0 : -N(900) }, { x: dir > 0 ? -N(900) : 0, duration: life(t0, t1), ease: 'none', immediateRender: false }, Math.max(0, t0 - 0.2));
+    });
+    dlay(amb, { inset: 0, backgroundImage: `radial-gradient(${rgba(ACC, 0.10)} ${N(3)}px, transparent ${N(3.5)}px)`, backgroundSize: `${N(18)}px ${N(18)}px`, WebkitMaskImage: 'linear-gradient(135deg, #000, transparent 45%)', maskImage: 'linear-gradient(135deg, #000, transparent 45%)' });
+  };
+  DECO.confetti = (amb, bg, t0, t1) => {
+    const cols = [ACC, A2, '#FFFFFF', mix(ACC, A2, 0.5), '#FFD447'];
+    for (let k = 0; k < 34; k++) {
+      const w = N(R(10, 18)), h = N(R(18, 34)), x = R(-0.05, 1.05) * W;
+      const c = dlay(amb, { left: x + 'px', top: '-6%', width: w + 'px', height: h + 'px', background: cols[k % cols.length], borderRadius: px(3), opacity: 0.9 });
+      const d = life(t0, t1);
+      tl.fromTo(c, { y: -N(R(0, 900)), rotation: R(-180, 180), x: 0 }, { y: H * R(0.7, 1.15), rotation: R(-540, 540), x: N(R(-120, 120)), duration: d, ease: 'none', immediateRender: false }, Math.max(0, t0 - 0.2));
+    }
+  };
+  DECO.bubbles = (amb, bg, t0, t1) => {
+    for (let k = 0; k < 16; k++) {
+      const sz = N(R(40, 170)), x = R(0, W), c = k % 2 ? A2 : ACC;
+      const b = dlay(amb, { left: x - sz / 2 + 'px', top: H * R(0.55, 1.1) + 'px', width: sz + 'px', height: sz + 'px', borderRadius: '50%', background: `radial-gradient(circle at 32% 30%, rgba(255,255,255,.85) 0 12%, ${rgba(c, bg === 'light' ? 0.28 : 0.35)} 13% 62%, ${rgba(c, 0.08)} 100%)` });
+      tl.fromTo(b, { y: 0, x: 0, scale: 0.6 }, { y: -H * R(0.4, 0.9), x: N(R(-60, 60)), scale: 1, duration: life(t0, t1), ease: 'sine.out', immediateRender: false }, Math.max(0, t0 - 0.2));
+    }
+  };
+  DECO.orbits = (amb, bg, t0, t1) => {
+    const c = bg === 'light' ? A_L : A_D;
+    [[1.05, 0.42, 12], [0.8, 0.3, -18], [1.35, 0.55, 8]].forEach(([s1, s2, rot], k) => {
+      const w = W * s1 * (PORTRAIT ? 1.3 : 0.8), h = w * s2;
+      const ring = dlay(amb, { left: '50%', top: '48%', width: w + 'px', height: h + 'px', marginLeft: -w / 2 + 'px', marginTop: -h / 2 + 'px', border: `${N(2)}px solid ${rgba(c, 0.28)}`, borderRadius: '50%' });
+      const dot = el('div', '', ring, '', { position: 'absolute', left: '50%', top: px(-9), width: px(16), height: px(16), marginLeft: px(-8), borderRadius: '50%', background: k === 1 ? A2 : c, boxShadow: `0 0 ${N(18)}px ${k === 1 ? A2 : c}` });
+      void dot;
+      tl.fromTo(ring, { rotation: rot }, { rotation: rot + (k % 2 ? -1 : 1) * 70, duration: life(t0, t1), ease: 'none', immediateRender: false }, Math.max(0, t0 - 0.2));
+    });
+    const mesh = dlay(amb, { left: '-20%', top: '-10%', width: '140%', height: '70%', background: `radial-gradient(40% 50% at 30% 40%, ${rgba(ACC, 0.22)}, transparent 70%), radial-gradient(35% 45% at 75% 60%, ${rgba(A2, 0.18)}, transparent 70%)` });
+    tl.fromTo(mesh, { x: -N(60) }, { x: N(60), duration: life(t0, t1), ease: 'sine.inOut', immediateRender: false }, Math.max(0, t0 - 0.2));
+  };
+  DECO.beams = (amb, bg, t0, t1) => {
+    const c = bg === 'light' ? rgba(ACC, 0.16) : 'rgba(255,240,200,.13)';
+    for (let k = 0; k < 6; k++) {
+      const b = dlay(amb, { left: '50%', top: '-12%', width: px(R(120, 220)), height: H * 1.3 + 'px', marginLeft: px(-80), background: `linear-gradient(180deg, ${c}, transparent 85%)`, transformOrigin: '50% 0%', filter: blur(6) });
+      const a0 = -46 + k * 18 + R(-4, 4);
+      tl.fromTo(b, { rotation: a0 }, { rotation: a0 + (k % 2 ? 6 : -6), duration: life(t0, t1), ease: 'sine.inOut', immediateRender: false }, Math.max(0, t0 - 0.2));
+    }
+    for (let k = 0; k < 10; k++) {
+      const sp = dlay(amb, { left: R(0.05, 0.95) * W + 'px', top: R(0.08, 0.9) * H + 'px', width: px(26), height: px(26), background: `conic-gradient(from 45deg, transparent 0 22%, ${ACC} 24% 26%, transparent 28% 47%, ${ACC} 49% 51%, transparent 53% 72%, ${ACC} 74% 76%, transparent 78% 97%, ${ACC} 99%)`, borderRadius: '50%', WebkitMaskImage: 'radial-gradient(circle, #000 0 30%, transparent 70%)', maskImage: 'radial-gradient(circle, #000 0 30%, transparent 70%)' });
+      tl.fromTo(sp, { scale: 0, opacity: 0, rotation: 0 }, { scale: R(0.8, 1.6), opacity: 1, rotation: 90, duration: 0.8, yoyo: true, repeat: Math.max(1, Math.floor(life(t0, t1) / 0.8) - 1), ease: 'sine.inOut', immediateRender: false }, t0 + R(0, 0.8));
+    }
+  };
+  DECO.petals = (amb, bg, t0, t1) => {
+    for (let k = 0; k < 14; k++) {
+      const sz = N(R(34, 90)), c = k % 3 ? A2 : ACC;
+      const p = dlay(amb, { left: R(-0.1, 1) * W + 'px', top: R(-0.1, 0.9) * H + 'px', width: sz + 'px', height: sz * 0.7 + 'px', borderRadius: '70% 0 70% 0', background: `linear-gradient(135deg, ${rgba(c, bg === 'light' ? 0.45 : 0.35)}, ${rgba(c, 0.1)})` });
+      tl.fromTo(p, { x: 0, y: 0, rotation: R(0, 90) }, { x: N(R(80, 220)), y: N(R(120, 360)), rotation: R(120, 300), duration: life(t0, t1), ease: 'sine.inOut', immediateRender: false }, Math.max(0, t0 - 0.2));
+    }
+  };
+  DECO.halftone = (amb, bg, t0, t1) => {
+    DECO.sunburst(amb, bg, t0, t1);
+    const h = dlay(amb, { right: '-15%', bottom: '-10%', width: W * 0.9 + 'px', height: W * 0.9 + 'px', backgroundImage: `radial-gradient(${bg === 'light' ? 'rgba(17,17,17,.35)' : rgba(A2, 0.4)} ${N(7)}px, transparent ${N(8)}px)`, backgroundSize: `${N(26)}px ${N(26)}px`, WebkitMaskImage: 'radial-gradient(circle at 70% 70%, #000 0%, transparent 65%)', maskImage: 'radial-gradient(circle at 70% 70%, #000 0%, transparent 65%)' });
+    tl.fromTo(h, { scale: 0.9 }, { scale: 1.08, duration: life(t0, t1), ease: 'sine.inOut', immediateRender: false }, Math.max(0, t0 - 0.2));
+  };
+  DECO.speed = (amb, bg, t0, t1) => {
+    const d = life(t0, t1);
+    for (let k = 0; k < 18; k++) {
+      const len = N(R(220, 640)), y = R(0.04, 0.96) * H;
+      const l = dlay(amb, { left: 0, top: y + 'px', width: len + 'px', height: px(R(2, 5)), background: `linear-gradient(90deg, transparent, ${k % 4 ? (bg === 'light' ? 'rgba(17,17,17,.25)' : 'rgba(255,255,255,.35)') : ACC})` });
+      const per = R(0.45, 0.9);
+      tl.fromTo(l, { x: W + N(100) }, { x: -len - N(100), duration: per, repeat: Math.max(0, Math.floor(d / per) - 1), ease: 'none', immediateRender: false }, Math.max(0, t0 - 0.2) + R(0, per));
+    }
+    [[0.12, -1], [0.82, 1]].forEach(([y, dir]) => {
+      const sl = dlay(amb, { left: '-10%', width: '120%', top: y * H + 'px', height: px(60), background: ACC, transform: 'skewY(-6deg)', opacity: 0.9 });
+      tl.fromTo(sl, { xPercent: dir * 110 }, { xPercent: 0, duration: 0.5, ease: 'expo.out', immediateRender: false }, t0 - 0.05);
+    });
+  };
+  DECO.blueprint = (amb, bg, t0, t1) => {
+    const c = bg === 'light' ? 'rgba(17,40,80,.10)' : rgba(A2, 0.14);
+    const g = dlay(amb, { inset: '-5%', backgroundImage: `linear-gradient(${c} 1px, transparent 1px), linear-gradient(90deg, ${c} 1px, transparent 1px), linear-gradient(${c} 2px, transparent 2px), linear-gradient(90deg, ${c} 2px, transparent 2px)`, backgroundSize: `${N(40)}px ${N(40)}px, ${N(40)}px ${N(40)}px, ${N(200)}px ${N(200)}px, ${N(200)}px ${N(200)}px`, WebkitMaskImage: 'radial-gradient(ellipse 75% 65% at 50% 50%, #000, transparent)', maskImage: 'radial-gradient(ellipse 75% 65% at 50% 50%, #000, transparent)' });
+    tl.fromTo(g, { scale: 1.06 }, { scale: 1, duration: life(t0, t1), ease: 'sine.out', immediateRender: false }, Math.max(0, t0 - 0.2));
+    const sq = dlay(amb, { left: '50%', top: '48%', width: px(700), height: px(700), marginLeft: px(-350), marginTop: px(-350), border: `${N(2)}px solid ${rgba(ACC, 0.35)}` });
+    tl.fromTo(sq, { rotation: 45, scale: 0.6, opacity: 0 }, { rotation: 45 + 30, scale: 1, opacity: 1, duration: life(t0, t1), ease: 'power2.out', immediateRender: false }, Math.max(0, t0 - 0.2));
+    [[0.08, 0.06], [0.92, 0.06], [0.08, 0.94], [0.92, 0.94]].forEach(([x, y]) => { dlay(amb, { left: x * W - N(24) + 'px', top: y * H - N(24) + 'px', width: px(48), height: px(48), borderLeft: x < 0.5 ? `${N(3)}px solid ${rgba(ACC, 0.6)}` : 'none', borderRight: x > 0.5 ? `${N(3)}px solid ${rgba(ACC, 0.6)}` : 'none', borderTop: y < 0.5 ? `${N(3)}px solid ${rgba(ACC, 0.6)}` : 'none', borderBottom: y > 0.5 ? `${N(3)}px solid ${rgba(ACC, 0.6)}` : 'none' }); });
+  };
+  DECO.paper = (amb, bg, t0, t1, i) => {
+    if (bg !== 'light') return;
+    dlay(amb, { inset: 0, opacity: 0.5, backgroundImage: "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.75' numOctaves='3'/><feColorMatrix values='0 0 0 0 0.4  0 0 0 0 0.35  0 0 0 0 0.3  0 0 0 .18 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>\")" });
+    const num = dlay(amb, { right: '4%', top: PORTRAIT ? '3%' : '2%', fontFamily: DISPLAY, fontWeight: DW, fontSize: px(PORTRAIT ? 420 : 360), lineHeight: 1, color: 'rgba(17,17,17,.06)', letterSpacing: '-0.06em' });
+    num.textContent = String(i + 1).padStart(2, '0');
+    tl.fromTo(num, { y: N(40) }, { y: -N(20), duration: life(t0, t1), ease: 'sine.out', immediateRender: false }, Math.max(0, t0 - 0.2));
+    dlay(amb, { left: '6%', right: '6%', top: PORTRAIT ? '9%' : '10%', height: px(4), background: '#111' });
+    dlay(amb, { left: '6%', right: '6%', bottom: PORTRAIT ? '9%' : '10%', height: px(2), background: '#111' });
+    dlay(amb, { left: '6%', bottom: PORTRAIT ? '6%' : '6.5%', fontSize: px(26), fontWeight: 700, letterSpacing: '0.18em', color: '#111', textTransform: 'uppercase' }).textContent = String(D.brand || '').slice(0, 30);
+  };
+  DECO.kente = (amb, bg, t0, t1) => {
+    const green = '#1F8A3B';
+    [[0, 1], [1, -1]].forEach(([bottom, dir]) => {
+      const band = dlay(amb, { left: '-20%', width: '140%', [bottom ? 'bottom' : 'top']: 0, height: px(PORTRAIT ? 120 : 90), backgroundImage: `repeating-linear-gradient(90deg, ${ACC} 0 ${N(60)}px, ${A2} ${N(60)}px ${N(84)}px, #111 ${N(84)}px ${N(100)}px, ${green} ${N(100)}px ${N(150)}px, #111 ${N(150)}px ${N(166)}px), repeating-linear-gradient(0deg, rgba(0,0,0,.25) 0 ${N(6)}px, transparent ${N(6)}px ${N(18)}px)`, backgroundBlendMode: 'multiply', opacity: bg === 'light' ? 0.85 : 0.9, boxShadow: `0 0 ${N(30)}px rgba(0,0,0,.35)` });
+      tl.fromTo(band, { x: 0 }, { x: dir * N(166) * 2, duration: life(t0, t1), ease: 'none', immediateRender: false }, Math.max(0, t0 - 0.2));
+    });
+  };
+  DECO.waves = (amb, bg, t0, t1) => {
+    const svgNS = 'http://www.w3.org/2000/svg';
+    [[0.86, ACC, 0.22, 1], [0.9, A2, 0.25, -1], [0.94, ACC, 0.35, 1]].forEach(([y, c, a, dir], k) => {
+      const ww = W * 2.2, amp = N(28 + k * 8), wl = N(320 + k * 60);
+      const svg = document.createElementNS(svgNS, 'svg'); svg.setAttribute('width', ww); svg.setAttribute('height', H * (1 - y) + amp * 2);
+      Object.assign(svg.style, { position: 'absolute', left: 0, top: H * y - amp + 'px', pointerEvents: 'none' });
+      let d = `M0 ${amp}`; for (let x = 0; x <= ww; x += wl / 2) d += ` Q ${x + wl / 4} ${(x / (wl / 2)) % 2 ? amp * 2 : 0}, ${x + wl / 2} ${amp}`;
+      d += ` L ${ww} ${H} L 0 ${H} Z`;
+      const p = document.createElementNS(svgNS, 'path'); p.setAttribute('d', d); p.setAttribute('fill', rgba(c, a)); svg.appendChild(p); amb.appendChild(svg);
+      tl.fromTo(svg, { x: dir > 0 ? 0 : -wl * 2 }, { x: dir > 0 ? -wl * 2 : 0, duration: life(t0, t1), ease: 'none', immediateRender: false }, Math.max(0, t0 - 0.2));
+    });
+  };
+  DECO.glow = (amb, bg, t0, t1) => {
+    [[0.2, 0.25, 900, ACC], [0.85, 0.7, 1000, A2], [0.5, 0.95, 800, ACC]].forEach(([x, y, size, c], k) => {
+      const sz = N(size);
+      const o = dlay(amb, { left: x * W - sz / 2 + 'px', top: y * H - sz / 2 + 'px', width: sz + 'px', height: sz + 'px', borderRadius: '50%', background: `radial-gradient(circle, ${rgba(c, bg === 'light' ? 0.18 : 0.28)}, transparent 65%)` });
+      tl.fromTo(o, { x: 0, y: 0, scale: 0.9 }, { x: N(k % 2 ? -120 : 120), y: N(k ? -80 : 80), scale: 1.15, duration: life(t0, t1), ease: 'sine.inOut', immediateRender: false }, Math.max(0, t0 - 0.2));
+    });
+  };
+  DECO.ribbon = (amb, bg, t0, t1) => {
+    const svgNS = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(svgNS, 'svg'); svg.setAttribute('width', W); svg.setAttribute('height', H);
+    Object.assign(svg.style, { position: 'absolute', left: 0, top: 0, pointerEvents: 'none' });
+    const id = 'rg' + Math.floor(rnd() * 1e6);
+    svg.innerHTML = `<defs><linearGradient id="${id}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${ACC}"/><stop offset="1" stop-color="${A2}"/></linearGradient></defs>`;
+    const p = document.createElementNS(svgNS, 'path');
+    p.setAttribute('d', `M ${-W * 0.2} ${H * 0.82} C ${W * 0.25} ${H * 0.5}, ${W * 0.55} ${H * 1.02}, ${W * 1.2} ${H * 0.62}`);
+    Object.entries({ fill: 'none', stroke: `url(#${id})`, 'stroke-width': N(PORTRAIT ? 120 : 90), 'stroke-linecap': 'round', opacity: bg === 'light' ? 0.9 : 0.75 }).forEach(([k, v]) => p.setAttribute(k, v));
+    svg.appendChild(p); amb.appendChild(svg);
+    const len = p.getTotalLength(); p.setAttribute('stroke-dasharray', len);
+    tl.fromTo(p, { attr: { 'stroke-dashoffset': len } }, { attr: { 'stroke-dashoffset': 0 }, duration: 1.2, ease: 'expo.out', immediateRender: false }, t0 - 0.1);
+    tl.fromTo(svg, { y: N(30) }, { y: -N(30), duration: life(t0, t1), ease: 'sine.inOut', immediateRender: false }, Math.max(0, t0 - 0.2));
+  };
+  DECO.pulse = (amb, bg, t0, t1) => {
+    const d = life(t0, t1);
+    for (let k = 0; k < 3; k++) {
+      const r = dlay(amb, { left: '50%', top: '50%', width: px(700), height: px(700), marginLeft: px(-350), marginTop: px(-350), borderRadius: '50%', border: `${N(3)}px solid ${rgba(ACC, 0.35)}` });
+      tl.fromTo(r, { scale: 0.3, opacity: 0.9 }, { scale: 2.2, opacity: 0, duration: 2.4, repeat: Math.max(0, Math.floor(d / 2.4)), ease: 'power1.out', immediateRender: false }, Math.max(0, t0 - 0.2) + k * 0.8);
+    }
+  };
+  DECO.spot = (amb, bg, t0, t1) => {
+    if (bg === 'light') return;
+    const sp = dlay(amb, { left: '50%', top: '40%', width: W * 1.3 + 'px', height: W * 1.3 + 'px', marginLeft: -W * 0.65 + 'px', marginTop: -W * 0.65 + 'px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(255,255,255,.09), transparent 62%)' });
+    tl.fromTo(sp, { x: -N(120) }, { x: N(120), duration: life(t0, t1), ease: 'sine.inOut', immediateRender: false }, Math.max(0, t0 - 0.2));
+  };
+  // which decos also play on the brand-colour and the contrast stages
+  const DECO_ANYWHERE = new Set(['sunburst', 'golddust', 'confetti', 'bubbles', 'petals', 'beams', 'speed', 'halftone', 'tape', 'kente', 'pulse']);
 
   // ================================================================ timeline
   function build() {
@@ -868,7 +1115,18 @@
     window.__timeline = tl;
     window.__MOTION = { tl, total };
   }
-  Promise.race([document.fonts.ready, new Promise((r) => setTimeout(r, 2500))]).then(() => {
+  // load the style's fonts BEFORE building: text is measured to fit, so it must be measured in its real font
+  const fontLoads = () => {
+    if (!document.fonts || !document.fonts.load) return Promise.resolve();
+    const fam = (f) => `"${String(f).replace(/"/g, '')}"`;
+    const want = [];
+    const disp = LOOK.display || D.font || 'Inter', ui = LOOK.ui || D.font || 'Inter';
+    [DW, 700].forEach((w) => want.push(`${w} 64px ${fam(disp)}`));
+    if (LOOK.text === 'serif' || LOOK.text === 'sport') want.push(`italic ${DW} 64px ${fam(disp)}`);
+    [400, 500, 600, 700].forEach((w) => want.push(`${w} 32px ${fam(ui)}`));
+    return Promise.all(want.map((f) => document.fonts.load(f, 'Aa1₦').catch(() => null)));
+  };
+  Promise.race([Promise.all([fontLoads(), document.fonts.ready]), new Promise((r) => setTimeout(r, 4000))]).then(() => {
     const imgs = Array.from(document.images);
     return Promise.race([Promise.all(imgs.map((im) => im.decode ? im.decode().catch(() => {}) : null)), new Promise((r) => setTimeout(r, 3000))]);
   }).then(build);

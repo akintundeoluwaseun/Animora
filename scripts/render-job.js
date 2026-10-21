@@ -4,7 +4,8 @@
 import { mkdtemp, readFile, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { renderVideo, snapshotFrames } from '../server/engine/renderer.js';
+import { spawn } from 'node:child_process';
+import { renderVideo } from '../server/engine/renderer.js';
 import { addSfxToVideo } from '../server/engine/sfx.js';
 
 const jobUrl = process.argv[2];
@@ -12,6 +13,12 @@ if (!jobUrl) { console.error('usage: node scripts/render-job.js <job url>'); pro
 const u = new URL(jobUrl);
 const base = `${u.origin}${u.pathname}`, token = u.searchParams.get('t');
 const at = (sub) => `${base}${sub}?t=${encodeURIComponent(token)}`;
+// a thumbnail straight from the finished MP4 (no second browser to start)
+const thumbFrom = (file, t) => new Promise((resolve) => {
+  const ff = spawn('ffmpeg', ['-v', 'error', '-ss', String(t), '-i', file, '-frames:v', '1', '-vf', 'scale=432:-2', '-q:v', '4', '-f', 'image2pipe', '-vcodec', 'mjpeg', '-'], { stdio: ['ignore', 'pipe', 'ignore'] });
+  const chunks = []; ff.stdout.on('data', (d) => chunks.push(d));
+  ff.on('close', (code) => resolve(code === 0 && chunks.length ? Buffer.concat(chunks) : null)); ff.on('error', () => resolve(null));
+});
 const post = async (sub, body, type = 'application/json') => {
   for (let tries = 0; ; tries++) {
     try {
@@ -40,19 +47,25 @@ try {
         .then((r) => { if (r.cancelled) controller.abort(); }).catch(() => {});
     },
   });
-  let finalFile = outFile;
-  if (job.sfx && (result.sfx?.length || result.music)) {
-    try { finalFile = await addSfxToVideo(outFile, path.join(dir, 'video-sfx.mp4'), result.sfx || [], job.duration, { music: result.music }); }
-    catch (e) { console.warn('sound skipped:', e.message); }
-  }
-  const [thumb] = await snapshotFrames(job.html, [Math.min(2, job.duration / 4)], { aspectRatio: job.aspectRatio, scale: 0.4 }).catch(() => [null]);
-  if (thumb) await post('/thumb', thumb, 'image/jpeg').catch(() => {});
+  // sound mixing and the thumbnail run side by side
+  const withSound = job.sfx && (result.sfx?.length || result.music)
+    ? addSfxToVideo(outFile, path.join(dir, 'video-sfx.mp4'), result.sfx || [], job.duration, { music: result.music }).catch((e) => { console.warn('sound skipped:', e.message); return outFile; })
+    : Promise.resolve(outFile);
+  const thumbSent = thumbFrom(outFile, Math.min(2, job.duration / 4)).then((t) => (t ? post('/thumb', t, 'image/jpeg') : null)).catch(() => {});
+  const finalFile = await withSound;
+  await thumbSent;
   const buf = await readFile(finalFile);
   const parts = Math.ceil(buf.length / job.partSize);
-  for (let n = 0; n < parts; n++) {
-    await post(`/part/${n}`, buf.subarray(n * job.partSize, (n + 1) * job.partSize), 'application/octet-stream');
-    await post('/progress', { percent: 95 + Math.round(((n + 1) / parts) * 3) }).catch(() => {});
-  }
+  // upload two pieces at a time
+  let next = 0, sent = 0;
+  const lane = async () => {
+    while (next < parts) {
+      const n = next++;
+      await post(`/part/${n}`, buf.subarray(n * job.partSize, (n + 1) * job.partSize), 'application/octet-stream');
+      sent++; post('/progress', { percent: 95 + Math.round((sent / parts) * 3) }).catch(() => {});
+    }
+  };
+  await Promise.all([lane(), lane()]);
   await post('/done', { parts, size: (await stat(finalFile)).size });
   console.log(`done in ${result.elapsedSeconds}s, ${(buf.length / 1e6).toFixed(1)} MB in ${parts} part(s)`);
 } catch (e) {

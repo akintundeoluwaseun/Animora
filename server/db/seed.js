@@ -14,7 +14,7 @@ import { STARTER_STYLES, DEMO_ADS } from './starter.js';
 const ASSETS = path.join(ROOT, 'assets');
 const PASSWORD = 'demo1234';
 // Bump when assets/styles/*.mp4|jpg are re-rendered so existing databases pick up the new files.
-const STYLE_ASSETS_VERSION = 6;   // v6: re-rendered with the premium engine
+const STYLE_ASSETS_VERSION = 7;   // v7: style looks (fonts, type treatments, background worlds)
 
 async function upload(rel, type, prefix = 'demo') {
   // On Vercel the demo videos are served as static files (copied to web/dist/demo by scripts/vercel-build.js).

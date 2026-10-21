@@ -47,13 +47,14 @@ r.get('/renders', async (req, res) => {
   const rows = await q(`SELECT r.id, r.project_id, r.status, r.progress, r.frames_done, r.total_frames, r.eta_seconds, r.video_url, r.thumbnail_url, r.file_size, r.error,
       r.paid_via, r.ad_view_id, r.aspect_ratio, r.duration_seconds, r.created_at, r.started_at, r.finished_at, p.title,
       (r.code_html IS DISTINCT FROM p.code_html) AS stale FROM renders r JOIN projects p ON p.id=r.project_id
-    WHERE r.user_id=$1 ORDER BY r.created_at DESC LIMIT 100`, [req.user.id]);
+    WHERE r.user_id=$1 AND NOT (r.status='failed' AND (r.error='expired' OR r.error LIKE 'This MP4 was cleared%')) ORDER BY r.created_at DESC LIMIT 100`, [req.user.id]);
   res.json({ renders: rows.map((x) => shape(x, { title: x.title })) });
 });
 
 r.get('/renders/:id', async (req, res) => {
   const x = await one(`SELECT r.*, p.title, (r.code_html IS DISTINCT FROM p.code_html) AS stale FROM renders r JOIN projects p ON p.id=r.project_id WHERE r.id=$1 AND r.user_id=$2`, [req.params.id, req.user.id]);
   if (!x) return res.status(404).json({ error: 'Render not found.' });
+  if (x.status === 'failed' && (x.error === 'expired' || /^This MP4 was cleared/.test(x.error || ''))) return res.json({ render: null });   // expired: say nothing
   res.json({ render: shape(x, { title: x.title, queuePosition: x.status === 'queued' ? await queuePosition(x.id) : 0 }) });
 });
 

@@ -101,7 +101,7 @@ export function accentFor(colors = {}, text = '') {
  * The storyboard. Returns { beats, font, accent, accent2 }.
  * opts: { brief, assets, salt, avoid: [types used last time], duration }
  */
-export function composeMotion(plan, { brief = {}, assets = [], salt = '', avoid = [], colors = {} } = {}) {
+export function composeMotion(plan, { brief = {}, assets = [], salt = '', avoid = [], colors = {}, look = null } = {}) {
   const f = factsFrom(plan, brief || {}, assets);
   f.brand = brandCase(smartClip(cleanText(brief.name || plan.business?.name || f.brand, 80, { keepCase: true }), 48) || f.brand);
   const specific = cleanText(plan.business?.category || '', 40);
@@ -146,9 +146,9 @@ export function composeMotion(plan, { brief = {}, assets = [], salt = '', avoid 
 
   // ---- the look: mostly light (Apple-clean) or mostly dark (premium night) ----
   const darkPref = tech || beauty ? 0.55 : fashion ? 0.5 : 0.3;
-  const theme = chance(darkPref) ? 'dark' : 'light';
+  const theme = look?.theme || (chance(darkPref) ? 'dark' : 'light');   // a chosen style decides the stage
   const base = theme, contrast = theme === 'light' ? 'dark' : 'light';
-  const font = pick(tech ? ['Inter', 'Sora', 'Manrope', 'Plus Jakarta Sans'] : beauty || fashion ? ['DM Sans', 'Outfit', 'Plus Jakarta Sans', 'Manrope'] : food ? ['Plus Jakarta Sans', 'Outfit', 'Inter', 'DM Sans'] : FONTS);
+  const font = look?.ui || pick(tech ? ['Inter', 'Sora', 'Manrope', 'Plus Jakarta Sans'] : beauty || fashion ? ['DM Sans', 'Outfit', 'Plus Jakarta Sans', 'Manrope'] : food ? ['Plus Jakarta Sans', 'Outfit', 'Inter', 'DM Sans'] : FONTS);
 
   // ---- beats (each builder returns a beat or null when the facts can't support it) ----
   const B = {};
@@ -227,7 +227,9 @@ export function composeMotion(plan, { brief = {}, assets = [], salt = '', avoid 
   }
 
   // ---- order: hook, brand, the owner's picks, then the proof the facts support ----
-  const opener = (event && !avoidSet.has('countdown') && chance(0.5) ? B.countdown() : null) || (chance(0.3) ? B.hookSlam() : null) || (chance(0.35) ? B.hookGlow() : B.hookBuild());
+  const energy = look?.energy || 'medium';
+  const slamP = energy === 'high' ? 0.55 : energy === 'calm' ? 0.05 : 0.3, glowP = energy === 'calm' ? 0.5 : 0.3;
+  const opener = (event && !avoidSet.has('countdown') && chance(0.5) ? B.countdown() : null) || (chance(slamP) ? B.hookSlam() : null) || (chance(glowP) ? B.hookGlow() : B.hookBuild());
   const brandBeat = (tech && chance(0.5) ? B.phone() : null) || B.brand();
   const pool = [
     B.photos(), B.price(), B.menu(), B.receipt(), B.features(), ...B.heads(), B.stat(), B.ring(), B.calendar(), B.grid(), B.notif(), B.search(), B.map(),
@@ -310,7 +312,7 @@ export function composeMotion(plan, { brief = {}, assets = [], salt = '', avoid 
     const k = duration / tot; for (let i = 0; i < durs.length; i++) durs[i] *= k;
   }
   // ---- transitions: varied, never the same twice in a row ----
-  const outs = ['push', 'whip', 'zoom', 'rise', 'push', 'drop'];
+  const outs = energy === 'high' ? ['whip', 'zoom', 'drop', 'whip', 'push', 'rise'] : energy === 'calm' ? ['push', 'fade', 'rise', 'push', 'fade'] : ['push', 'whip', 'zoom', 'rise', 'push', 'drop'];
   let last = '';
   beats = beats.map((b, i) => {
     let out = 'push';

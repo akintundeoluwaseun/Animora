@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { GSAP_CDN } from '../../engine/prompts.js';
+import { FONT_AXES, fontsUrl } from './looks.js';
 
 const dir = path.join(path.dirname(fileURLToPath(import.meta.url)), 'browser');
 let cache = null;
@@ -26,7 +27,8 @@ const esc = (s) => String(s).replace(/</g, '\\u003c');
 
 export function motionHtml(data) {
   const { css, js } = runtime();
-  const font = MOTION_FONTS[data.font] ? data.font : 'Inter';
+  const font = MOTION_FONTS[data.font] || FONT_AXES[data.font] !== undefined ? data.font : 'Inter';
+  const fontLink = fontsUrl([font, data.look?.display, data.look?.ui].filter(Boolean));
   const total = Math.round(data.beats.reduce((a, s) => a + s.dur, 0) * 100) / 100;
   const d = { ...data, font, duration: total };
   return `<!DOCTYPE html>
@@ -35,7 +37,7 @@ export function motionHtml(data) {
 <meta charset="utf-8">
 <meta name="adflash" content="width=${d.W},height=${d.H},duration=${total},fps=30,engine=motion-v1">
 <title>${String(d.brand || 'Animora video').replace(/[<>&]/g, '')}</title>
-<link href="https://fonts.googleapis.com/css2?family=${MOTION_FONTS[font]}&display=block" rel="stylesheet">
+<link href="${fontLink.replace(/&/g, '&amp;')}" rel="stylesheet">
 <style>${css}</style>
 </head>
 <body>

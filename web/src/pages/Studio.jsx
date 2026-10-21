@@ -1,3 +1,4 @@
+import { announceKind } from '../components/Shell.jsx';
 import { publicMessage } from '../lib/errors.js';
 // Page 2: live preview + edit by prompt + code view.
 import { useEffect, useRef, useState } from 'react';
@@ -272,6 +273,7 @@ export default function Studio() {
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const [project, setProject] = useState(null);
+  useEffect(() => { if (project?.kind || project) announceKind(project.kind || 'video'); }, [project?.kind, !!project]); // eslint-disable-line react-hooks/exhaustive-deps
   const [canRender, setCanRender] = useState(true);
   useEffect(() => { api('/status').then((st) => setCanRender(st.render !== false)).catch(() => {}); }, []);
   const [tab, setTab] = useState('edit');

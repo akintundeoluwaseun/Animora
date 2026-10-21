@@ -108,8 +108,12 @@ export async function clearOldVideos({ force = false } = {}) {
       OR finished_at < now() - ($2 || ' hours')::interval) LIMIT 100`, [String(AFTER_DOWNLOAD_H), String(KEEP_H)]);
   for (const { id } of old) {
     await q("DELETE FROM files WHERE key LIKE $1", [`renders/${id}.mp4%`]);
-    await q("UPDATE renders SET status='failed', chunk_count=0, video_url=NULL, error=$2 WHERE id=$1", [id, 'This MP4 was cleared to keep Animora free. Your video is saved: press Generate Video to make the MP4 again (free).']);
+    // expired quietly: no "failed", no message; the project simply goes back to "ready" (its design is kept)
+    const x = await one("UPDATE renders SET status='failed', chunk_count=0, video_url=NULL, error='expired' WHERE id=$1 RETURNING project_id", [id]);
+    if (x) await q("UPDATE projects SET status='ready' WHERE id=$1 AND status='rendered' AND NOT EXISTS (SELECT 1 FROM renders WHERE project_id=$1 AND status='done')", [x.project_id]);
   }
+  // older MP4s cleared before this change: tidy their projects too
+  await q("UPDATE projects p SET status='ready' WHERE status='rendered' AND NOT EXISTS (SELECT 1 FROM renders r WHERE r.project_id=p.id AND r.status='done')").catch(() => {});
   if (old.length) console.log(`[renders] cleared ${old.length} old MP4(s)`);
 }
 

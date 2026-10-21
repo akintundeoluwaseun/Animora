@@ -1,6 +1,7 @@
 // Page 1: the guided question flow. One question at a time, like a chat with a director:
 // pick an option (or several), or type your own answer. Every answer is saved once, so nothing is asked twice.
 // Pictures can be uploaded or pasted (Ctrl+V) anywhere on the page, up to 10. Special instructions come last.
+import { announceKind } from '../components/Shell.jsx';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api, ASPECTS, duration, shrinkImage, imageLook } from '../lib.jsx';
@@ -265,6 +266,7 @@ export default function Plan() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [project, setProject] = useState(null);
+  useEffect(() => { if (project?.kind || project) announceKind(project.kind || 'video'); }, [project?.kind, !!project]); // eslint-disable-line react-hooks/exhaustive-deps
   const [styles, setStyles] = useState([]);
   const [limits, setLimits] = useState({ minSeconds: 15, maxSeconds: 60 });
   const [b, setB] = useState({});

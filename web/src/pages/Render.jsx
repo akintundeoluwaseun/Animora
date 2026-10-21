@@ -1,3 +1,4 @@
+import { announceKind } from '../components/Shell.jsx';
 import { publicMessage } from '../lib/errors.js';
 // Page 3: watch an ad if needed, render with our engine, then download.
 import { useEffect, useRef, useState } from 'react';
@@ -113,6 +114,7 @@ export default function Render() {
   const [params, setParams] = useSearchParams();
   const { refresh } = useAuth();
   const [project, setProject] = useState(null);
+  useEffect(() => { if (project?.kind || project) announceKind(project.kind || 'video'); }, [project?.kind, !!project]); // eslint-disable-line react-hooks/exhaustive-deps
   const [check, setCheck] = useState(null);
   const [render, setRender] = useState(null);
   const [script, setScript] = useState(null);

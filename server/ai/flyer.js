@@ -5,6 +5,8 @@
 import { THEMES } from './themes.js';
 import { CANVAS } from '../engine/renderer.js';
 import { geminiGenerate } from '../engine/gemini.js';
+import { flyerHtml2, chooseFlyerLayout, FLYER2_LAYOUTS } from './flyer2.js';
+import { lookFor } from './motion/looks.js';
 
 export const FLYER_LAYOUTS = ['hero', 'grid', 'split', 'type'];
 const PHONE_RE = /(\+?234[\s-]?|0)[789][01]\d[\s-]?\d{3}[\s-]?\d{4}/;
@@ -21,13 +23,49 @@ const logoOf = (assets) => (assets || []).find((a) => (a.kind || 'image') === 'i
 // ---------------------------------------------------------------------------
 // The words (Gemini, or straight from the answers)
 // ---------------------------------------------------------------------------
+const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+/** "Sat 14 Dec, 4pm, Ado Ekiti Town Hall" -> { weekday, day, month, time, place } (only what is really there). */
+export function parseWhen(text) {
+  const t = str(text, 140); if (!t) return null;
+  const out = {};
+  const wd = t.match(/\b(mon|tue|wed|thu|fri|sat|sun)[a-z]*\.?\b/i); if (wd) out.weekday = wd[1][0].toUpperCase() + wd[1].slice(1, 3).toLowerCase();
+  let m = t.match(/\b(\d{1,2})(?:st|nd|rd|th)?\s*(?:of\s+)?(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\b/i) || null;
+  if (m) { out.day = m[1]; out.month = m[2]; }
+  else if ((m = t.match(/\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+(\d{1,2})(?:st|nd|rd|th)?\b/i))) { out.day = m[2]; out.month = m[1]; }
+  else if ((m = t.match(/\b(\d{1,2})[\/.-](\d{1,2})(?:[\/.-]\d{2,4})?\b/))) { const mo = +m[2]; if (mo >= 1 && mo <= 12) { out.day = m[1]; out.month = MONTHS[mo - 1]; } }
+  const tm = t.match(/\b(\d{1,2}(?::\d{2})?\s*(?:am|pm)(?:\s*(?:-|–|to)\s*\d{1,2}(?::\d{2})?\s*(?:am|pm))?|\d{1,2}:\d{2})\b/i); if (tm) out.time = tm[1].replace(/\s+/g, '').toLowerCase().replace('to', '–');
+  const parts = t.split(/\s*[,|·;]\s*|\s+(?:at|@)\s+/i).map((x) => x.trim()).filter(Boolean);
+  const place = parts.filter((x) => !(wd && x.toLowerCase().includes(wd[0].toLowerCase()) && x.length < 22) && !(m && x.includes(m[0])) && !(tm && x.toLowerCase().includes(tm[1].toLowerCase())) && !/^\d+$/.test(x));
+  if (place.length) out.place = place.join(', ').slice(0, 60);
+  if (!out.day && !out.time && !out.place) out.place = t.slice(0, 60);
+  return out;
+}
+const kindsOf = (brief) => [].concat(brief.flyerType || []).map((x) => String(x).toLowerCase()).concat(/offer|sale|discount|promo/i.test(brief.goal || '') ? ['sale'] : [], /event/i.test(brief.goal || '') ? ['event'] : [], /launch|new/i.test(brief.goal || '') ? ['launch'] : []);
+/** Can this composition be filled with what we have? */
+export function layoutFits(l, { photos = 0, items = 0, features = 0, offer = '', priced = 0, when = null, kinds = [] }) {
+  if (l === 'photo') return photos >= 1;
+  if (l === 'collage') return photos >= 2;
+  if (l === 'menu') return items >= 3;
+  if (l === 'services') return features + items >= 3;
+  if (l === 'hiring') return kinds.some((k) => /hir|job|vacan|train/.test(k));
+  if (l === 'event') return !!when || kinds.some((k) => /event|party|show/.test(k));
+  if (l === 'price') return !!offer || priced >= 1;
+  return FLYER2_LAYOUTS.includes(l);
+}
+
 function rulesCopy(brief, assets, avoid) {
   const photos = photosOf(assets);
   const products = (brief.products || []).map((p) => { const m = String(p).match(/^(.*?)[\s:–-]*((?:₦|N|NGN|\$)\s?[\d,.]+k?)\s*$/i); return m ? { title: str(m[1], 40), price: m[2] } : { title: str(p, 40) }; });
-  const items = (products.length ? products : (brief.features || []).map((f) => ({ title: str(f, 40) }))).slice(0, 4)
+  const items = (products.length ? products : (brief.features || []).map((f) => ({ title: str(f, 40) }))).slice(0, products.length ? 8 : 4)
     .map((it, i) => ({ ...it, img: photos[i]?.name }));
-  const layout = FLYER_LAYOUTS.filter((l) => l !== avoid).find((l) => (l === 'grid' ? photos.length >= 3 : l === 'hero' ? photos.length >= 1 : l === 'split' ? photos.length >= 2 : true)) || 'type';
+  const allItems = (products.length ? products : []).slice(0, 8).map((it, i) => ({ ...it, img: photos[i]?.name }));
+  const when = parseWhen(brief.when), kinds = kindsOf(brief), offer = str(brief.offer, 40);
+  const facts = { photos: photos.length, items: allItems.length || items.length, features: (brief.features || []).length, priced: allItems.filter((x) => x.price).length, offer, when, kinds };
+  const pref = brief.layout && brief.layout !== 'auto' ? brief.layout : '';
+  let layout = chooseFlyerLayout({ ...facts, pref, avoid, seed: (Date.now() % 100000) + 1 });
+  if (!layoutFits(layout, facts)) layout = FLYER2_LAYOUTS.find((l) => l !== avoid && layoutFits(l, facts) && l !== 'hiring' && l !== 'event') || 'poster';
   return {
+    v: 2, kinds, offer, when, facts,
     layout, headline: str(brief.headline || brief.name, 60), highlight: '', subhead: str(brief.headlines?.[1] || '', 90),
     badge: /sale|offer|discount|%|off/i.test(brief.goal || '') ? 'Special offer' : '',
     items, features: (brief.features || []).slice(0, 4).map((f) => str(f, 34)), cta: str(brief.cta || 'Order now', 30),
@@ -39,6 +77,7 @@ export async function flyerCopy({ brief = {}, assets = [], style = null, avoid =
   const base = rulesCopy(brief, assets, avoid);
   if (!useAI) return base;
   const photos = photosOf(assets);
+  const okLayouts = FLYER2_LAYOUTS.filter((l) => l !== avoid && layoutFits(l, base.facts));
   const user = `BUSINESS: ${brief.name || ''} (${brief.category || ''})
 GOAL: ${brief.goal || ''}
 MESSAGES: ${JSON.stringify(brief.headlines || [brief.headline].filter(Boolean))}
@@ -49,21 +88,24 @@ CONTACT: ${brief.contact || ''}
 STYLE: ${style?.name || ''}
 PICTURES (use the NAME exactly; a picture's words must match what it SHOWS):
 ${photos.length ? photos.map((a) => `- "${a.name}"${a.description ? ` SHOWS: ${a.description}` : ''}`).join('\n') : '- none'}
-${brief.extra || brief.pasteText ? `SPECIAL INSTRUCTIONS (follow them): ${str([brief.extra, brief.pasteText].filter(Boolean).join(' | '), 3000)}\n` : ''}${avoid ? `The last version used the "${avoid}" layout. Use a different one.\n` : ''}
+${brief.extra || brief.pasteText ? `SPECIAL INSTRUCTIONS (follow them): ${str([brief.extra, brief.pasteText].filter(Boolean).join(' | '), 3000)}\n` : ''}FLYER KIND: ${JSON.stringify(base.kinds)}${base.offer ? `  BIG OFFER: ${base.offer}` : ''}${brief.when ? `  WHEN/WHERE: ${brief.when}` : ''}
+LAYOUTS you may use (pick one that fits): ${JSON.stringify(okLayouts)}  — poster = huge type magazine cover; price = the offer in a giant starburst; event = date block + ticket stub; menu = menu board with dotted price leaders; photo = full-bleed photo with text on it; diagonal = photo cut on a diagonal; collage = taped polaroids; services = icon tiles; hiring = job announcement.
+SUGGESTED: "${base.layout}"
+${avoid ? `The last version used the "${avoid}" layout. Use a different one.\n` : ''}
 Write the flyer now.`;
   try {
     const { text } = await geminiGenerate({
       system: `You are a senior graphic designer writing a one-page promotional flyer for a Nigerian business.
 Return JSON only:
-{ "layout": "hero" | "grid" | "split" | "type",   // hero = one big photo; grid = 3-4 product photos with names/prices; split = text panel + 2-3 photos; type = big typography, few or no photos
+{ "layout": "<one of LAYOUTS>",
   "headline": "max 6 words, punchy",  "highlight": "one word from the headline to colour",
   "subhead": "max 14 words",  "badge": "optional 1-3 word sticker like '20% OFF' or 'NEW' (empty if none)",
-  "items": [ { "title": "max 4 words", "price": "optional, exactly as given", "img": "optional picture NAME" } ],   // 0-4 products or services
+  "items": [ { "title": "max 4 words", "price": "optional, exactly as given", "img": "optional picture NAME" } ],   // 0-8 products or services (all of them for a menu)
   "features": [ "max 4 words each" ],   // 0-4 short selling points
   "heroImg": "picture NAME for the main photo, or null",
   "cta": "max 4 words", "contact": "phone / WhatsApp / website / address, exactly as given" }
 Rules: never invent prices, phone numbers or addresses. Only use picture NAMES from the list, and only where the words match what the picture shows.
-Short words beat long sentences. Pick the layout that suits the pictures you have.`,
+Short words beat long sentences. Pick the layout that suits what the flyer is for and the pictures you have.`,
       messages: [{ role: 'user', text: user }],
       temperature: 0.85, maxOutputTokens: 4096, json: true, timeoutMs: 60000, thinking: 'low',
     });
@@ -71,9 +113,10 @@ Short words beat long sentences. Pick the layout that suits the pictures you hav
     const names = new Set(photos.map((a) => a.name));
     const pick = (n) => (n && names.has(n) ? n : null);
     return {
-      layout: FLYER_LAYOUTS.includes(o.layout) && o.layout !== avoid ? o.layout : base.layout,
+      ...base,
+      layout: okLayouts.includes(o.layout) ? o.layout : base.layout,
       headline: str(o.headline, 60) || base.headline, highlight: str(o.highlight, 30), subhead: str(o.subhead, 110), badge: str(o.badge, 18),
-      items: (Array.isArray(o.items) ? o.items : []).slice(0, 4).map((it) => ({ title: str(it?.title, 40), price: str(it?.price, 20), img: pick(it?.img) })).filter((it) => it.title),
+      items: (Array.isArray(o.items) ? o.items : []).slice(0, 8).map((it) => ({ title: str(it?.title, 40), price: str(it?.price, 20), img: pick(it?.img) })).filter((it) => it.title),
       features: (Array.isArray(o.features) ? o.features : []).slice(0, 4).map((f) => str(f, 34)).filter(Boolean),
       heroImg: pick(o.heroImg) || base.heroImg, cta: str(o.cta, 30) || base.cta, contact: str(o.contact, 120) || base.contact,
     };
@@ -115,6 +158,7 @@ function headlineHtml(text, highlight) {
 }
 
 export function flyerHtml(data) {
+  if (data?.v === 2) return flyerHtml2(data);
   const { W, H, theme: themeKey, colors: c, brand, logo, layout } = data;
   const theme = THEMES[themeKey] || THEMES.bold;
   const U = Math.min(W, H) / 1080;
@@ -294,11 +338,12 @@ export async function makeFlyer({ brief, plan, style, assets, previous = null, u
   const theme = THEMES[themeKey] || THEMES.bold;
   const { width: W, height: H } = CANVAS[plan?.aspect_ratio] || CANVAS['4:5'];
   const colors = { ...theme.colors, ...(plan?.style?.colors || {}) };
+  const look = lookFor(style?.slug || themeKey, { ...(style?.palette || {}), ...(plan?.style?.colors || {}) });
   const avoid = previous ? readFlyer(previous)?.layout : null;
   const copy = await flyerCopy({ brief, assets, style, avoid, useAI });
   const logo = logoOf(assets);
   const data = {
-    W, H, theme: themeKey, colors, brand: brief?.name || plan?.business?.name || 'Your business', ...copy,
+    W, H, theme: themeKey, colors, look, brand: brief?.name || plan?.business?.name || 'Your business', ...copy,
     logo: logo ? { url: logo.url, transparent: !!(logo.has_alpha ?? logo.transparent), light: logo.is_light ?? logo.light ?? null, ratio: logo.width && logo.height ? logo.width / logo.height : null } : null,
     images: Object.fromEntries(photosOf(assets).map((a) => [a.name, a.url])),
   };
@@ -328,10 +373,11 @@ export async function editFlyer({ html, instruction, assets = [] }) {
   const data = readFlyer(html);
   if (!data) throw new Error('Not a flyer');
   const photos = photosOf(assets);
-  const { images, logo, W, H, theme, brand, ...fields } = data;
+  const { images, logo, W, H, theme, brand, look, facts, v, ...fields } = data;
+  const LAYS = v === 2 ? FLYER2_LAYOUTS : FLYER_LAYOUTS;
   const { text } = await geminiGenerate({
     system: `You edit a one-page flyer. You get its fields as JSON and the owner's change request.
-Return JSON with the FULL updated fields: { "layout": "hero"|"grid"|"split"|"type", "headline", "highlight", "subhead", "badge", "items": [{ "title", "price"?, "img"? }], "features": [], "heroImg", "cta", "contact",
+Return JSON with the FULL updated fields: { "layout": ${LAYS.map((l) => `"${l}"`).join('|')}, "headline", "highlight", "subhead", "badge", "items": [{ "title", "price"?, "img"? }], "features": [], "heroImg", "cta", "contact",
 "colors"?: { "primary"?, "secondary"?, "background"?, "text"? } (hex), "summary": "one short sentence of what you changed" }.
 Change only what was asked. Picture NAMES must come from the list, and a picture's words must match what it shows. Never invent prices or phone numbers.`,
     messages: [{ role: 'user', text: `FLYER:\n${JSON.stringify(fields)}\n\nPICTURES:\n${photos.map((a) => `- "${a.name}"${a.description ? ` SHOWS: ${a.description}` : ''}`).join('\n') || '- none'}\n\nCHANGE REQUEST: ${instruction}` }],
@@ -345,9 +391,9 @@ Change only what was asked. Picture NAMES must come from the list, and a picture
   for (const k of ['primary', 'secondary', 'background', 'text']) if (HEX.test(o.colors?.[k] || '')) colors[k] = o.colors[k];
   const next = {
     ...data, colors,
-    layout: FLYER_LAYOUTS.includes(o.layout) ? o.layout : data.layout,
+    layout: LAYS.includes(o.layout) ? o.layout : data.layout,
     headline: str(o.headline, 60) || data.headline, highlight: str(o.highlight, 30), subhead: str(o.subhead, 110), badge: str(o.badge, 18),
-    items: Array.isArray(o.items) ? o.items.slice(0, 4).map((it) => ({ title: str(it?.title, 40), price: str(it?.price, 20), img: pick(it?.img) })).filter((it) => it.title) : data.items,
+    items: Array.isArray(o.items) ? o.items.slice(0, 8).map((it) => ({ title: str(it?.title, 40), price: str(it?.price, 20), img: pick(it?.img) })).filter((it) => it.title) : data.items,
     features: Array.isArray(o.features) ? o.features.slice(0, 4).map((f) => str(f, 34)).filter(Boolean) : data.features,
     heroImg: pick(o.heroImg) || data.heroImg, cta: str(o.cta, 30) || data.cta, contact: str(o.contact, 120) || data.contact,
     images: Object.fromEntries(photos.map((a) => [a.name, a.url])),
@@ -364,8 +410,11 @@ export function offlineFlyerEdit({ html, instruction, assets = [] }) {
   const say = String(instruction || '').toLowerCase(), done = [], next = { ...data, colors: { ...data.colors } };
   const photos = photosOf(assets).length || Object.keys(data.images || {}).length;
   if (/layout|design|different|arrange|style|another|new look/.test(say)) {
-    const ok = FLYER_LAYOUTS.filter((l) => l !== data.layout && (l === 'grid' ? photos >= 3 : l === 'hero' ? photos >= 1 : l === 'split' ? photos >= 2 : true));
-    if (ok.length) { next.layout = ok[0]; done.push(`a new ${ok[0] === 'type' ? 'typography' : ok[0]} layout`); }
+    const ok = data.v === 2
+      ? FLYER2_LAYOUTS.filter((l) => l !== data.layout && layoutFits(l, { ...(data.facts || {}), photos }))
+      : FLYER_LAYOUTS.filter((l) => l !== data.layout && (l === 'grid' ? photos >= 3 : l === 'hero' ? photos >= 1 : l === 'split' ? photos >= 2 : true));
+    const pickL = ok[Math.floor(Math.random() * ok.length)];
+    if (ok.length) { next.layout = pickL; done.push(`a new ${pickL === 'type' ? 'typography' : pickL} layout`); }
     else { const c = next.colors; [c.primary, c.secondary] = [c.secondary || c.primary, c.primary]; done.push('a fresh colour arrangement (add photos for more layouts)'); }
   }
   if (/dark/.test(say)) { next.colors.background = shade(next.colors.background, 0.35); if (/text/.test(say) === false) next.colors.text = '#FFFFFF'; done.push('darker colours'); }

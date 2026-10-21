@@ -4,8 +4,8 @@ body { font-family: var(--font), 'Inter', system-ui, -apple-system, 'Segoe UI', 
 #stage { position: relative; width: var(--W); height: var(--H); overflow: hidden; }
 .layer { position: absolute; inset: 0; }
 .bg { position: absolute; inset: 0; opacity: 0; }
-.bg-light { background: radial-gradient(120% 80% at 50% 46%, #FFFFFF 0%, #F4F4F6 38%, #E2E2E7 78%, #D3D3D9 100%); }
-.bg-dark { background: radial-gradient(110% 75% at 50% 46%, #1D1D22 0%, #0E0E11 50%, #030304 100%); }
+.bg-light { background: radial-gradient(120% 80% at 50% 46%, var(--l1, #FFFFFF) 0%, var(--l2, #F4F4F6) 38%, var(--l3, #E2E2E7) 78%, var(--l4, #D3D3D9) 100%); }
+.bg-dark { background: radial-gradient(110% 75% at 50% 46%, var(--d1, #1D1D22) 0%, var(--d2, #0E0E11) 50%, var(--d3, #030304) 100%); }
 .bg-brand { background: radial-gradient(120% 90% at 50% 40%, var(--a1l) 0%, var(--a1) 45%, var(--a1d) 100%); }
 .beat { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; visibility: hidden; transform-origin: 50% 50%; }
 .ink-light { color: #111114; }

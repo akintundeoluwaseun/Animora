@@ -35,11 +35,13 @@ export function prepareHtml(html) {
   return out;
 }
 
-export function PhoneFrame({ aspect = '9:16', maxWidth = 340, children, className = '' }) {
+// exact: the frame is exactly `maxWidth` wide (full screen); otherwise wide and square videos get a little more room.
+export function PhoneFrame({ aspect = '9:16', maxWidth = 340, children, className = '', exact = false }) {
   const a = ASPECTS[aspect] || ASPECTS['9:16'];
   const wide = a.w > a.h;
+  const w = exact ? maxWidth : wide ? Math.max(maxWidth * 1.9, 560) : a.w === a.h ? maxWidth * 1.25 : maxWidth;
   return (
-    <div className={`phone mx-auto w-full ${className}`} style={{ maxWidth: wide ? Math.max(maxWidth * 1.9, 560) : a.w === a.h ? maxWidth * 1.25 : maxWidth }}>
+    <div className={`phone mx-auto w-full ${exact ? 'phone-exact' : ''} ${className}`} style={exact ? { width: w, maxWidth: w } : { maxWidth: w }}>
       <div className="phone-screen" style={{ aspectRatio: `${a.w} / ${a.h}` }}>{children}</div>
     </div>
   );
@@ -72,7 +74,7 @@ function playSfx(e) {
   g.gain.value = Math.min(1.2, (e.v || 1) * 0.8); src.buffer = b; src.connect(g).connect(master(c)); src.start();
 }
 
-export function LivePreview({ html, aspect = '9:16', autoPlay = true, maxWidth = 340, onError, sound: soundOn = true, onSoundChange, still = false, onEnded }) {
+export function LivePreview({ html, aspect = '9:16', autoPlay = true, maxWidth = 340, onError, sound: soundOn = true, onSoundChange, still = false, onEnded, exact = false }) {
   const sfxRef = useRef([]);
   const musicRef = useRef(null);
   useEffect(() => () => { musicRef.current?.pause(); }, []);
@@ -157,7 +159,7 @@ export function LivePreview({ html, aspect = '9:16', autoPlay = true, maxWidth =
 
   return (
     <div>
-      <PhoneFrame aspect={aspect} maxWidth={maxWidth}>
+      <PhoneFrame aspect={aspect} maxWidth={maxWidth} exact={exact}>
         <div ref={boxRef} className="absolute inset-0">
           {srcDoc && (
             <iframe ref={frameRef} title="Video preview" sandbox="allow-scripts" srcDoc={srcDoc} name={String(scale)}
@@ -168,7 +170,7 @@ export function LivePreview({ html, aspect = '9:16', autoPlay = true, maxWidth =
           {!still && <button onClick={toggle} className="absolute inset-0 cursor-pointer" aria-label={playing ? 'Pause' : 'Play'} disabled={!ready} />}
         </div>
       </PhoneFrame>
-      {!still && <div className="mx-auto mt-4 flex items-center gap-3" style={{ maxWidth: Math.max(maxWidth, 320) * (a.w > a.h ? 1.9 : 1) }}>
+      {!still && <div className="mx-auto mt-4 flex items-center gap-3" style={exact ? { width: Math.max(maxWidth, 300), maxWidth: '100%' } : { maxWidth: Math.max(maxWidth, 320) * (a.w > a.h ? 1.9 : 1) }}>
         <button onClick={toggle} disabled={!ready} className="press grid size-12 shrink-0 place-items-center rounded-full bg-danfo text-white disabled:opacity-40" aria-label={playing ? 'Pause' : 'Play'}>
           {playing
             ? <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><rect x="3" y="2" width="3.5" height="12" rx="1" /><rect x="9.5" y="2" width="3.5" height="12" rx="1" /></svg>
@@ -198,24 +200,51 @@ export function VideoPhone({ src, aspect = '9:16', maxWidth = 320, poster, autoP
 }
 
 // Full screen: the flyer (or video) as big as the screen allows, sharp, with every detail readable.
+// It asks the browser for real full screen (phones hide their bars; wide videos turn the phone sideways where allowed),
+// and falls back to a full-window overlay where the browser says no (iPhone Safari).
 export function FullView({ html, aspect = '9:16', still = false, onClose }) {
-  const [box, setBox] = useState({ w: window.innerWidth, h: window.innerHeight });
-  useEffect(() => {
-    const fit = () => setBox({ w: window.innerWidth, h: window.innerHeight });
-    const key = (e) => { if (e.key === 'Escape') onClose(); };
-    window.addEventListener('resize', fit); window.addEventListener('keydown', key);
-    const prev = document.body.style.overflow; document.body.style.overflow = 'hidden';
-    return () => { window.removeEventListener('resize', fit); window.removeEventListener('keydown', key); document.body.style.overflow = prev; };
-  }, [onClose]);
+  const rootRef = useRef(null);
+  const closeRef = useRef(onClose);
+  useEffect(() => { closeRef.current = onClose; }, [onClose]);
+  const size = () => ({ w: window.visualViewport?.width || window.innerWidth, h: window.visualViewport?.height || window.innerHeight });
+  const [box, setBox] = useState(size);
   const a = ASPECTS[aspect] || ASPECTS['9:16'];
-  const width = Math.floor(Math.min(box.w - 24, (box.h - (still ? 90 : 150)) * (a.w / a.h)));
+  useEffect(() => {
+    const fit = () => setBox(size());
+    const key = (e) => { if (e.key === 'Escape' && !document.fullscreenElement) closeRef.current?.(); };
+    window.addEventListener('resize', fit); window.visualViewport?.addEventListener('resize', fit); window.addEventListener('keydown', key);
+    const prev = document.body.style.overflow; document.body.style.overflow = 'hidden';
+    // real full screen (still allowed: the click that opened this is a fresh user gesture)
+    const el = rootRef.current;
+    let entered = false;
+    const onFs = () => { if (entered && !document.fullscreenElement && !document.webkitFullscreenElement) closeRef.current?.(); fit(); };
+    document.addEventListener('fullscreenchange', onFs); document.addEventListener('webkitfullscreenchange', onFs);
+    const req = el?.requestFullscreen || el?.webkitRequestFullscreen;
+    if (req) {
+      try {
+        const p = req.call(el, { navigationUI: 'hide' });
+        const after = () => { entered = true; if (a.w > a.h) screen.orientation?.lock?.('landscape').catch(() => {}); fit(); };
+        if (p && p.then) p.then(after).catch(() => {}); else after();
+      } catch { /* the overlay is still full window */ }
+    }
+    return () => {
+      window.removeEventListener('resize', fit); window.visualViewport?.removeEventListener('resize', fit); window.removeEventListener('keydown', key);
+      document.removeEventListener('fullscreenchange', onFs); document.removeEventListener('webkitfullscreenchange', onFs);
+      document.body.style.overflow = prev;
+      try { screen.orientation?.unlock?.(); } catch { /* not supported */ }
+      if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
+      else if (document.webkitFullscreenElement) document.webkitExitFullscreen?.();
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const chrome = still ? 24 : 96;   // room for the play bar under a video
+  const width = Math.max(120, Math.floor(Math.min(box.w - 16, (box.h - chrome - 16) * (a.w / a.h))));
   return (
-    <div className="fixed inset-0 z-[80] flex flex-col items-center justify-center bg-black/92 p-3" role="dialog" aria-modal="true" aria-label="Full screen" onClick={onClose}>
-      <button type="button" onClick={onClose} className="absolute right-3 top-3 z-10 grid size-11 place-items-center rounded-full bg-white/12 text-white hover:bg-white/20" aria-label="Close full screen">
+    <div ref={rootRef} className="fullview fixed inset-0 z-[80] flex flex-col items-center justify-center bg-black p-2" role="dialog" aria-modal="true" aria-label="Full screen" onClick={() => closeRef.current?.()}>
+      <button type="button" onClick={(e) => { e.stopPropagation(); closeRef.current?.(); }} className="absolute right-3 top-[max(12px,env(safe-area-inset-top))] z-10 grid size-11 place-items-center rounded-full bg-white/15 text-white backdrop-blur hover:bg-white/25" aria-label="Close full screen">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M6 6l12 12M18 6 6 18" /></svg>
       </button>
-      <div onClick={(e) => e.stopPropagation()}>
-        <LivePreview html={html} aspect={aspect} maxWidth={width} still={still} autoPlay={!still} />
+      <div onClick={(e) => e.stopPropagation()} style={{ width, maxWidth: '100%' }}>
+        <LivePreview html={html} aspect={aspect} maxWidth={width} exact still={still} autoPlay={!still} />
       </div>
     </div>
   );

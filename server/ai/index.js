@@ -121,22 +121,26 @@ export function aiReason(e) {
 
 /** Plan -> HTML. Returns { html, source, problems, notice? } */
 export async function generateCode({ plan, style, assets, brief = null, previous = null, onStatus }) {
-  if (config.useGemini) { onStatus?.('Looking at your pictures'); assets = await describeAssets(assets, loadImage); }
-  const planWithAssets = enrichPlan(plan, assets);
   const themeKey = themeKeyFor(style);
+  const motionFirst = CODE_MODE !== 'html' && process.env.ANIMORA_ENGINE !== 'cinema' && MOTION_ASPECTS.includes(plan.aspect_ratio || '9:16');
+  // The Motion director sees the pictures itself, so it skips the separate "describe the pictures" call (one AI round trip saved).
+  if (config.useGemini && !motionFirst) { onStatus?.('Looking at your pictures'); assets = await describeAssets(assets, loadImage); }
+  let planWithAssets = enrichPlan(plan, assets);
   // Every video size is made by the Motion engine (Apple-style product films): the AI directs, or the rule-based composer without a key
   const motion = CODE_MODE !== 'html' && process.env.ANIMORA_ENGINE !== 'cinema' && MOTION_ASPECTS.includes(planWithAssets.aspect_ratio || '9:16');
   if (motion) {
     try {
-      onStatus?.(config.useGemini ? 'Directing the film' : 'Building animation');
+      onStatus?.(config.useGemini ? 'Directing your film' : 'Building animation');
       const prev = readMotion(previous) || readCinema(previous);
       const r = await directMotion({
         plan: planWithAssets, brief, assets: planWithAssets.assets, themeColors: THEMES[themeKey]?.colors || {},
         images: config.useGemini ? await imageParts(assets) : [], useAi: !!config.useGemini,
-        salt: previous ? String(Date.now()) : '', avoid: (prev?.beats || prev?.scenes || []).map((x) => x.type),
+        salt: previous ? String(Date.now()) : '', avoid: (prev?.beats || prev?.scenes || []).map((x) => x.type), style,
       });
       return { html: r.html, source: config.useGemini && r.source === 'gemini' ? 'gemini' : 'template', problems: [], ...(config.useGemini && r.source !== 'gemini' ? { notice: "The AI director couldn't finish, so this version was arranged automatically. Press Regenerate to try the AI again." } : {}) };
     } catch (e) { console.warn('[motion] failed, trying Cinema:', e.message); }
+    // the older engines below use picture descriptions
+    if (config.useGemini) { onStatus?.('Looking at your pictures'); assets = await describeAssets(assets, loadImage); planWithAssets = enrichPlan(plan, assets); }
   }
   // older engine (kept for 9:16 if Motion fails, and for editing videos made before Motion)
   const cinema = CODE_MODE !== 'html' && CINEMA_ASPECTS.includes(planWithAssets.aspect_ratio || '9:16');
@@ -179,7 +183,7 @@ export async function generateCode({ plan, style, assets, brief = null, previous
 
 /** Plain-words edit. Returns { html, source, summary } */
 export async function editCode({ html, instruction, aspectRatio, duration, plan = null, assets = [], onStatus }) {
-  if (config.useGemini) assets = await describeAssets(assets, loadImage);
+  if (config.useGemini && !isMotion(html)) assets = await describeAssets(assets, loadImage);
   if (isFlyer(html)) {
     if (!config.useGemini) return { html, source: 'offline', unchanged: true, summary: 'Flyer changes need the AI, which is off right now.' };
     try { const r = await editFlyer({ html, instruction, assets }); return { html: r.html, source: 'gemini', summary: r.summary }; }

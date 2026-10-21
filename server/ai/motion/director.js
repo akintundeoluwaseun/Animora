@@ -5,8 +5,14 @@ import { geminiGenerate } from '../../engine/gemini.js';
 import { fixPrices, factsFrom } from '../cinema/compose.js';
 import { composeMotion, accentFor, BEAT_MIN, BEAT_MAX, MOTION_WANTS, FONTS } from './compose.js';
 import { motionHtml, readMotion } from './page.js';
+import { lookFor } from './looks.js';
 
 const MODEL = process.env.GEMINI_DIRECTOR_MODEL || process.env.GEMINI_CHAT_MODEL || 'gemini-flash-latest';
+// Speed: the director answers in seconds with light thinking; if it is slow (busy model, retries), the instant
+// rule-based storyboard is used instead of keeping the owner waiting. Tunable with MOTION_AI_DEADLINE_MS.
+const DEADLINE = Number(process.env.MOTION_AI_DEADLINE_MS) || 28000;
+const THINK = process.env.MOTION_AI_THINKING || 'low';
+const withDeadline = (p, ms, what) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error(`${what} took longer than ${Math.round(ms / 1000)}s`)), ms))]);
 export const SIZES = { '9:16': [1080, 1920], '1:1': [1080, 1080], '16:9': [1920, 1080], '4:5': [1080, 1350] };
 const GLYPHS = ['check', 'bolt', 'heart', 'star', 'bag', 'clock', 'pin', 'chat', 'phone', 'card', 'gift', 'sparkle', 'leaf', 'shield', 'truck', 'cake', 'cup', 'scissors', 'home', 'book', 'chart', 'search', 'tag', 'wifi', 'smile', 'car', 'dumbbell', 'shirt', 'tooth', 'globe', 'money'];
 const BGS = ['light', 'dark', 'brand'];
@@ -124,12 +130,14 @@ export function sanitizeBeats(raw, { duration, assets = [] } = {}) {
 const seedOf = (s) => (Array.from(String(s)).reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7) % 2147483646) + 1;
 
 /** Storyboard -> Motion HTML. Tries Gemini first (when `useAi`), then the rule-based composer. */
-export async function directMotion({ plan, brief = null, assets = [], themeColors = {}, images = [], useAi = true, salt = '', avoid = [] }) {
+export async function directMotion({ plan, brief = null, assets = [], themeColors = {}, images = [], useAi = true, salt = '', avoid = [], style = null }) {
   const aspect = SIZES[plan.aspect_ratio] ? plan.aspect_ratio : '9:16';
   const [W, H] = SIZES[aspect];
   const duration = Math.max(10, Math.round(Number(plan.duration_seconds) || 24));
   const colors = { ...themeColors, ...(plan.style?.colors || {}) };
-  const rules = composeMotion(plan, { brief: brief || {}, assets, salt, avoid, colors });
+  // the chosen style is a whole look: stage, display type, background world, pacing
+  const look = lookFor(style?.slug || style?.palette?.theme || '', { ...(style?.palette || {}), ...themeColors });
+  const rules = composeMotion(plan, { brief: brief || {}, assets, salt, avoid, colors, look });
   const logo = (assets || []).find((a) => (a.kind || 'image') === 'image' && (a.role === 'logo' || /logo/i.test(a.name || '')));
   let beats = null, font = rules.font, concept = '';
   if (useAi) {
@@ -139,11 +147,11 @@ export async function directMotion({ plan, brief = null, assets = [], themeColor
       const assetLines = (assets || []).filter((a) => (a.kind || 'image') === 'image').map((a) => `- url "${a.url}" (${a.role || 'photo'}${a.description ? `, shows: ${a.description}` : ''})`).join('\n') || '- none';
       const wants = [].concat(brief?.scenes || []).filter((id) => MOTION_WANTS[id]);
       const wantLine = wants.length ? `\n\nTHE OWNER CHOSE THESE BEATS (include each, adapted to this business): ${wants.map((id) => `${id} -> ${MOTION_WANTS[id].join(' or ')}`).join('; ')}.` : '';
-      const { text } = await geminiGenerate({
+      const { text } = await withDeadline(geminiGenerate({
         system: system({ duration, aspect }),
-        messages: [{ role: 'user', images, text: `THE BUSINESS (facts you may use, typed by the owner; clean them up): ${JSON.stringify(facts)}\n\nASSETS (use exact urls):\n${assetLines}${wantLine}${avoid.length ? `\n\nTHE LAST VERSION USED THESE BEATS (make this one clearly different): ${avoid.join(', ')}` : ''}\n\nA rule-based draft you may improve on or ignore: ${JSON.stringify(rules.beats.map((b) => b.type))}\n\nDirect the film. ${duration} seconds, ${aspect}.` }],
-        model: MODEL, temperature: 1, maxOutputTokens: 12000, json: true, timeoutMs: 90000, thinking: 'medium',
-      });
+        messages: [{ role: 'user', images, text: `THE LOOK (the owner's chosen style): ${look.theme} stages ("bg": "${look.theme}" for most beats; one or two contrasting beats are fine), ${look.energy} energy${look.energy === 'high' ? ' (fast cuts, "slam" hooks, whip/zoom/drop transitions)' : look.energy === 'calm' ? ' (unhurried, "build" or "glow" hooks, push/fade/rise transitions)' : ''}.\n\nTHE BUSINESS (facts you may use, typed by the owner; clean them up): ${JSON.stringify(facts)}\n\nASSETS (use exact urls):\n${assetLines}${wantLine}${avoid.length ? `\n\nTHE LAST VERSION USED THESE BEATS (make this one clearly different): ${avoid.join(', ')}` : ''}\n\nA rule-based draft you may improve on or ignore: ${JSON.stringify(rules.beats.map((b) => b.type))}\n\nDirect the film. ${duration} seconds, ${aspect}.` }],
+        model: MODEL, temperature: 0.9, maxOutputTokens: 8000, json: true, timeoutMs: DEADLINE, thinking: THINK,
+      }), DEADLINE, 'The AI director');
       const j = JSON.parse(String(text).match(/\{[\s\S]*\}/)[0]);
       beats = sanitizeBeats(j.beats, { duration, assets });
       if (FONTS.includes(j.font)) font = j.font;
@@ -155,7 +163,7 @@ export async function directMotion({ plan, brief = null, assets = [], themeColor
   // sound: 'all'/'sfx' = effects, 'none' = silent, 'own' = the owner's track (+ effects), 'piano'/'soft' = a library track
   const sound = plan.sound || (plan.sfx === false ? 'none' : 'sfx');
   const music = sound === 'own' && plan.music_url ? { url: plan.music_url } : sound === 'piano' || sound === 'soft' ? { url: `/music/${sound}.mp3`, builtin: sound } : null;
-  const data = { W, H, seed: seedOf(`${rules.brand}${salt}`), brand: rules.brand, logo: logo?.url || null, font, accent: rules.accent, beats, sound: sound === 'none' ? 'none' : 'on', music };
+  const data = { W, H, seed: seedOf(`${rules.brand}${salt}`), brand: rules.brand, logo: logo?.url || null, font: look.ui || font, look, accent: rules.accent, accent2: look.accent2, beats, sound: sound === 'none' ? 'none' : 'on', music };
   return { html: motionHtml(data), data, concept, source: aiBeats ? 'gemini' : 'template' };
 }
 
@@ -167,11 +175,11 @@ export async function motionEdit({ html, instruction, assets = [], images = [], 
   const aspect = Object.entries(SIZES).find(([, [w, h]]) => w === data.W && h === data.H)?.[0] || '9:16';
   const past = (history || []).filter((h) => h.role === 'user').slice(-6).map((h) => `- ${h.text}`).join('\n');
   const assetLines = (assets || []).filter((a) => (a.kind || 'image') === 'image').map((a) => `- url "${a.url}" (${a.role || 'photo'})`).join('\n') || '- none';
-  const { text } = await geminiGenerate({
+  const { text } = await withDeadline(geminiGenerate({
     system: `${system({ duration, aspect })}\n\nYOU ARE EDITING AN EXISTING FILM. You get its storyboard and the owner's change request. Return { "beats": [the FULL updated list], "accent"?: "#hex" (only if they asked for another colour), "font"?: "...", "summary": "one short sentence of what you changed" }. Do everything asked in this one edit; change only what was asked; keep everything else exactly as it is. Keep the total at ${duration} seconds unless asked for another length.`,
     messages: [{ role: 'user', images, text: `CURRENT STORYBOARD:\n${JSON.stringify(data.beats)}\n\nASSETS:\n${assetLines}${past ? `\n\nEARLIER REQUESTS (already done; keep them):\n${past}` : ''}\n\nCHANGE REQUEST: ${instruction}` }],
-    model: MODEL, temperature: 0.5, maxOutputTokens: 12000, json: true, timeoutMs: 90000, thinking: 'medium',
-  });
+    model: MODEL, temperature: 0.5, maxOutputTokens: 8000, json: true, timeoutMs: DEADLINE + 12000, thinking: THINK,
+  }), DEADLINE + 15000, 'The AI editor');
   const j = JSON.parse(String(text).match(/\{[\s\S]*\}/)[0]);
   const want = /(\d{2,3})\s*(s|sec|seconds)\b/i.exec(instruction);
   const beats = sanitizeBeats(j.beats, { duration: want ? Number(want[1]) : duration, assets });
