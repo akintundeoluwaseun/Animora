@@ -148,6 +148,21 @@ button:disabled { cursor: not-allowed; }
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; }
 .dev-mark { background: linear-gradient(140deg, #7A6CFF, #5546FF 45%, #2FA8FF); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .35), 0 6px 16px -6px rgba(85, 70, 255, .8); letter-spacing: -0.04em; }
 
+/* ================= Developer signature (site footer): classic, premium ================= */
+.dev-sign { position: relative; border-radius: 20px; padding: 1px; background: linear-gradient(135deg, #E9D5A1 0%, #B8914A 35%, rgba(184, 145, 74, .25) 70%, #E9D5A1 100%); box-shadow: 0 28px 60px -34px rgba(20, 17, 43, .65); }
+.dev-sign-inner { border-radius: 19px; color: #F6F1E6; background: radial-gradient(120% 140% at 0% 0%, #1D1A33 0%, #0F0D1E 55%, #0A0914 100%); box-shadow: inset 0 1px 0 rgba(233, 213, 161, .18); }
+.dev-sign-mark { width: 64px; height: 64px; font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif; font-size: 22px; font-weight: 600; letter-spacing: .04em; color: #E9D5A1; border: 1px solid rgba(233, 213, 161, .7); background: radial-gradient(circle at 30% 25%, rgba(233, 213, 161, .16), rgba(233, 213, 161, .02) 70%); box-shadow: 0 0 0 5px rgba(233, 213, 161, .07); }
+.dev-sign-eyebrow { font-size: 10.5px; font-weight: 600; letter-spacing: .26em; text-transform: uppercase; color: #C9A961; }
+.dev-sign-name { font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif; font-size: 28px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.1; color: #FBF7EC; }
+.dev-sign-tag { font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif; font-style: italic; font-size: 15px; color: rgba(246, 241, 230, .66); max-width: 44ch; }
+.dev-sign-btn { display: inline-flex; align-items: center; gap: .5rem; height: 44px; padding: 0 1.25rem; border-radius: 999px; font-size: 14px; font-weight: 600; letter-spacing: .01em; transition: filter .15s, background .15s, border-color .15s; }
+.dev-sign-btn-gold { color: #1A1405; background: linear-gradient(180deg, #F0DEB0, #C9A961); box-shadow: 0 8px 20px -10px rgba(201, 169, 97, .8), inset 0 1px 0 rgba(255, 255, 255, .5); }
+.dev-sign-btn-gold:hover { filter: brightness(1.06); }
+.dev-sign-btn-line { color: #F6F1E6; border: 1px solid rgba(233, 213, 161, .45); }
+.dev-sign-btn-line:hover { background: rgba(233, 213, 161, .1); border-color: rgba(233, 213, 161, .8); }
+.dev-sign-phone { font-size: 12.5px; letter-spacing: .12em; color: rgba(233, 213, 161, .7); }
+@media (max-width: 639px) { .dev-sign-name { font-size: 24px; } .dev-sign-btn { flex: 1 1 100%; justify-content: center; } }
+
 /* ================= Wizard form (Plan page) ================= */
 @theme { --color-video: #4F46E5; --color-video-soft: #ECEBFF; --color-flyer: #F2691B; --color-flyer-soft: #FFEBDD; }
 .wiz { min-height: calc(100vh - 3.7rem); padding-bottom: 5rem; }

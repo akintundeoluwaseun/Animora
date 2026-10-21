@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react';
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth, api, naira } from '../lib.jsx';
 import { useInstall } from './InstallApp.jsx';
-import { Logo, Modal, PlanBadge, DeveloperCard } from './ui.jsx';
+import { Logo, Modal, PlanBadge, DeveloperCard, DeveloperSignature } from './ui.jsx';
 import { creditsLeft } from './BuyCredits.jsx';
 
 export function modeFor(pathname, signedIn = false) {
@@ -90,7 +90,7 @@ function SiteBar({ onCreate }) {
 function SiteFooter() {
   return (
     <footer className="border-t border-ink/10 bg-white">
-      <div className="mx-auto grid max-w-[1180px] gap-10 px-6 py-12 sm:px-10 md:grid-cols-[1.2fr_1fr_1fr]">
+      <div className="mx-auto grid max-w-[1180px] gap-10 px-6 pb-8 pt-12 sm:px-10 md:grid-cols-[1.6fr_1fr]">
         <div>
           <Logo />
           <p className="mt-3 max-w-[36ch] text-sm leading-relaxed text-ink-soft">Motion-design video ads and flyers for businesses, directed by AI and rendered in minutes.</p>
@@ -102,8 +102,8 @@ function SiteFooter() {
           <Link to="/videos" className="text-ink-soft hover:text-ink">My videos</Link>
           <Link to="/flyers" className="text-ink-soft hover:text-ink">My flyers</Link>
         </nav>
-        <DeveloperCard />
       </div>
+      <div className="mx-auto max-w-[1180px] px-6 pb-12 sm:px-10"><DeveloperSignature /></div>
     </footer>
   );
 }

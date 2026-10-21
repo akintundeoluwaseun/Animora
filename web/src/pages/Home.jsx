@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, naira } from '../lib.jsx';
-import { Button, DeveloperCard } from '../components/ui.jsx';
+import { Button } from '../components/ui.jsx';
 
 const STEPS = [
   ['Answer a few questions', 'Your business name, what you sell, your message and your pictures. One question at a time.'],
@@ -117,9 +117,6 @@ export default function Home() {
             <Button as={Link} to="/new/video" variant="dark">Make a video</Button>
           </div>
         </div>
-      </section>
-      <section className="mx-auto max-w-[1180px] px-6 pb-14 sm:px-10" aria-label="The developer">
-        <DeveloperCard wide />
       </section>
     </div>
   );
