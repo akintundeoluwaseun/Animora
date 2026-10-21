@@ -187,6 +187,11 @@ r.post('/:id/assets', upload.single('file'), async (req, res) => {
     RETURNING id, name, kind, role, mime, url, width, height, has_alpha, duration_seconds, is_light`,
   [req.user.id, p.id, label, kind, role, f.mimetype, url, meta.width || null, meta.height || null, hasAlpha, meta.duration || null, isLight]);
   res.json({ asset });
+  // Read what the picture shows now, in the background, so "Make my video / flyer" doesn't wait for the AI to look at it later.
+  if (kind === 'image' && config.useGemini) {
+    const job = describeAssets([asset], loadImage).catch(() => {});
+    if (config.serverless) waitUntil(job);
+  }
 });
 
 // The browser makes the thumbnail (a still of the video) when the server can't (no Chrome on Vercel).

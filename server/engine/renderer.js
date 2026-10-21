@@ -33,7 +33,7 @@ export const CANVAS = {
 const DEFAULTS = {
   fps: 30,
     // Parallel capture: each extra worker gets its own browser process (stable on Windows too).
-  workers: Number(process.env.ADFLASH_WORKERS) || Math.max(1, Math.min(4, Math.floor(cpus().length / 2))),
+  workers: Number(process.env.ADFLASH_WORKERS) || Math.max(1, Math.min(6, cpus().length > 4 ? cpus().length - 1 : cpus().length)),   // one browser per core (leave one free for FFmpeg on bigger machines)
   // 'beginframe': Chrome headless-shell renders + captures each frame in ONE call (about 1.8x faster).
   // 'screenshot': classic seek -> 2x requestAnimationFrame -> page.screenshot (works on any Chrome).
   // 'auto': try beginframe, fall back to screenshot.

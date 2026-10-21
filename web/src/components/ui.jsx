@@ -211,6 +211,31 @@ export function DeveloperMark({ size = 40 }) {
   );
 }
 
+// One classic, premium signature for the foot of the site (replaces the old double card).
+export function DeveloperSignature() {
+  return (
+    <div className="dev-sign">
+      <div className="dev-sign-inner flex flex-col gap-7 p-7 sm:flex-row sm:items-center sm:justify-between sm:gap-10 sm:p-9">
+        <div className="flex items-center gap-5">
+          <span className="dev-sign-mark grid shrink-0 place-items-center rounded-full" aria-hidden="true">OJ</span>
+          <div className="min-w-0">
+            <p className="dev-sign-eyebrow">Designed &amp; developed by</p>
+            <a href={DEVELOPER.website} target="_blank" rel="noopener" className="dev-sign-name mt-1.5 inline-flex items-center gap-2 hover:underline">{DEVELOPER.name.replace(/\.$/, '')}<span className="shrink-0">{VERIFIED}</span></a>
+            <p className="dev-sign-tag mt-1.5">Websites, software and apps for businesses. Animora is one of them.</p>
+          </div>
+        </div>
+        <div className="flex flex-col gap-2.5 sm:items-end">
+          <div className="flex flex-wrap gap-2.5">
+            <a href={DEVELOPER.whatsapp} target="_blank" rel="noopener" className="dev-sign-btn dev-sign-btn-gold press">{WA_ICON}Chat on WhatsApp</a>
+            <a href={DEVELOPER.website} target="_blank" rel="noopener" className="dev-sign-btn dev-sign-btn-line press">{GLOBE_ICON}Visit website</a>
+          </div>
+          <p className="dev-sign-phone tabular-nums">{DEVELOPER.phone}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function DeveloperCard({ wide = false }) {
   if (wide) {
     return (
