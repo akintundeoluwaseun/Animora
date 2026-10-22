@@ -1,43 +1,44 @@
-{
-  "name": "adflash",
-  "version": "1.0.0",
-  "private": true,
-  "type": "module",
-  "description": "AdFlash - plan a video ad by chatting with AI, preview it live, render it to MP4 with our own engine.",
-  "scripts": {
-    "dev": "node scripts/dev.js",
-    "dev:server": "node --watch server/index.js",
-    "dev:web": "vite --config web/vite.config.js",
-    "build": "vite build --config web/vite.config.js",
-    "start": "node server/index.js",
-    "worker": "node server/worker.js",
-    "seed": "node server/db/seed.js",
-    "test": "node scripts/test-engine.js && node scripts/test-gemini-stub.js && node scripts/test-api.js && node scripts/test-media.js",
-    "test:ui": "node scripts/ui-walkthrough.js",
-    "assets": "node scripts/build-demo-assets.js",
-    "check:gemini": "node scripts/check-gemini.js"
-  },
-  "engines": {
-    "node": ">=20"
-  },
-  "dependencies": {
-    "@electric-sql/pglite": "^0.5.10",
-    "@vercel/functions": "^3.10.1",
-    "express": "^5.3.0",
-    "gsap": "^3.15.0",
-    "mp4-muxer": "^5.2.2",
-    "multer": "^2.4.0",
-    "pg": "^8.23.1",
-    "puppeteer": "^25.14.0",
-    "web-push": "^3.6.7"
-  },
-  "devDependencies": {
-    "@tailwindcss/vite": "^4.3.3",
-    "@vitejs/plugin-react": "^6.1.2",
-    "react": "^19.3.1",
-    "react-dom": "^19.3.1",
-    "react-router-dom": "^7.18.4",
-    "tailwindcss": "^4.3.3",
-    "vite": "^8.3.4"
-  }
-}
+{
+  "name": "adflash",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "AdFlash - plan a video ad by chatting with AI, preview it live, render it to MP4 with our own engine.",
+  "scripts": {
+    "dev": "node scripts/dev.js",
+    "dev:server": "node --watch server/index.js",
+    "dev:web": "vite --config web/vite.config.js",
+    "build": "vite build --config web/vite.config.js",
+    "start": "node server/index.js",
+    "worker": "node server/worker.js",
+    "seed": "node server/db/seed.js",
+    "test": "node scripts/test-engine.js && node scripts/test-gemini-stub.js && node scripts/test-api.js && node scripts/test-media.js",
+    "test:ui": "node scripts/ui-walkthrough.js",
+    "assets": "node scripts/build-demo-assets.js",
+    "check:gemini": "node scripts/check-gemini.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@electric-sql/pglite": "^0.5.10",
+    "@vercel/analytics": "^2.0.1",
+    "@vercel/functions": "^3.10.1",
+    "express": "^5.3.0",
+    "gsap": "^3.15.0",
+    "mp4-muxer": "^5.2.2",
+    "multer": "^2.4.0",
+    "pg": "^8.23.1",
+    "puppeteer": "^25.14.0",
+    "web-push": "^3.6.7"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "@vitejs/plugin-react": "^6.1.2",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "react-router-dom": "^7.18.4",
+    "tailwindcss": "^4.3.3",
+    "vite": "^8.3.4"
+  }
+}
