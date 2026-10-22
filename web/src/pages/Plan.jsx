@@ -79,7 +79,7 @@ export function fitSeconds(b = {}) {
 export function lengthWarning(b, v) {
   const rec = fitSeconds(b), sec = Number(v);
   if (!sec) return null;
-  if (sec >= rec * 1.6 && sec - rec >= 15) return { rec, text: `Your details fill about ${rec} seconds. At ${sec} seconds the video has to stretch them, so the video can feel slow and repeat itself. Add more messages, selling points or products, or choose ${rec} seconds.` };
+  // long videos are never stretched: Animora adds new scenes (new words, new looks) to fill the time, so there is no warning for long lengths
   if (sec <= rec * 0.7 && rec - sec >= 10) return { rec, text: `That's a lot for ${sec} seconds: everything will flash by too fast to read. ${rec} seconds fits your details, or remove some of them.` };
   return null;
 }
@@ -100,13 +100,10 @@ const QUESTIONS = [
   { id: 'cta', type: 'multi', max: 5, options: CTAS, typed: true, ask: () => 'What should people do after watching?', placeholder: 'Or type your own, e.g. "Send us a DM"' },
   { id: 'contact', type: 'text', optional: true, ask: () => 'Your phone number, website or address for the end of the video?', placeholder: '0803 123 4567 · www.yoursite.com · 12 Allen Ave, Ikeja' },
   { id: 'aspect', type: 'single', options: ASPECT_OPTS, ask: () => 'Where will you post it?' },
-  { id: 'duration', type: 'single', options: [15, 20, 25, 30, 45, 60], ask: (b) => `How long should it be? Your details fit about ${fitSeconds(b)} seconds.` },
+  { id: 'duration', type: 'single', options: [15, 20, 25, 30, 40, 45, 60], ask: () => 'How long should it be?', hint: 'Any length works. A longer video gets more scenes, not slower ones.' },
   { id: 'pictures', type: 'upload', optional: true, ask: () => `Add your logo and product photos if you have them (up to ${MAX_PICS}). Both are optional. You can also paste a picture with Ctrl+V.` },
   { id: 'colors', type: 'colors', ask: () => 'Which colours should the video use?' },
   { id: 'style', type: 'style', ask: () => 'Pick a look for your video, or let me choose one that fits.' },
-  { id: 'template', type: 'single', options: TEMPLATE_OPTS, ask: () => 'Want a signature motion template, or a film mixed just for you?' },
-  { id: 'intensity', type: 'single', show: (b) => !!b.template && b.template !== 'auto', options: INTENSITY_OPTS, ask: () => 'How should it move?' },
-  { id: 'scenes', type: 'scenes', show: (b) => !b.template || b.template === 'auto', ask: () => 'Which kinds of scenes would you like in your video?', hint: 'Pick any you love. Not sure? Let the AI choose what suits your business best.' },
   { id: 'voiceover', type: 'single', options: [{ v: 'yes', l: 'Yes, write me a script', d: 'For ElevenLabs, CapCut and other voice apps' }, { v: 'no', l: 'No, just on-screen text' }], ask: () => 'Do you want a narration script for a voice-over app?' },
   { id: 'sound', type: 'sound', ask: () => 'What sound should the video have?' },
   { id: 'extra', type: 'long', optional: true, chips: EXTRA_CHIPS, ask: () => 'Last one: any other special instructions? Anything goes. You can paste pictures here too.', placeholder: 'e.g. "Start by zooming into the logo of the chatbot, then show the app screen"', done: true },
@@ -153,7 +150,7 @@ const FLYER_QUESTIONS = [
   { id: 'category', type: 'single', options: CATEGORIES, typed: true, ask: (b) => `Nice! What does ${b.name} do?`, placeholder: 'Or type your own' },
   { id: 'flyerType', type: 'multi', max: 3, options: FLYER_TYPES, typed: true, ask: () => 'What kind of flyer is this?', hint: 'Pick one or more. A sale and a new opening can share one flyer.', placeholder: 'Or describe it in your own words' },
   { id: 'headline', type: 'multi', max: 3, suggest: 'headline', typed: true, ask: () => 'What is the big title? The words people read first.', hint: 'Short wins. One to three lines work best on a flyer.' },
-  { id: 'offer', type: 'text', optional: true, ask: () => 'Is there one big thing to show huge: a price, a discount or a date?', placeholder: 'e.g. 30% OFF or ₦5,000 or 24 Dec' },
+  { id: 'offer', type: 'text', optional: true, show: (b) => { const t = [].concat(b.flyerType || []); return !t.length || !t.every((x) => x === 'hiring' || x === 'brand'); }, ask: () => 'Is there one big thing to show huge: a price, a discount or a date?', placeholder: 'e.g. 30% OFF or ₦5,000 or 24 Dec' },
   { id: 'products', type: 'long', optional: true, ask: () => 'Any items, services or prices to list? One per line.', placeholder: 'Jollof rice ₦2,500\nFried rice ₦3,000' },
   { id: 'when', type: 'text', optional: true, show: (b) => !b.flyerType || [].concat(b.flyerType).some((x) => x === 'event' || x === 'launch' || /event|party|show|launch|open/i.test(x)), ask: () => 'When and where? Date, time and venue.', placeholder: 'e.g. Sat 14 Dec, 4pm, Ado Ekiti Town Hall' },
   { id: 'cta', type: 'multi', max: 3, options: CTAS, typed: true, ask: FLYER_TEXT.cta, placeholder: 'Or type your own' },
@@ -166,6 +163,9 @@ const FLYER_QUESTIONS = [
   { id: 'extra', type: 'long', optional: true, chips: ['Make the price really big', 'Keep it calm and premium', 'Make it loud and colourful', 'Use my photo as the background'], ask: FLYER_TEXT.extra, placeholder: 'e.g. "Put the prices in big circles" or "Make it look like a Christmas sale"' },
 ];
 
+// Only the business name is needed. Every other question can be skipped, and Animora chooses well for whatever is skipped.
+const SKIPPABLE = new Set(['category', 'goal', 'headline', 'cta', 'aspect', 'duration', 'colors', 'style', 'template', 'intensity', 'scenes', 'voiceover', 'sound', 'flyerType', 'layout', 'offer', 'when', 'features', 'products', 'contact', 'pictures', 'extra']);
+for (const qq of [...QUESTIONS, ...FLYER_QUESTIONS]) if (SKIPPABLE.has(qq.id)) qq.optional = true;
 
 
 const label = (q, v, b, styles) => {
@@ -411,6 +411,7 @@ export default function Plan() {
         const next = save({ pasted: true });
         if (r.aiError) setError(`The AI couldn't read all of it (${r.aiError.slice(0, 90)}). I picked up what I could and will ask about the rest.`);
         setToast(r.found?.length ? `Got it. I found your ${r.found.map((k) => FOUND_LABEL[k] || k).join(', ')}.` : "Got it. I'll ask about the rest."); setTimeout(() => setToast(''), 5000);
+        if (bRef.current.name) { setReading(false); return makeNow(); }
         advance(next);
       } catch (e) { setError(e.message); } finally { setReading(false); }
       return;
@@ -425,6 +426,13 @@ export default function Plan() {
     else patch = { [q.id]: value };
     const next = save({ ...patch, ...extra, [`${q.id}Skipped`]: false });
     advance(next);
+  };
+  // "Make it now": skip every question that is left and build with what is known
+  const makeNow = async () => {
+    if (building || reading || !bRef.current.name) return;
+    const patch = { done: true, extraSkipped: true, picturesDone: true };
+    for (const qq of QS) if (qq.optional && valueOf(qq, bRef.current, pics.length) === undefined) patch[`${qq.id}Skipped`] = true;
+    const next = save(patch); setBuilding(true); await saved(); build(next);
   };
   const skip = () => { const next = save({ [`${q.id}Skipped`]: true, ...(q.id === 'pictures' ? { picturesDone: true } : {}) }); advance(next); };
 
@@ -487,7 +495,7 @@ export default function Plan() {
   };
   const continueDisabled = reading || (q?.type === 'multi' ? !multi.length && !text.trim() : q?.type === 'scenes' ? false : q?.type === 'upload' ? uploading : q?.done ? false : !text.trim());
   const continueLabel = q?.done ? (text.trim() ? `Make my ${what}` : "No, that's all") : q?.type === 'multi' ? (multi.length ? `Continue · ${multi.length + (text.trim() && !multi.includes(text.trim()) ? 1 : 0)}` : 'Continue')
-    : q?.type === 'scenes' ? (multi.length ? `Use my ${multi.length} pick${multi.length === 1 ? '' : 's'}` : 'Continue') : q?.type === 'upload' ? (pics.length ? 'Continue' : 'Continue without pictures') : q?.id === 'paste' ? 'Read it' : 'Continue';
+    : q?.type === 'scenes' ? (multi.length ? `Use my ${multi.length} pick${multi.length === 1 ? '' : 's'}` : 'Continue') : q?.type === 'upload' ? (pics.length ? 'Continue' : 'Continue without pictures') : q?.id === 'paste' ? 'Read it and make my video' : 'Continue';
   const onContinue = (e) => {
     if (q.type === 'scenes') { e?.preventDefault(); return multi.length ? answer(multi) : answer('auto'); }
     if (q.type === 'upload') { e?.preventDefault(); return pics.length ? answer(pics.length, { picturesDone: true }) : skip(); }
@@ -551,7 +559,7 @@ export default function Plan() {
                     {opts.filter((o) => q.id !== 'duration' || (o >= limits.minSeconds && o <= limits.maxSeconds)).map((o) => {
                       const v = o.v ?? o, l = o.l ?? (q.id === 'duration' ? `${o} seconds` : o);
                       const on = q.type === 'multi' ? multi.includes(v) : b[q.id] === v;
-                      const best = q.id === 'duration' && v === fitSeconds(b);
+                      const best = false;
                       return <Chip key={v} active={on} sub={o.d || (best ? 'Fits your details best' : undefined)} multi={q.type === 'multi'} onClick={() => {
                         if (q.id === 'duration') { const w = lengthWarning(b, v); if (w) { setLenWarn({ v, ...w }); return undefined; } setLenWarn(null); }
                         if (q.type === 'single') return answer(v);
@@ -683,6 +691,8 @@ export default function Plan() {
               {!finished && <button type="button" onClick={goBack} disabled={isFirst || building} className="wiz-back">← Back</button>}
               <span className="flex-1" />
               {!finished && q?.optional && !q.done && <button type="button" onClick={skip} className="wiz-skip">Skip</button>}
+              {!finished && b.name && q && !['mode', 'paste', 'name'].includes(q.id) && !q.done && <button type="button" onClick={makeNow} disabled={building || reading} className="wiz-now">Make it now</button>}
+              {false}
               {!finished && needsContinue && <Button type="submit" size="lg" loading={reading} disabled={continueDisabled}>{continueLabel}</Button>}
               {finished && (
                 <div className="flex w-full flex-col gap-2 sm:w-auto sm:items-end">

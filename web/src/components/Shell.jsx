@@ -4,6 +4,7 @@
 //   focus  (/p/:id/...)          no rail: a slim bar with "Back to library", all the room goes to the work
 import { useEffect, useState } from 'react';
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
+import ThemeToggle from './ThemeToggle.jsx';
 import { useAuth, api, naira } from '../lib.jsx';
 import { useInstall } from './InstallApp.jsx';
 import { Logo, Modal, PlanBadge, DeveloperCard, DeveloperSignature } from './ui.jsx';
@@ -79,6 +80,7 @@ function SiteBar({ onCreate }) {
           {!user && <NavLink to="/videos" className={link}>My work</NavLink>}
         </nav>
         <div className="ml-auto flex items-center gap-2">
+          <ThemeToggle onDark />
           {user && <Link to={lastLib()} className="rounded-lg px-3 py-2 text-[15px] font-medium text-white/70 hover:text-white">My work</Link>}
           <button onClick={onCreate} className="press flex h-10 items-center gap-1.5 rounded-[10px] bg-white px-4 text-[15px] font-semibold text-ink hover:bg-white/90"><Icon k="plus" size={17} />Create</button>
         </div>
@@ -164,7 +166,7 @@ function Rail({ onCreate }) {
   useEffect(() => { api('/status').then(setStatus).catch(() => {}); }, []);
   return (
     <aside className="sticky top-0 hidden h-screen flex-col border-r border-ink/8 bg-[#FBFBFD] lg:flex" aria-label="Main">
-      <div className="px-5 pb-2 pt-6"><Logo /></div>
+      <div className="flex items-center justify-between px-5 pb-2 pt-6"><Logo /><ThemeToggle className="!size-9" /></div>
       <div className="mt-5 space-y-3 px-4">
         <Studio kind="video" to="/videos" label="Videos" sub="Motion ads, MP4" icon="videos" />
         <Studio kind="flyer" to="/flyers" label="Flyers" sub="Posters, still designs" icon="flyers" />
@@ -292,8 +294,9 @@ function AppTopBar() {   // phones only: logo, the library you're in, videos lef
       <div className="flex h-14 items-center gap-2 px-4">
         <Logo />
         {kind && <span className={`ml-1 rounded-full px-2.5 py-1 text-[12px] font-bold ${kind === 'flyer' ? 'bg-flyer-soft text-flyer' : 'bg-video-soft text-video'}`}>{kind === 'flyer' ? 'Flyers' : 'Videos'}</span>}
+        <ThemeToggle className="ml-auto !size-9" />
         {left !== null && (
-          <Link to="/pricing" className="press ml-auto flex items-center gap-1.5 rounded-full border border-ink/10 bg-white px-3 py-1.5 text-[13px] font-semibold text-ink-soft">
+          <Link to="/pricing" className="press flex items-center gap-1.5 rounded-full border border-ink/10 bg-white px-3 py-1.5 text-[13px] font-semibold text-ink-soft">
             <span className="size-2 rounded-full bg-money" aria-hidden="true" /><b className="tabular-nums text-ink">{left}</b> left
           </Link>
         )}

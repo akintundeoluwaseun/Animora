@@ -1,6 +1,7 @@
 import { Component, StrictMode, lazy, Suspense } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Analytics } from '@vercel/analytics/react';
+import { initTheme } from './components/ThemeToggle.jsx';
 import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom';
 import './styles.css';
 import { AuthProvider, useAuth } from './lib.jsx';
@@ -103,4 +104,5 @@ function App() {
   );
 }
 
+initTheme();
 createRoot(document.getElementById('root')).render(<StrictMode><App /><Analytics /></StrictMode>);
