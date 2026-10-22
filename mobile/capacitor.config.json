@@ -1,0 +1,14 @@
+{
+  "appId": "com.animora.app",
+  "appName": "Animora",
+  "webDir": "www",
+  "server": {
+    "url": "https://animora-ivory.vercel.app/videos",
+    "cleartext": false,
+    "androidScheme": "https"
+  },
+  "android": {
+    "allowMixedContent": false,
+    "backgroundColor": "#FFFFFF"
+  }
+}

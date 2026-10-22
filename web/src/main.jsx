@@ -22,6 +22,7 @@ const Studio = lazy(() => import('./pages/Studio.jsx'));
 const Render = lazy(() => import('./pages/Render.jsx'));
 const Pricing = lazy(() => import('./pages/Pricing.jsx'));
 const Checkout = lazy(() => import('./pages/Checkout.jsx'));
+const Admin = lazy(() => import('./pages/Admin.jsx'));
 
 // After a new version is deployed, the old page's files are gone: reload once to get the new ones.
 window.addEventListener('vite:preloadError', (e) => {
@@ -93,6 +94,7 @@ function App() {
               <Route path="/p/:id/render" element={<Private><Keyed el={Render} /></Private>} />
               <Route path="/checkout" element={<Private><Checkout /></Private>} />
               <Route path="/creator" element={<Navigate to="/videos" replace />} />
+              <Route path="/admin" element={<Admin />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>

@@ -39,6 +39,7 @@ export const config = {
   // On Vercel, MP4s are made by a GitHub Actions run (see .github/workflows/render.yml) when GH_DISPATCH_TOKEN is set.
   githubRender: !!env('GH_DISPATCH_TOKEN'),
   githubToken: env('GH_DISPATCH_TOKEN'),
+  adminKey: env('ADMIN_KEY'),   // turns the private /admin dashboard on
   githubRepo: env('GH_REPO', process.env.VERCEL_GIT_REPO_OWNER && process.env.VERCEL_GIT_REPO_SLUG ? `${process.env.VERCEL_GIT_REPO_OWNER}/${process.env.VERCEL_GIT_REPO_SLUG}` : 'akintundeoluwaseun/animora'),
   githubRef: env('GH_REF', process.env.VERCEL_GIT_COMMIT_REF || 'main'),
   renderEnabled: env('RENDER_ENABLED', SERVERLESS ? (env('GH_DISPATCH_TOKEN') ? 'true' : 'false') : 'true') !== 'false',

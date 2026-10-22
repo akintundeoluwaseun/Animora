@@ -1,0 +1,21 @@
+{
+  "name": "animora-android",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Android wrapper for Animora. Opens the live website inside a native app.",
+  "scripts": {
+    "add": "cap add android",
+    "sync": "cap sync android",
+    "assets": "capacitor-assets generate --android",
+    "open": "cap open android",
+    "apk": "cd android && gradlew assembleDebug"
+  },
+  "dependencies": {
+    "@capacitor/android": "^7.4.0",
+    "@capacitor/core": "^7.4.0"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^7.4.0"
+  }
+}

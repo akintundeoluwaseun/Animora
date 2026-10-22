@@ -25,7 +25,8 @@ const DARK_ONLY = new Set(['photo-depth', 'photo-cinema', 'open-light', 'end-gla
 export const isPieces = (html) => /window\.PIECES_FILM = /.test(String(html || ''));
 export const readPieces = (html) => { const m = String(html || '').match(/window\.PIECES_FILM = (.*);\n/); try { return m ? JSON.parse(m[1]) : null; } catch { return null; } };
 const esc = (s) => String(s).replace(/</g, '\\u003c');
-const str = (v, n = 80) => (v == null ? '' : String(v).replace(/\s+/g, ' ').trim().slice(0, n));
+// cut at a whole word, never in the middle of one ("This flyer was mad", "fix your devi")
+const str = (v, n = 80) => { const t = v == null ? '' : String(v).replace(/\s+/g, ' ').trim(); if (t.length <= n) return t; const c = t.slice(0, n), sp = c.lastIndexOf(' '); return (sp > n * 0.5 ? c.slice(0, sp) : c).replace(/[\s,;:&–—-]+$/, ''); };
 const hashStr = (t) => { let h = 2166136261; for (const c of String(t)) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; };
 const mulberry = (a) => () => { a |= 0; a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
 const lum = (h) => { const n = parseInt(String(h || '#777777').slice(1), 16); const c = [n >> 16, (n >> 8) & 255, n & 255].map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }); return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; };
@@ -99,10 +100,17 @@ export function composePieces({ facts: f, duration = 24, seed = 1, energy = 'med
     if (!fillQ.length) fillQ = cycle();
     let k = fillQ.findIndex((x) => x.piece !== lastPiece && !keep.slice(-2).some((m) => m.piece === x.piece)); if (k < 0) k = fillQ.findIndex((x) => x.piece !== lastPiece); if (k < 0) { fillQ = cycle(); continue; }
     const x = fillQ.splice(k, 1)[0]; if (total + cost(x.piece) > duration + 0.2) break;
-    keep.push({ piece: x.piece, data: x.data(fi) }); total += cost(x.piece); lastPiece = x.piece; fi++;
+    keep.push({ piece: x.piece, data: x.data(fi), fill: true }); total += cost(x.piece); lastPiece = x.piece; fi++;
   }
   // no scene twice in a row, and never the same piece as the opener or the ending right next to it
-  const ordered = shuffle(keep.slice());
+  // A story arc, not a shuffle: hero shot first, then the benefits, then the offer, then where/when, with a bold statement between the information scenes so the film breathes.
+  const RANK = (m) => /^photo/.test(m.piece) ? 1 : /^(info-checks|info-tiles|info-stat|info-quote|info-compare)$/.test(m.piece) ? 3 : m.piece === 'info-price' ? 4 : m.piece === 'info-countdown' ? 5 : m.piece === 'info-location' ? 6 : 2;
+  const core = keep.filter((m) => !m.fill).map((m, i) => ({ m, k: RANK(m) + (/^photo/.test(m.piece) && m !== keep.find((x) => /^photo/.test(x.piece)) ? 1.5 : 0) + r() * 0.2 })).sort((x, y) => x.k - y.k).map((x) => x.m);
+  const breaths = shuffle(keep.filter((m) => m.fill));
+  const ordered = [];
+  const gapEvery = core.length ? Math.max(1, Math.ceil(breaths.length / Math.max(1, core.length))) : breaths.length;
+  core.forEach((m, i) => { ordered.push(m); for (let g = 0; g < gapEvery && breaths.length && !(i === core.length - 1 && g >= 1); g++) ordered.push(breaths.shift()); });
+  while (breaths.length) ordered.push(breaths.shift());
   for (let a = 1; a < ordered.length; a++) if (ordered[a].piece === ordered[a - 1].piece) { const b = ordered.findIndex((m, x) => x > a && m.piece !== ordered[a - 1].piece && (ordered[x + 1] ? ordered[x + 1].piece !== ordered[a].piece : true)); if (b > 0) [ordered[a], ordered[b]] = [ordered[b], ordered[a]]; }
   const all = [scenes[0], ...ordered, end];
   for (const sc of all) if (sc.data && sc.data.img && f.fits) sc.data.fit = f.fits[sc.data.img] || 'cover';
@@ -152,8 +160,8 @@ function mixFilm({ plan = {}, brief = {}, assets = [], style = null, themeColors
   // Every business and every Regenerate gets its own colour play, not just a new scene order (the chosen style keeps its fonts and mood).
   { const rv = mulberry(seed + 7); if (rv() < 0.5 && !plan.style?.colors?.primary && look.A2 && HEX.test(look.A2)) { const t = look.A; look.A = look.A2; look.A2 = t; } if (rv() < 0.3) look.upper = !look.upper; }
   const comp = composePieces({ facts, duration, seed, energy: look0.energy || 'medium' });
-  const r = mulberry(seed + 99), kinds = look.dark ? ['dark', 'dark', 'brand', 'light'] : ['light', 'light', 'brand', 'dark'];
-  comp.scenes.forEach((s, i) => { if (!s.kind) s.kind = DARK_ONLY.has(s.piece) ? 'dark' : i === 0 ? (look.dark ? 'dark' : 'light') : kinds[Math.floor(r() * kinds.length)]; if (s.kind === 'light' && lum(A) > 0.4) s.kind = 'dark'; });
+  const r = mulberry(seed + 99), off = Math.floor(r() * 4), kinds = look.dark ? ['dark', 'dark', 'brand', 'light'] : ['light', 'light', 'brand', 'dark'];
+  comp.scenes.forEach((s, i) => { if (!s.kind) { const prevK = comp.scenes[i - 1]?.kind; let kk = DARK_ONLY.has(s.piece) ? 'dark' : i === 0 ? (look.dark ? 'dark' : 'light') : kinds[(i + off) % kinds.length]; if (kk === prevK && kk !== 'brand' && !DARK_ONLY.has(s.piece)) kk = kinds[(i + off + 1) % kinds.length]; s.kind = kk; } if (s.kind === 'light' && lum(A) > 0.4) s.kind = 'dark'; });
   const sound = plan.sound || (plan.sfx === false ? 'none' : 'sfx');
   const music = sound === 'own' && plan.music_url ? { url: plan.music_url } : sound === 'piano' || sound === 'soft' ? { url: `/music/${sound}.mp3`, builtin: sound } : null;
   const cfg = { target: duration, W, H, seed, look, energy: comp.energy, scenes: comp.scenes, sound: sound === 'none' ? 'none' : 'on', brand: facts.name, logo: facts.logo };

@@ -6,3 +6,7 @@ scripts/tmp/
 output/
 assets/samples/
 shots-tmp.mjs
+
+# Android wrapper build output
+mobile/node_modules/
+mobile/android/
