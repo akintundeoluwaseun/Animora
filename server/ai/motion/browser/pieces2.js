@@ -3,6 +3,7 @@
    kinetic type wall · logo draw · split slam · cinematic photo · price compare. Needs pieces.js + atoms.js. */
 (function () {
   'use strict';
+  const BG2 = d => (d.fit === 'contain' ? `url("${d.img}") center/contain no-repeat, linear-gradient(rgba(8,8,12,.64), rgba(8,8,12,.64)), url("${d.img}") center/cover` : `url("${d.img}") center/cover`);
   const P = window.PIECES, X = window.PIECE_UTILS;
   const { el, sv, clamp, lerp, ez, esc, rgba, mix, on, drive, orb, chars, fit, natural, inkOn, seeded } = X;
   const ICON = {
@@ -155,8 +156,8 @@
       const { W, H, U, look } = ctx;
       const vert = ctx.pick('split:dir' + salt(ctx), [true, false]);
       const frame = el('div', `position:absolute;left:${60 * U}px;right:${60 * U}px;top:${H * 0.14}px;height:${H * 0.62}px;border-radius:${44 * U}px;overflow:hidden;box-shadow:0 ${40 * U}px ${90 * U}px ${-30 * U}px rgba(0,0,0,.6);`, L);
-      const before = el('div', `position:absolute;inset:0;background:url("${d.img}") center/cover;filter:grayscale(1) brightness(.75) contrast(.85) blur(${2 * U}px);`, frame);
-      const after = el('div', `position:absolute;inset:0;background:url("${d.img}") center/cover;filter:saturate(1.25) contrast(1.05);`, frame);
+      const before = el('div', `position:absolute;inset:0;background:${BG2(d)};filter:grayscale(1) brightness(.75) contrast(.85) blur(${2 * U}px);`, frame);
+      const after = el('div', `position:absolute;inset:0;background:${BG2(d)};filter:saturate(1.25) contrast(1.05);`, frame);
       const line = el('div', `position:absolute;${vert ? `top:0;bottom:0;width:${6 * U}px;margin-left:${-3 * U}px;` : `left:0;right:0;height:${6 * U}px;margin-top:${-3 * U}px;`}background:#fff;box-shadow:0 0 ${20 * U}px rgba(0,0,0,.4);`, frame);
       const knob = el('div', `position:absolute;width:${90 * U}px;height:${90 * U}px;margin:${-45 * U}px 0 0 ${-45 * U}px;border-radius:50%;background:#fff;display:grid;place-items:center;color:#111;font-weight:900;font-size:${34 * U}px;font-family:system-ui;${vert ? 'top:50%;' : 'left:50%;'}`, frame, vert ? '⟷' : '↕');
       const tagB = el('div', `position:absolute;left:${30 * U}px;top:${30 * U}px;padding:${10 * U}px ${22 * U}px;border-radius:999px;background:rgba(0,0,0,.6);color:#fff;font-family:${look.ui};font-weight:800;font-size:${28 * U}px;letter-spacing:.15em;`, frame, esc(d.before || 'BEFORE'));
@@ -192,7 +193,7 @@
       el('div', `position:absolute;left:50%;top:${pw * 0.03}px;width:${pw * 0.3}px;height:${pw * 0.075}px;margin-left:${-pw * 0.15}px;border-radius:999px;background:#000;z-index:3;`, screen);
       const feed = el('div', 'position:absolute;left:0;right:0;top:0;', screen);
       const sw = pw * 0.93, fg = look.dark ? '#fff' : '#111';
-      el('div', `height:${sw * 1.05}px;background:url("${d.img}") center/cover;`, feed);
+      el('div', `height:${sw * 1.05}px;background:${BG2(d)};`, feed);
       el('div', `padding:${sw * 0.06}px;font-family:${look.ui};color:${fg};`, feed, `<b style="display:block;font-size:${sw * 0.085}px">${esc(d.title || '')}</b><span style="display:block;margin-top:${sw * 0.02}px;font-size:${sw * 0.055}px;opacity:.6">${esc(d.subtitle || '')}</span><div style="display:flex;justify-content:space-between;align-items:center;margin-top:${sw * 0.05}px"><b style="font-size:${sw * 0.08}px;color:${look.A}">${esc(d.price || '')}</b><span style="padding:${sw * 0.025}px ${sw * 0.05}px;border-radius:999px;background:${look.A};color:${on(look.A)};font-weight:800;font-size:${sw * 0.05}px">${esc(d.cta || 'Add to cart')}</span></div>`);
       for (let i = 0; i < 3; i++) el('div', `margin:${sw * 0.03}px ${sw * 0.06}px;height:${sw * 0.32}px;border-radius:${sw * 0.05}px;background:${look.dark ? rgba('#FFFFFF', 0.06) : '#FFFFFF'};display:flex;gap:${sw * 0.04}px;align-items:center;padding:${sw * 0.03}px;`, feed, `<span style="width:${sw * 0.26}px;height:${sw * 0.26}px;border-radius:${sw * 0.04}px;background:url('${d.img}') ${30 * i}% 50%/300%"></span><span style="flex:1"><i style="display:block;height:${sw * 0.03}px;width:70%;border-radius:9px;background:${rgba(fg, 0.25)}"></i><i style="display:block;margin-top:${sw * 0.025}px;height:${sw * 0.03}px;width:45%;border-radius:9px;background:${rgba(fg, 0.12)}"></i></span>`);
       const tilt = ez('expo.out'), drift = ez('sine.inOut');
@@ -285,7 +286,7 @@
     build(ctx, L, t0, d) {
       const { W, H, U, look } = ctx;
       const move = ctx.pick('cine:move' + salt(ctx), ['in', 'pan', 'out']);
-      const ph = el('div', `position:absolute;inset:-8%;background:url("${d.img}") center/cover;filter:saturate(1.15) contrast(1.05);`, L);
+      const ph = el('div', `position:absolute;inset:-8%;background:${BG2(d)};filter:saturate(1.15) contrast(1.05);`, L);
       const from = move === 'in' ? { scale: 1, x: 0 } : move === 'out' ? { scale: 1.2, x: 0 } : { scale: 1.12, x: -W * 0.05 }, to = move === 'in' ? { scale: 1.18 } : move === 'out' ? { scale: 1.02 } : { scale: 1.12, x: W * 0.05 };
       ctx.tl.fromTo(ph, from, { ...to, duration: 4.2, ease: 'sine.inOut' }, t0);
       el('div', `position:absolute;inset:0;background:linear-gradient(180deg, rgba(0,0,0,.1) 40%, rgba(0,0,0,.85) 100%);`, L);

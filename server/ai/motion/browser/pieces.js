@@ -10,6 +10,7 @@
 
   // ------------------------------------------------------------------ helpers
   const el = (tag, css, parent, html) => { const e = document.createElement(tag); if (css) e.style.cssText = css; if (html != null) e.innerHTML = html; if (parent) parent.appendChild(e); return e; };
+  const BG1 = d => (d.fit === 'contain' ? `url("${d.img}") center/contain no-repeat, linear-gradient(rgba(8,8,12,.64), rgba(8,8,12,.64)), url("${d.img}") center/cover` : `url("${d.img}") center/cover`);
   const NS = 'http://www.w3.org/2000/svg';
   const sv = (tag, attrs, parent) => { const e = document.createElementNS(NS, tag); for (const k in attrs || {}) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; };
   const clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
@@ -583,7 +584,7 @@
       const cw = W * (shape === 'tall' ? 0.7 : 0.8), ch = cw * (shape === 'tall' ? 1.32 : shape === 'arch' ? 1.2 : 1.12);
       const card = el('div', `position:absolute;left:50%;top:38%;width:${cw}px;height:${ch}px;margin:${-ch / 2}px 0 0 ${-cw / 2}px;border-radius:${44 * U}px;overflow:hidden;box-shadow:0 ${60 * U}px ${120 * U}px ${-30 * U}px rgba(0,0,0,.75), 0 0 0 ${2 * U}px rgba(255,255,255,.14);transform-style:preserve-3d;`, stage3);
       if (shape === 'arch') card.style.borderRadius = `${cw / 2}px ${cw / 2}px ${44 * U}px ${44 * U}px`;
-      const img = el('div', `position:absolute;inset:-6%;background:url("${d.img}") center/cover;`, card);
+      const img = el('div', `position:absolute;inset:-6%;background:${BG1(d)};`, card);
       const glare = el('div', `position:absolute;inset:-50%;background:linear-gradient(115deg, transparent 38%, rgba(255,255,255,.28) 48%, transparent 58%);mix-blend-mode:screen;`, card);
       const tilt = ez('power2.out'), drift = ez('sine.inOut');
       drive(ctx, t0, 3.8, (p) => {
@@ -630,7 +631,7 @@
       const ringA = el('div', `position:absolute;left:${cx}px;top:${cy}px;width:${R * 2.75}px;height:${R * 2.75}px;margin:${-R * 1.375}px 0 0 ${-R * 1.375}px;border-radius:50%;border:${3 * U}px dashed ${rgba(ink, 0.35)};`, L);
       const shadow = el('div', `position:absolute;left:${cx}px;top:${cy + R * 0.95}px;width:${R * 1.7}px;height:${R * 0.32}px;margin:${-R * 0.16}px 0 0 ${-R * 0.85}px;border-radius:50%;background:radial-gradient(ellipse, rgba(0,0,0,.45), transparent 70%);filter:blur(${10 * U}px);`, L);
       const mask = ctx.pick('pop:mask' + (ctx.salt || ''), ['50%', '42% 58% 63% 37% / 41% 44% 56% 59%', '30%']);
-      const prod = el('div', `position:absolute;left:${cx}px;top:${cy}px;width:${R * 2}px;height:${R * 2}px;margin:${-R}px 0 0 ${-R}px;border-radius:${mask};overflow:hidden;background:url("${d.img}") ${d.focus || '50% 50%'}/cover;box-shadow:0 ${30 * U}px ${70 * U}px ${-10 * U}px rgba(0,0,0,.55), inset 0 0 0 ${8 * U}px rgba(255,255,255,.9);`, L);
+      const prod = el('div', `position:absolute;left:${cx}px;top:${cy}px;width:${R * 2}px;height:${R * 2}px;margin:${-R}px 0 0 ${-R}px;border-radius:${d.fit === 'contain' ? 36 * U + 'px' : mask};overflow:hidden;background:${d.fit === 'contain' ? BG1(d) : `url("${d.img}") ${d.focus || '50% 50%'}/cover`};box-shadow:0 ${30 * U}px ${70 * U}px ${-10 * U}px rgba(0,0,0,.55), inset 0 0 0 ${8 * U}px rgba(255,255,255,.9);`, L);
       ctx.tl.fromTo(disc, { scale: 0 }, { scale: 1, duration: 0.6, ease: 'expo.out' }, t0 + 0.05);
       ctx.tl.fromTo(shock, { scale: 0.9, opacity: 1 }, { scale: 1.6, opacity: 0, duration: 0.9, ease: 'power3.out' }, t0 + 0.25);
       ctx.tl.fromTo(prod, { scale: 0.3, rotation: -25, opacity: 0 }, { scale: 1, rotation: 0, opacity: 1, duration: 0.8, ease: 'back.out(1.8)' }, t0 + 0.2);

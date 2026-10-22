@@ -6,6 +6,7 @@
    quality (preview | premium | max). Needs pieces.js, atoms.js, pieces2.js, premium.js. */
 (function () {
   'use strict';
+  const BG3 = d => (d.fit === 'contain' ? `url("${d.img}") center/contain no-repeat, linear-gradient(rgba(8,8,12,.64), rgba(8,8,12,.64)), url("${d.img}") center/cover` : `url("${d.img}") center/cover`);
   const P = window.PIECES, X = window.PIECE_UTILS, ACCENT = window.ATOM_ACCENT;
   const { el, sv, clamp, lerp, ez, esc, rgba, mix, on, lum, drive, show, chars, fit, natural, seeded, blurFilter } = X;
   const Q = (ctx) => ctx.quality === 'preview' ? 0.4 : ctx.quality === 'max' ? 1.6 : 1;   // how much detail (particles, blur)
@@ -105,7 +106,7 @@
   // ================================================================== 2. LUXURY PRODUCT
   function product(ctx, L, d, size) {   // the hero object: the owner's photo, or a metallic emblem when there is none
     const { U, look } = ctx, s = size;
-    if (d.img) { const n = el('div', `position:absolute;width:${s}px;height:${s}px;border-radius:${d.round === false ? 36 * U : s / 2}px;background:url("${d.img}") center/cover;`, L); return n; }
+    if (d.img) { const n = el('div', `position:absolute;width:${s}px;height:${s}px;border-radius:${d.round === false || d.fit === 'contain' ? 36 * U : s / 2}px;background:${BG3(d)};`, L); return n; }
     const n = el('div', `position:absolute;width:${s}px;height:${s}px;border-radius:50%;background:${metalGrad(look.A)};display:grid;place-items:center;box-shadow:inset 0 0 ${40 * U}px rgba(0,0,0,.5);`, L);
     el('div', `font-family:${look.display};font-weight:800;font-size:${s * 0.42}px;color:${mix(look.A, '#000000', 0.55)};letter-spacing:-.04em;`, n, esc(d.mono || 'A'));
     return n;
@@ -140,7 +141,7 @@
   });
   B('lux-macro', 'Macro detail', 3.0, function (ctx, L, t0, d) {
     const { W, H, U, look } = ctx, dur = D(d, this.dur);
-    const ph = el('div', `position:absolute;inset:-20%;background:${d.img ? `url("${d.img}") center/cover` : metalGrad(look.A)};filter:contrast(1.08) saturate(1.1);`, L);
+    const ph = el('div', `position:absolute;inset:-20%;background:${d.img ? `${BG3(d)}` : metalGrad(look.A)};filter:contrast(1.08) saturate(1.1);`, L);
     ctx.tl.fromTo(ph, { scale: 1.6, x: -W * 0.08, y: H * 0.04 }, { scale: 1.9, x: W * 0.06, y: -H * 0.03, duration: dur, ease: 'sine.inOut' }, t0);
     // shallow depth of field: sharp band in the middle, blurred top and bottom
     [['top:0', 'linear-gradient(180deg, #000, transparent)'], ['bottom:0', 'linear-gradient(0deg, #000, transparent)']].forEach(([pos, m]) => { const b = el('div', `position:absolute;left:0;right:0;${pos};height:34%;backdrop-filter:blur(${14 * U}px);-webkit-backdrop-filter:blur(${14 * U}px);-webkit-mask-image:${m};mask-image:${m};`, L); void b; });
@@ -306,7 +307,7 @@
   });
   B('sport-impact', 'Headline impact', 2.8, function (ctx, L, t0, d) {
     const { W, H, U, look } = ctx, dur = D(d, this.dur);
-    if (d.img) { const ph = el('div', `position:absolute;inset:0;background:url("${d.img}") center/cover;filter:grayscale(1) contrast(1.4) brightness(.45);`, L); ctx.tl.fromTo(ph, { scale: 1.15 }, { scale: 1.25, duration: dur, ease: 'none' }, t0); }
+    if (d.img) { const ph = el('div', `position:absolute;inset:0;background:${BG3(d)};filter:grayscale(1) contrast(1.4) brightness(.45);`, L); ctx.tl.fromTo(ph, { scale: 1.15 }, { scale: 1.25, duration: dur, ease: 'none' }, t0); }
     for (let i = 0; i < Math.round(14 * Q(ctx)); i++) { const ln = el('div', `position:absolute;left:50%;top:50%;width:${W}px;height:${(4 + (i % 3) * 4) * U}px;background:linear-gradient(90deg, transparent, ${i % 4 ? 'rgba(255,255,255,.6)' : look.A});transform-origin:0 50%;transform:rotate(${i * 360 / 14}deg);`, L); ctx.tl.fromTo(ln, { scaleX: 0, opacity: 1 }, { scaleX: 1, opacity: 0, duration: 0.6, ease: 'expo.out' }, t0 + 0.32); }
     const lines = rebreak(ctx, d.headline);
     const box = el('div', `position:absolute;left:${60 * U}px;right:${60 * U}px;top:0;bottom:0;display:flex;flex-direction:column;justify-content:center;align-items:center;transform:skewX(-8deg);text-align:center;font-family:${look.display};font-weight:${look.dw};font-style:italic;line-height:.88;letter-spacing:-.03em;color:#fff;text-transform:uppercase;`, L);
@@ -320,7 +321,7 @@
   });
   B('sport-freeze', 'Freeze frame', 3.0, function (ctx, L, t0, d) {
     const { W, H, U, look } = ctx, dur = D(d, this.dur), port = PORT(ctx);
-    const card = el('div', `position:absolute;left:${W * 0.08}px;top:${H * (port ? 0.1 : 0.08)}px;width:${W * 0.84}px;height:${H * (port ? 0.56 : 0.6)}px;background:${d.img ? `url("${d.img}") center/cover` : look.A};border:${10 * U}px solid #fff;transform:rotate(-3deg);box-shadow:0 ${30 * U}px ${80 * U}px rgba(0,0,0,.6);filter:contrast(1.2) saturate(1.25);`, L);
+    const card = el('div', `position:absolute;left:${W * 0.08}px;top:${H * (port ? 0.1 : 0.08)}px;width:${W * 0.84}px;height:${H * (port ? 0.56 : 0.6)}px;background:${d.img ? `${BG3(d)}` : look.A};border:${10 * U}px solid #fff;transform:rotate(-3deg);box-shadow:0 ${30 * U}px ${80 * U}px rgba(0,0,0,.6);filter:contrast(1.2) saturate(1.25);`, L);
     ctx.tl.fromTo(card, { scale: 1.3, rotation: 6, filter: 'contrast(1.2) saturate(1.25) blur(10px)' }, { scale: 1, rotation: -3, filter: 'contrast(1.2) saturate(1.25) blur(0px)', duration: 0.25, ease: 'power4.out' }, t0);
     flash(ctx, L, t0 + 0.2, '#FFFFFF', 0.9); shake(ctx, L, t0 + 0.25, 10);
     el('div', `position:absolute;inset:0;background-image:radial-gradient(${rgba(look.A, 0.5)} ${4 * U}px, transparent ${5 * U}px);background-size:${18 * U}px ${18 * U}px;-webkit-mask-image:linear-gradient(0deg, #000, transparent 45%);mask-image:linear-gradient(0deg, #000, transparent 45%);`, L);
@@ -387,7 +388,7 @@
       for (let i = 0; i < N; i++) { const a = (i / N) * Math.PI * 2 - Math.PI / 2, band = i / N, k = band < 0.25 ? e.bass : band < 0.7 ? e.mid * (0.6 + 0.4 * Math.sin(i * 1.7 + t * 6)) : e.high * (0.5 + 0.5 * Math.sin(i * 3.1 + t * 11)); const len = (14 + k * 150) * U * grow; g.strokeStyle = i % 2 ? look.A : look.A2; g.lineWidth = 7 * U; g.globalAlpha = 0.9; g.beginPath(); g.moveTo(cx + Math.cos(a) * R, cy + Math.sin(a) * R); g.lineTo(cx + Math.cos(a) * (R + len), cy + Math.sin(a) * (R + len)); g.stroke(); }
       g.globalAlpha = 0.25 + e.bass * 0.4; g.fillStyle = look.A; g.beginPath(); g.arc(cx, cy, R * (0.95 + e.bass * 0.06), 0, 6.283); g.fill(); g.restore();
     });
-    const disc = el('div', `position:absolute;left:${cx}px;top:${cy}px;width:${R * 1.7}px;height:${R * 1.7}px;margin:${-R * 0.85}px;border-radius:50%;background:${d.img ? `url("${d.img}") center/cover` : `radial-gradient(circle at 35% 30%, ${mix(look.A, '#fff', 0.3)}, ${look.A})`};display:grid;place-items:center;font-family:${look.display};font-weight:800;font-size:${R * 0.6}px;color:#fff;box-shadow:0 0 0 ${8 * U}px rgba(255,255,255,.15);`, L, d.img ? '' : esc(d.mono || '♪'));
+    const disc = el('div', `position:absolute;left:${cx}px;top:${cy}px;width:${R * 1.7}px;height:${R * 1.7}px;margin:${-R * 0.85}px;border-radius:${d.fit === 'contain' ? 36 * U + 'px' : '50%'};background:${d.img ? `${BG3(d)}` : `radial-gradient(circle at 35% 30%, ${mix(look.A, '#fff', 0.3)}, ${look.A})`};display:grid;place-items:center;font-family:${look.display};font-weight:800;font-size:${R * 0.6}px;color:#fff;box-shadow:0 0 0 ${8 * U}px rgba(255,255,255,.15);`, L, d.img ? '' : esc(d.mono || '♪'));
     drive(ctx, t0, dur, (p) => { const e = env(p * dur, bpm); disc.style.transform = `scale(${1 + e.bass * 0.06}) rotate(${p * 40}deg)`; });
     for (let b = 0; b * 60 / bpm < dur; b++) ctx.sfx.push({ t: t0 + b * 60 / bpm, k: b % 4 ? 'tick' : 'pop', v: b % 4 ? 0.25 : 0.4 });
     return t0 + dur;
@@ -478,12 +479,12 @@
     const nth = (k) => (pool.length ? pool[k % pool.length] : head);
     return ({
       'tr-words': { text: i ? nth(i - 1) : head }, 'tr-split': { word: (nth(i + 1) || f.brand || '').split(/\s+/)[0], tag: f.brand }, 'tr-final': { headline: lines },
-      'lux-reveal': { img: f.img, mono: f.mono, kicker: f.brand }, 'lux-orbit': { img: f.img, mono: f.mono, brand: f.brand }, 'lux-macro': { img: f.img, benefit: nth(i) || f.sub }, 'lux-lockup': { brand: f.brand, benefit: f.sub, cta: f.cta },
+      'lux-reveal': { img: f.img, fit: f.fit, mono: f.mono, kicker: f.brand }, 'lux-orbit': { img: f.img, fit: f.fit, mono: f.mono, brand: f.brand }, 'lux-macro': { img: f.img, fit: f.fit, benefit: nth(i) || f.sub }, 'lux-lockup': { brand: f.brand, benefit: f.sub, cta: f.cta },
       'hud-boot': {}, 'hud-panels': { headline: i % 2 ? nth(i) : head, tag: f.brand, metric: (nth(i + 1) || 'SYSTEM READY').toUpperCase() }, 'hud-emblem': { mono: f.mono, logo: f.logo, brand: f.brand },
       'chrome-emerge': {}, 'chrome-ribbons': {}, 'chrome-type': { headline: f.brand, sub: f.sub },
-      'sport-cuts': { img: f.img }, 'sport-impact': { img: f.img, headline: lines, sub: f.sub }, 'sport-freeze': { img: f.img, headline: f.brand, sub: f.cta },
-      'swiss-grid': { headline: lines, kicker: f.sub, date: f.date, place: f.place }, 'swiss-photo': { img: f.img, word: words[i % words.length] }, 'swiss-poster': { brand: f.brand, line: f.sub, cta: f.cta, contact: f.contact },
-      'viz-ring': { img: f.img, mono: f.mono, bpm: f.bpm }, 'viz-bars': { artist: f.brand, track: f.sub || head, bpm: f.bpm },
+      'sport-cuts': { img: f.img, fit: f.fit }, 'sport-impact': { img: f.img, fit: f.fit, headline: lines, sub: f.sub }, 'sport-freeze': { img: f.img, fit: f.fit, headline: f.brand, sub: f.cta },
+      'swiss-grid': { headline: lines, kicker: f.sub, date: f.date, place: f.place }, 'swiss-photo': { img: f.img, fit: f.fit, word: words[i % words.length] }, 'swiss-poster': { brand: f.brand, line: f.sub, cta: f.cta, contact: f.contact },
+      'viz-ring': { img: f.img, fit: f.fit, mono: f.mono, bpm: f.bpm }, 'viz-bars': { artist: f.brand, track: f.sub || head, bpm: f.bpm },
       'logo-trace': { mono: f.mono }, 'logo-burst': { mono: f.mono, logo: f.logo, brand: f.brand, tagline: f.sub },
     })[beat] || {};
   }

@@ -34,6 +34,9 @@ const HEX = /^#[0-9a-f]{6}$/i;
 // the facts a video may use, taken from the owner's answers (never invented)
 function factsOf(plan = {}, brief = {}, assets = []) {
   const photos = assets.filter((a) => (a.kind || 'image') === 'image' && a.role !== 'logo' && !/logo/i.test(a.name || '')).map((a) => a.url);
+  // What each picture can honestly do: small, very wide/tall or flat pictures are shown whole on a dimmed copy of themselves, never cropped into a circle or blown up.
+  const fitOf = (m) => { const w = Number(m.width) || 0, h = Number(m.height) || 0; if (!w || !h) return 'cover'; const ratio = w / h; return Math.min(w, h) < 600 || ratio > 2.1 || ratio < 0.48 ? 'contain' : 'cover'; };
+  const fits = {}; for (const a of assets) if (a.url) fits[a.url] = fitOf(a);
   const logo = assets.find((a) => (a.kind || 'image') === 'image' && (a.role === 'logo' || /logo/i.test(a.name || '')))?.url || null;
   const name = str(brief.name || plan.business?.name || 'Your business', 40);
   const heads = [].concat(brief.headlines || [], brief.headline || []).map((h) => str(h, 60)).filter(Boolean);
@@ -42,7 +45,7 @@ function factsOf(plan = {}, brief = {}, assets = []) {
   const priced = products.find((p) => p.price);
   const contact = str(brief.contact, 120), phone = (contact.match(/(\+?\d[\d\s-]{7,}\d)/) || [])[1] || '';
   const place = str(brief.address || (contact.split(/[·|,]/).find((x) => /street|road|way|avenue|lagos|abuja|ibadan|lekki|ikeja|island|close|estate|plaza|mall|area/i.test(x)) || ''), 60);
-  return { name, mono: name.replace(/[^\p{L}\p{N} ]/gu, '').split(/\s+/).filter((w) => !/^(the|and|of)$/i.test(w)).slice(0, 2).map((w) => w[0]).join('').toUpperCase() || 'A', heads, features, products, priced, offer: str(brief.offer, 30), when: str(brief.when, 60), cta: str(brief.cta || [].concat(brief.ctas || [])[0] || 'Order now', 28), phone, place, photos, logo, category: str(brief.category, 40), sub: str(heads[1] || brief.goal || '', 90) };
+  return { fits, name, mono: name.replace(/[^\p{L}\p{N} ]/gu, '').split(/\s+/).filter((w) => !/^(the|and|of)$/i.test(w)).slice(0, 2).map((w) => w[0]).join('').toUpperCase() || 'A', heads, features, products, priced, offer: str(brief.offer, 30), when: str(brief.when, 60), cta: str(brief.cta || [].concat(brief.ctas || [])[0] || 'Order now', 28), phone, place, photos, logo, category: str(brief.category, 40), sub: str(heads[1] || brief.goal || '', 90) };
 }
 const split2 = (t) => { const w = String(t).split(/\s+/); if (w.length < 3) return w.join(' '); const k = Math.ceil(w.length / 2); return w.slice(0, k).join(' ') + '|' + w.slice(k).join(' '); };
 
@@ -99,7 +102,9 @@ export function composePieces({ facts: f, duration = 24, seed = 1, energy = 'med
   // no scene twice in a row, and never the same piece as the opener or the ending right next to it
   const ordered = shuffle(keep.slice());
   for (let a = 1; a < ordered.length; a++) if (ordered[a].piece === ordered[a - 1].piece) { const b = ordered.findIndex((m, x) => x > a && m.piece !== ordered[a - 1].piece && (ordered[x + 1] ? ordered[x + 1].piece !== ordered[a].piece : true)); if (b > 0) [ordered[a], ordered[b]] = [ordered[b], ordered[a]]; }
-  return { scenes: [scenes[0], ...ordered, end], energy };
+  const all = [scenes[0], ...ordered, end];
+  for (const sc of all) if (sc.data && sc.data.img && f.fits) sc.data.fit = f.fits[sc.data.img] || 'cover';
+  return { scenes: all, energy };
 }
 
 export function piecesFilm({ plan = {}, brief = {}, assets = [], style = null, themeColors = {}, salt = '' }) {
@@ -135,7 +140,7 @@ export function templateFilm({ plan = {}, brief = {}, assets = [], themeColors =
   const own = { ...(brief.colorMode && brief.colorMode !== 'style' ? brief.colors || {} : {}), ...(plan.style?.colors && brief.colorMode && brief.colorMode !== 'style' ? plan.style.colors : {}) };
   const colors = HEX.test(own.primary || '') ? { A: own.primary, A2: HEX.test(own.secondary || '') ? own.secondary : undefined } : undefined;
   const head = f.heads[0] || f.name;
-  const fields = { brand: f.name, headline: split2(head), sub: f.sub || f.category, cta: f.cta, points: (f.features.length ? f.features : f.products.map((p) => p.title)).slice(0, 4), words: (f.features.length ? f.features : [f.category || f.name]).map((w) => w.split(/\s+/)[0]).slice(0, 3), img: f.photos[0] || '', logo: f.logo || '', mono: f.mono, date: f.when, place: f.place, contact: f.phone || f.place };
+  const fields = { brand: f.name, headline: split2(head), sub: f.sub || f.category, cta: f.cta, points: (f.features.length ? f.features : f.products.map((p) => p.title)).slice(0, 4), words: (f.features.length ? f.features : [f.category || f.name]).map((w) => w.split(/\s+/)[0]).slice(0, 3), img: f.photos[0] || '', fit: f.fits[f.photos[0]] || 'cover', logo: f.logo || '', mono: f.mono, date: f.when, place: f.place, contact: f.phone || f.place };
   const sound = plan.sound || (plan.sfx === false ? 'none' : 'sfx');
   const music = sound === 'own' && plan.music_url ? { url: plan.music_url } : sound === 'piano' || sound === 'soft' ? { url: `/music/${sound}.mp3`, builtin: sound } : null;
   const template = { template: brief.template, W, H, seed, duration, intensity: brief.intensity === 'auto' ? undefined : brief.intensity, sound: sound === 'none' ? 'none' : brief.soundStyle, quality: brief.quality || 'premium', colors, fields };
