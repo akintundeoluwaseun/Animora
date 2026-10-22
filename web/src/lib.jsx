@@ -23,7 +23,7 @@ export const otherDeviceLink = () => `${location.origin}/#k=${deviceKey()}`;
 
 // The developer, shown in the menu and on the home page (help, custom videos, feedback).
 export const DEVELOPER = {
-  name: 'Oluwaseun Joshua.', phone: '0807 691 1614',
+  name: 'Oluwaseun Joshua.', handle: '@oluwaseun85148',
   website: 'https://oluwaseun-joshua-site.vercel.app', websiteLabel: 'oluwaseun-joshua-site.vercel.app',
   whatsapp: `https://wa.me/2348076911614?text=${encodeURIComponent("Hi, I'm messaging from Animora.")}`,
 };

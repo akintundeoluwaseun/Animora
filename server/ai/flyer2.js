@@ -166,8 +166,8 @@ export function flyerHtml2(data) {
     body = `<div class="pf">
       <div class="topline">${brandRow()}<span class="tag">${esc(data.badge || (data.kinds || [])[0] || 'New')}</span></div>
       <div class="rule"></div>
-      <section class="hero-type">${h1('giant')}${sub}</section>
-      ${hero ? `<div class="cut"><img src="${esc(hero)}" crossorigin="anonymous" alt=""></div>` : `<div class="ghost">${num}</div>`}
+      <section class="hero-type ${hero ? '' : 'centered'}">${h1('giant')}${sub}</section>
+      ${hero ? `<div class="cut"><img src="${esc(hero)}" crossorigin="anonymous" alt=""></div>` : ''}
       <div class="rule thin"></div>
       <section class="cols">${(data.features || []).slice(0, 4).map((f, i) => `<div class="col"><b>${String(i + 1).padStart(2, '0')}</b><span>${esc(f)}</span></div>`).join('') || `<div class="col wide">${sub || esc(brand)}</div>`}</section>
       <footer class="foot">${cta()}${contactList()}</footer></div>`;
@@ -213,7 +213,7 @@ export function flyerHtml2(data) {
       <div class="pola n${pics.length}">${pics.map((p, i) => `<figure style="--r:${[-6, 5, -3, 7][i]}deg"><i class="tape"></i><img src="${esc(p)}" crossorigin="anonymous" alt=""><figcaption>${esc(items[i]?.title || '')}</figcaption></figure>`).join('')}</div>
       <footer class="foot">${cta()}${contactList()}</footer></div>`;
   } else if (L === 'services') {
-    const tiles = [...(data.features || []).map((t) => ({ title: t })), ...items].slice(0, 6);
+    const tiles = [...(data.features || []).map((t) => ({ title: t })), ...items].filter((t, i, all) => all.findIndex((u) => String(u.title).trim().toLowerCase() === String(t.title).trim().toLowerCase()) === i).slice(0, 6);
     body = `<div class="pf services">${brandRow()}
       <section class="sv-head">${h1()}${sub}</section>
       <div class="tiles n${tiles.length}">${tiles.map((t, i) => `<div class="tile"><i>${ic(glyphFor(t.title, i), Math.round(54 * U), '#fff', 2.2)}</i><b>${esc(t.title)}</b>${t.price ? `<em>${esc(t.price)}</em>` : ''}</div>`).join('')}</div>
@@ -278,7 +278,8 @@ ${treat}
 .topline { display:flex; align-items:center; }
 .rule { height:${n(6)}; background:${ink}; } .rule.thin { height:${n(2)}; opacity:.5; }
 .hero-type { display:flex; flex-direction:column; gap:${n(24)}; position:relative; z-index:2; } .hero-type h1.giant { font-size:${n(tall ? 230 : wide ? 170 : 190)}; max-height:${tall ? Math.round(H * 0.42) : Math.round(H * 0.4)}px; }
-.cut { position:absolute; right:${n(-90)}; bottom:${n(tall ? 300 : 170)}; width:${n(tall ? 560 : wide ? 380 : 440)}; height:${n(tall ? 560 : wide ? 380 : 440)}; border-radius:50%; overflow:hidden; border:${n(14)} solid ${surface}; box-shadow:${shadow}; z-index:1; }
+.cut { position:absolute; right:${n(60)}; bottom:${n(tall ? 300 : 170)}; width:${n(tall ? 500 : wide ? 360 : 400)}; height:${n(tall ? 620 : wide ? 440 : 500)}; border-radius:${n(34)}; overflow:hidden; border:${n(14)} solid ${surface}; box-shadow:${shadow}; z-index:1; }
+.hero-type.centered { margin:auto 0; }
 .ghost { position:absolute; right:${n(40)}; top:${tall ? '44%' : '40%'}; font-family:${display}; font-weight:800; font-size:${n(tall ? 520 : 420)}; line-height:1; color:${dark ? 'rgba(255,255,255,.05)' : 'rgba(17,17,20,.05)'}; z-index:0; }
 .cols { display:grid; grid-template-columns:1fr 1fr; gap:${n(22)} ${n(40)}; position:relative; z-index:2; max-width:${hero ? '60%' : tall ? '100%' : '66%'}; }
 .col { display:flex; flex-direction:column; gap:${n(6)}; font-size:${n(32)}; font-weight:600; } .col b { font-family:${display}; font-size:${n(30)}; color:${ACC}; } .col.wide { grid-column:span 2; color:${mute}; }
@@ -372,7 +373,9 @@ ${treat}
     el.textContent.split(/\\s+/).forEach(function(w){ probe.textContent=w; m=Math.max(m, probe.getBoundingClientRect().width); }); probe.remove(); return m; }
   function fit(){ document.querySelectorAll('h1.fit').forEach(function(el){ var cs=getComputedStyle(el), s=parseFloat(cs.fontSize), max=parseFloat(cs.maxHeight)||1e9, i=0; el.style.maxHeight='none'; el.style.overflow='visible';
     function over(){ return el.scrollWidth>el.clientWidth+4 || el.getBoundingClientRect().height>max+s*0.1 || longest(el)>el.clientWidth+2; }
-    while(i++<60 && over() && s>18){ s*=0.94; el.style.fontSize=s+'px'; } }); }
+    while(i++<60 && over() && s>18){ s*=0.94; el.style.fontSize=s+'px'; }
+    // leave air around the headline: never the biggest size that merely fits
+    el.style.fontSize=(s*0.86)+'px'; }); }
   function guard(){ var foot=document.querySelector('.foot,.ticket'), pf=document.querySelector('.pf'), H=${H}, j=0;
     var boxes=[].slice.call(document.querySelectorAll('.dg-copy, .mn-body, .tiles, .roles, .ev-info, .cols'));
     function over(){ return (foot && foot.getBoundingClientRect().bottom>H+1) || (pf && pf.scrollHeight>H+2) || boxes.some(function(b){ return b.isConnected && b.clientHeight>0 && b.scrollHeight>b.clientHeight+16; }); }

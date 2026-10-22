@@ -371,6 +371,7 @@ export default function Plan() {
   // Saving is instant on screen; the server copy is updated in the background, one request at a time
   // (so answers never wait on the network, and quick taps can't overwrite each other).
   const bRef = useRef(b);
+  const autoMake = useRef(false);
   const saving = useRef(Promise.resolve());
   const save = (patch) => {
     const next = { ...bRef.current, ...patch };
@@ -411,7 +412,12 @@ export default function Plan() {
         const next = save({ pasted: true });
         if (r.aiError) setError(`The AI couldn't read all of it (${r.aiError.slice(0, 90)}). I picked up what I could and will ask about the rest.`);
         setToast(r.found?.length ? `Got it. I found your ${r.found.map((k) => FOUND_LABEL[k] || k).join(', ')}.` : "Got it. I'll ask about the rest."); setTimeout(() => setToast(''), 5000);
-        if (bRef.current.name) { setReading(false); return makeNow(); }
+        if (bRef.current.name) {
+          setReading(false);
+          // the logo and photos matter, so ask for them once (skippable), then make the video without any other question
+          if (!pics.length) { autoMake.current = true; setStep(Math.max(0, QS.findIndex((qq) => qq.id === 'pictures'))); return; }
+          return makeNow();
+        }
         advance(next);
       } catch (e) { setError(e.message); } finally { setReading(false); }
       return;
@@ -425,6 +431,7 @@ export default function Plan() {
     else if (q.id === 'scenes') patch = value === 'auto' ? { sceneAuto: true, scenes: [] } : { sceneAuto: false, scenes: value };
     else patch = { [q.id]: value };
     const next = save({ ...patch, ...extra, [`${q.id}Skipped`]: false });
+    if (autoMake.current && q.id === 'pictures') { autoMake.current = false; return makeNow(); }
     advance(next);
   };
   // "Make it now": skip every question that is left and build with what is known
@@ -434,7 +441,7 @@ export default function Plan() {
     for (const qq of QS) if (qq.optional && valueOf(qq, bRef.current, pics.length) === undefined) patch[`${qq.id}Skipped`] = true;
     const next = save(patch); setBuilding(true); await saved(); build(next);
   };
-  const skip = () => { const next = save({ [`${q.id}Skipped`]: true, ...(q.id === 'pictures' ? { picturesDone: true } : {}) }); advance(next); };
+  const skip = () => { const next = save({ [`${q.id}Skipped`]: true, ...(q.id === 'pictures' ? { picturesDone: true } : {}) }); if (autoMake.current && q.id === 'pictures') { autoMake.current = false; return makeNow(); } advance(next); };
 
   const upload = async (files, role) => {
     setError('');

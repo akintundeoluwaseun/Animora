@@ -86,13 +86,13 @@ async function thumbnail(projectId, html, aspect) {
 // ---------------- list / create / read / update / delete ----------------
 r.get('/', async (req, res) => {
   // New projects nobody has put anything into are not kept: they never show in the lists, and old ones are cleared away.
-  await q(`DELETE FROM projects p WHERE p.user_id=$1 AND p.code_html IS NULL AND p.plan_json IS NULL AND COALESCE(p.brief_json->>'name','')='' AND NOT EXISTS (SELECT 1 FROM assets a WHERE a.project_id=p.id) AND p.created_at < now() - interval '15 minutes'`, [req.user.id]).catch(() => {});
+  await q(`DELETE FROM projects p WHERE p.user_id=$1 AND p.code_html IS NULL AND p.plan_json IS NULL AND (p.brief_json IS NULL OR (COALESCE(p.brief_json->>'name','')='' AND COALESCE(p.brief_json->>'category','')='' AND COALESCE(p.brief_json->>'headline','')='' AND COALESCE(p.brief_json->>'goal','')='' AND COALESCE(p.brief_json->>'cta','')='' AND COALESCE(p.brief_json->>'contact','')='' AND COALESCE(p.brief_json->>'offer','')='' AND COALESCE(p.brief_json->>'pasteText','')='' AND jsonb_array_length(COALESCE(p.brief_json->'features','[]'::jsonb))=0 AND jsonb_array_length(COALESCE(p.brief_json->'products','[]'::jsonb))=0)) AND NOT EXISTS (SELECT 1 FROM assets a WHERE a.project_id=p.id) AND p.created_at < now() - interval '15 minutes'`, [req.user.id]).catch(() => {});
   // an MP4 that expired is simply not mentioned: no "Video ready", no "failed"
   const rows = await q(`SELECT p.id, p.kind, p.title, p.aspect_ratio, p.duration_seconds, p.thumbnail_url, p.updated_at, p.created_at,
       CASE WHEN p.status='rendered' AND NOT EXISTS (SELECT 1 FROM renders r2 WHERE r2.project_id=p.id AND r2.status='done') THEN 'ready' ELSE p.status END AS status,
       s.name AS style_name,
       (SELECT row_to_json(x) FROM (SELECT id, status, progress, video_url, created_at FROM renders WHERE project_id=p.id AND NOT (status='failed' AND (error='expired' OR error LIKE 'This MP4 was cleared%')) ORDER BY created_at DESC LIMIT 1) x) AS last_render
-    FROM projects p LEFT JOIN styles s ON s.id=p.style_id WHERE p.user_id=$1 AND NOT (p.code_html IS NULL AND p.plan_json IS NULL AND COALESCE(p.brief_json->>'name','')='' AND NOT EXISTS (SELECT 1 FROM assets a WHERE a.project_id=p.id)) ORDER BY p.updated_at DESC`, [req.user.id]);
+    FROM projects p LEFT JOIN styles s ON s.id=p.style_id WHERE p.user_id=$1 AND NOT (p.code_html IS NULL AND p.plan_json IS NULL AND (p.brief_json IS NULL OR (COALESCE(p.brief_json->>'name','')='' AND COALESCE(p.brief_json->>'category','')='' AND COALESCE(p.brief_json->>'headline','')='' AND COALESCE(p.brief_json->>'goal','')='' AND COALESCE(p.brief_json->>'cta','')='' AND COALESCE(p.brief_json->>'contact','')='' AND COALESCE(p.brief_json->>'offer','')='' AND COALESCE(p.brief_json->>'pasteText','')='' AND jsonb_array_length(COALESCE(p.brief_json->'features','[]'::jsonb))=0 AND jsonb_array_length(COALESCE(p.brief_json->'products','[]'::jsonb))=0)) AND NOT EXISTS (SELECT 1 FROM assets a WHERE a.project_id=p.id)) ORDER BY p.updated_at DESC`, [req.user.id]);
   res.json({ projects: rows });
 });
 
