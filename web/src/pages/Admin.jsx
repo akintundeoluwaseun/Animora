@@ -8,9 +8,9 @@ const ago = (t) => { const s = (Date.now() - new Date(t).getTime()) / 1000; retu
 
 function Card({ label, value, sub, tone }) {
   return (
-    <div className="rounded-[14px] border border-ink/10 bg-white p-4">
+    <div className="min-w-0 rounded-[14px] border border-ink/10 bg-white p-3 sm:p-4">
       <p className="text-[12px] font-semibold uppercase tracking-[0.1em] text-ink-mute">{label}</p>
-      <p className={`mt-1.5 text-[28px] font-bold leading-none tracking-tight tabular-nums ${tone || ''}`}>{value}</p>
+      <p className={`mt-1.5 text-[22px] font-bold leading-none sm:text-[28px] tracking-tight tabular-nums ${tone || ''}`}>{value}</p>
       {sub && <p className="mt-1.5 text-[13px] text-ink-soft">{sub}</p>}
     </div>
   );
@@ -20,7 +20,7 @@ function Card({ label, value, sub, tone }) {
 function Bars({ title, series, colour }) {
   const max = Math.max(1, ...series.map((x) => x.n)), total = series.reduce((a, x) => a + x.n, 0), w = 600, h = 120, bw = w / series.length;
   return (
-    <div className="rounded-[14px] border border-ink/10 bg-white p-4">
+    <div className="min-w-0 rounded-[14px] border border-ink/10 bg-white p-3 sm:p-4">
       <div className="flex items-baseline justify-between"><p className="text-[14px] font-semibold">{title}</p><p className="text-[13px] text-ink-soft tabular-nums">{total} in 30 days</p></div>
       <svg viewBox={`0 0 ${w} ${h + 18}`} className="mt-3 w-full" role="img" aria-label={`${title}, last 30 days`}>
         {series.map((x, i) => { const bh = Math.max(x.n ? 3 : 0, (x.n / max) * h); return <rect key={x.day} x={i * bw + 2} y={h - bh} width={bw - 4} height={bh} rx="3" fill={colour} opacity={x.n ? 1 : 0.15}><title>{`${x.day}: ${x.n}`}</title></rect>; })}
@@ -34,9 +34,9 @@ function Bars({ title, series, colour }) {
 
 function List({ title, rows, empty }) {
   return (
-    <div className="rounded-[14px] border border-ink/10 bg-white p-4">
+    <div className="min-w-0 rounded-[14px] border border-ink/10 bg-white p-3 sm:p-4">
       <p className="text-[14px] font-semibold">{title}</p>
-      {rows.length ? <ul className="mt-2 divide-y divide-ink/8">{rows.map(([a, b], i) => <li key={i} className="flex items-baseline justify-between gap-3 py-2 text-[14px]"><span className="min-w-0 truncate">{a}</span><span className="shrink-0 text-ink-soft tabular-nums">{b}</span></li>)}</ul> : <p className="mt-2 text-[14px] text-ink-mute">{empty}</p>}
+      {rows.length ? <ul className="mt-2 divide-y divide-ink/8">{rows.map(([a, b], i) => <li key={i} className="flex items-baseline justify-between gap-3 py-2 text-[14px]"><span className="min-w-0 break-words">{a}</span><span className="shrink-0 text-ink-soft tabular-nums">{b}</span></li>)}</ul> : <p className="mt-2 text-[14px] text-ink-mute">{empty}</p>}
     </div>
   );
 }
@@ -78,12 +78,12 @@ export default function Admin() {
   const { users, projects, renders, money } = data;
   const okRate = renders.done + renders.failed ? Math.round((renders.done / (renders.done + renders.failed)) * 100) : 100;
   return (
-    <main className="mx-auto max-w-[1100px] px-4 py-8 sm:px-6">
+    <main className="mx-auto w-full max-w-[1100px] overflow-x-hidden px-4 py-5 sm:px-6 sm:py-8">
       <header className="flex flex-wrap items-center gap-3">
-        <div><h1 className="text-[26px] font-bold tracking-tight">Owner dashboard</h1><p className="text-[13px] text-ink-mute">Updated {ago(data.at)}. Refreshes every minute.</p></div>
-        <div className="ml-auto flex gap-2">
-          <button onClick={() => load(key)} disabled={busy} className="press h-10 rounded-full border border-ink/15 px-4 text-[14px] font-semibold">{busy ? 'Refreshing…' : 'Refresh'}</button>
-          <button onClick={() => { try { sessionStorage.removeItem(KEY); } catch { /* fine */ } setKey(''); setData(null); setTyped(''); }} className="press h-10 rounded-full border border-ink/15 px-4 text-[14px] font-semibold">Lock</button>
+        <div><h1 className="text-[22px] font-bold tracking-tight sm:text-[26px]">Owner dashboard</h1><p className="text-[13px] text-ink-mute">Updated {ago(data.at)}. Refreshes every minute.</p></div>
+        <div className="flex w-full gap-2 sm:ml-auto sm:w-auto">
+          <button onClick={() => load(key)} disabled={busy} className="press h-10 flex-1 rounded-full border border-ink/15 px-4 text-[14px] font-semibold sm:flex-none">{busy ? 'Refreshing…' : 'Refresh'}</button>
+          <button onClick={() => { try { sessionStorage.removeItem(KEY); } catch { /* fine */ } setKey(''); setData(null); setTyped(''); }} className="press h-10 flex-1 rounded-full border border-ink/15 px-4 text-[14px] font-semibold sm:flex-none">Lock</button>
         </div>
       </header>
 
@@ -108,7 +108,7 @@ export default function Admin() {
         <Bars title="Flyers started" series={data.daily.flyers} colour="#F2691B" />
       </section>
 
-      <section className="mt-5 grid gap-3 md:grid-cols-3" aria-label="Details">
+      <section className="mt-5 grid gap-3 lg:grid-cols-3" aria-label="Details">
         <List title="Most used styles" rows={data.styles.map((x) => [x.name, x.n])} empty="Nothing yet." />
         <List title="Sizes people pick" rows={data.aspects.map((x) => [x.name, x.n])} empty="Nothing yet." />
         <List title="Why MP4s failed (30 days)" rows={data.failures.map((x) => [x.msg, x.n])} empty="No failures. 🎉" />
@@ -117,10 +117,13 @@ export default function Admin() {
       <section className="mt-5 rounded-[14px] border border-ink/10 bg-white p-4" aria-label="Latest">
         <p className="text-[14px] font-semibold">Latest made</p>
         {data.recent.length ? (
-          <div className="mt-2 overflow-x-auto"><table className="w-full min-w-[520px] text-left text-[14px]">
-            <thead className="text-[12px] uppercase tracking-[0.08em] text-ink-mute"><tr><th className="py-2 pr-3 font-semibold">Name</th><th className="py-2 pr-3 font-semibold">Type</th><th className="py-2 pr-3 font-semibold">Size</th><th className="py-2 text-right font-semibold">When</th></tr></thead>
-            <tbody className="divide-y divide-ink/8">{data.recent.map((x, i) => <tr key={i}><td className="max-w-[320px] truncate py-2 pr-3">{x.title}</td><td className="py-2 pr-3">{x.kind === 'flyer' ? 'Flyer' : `Video${x.duration_seconds ? ` ${x.duration_seconds}s` : ''}`}</td><td className="py-2 pr-3 tabular-nums">{x.aspect_ratio}</td><td className="py-2 text-right text-ink-soft">{ago(x.created_at)}</td></tr>)}</tbody>
-          </table></div>
+          <>
+            <ul className="mt-2 divide-y divide-ink/8 sm:hidden">{data.recent.map((x, i) => <li key={i} className="py-2.5"><p className="break-words text-[14px] font-medium">{x.title}</p><p className="mt-0.5 text-[13px] text-ink-soft">{x.kind === 'flyer' ? 'Flyer' : `Video${x.duration_seconds ? ` ${x.duration_seconds}s` : ''}`} · {x.aspect_ratio} · {ago(x.created_at)}</p></li>)}</ul>
+            <div className="mt-2 hidden overflow-x-auto sm:block"><table className="w-full text-left text-[14px]">
+              <thead className="text-[12px] uppercase tracking-[0.08em] text-ink-mute"><tr><th className="py-2 pr-3 font-semibold">Name</th><th className="py-2 pr-3 font-semibold">Type</th><th className="py-2 pr-3 font-semibold">Size</th><th className="py-2 text-right font-semibold">When</th></tr></thead>
+              <tbody className="divide-y divide-ink/8">{data.recent.map((x, i) => <tr key={i}><td className="max-w-[320px] truncate py-2 pr-3">{x.title}</td><td className="py-2 pr-3">{x.kind === 'flyer' ? 'Flyer' : `Video${x.duration_seconds ? ` ${x.duration_seconds}s` : ''}`}</td><td className="py-2 pr-3 tabular-nums">{x.aspect_ratio}</td><td className="py-2 text-right text-ink-soft">{ago(x.created_at)}</td></tr>)}</tbody>
+            </table></div>
+          </>
         ) : <p className="mt-2 text-[14px] text-ink-mute">Nothing made yet.</p>}
       </section>
     </main>

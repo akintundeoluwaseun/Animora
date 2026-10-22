@@ -309,7 +309,7 @@ ${theme.css ? '' : ''}`;
     while(over() && i++<20){ var gone=false; for(var k=0;k<drop.length;k++){ var el=document.querySelector(drop[k]); if(el){ el.remove(); gone=true; break; } } if(!gone) break; }
     shrink(12);
   }
-  function ready(){ fit(); guard(); window.__timeline = gsap.timeline({ paused:true }); window.__timeline.set({}, {}, 0.1); window.__flyer = true; }
+  function ready(){ var de=document.documentElement, z0=de.style.zoom; de.style.zoom='1'; try { fit(); guard(); } finally { de.style.zoom=z0; } window.__timeline = gsap.timeline({ paused:true }); window.__timeline.set({}, {}, 0.1); window.__flyer = true; }
   var imgs=[].slice.call(document.images).map(function(im){ return im.complete ? null : new Promise(function(r){ im.onload=im.onerror=r; }); }).filter(Boolean);
   Promise.race([Promise.all([document.fonts ? document.fonts.ready : null].concat(imgs)), new Promise(function(r){ setTimeout(r, 6000); })]).then(ready);
 })();

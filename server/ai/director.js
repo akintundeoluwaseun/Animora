@@ -138,7 +138,8 @@ export function sanitizeLook(look) {
   return Object.keys(out).length ? out : null;
 }
 
-const str = (v, max = 90) => (v == null ? '' : String(v).replace(/\s+/g, ' ').trim().slice(0, max));
+// cut at a whole word, never in the middle of one ("This flyer was mad", "fix your devi")
+const str = (v, max = 90) => { const t = v == null ? '' : String(v).replace(/\s+/g, ' ').trim(); if (t.length <= max) return t; const c = t.slice(0, max), sp = c.lastIndexOf(' '); return (sp > max * 0.5 ? c.slice(0, sp) : c).replace(/[\s,;:&–—-]+$/, ''); };
 const num = (v) => {
   if (typeof v === 'number' && Number.isFinite(v)) return v;
   const p = priceOf(String(v ?? ''));

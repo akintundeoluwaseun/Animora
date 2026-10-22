@@ -8,10 +8,11 @@ import path from 'node:path';
 import { GSAP_CDN } from '../../engine/prompts.js';
 import { lookFor, fontsUrl } from '../motion/looks.js';
 import { geminiGenerate } from '../../engine/gemini.js';
+import { composeStory, pickLook, lookFor as storyLook, fontLink as storyFonts, fontFamilies as storyFams, LOOK_IDS } from '../story/index.js';
 
 const dir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'motion', 'browser');
 let RUNTIME = null;
-const runtime = () => (RUNTIME ||= ['pieces.js', 'atoms.js', 'pieces2.js', 'premium.js', 'signature.js'].map((f) => readFileSync(path.join(dir, f), 'utf8')).join('\n;\n'));
+const runtime = () => (RUNTIME ||= ['pieces.js', 'atoms.js', 'pieces2.js', 'premium.js', 'signature.js', 'story.js'].map((f) => readFileSync(path.join(dir, f), 'utf8')).join('\n;\n'));
 export const PIECES_ASPECTS = ['9:16'];   // the library is laid out for vertical video; other sizes use the Motion engine
 const SIZES = { '9:16': [1080, 1920], '4:5': [1080, 1350] };
 // the eight signature templates (recipes live in motion/browser/signature.js); they work at every size
@@ -45,8 +46,13 @@ function factsOf(plan = {}, brief = {}, assets = []) {
   const products = [].concat(brief.products || []).map((p) => { const m = String(p).match(/^(.*?)[\s:–-]*((?:₦|N|NGN|\$)\s?[\d,.]+\s?[km]?)\s*$/i); return m ? { title: str(m[1], 34), price: m[2].replace(/^N(?=\d)/, '₦') } : { title: str(p, 34) }; });
   const priced = products.find((p) => p.price);
   const contact = str(brief.contact, 120), phone = (contact.match(/(\+?\d[\d\s-]{7,}\d)/) || [])[1] || '';
-  const place = str(brief.address || (contact.split(/[·|,]/).find((x) => /street|road|way|avenue|lagos|abuja|ibadan|lekki|ikeja|island|close|estate|plaza|mall|area/i.test(x)) || ''), 60);
-  return { fits, name, mono: name.replace(/[^\p{L}\p{N} ]/gu, '').split(/\s+/).filter((w) => !/^(the|and|of)$/i.test(w)).slice(0, 2).map((w) => w[0]).join('').toUpperCase() || 'A', heads, features, products, priced, offer: str(brief.offer, 30), when: str(brief.when, 60), cta: str(brief.cta || [].concat(brief.ctas || [])[0] || 'Order now', 28), phone, place, photos, logo, category: str(brief.category, 40), sub: str(heads[1] || brief.goal || '', 90) };
+  // the address: given, or the part of the contact line that is not a phone number, a handle or a link
+  const segs = contact.split(/\s*[·|•;]\s*|\s+-\s+/).map((x) => x.trim()).filter(Boolean);
+  const placeSeg = segs.find((x) => !/https?:|www\.|\.com|@/i.test(x) && /\b(street|st|road|rd|way|avenue|ave|lagos|abuja|ibadan|lekki|ikeja|island|close|estate|plaza|mall|area|crescent|junction|opposite|beside|gra|phase|market|shop|suite|floor|off)\b/i.test(x))
+    || segs.find((x) => !/\d{6,}|\d[\d\s-]{7,}\d|@|https?:|www\.|\.com|whats\s?app|instagram|ig:|email/i.test(x) && /\p{L}{3,}/u.test(x));
+  const place = str(brief.address || placeSeg || '', 60);
+  const whatsapp = /whats\s?app|wa\.me/i.test(String(brief.contact || '') + ' ' + String(brief.cta || ''));
+  return { whatsapp, fits, name, mono: name.replace(/[^\p{L}\p{N} ]/gu, '').split(/\s+/).filter((w) => !/^(the|and|of)$/i.test(w)).slice(0, 2).map((w) => w[0]).join('').toUpperCase() || 'A', heads, features, products, priced, offer: str(brief.offer, 30), when: str(brief.when, 60), cta: str(brief.cta || [].concat(brief.ctas || [])[0] || 'Order now', 28), phone, place, photos, logo, category: str(brief.category, 40), sub: str(heads[1] || brief.goal || '', 90) };
 }
 const split2 = (t) => { const w = String(t).split(/\s+/); if (w.length < 3) return w.join(' '); const k = Math.ceil(w.length / 2); return w.slice(0, k).join(' ') + '|' + w.slice(k).join(' '); };
 
@@ -139,12 +145,86 @@ function pickDirection({ brief, plan, salt, previous, aspect }) {
 }
 export function piecesFilm({ plan = {}, brief = {}, assets = [], style = null, themeColors = {}, salt = '', previous = null }) {
   const aspect = TPL_SIZES[plan.aspect_ratio] ? plan.aspect_ratio : '9:16';
+  if (!(!salt && isTemplateBrief(brief)) && process.env.ANIMORA_DIRECTOR !== 'pieces') {
+    const out = storyFilm({ plan, brief, assets, style, salt, previous });
+    out.html = out.html.replace('</body>', `<!--animora-direction:story-${out.data.story.look.id};--></body>`);
+    return out;
+  }
   const dir = !salt && isTemplateBrief(brief) ? brief.template : pickDirection({ brief, plan, salt, previous, aspect });
   const out = dir !== 'mix' && TEMPLATE_IDS.includes(dir)
     ? templateFilm({ plan, brief: { ...brief, template: dir, intensity: 'auto' }, assets, themeColors, salt })
     : mixFilm({ plan, brief, assets, style, themeColors, salt });
   out.html = out.html.includes('</body>') ? out.html.replace('</body>', `<!--animora-direction:${dir};--></body>`) : `${out.html}<!--animora-direction:${dir};-->`;
   return out;
+}
+/** The Story engine: an art-directed film from the owner's facts (looks, beats and timing live in server/ai/story). */
+export function storyFilm({ plan = {}, brief = {}, assets = [], style = null, salt = '', previous = null, look: forceLook = null, seed: forceSeed = null }) {
+  const aspect = TPL_SIZES[plan.aspect_ratio] ? plan.aspect_ratio : '9:16', [W, H] = TPL_SIZES[aspect];
+  const facts = factsOf(plan, brief, assets);
+  const seed = forceSeed || (hashStr(`${facts.name}|${salt}|story`) % 2147483647 || 7);
+  const duration = Math.max(6, Math.min(120, Math.round(Number(plan.duration_seconds) || Number(brief.duration) || 20)));
+  const lookId = LOOK_IDS.includes(forceLook) ? forceLook : pickLook({ facts, style, brief, salt, previous });
+  // the owner's own colours lead; a style they picked gives its accent; otherwise the look keeps its house colours
+  const own = { ...(brief.colorMode && brief.colorMode !== 'style' ? brief.colors || {} : {}), ...(plan.style?.colors && brief.colorMode && brief.colorMode !== 'style' ? plan.style.colors : {}) };
+  if (!HEX.test(own.primary || '') && style && !brief.styleAuto && HEX.test(style.palette?.primary || '')) own.primary = style.palette.primary;
+  const sound = plan.sound || (plan.sfx === false ? 'none' : 'sfx');
+  const music = sound === 'own' && plan.music_url ? { url: plan.music_url } : sound === 'piano' || sound === 'soft' ? { url: `/music/${sound}.mp3`, builtin: sound } : null;
+  const cfg = buildStory({ facts, lookId, own, seed, duration, aspect, sound: sound === 'none' ? 'none' : 'on' });
+  return { html: piecesHtml(cfg, music), data: cfg };
+}
+function buildStory({ facts, lookId, own = {}, seed, duration, aspect, sound = 'on', tweak = {} }) {
+  const [W, H] = TPL_SIZES[aspect] || TPL_SIZES['9:16'];
+  const look = storyLook(lookId, own);
+  if (tweak.motion) look.motion = tweak.motion;
+  const beats = composeStory({ facts, duration, seed, look: lookId, aspect });
+  const story = { W, H, seed, target: duration, aspect, own, tweak, textScale: tweak.textScale || 1, facts, look, beats, brand: facts.name, category: facts.category, logo: facts.logo, mono: facts.mono, sound, overlap: 0.7 };
+  return { W, H, seed, story, brand: facts.name, sound, fontUrl: storyFonts(look), fams: storyFams(look), look: { display: look.display, ui: look.ui } };
+}
+// Plain-words change to a Story film: the AI edits the owner's words, the look, the accent colour or the length; the film is then re-told.
+async function storyEdit({ cfg, say, instruction, useAi, html }) {
+  const S = cfg.story, f = JSON.parse(JSON.stringify(S.facts || {}));
+  let lookId = S.look.id, own = { ...(S.own || {}) }, seed = S.seed, duration = S.target, summary = '';
+  const tweak = { ...(S.tweak || {}) };
+  const bigger = () => { tweak.textScale = Math.min(1.35, +((tweak.textScale || 1) * 1.15).toFixed(2)); }, smaller = () => { tweak.textScale = Math.max(0.75, +((tweak.textScale || 1) / 1.15).toFixed(2)); };
+  const COL = { red: '#E5383B', green: '#1F8A4C', blue: '#1F6FEB', yellow: '#FFC93C', gold: '#C9A45C', orange: '#E8530E', purple: '#7B2CBF', pink: '#E83E8C', teal: '#0FA3A3', black: '#111111', brown: '#7A4A2A' };
+  if (useAi) {
+    try {
+      const { text } = await geminiGenerate({
+        system: `You edit a short video ad for a small business. It is described as JSON: { look: one of ${LOOK_IDS.join(', ')} (${LOOK_IDS.map((id) => `${id}`).join('/')}: editorial = warm paper and serif, noir = black and gold luxury, bold = loud colour blocks, fresh = light and friendly, tech = dark blue digital, clean = white and simple), accent: hex colour or null, seconds: number, text: "bigger"|"smaller"|"same", pace: "calmer"|"faster"|"same", words: { name, headlines: [..], sub, category, features: [..up to 4], products: [{ title, price }], offer, when, place, phone, cta } }. Change only what the owner asks for. Never invent prices, phone numbers, addresses or claims. Keep words short (headline under 8 words, features under 4 words). Return the same JSON plus "summary": one short friendly sentence of what you changed.`,
+        messages: [{ role: 'user', text: `VIDEO: ${JSON.stringify({ look: lookId, accent: own.primary || null, seconds: duration, text: 'same', pace: 'same', words: { name: f.name, headlines: f.heads, sub: f.sub, category: f.category, features: f.features, products: f.products, offer: f.offer, when: f.when, place: f.place, phone: f.phone, cta: f.cta } })}\n\nCHANGE: ${instruction}` }],
+        temperature: 0.4, maxOutputTokens: 3000, json: true, timeoutMs: 45000, thinking: 'low',
+      });
+      const o = JSON.parse(String(text).match(/\{[\s\S]*\}/)[0]);
+      if (LOOK_IDS.includes(o.look)) lookId = o.look;
+      if (o.text === 'bigger') bigger(); else if (o.text === 'smaller') smaller();
+      if (o.pace === 'calmer') tweak.motion = 'calm'; else if (o.pace === 'faster') tweak.motion = 'snap';
+      if (o.accent === null) delete own.primary; else if (HEX.test(o.accent || '')) own.primary = o.accent;
+      const sec = Math.round(Number(o.seconds)); if (sec >= 6 && sec <= 120) duration = sec;
+      const w = o.words || {};
+      for (const k of ['name', 'sub', 'category', 'offer', 'when', 'place', 'phone', 'cta']) if (typeof w[k] === 'string') f[k] = str(w[k], k === 'sub' ? 90 : 60);
+      if (Array.isArray(w.headlines)) f.heads = w.headlines.map((x) => str(x, 60)).filter(Boolean);
+      if (Array.isArray(w.features)) f.features = w.features.map((x) => str(x, 34)).filter(Boolean).slice(0, 4);
+      if (Array.isArray(w.products)) f.products = w.products.filter((x) => x && x.title).map((x) => ({ title: str(x.title, 34), ...(x.price ? { price: str(x.price, 16) } : {}) })).slice(0, 4);
+      summary = str(o.summary, 200);
+    } catch (e) { console.warn('[story] AI edit failed, trying simple changes:', e.message); }
+  }
+  if (!summary) {
+    const done = [];
+    if (/different|another|new look|remix|shuffle|change (it|the look|style)/.test(say)) { seed = (seed * 7 + 13) % 2147483647; lookId = LOOK_IDS[(LOOK_IDS.indexOf(lookId) + 1 + (seed % (LOOK_IDS.length - 1))) % LOOK_IDS.length]; done.push(`a new look (${lookId})`); }
+    const named = LOOK_IDS.find((id) => new RegExp(`\\b${id}\\b`).test(say)); if (named) { lookId = named; done.push(`the ${named} look`); }
+    if (/\bdark|black background|night/.test(say) && !named) { lookId = ['noir', 'tech', 'bold'].find((x) => x !== lookId); done.push('a darker look'); }
+    else if (/\blight|bright|white background/.test(say) && !named) { lookId = ['clean', 'fresh', 'editorial'].find((x) => x !== lookId); done.push('a lighter look'); }
+    const c = Object.keys(COL).find((x) => new RegExp(`\\b${x}\\b`).test(say)); if (c) { own.primary = COL[c]; done.push(`${c} accents`); }
+    if (/(bigger|larger|increase).*(text|word|font|letter)|(text|word|font|letter)s?.*(bigger|larger)/.test(say)) { bigger(); done.push('bigger text'); }
+    else if (/(smaller|reduce).*(text|word|font|letter)|(text|word|font|letter)s?.*smaller/.test(say)) { smaller(); done.push('smaller text'); }
+    if (/calm|slow|smooth|soft/.test(say)) { tweak.motion = 'calm'; done.push('calmer motion'); } else if (/fast|energ|punch|snappy|quick/.test(say)) { tweak.motion = 'snap'; done.push('snappier motion'); }
+    const n = Number((say.match(/\b(\d{1,3})\s*(s|sec|secs|seconds)\b/) || [])[1]); if (n >= 6 && n <= 120) { duration = n; done.push(`${n} seconds long`); }
+    if (!done.length) return null;
+    summary = `Done: ${done.join(', ')}.`;
+  }
+  const next = buildStory({ facts: f, lookId, own, seed, duration, aspect: S.aspect || '9:16', sound: S.sound, tweak });
+  const out = piecesHtml(next, readMusic(html)).replace('</body>', `<!--animora-direction:story-${lookId};--></body>`);
+  return { html: out, summary: summary || 'Done! Check the video.' };
 }
 function mixFilm({ plan = {}, brief = {}, assets = [], style = null, themeColors = {}, salt = '' }) {
   const aspect = SIZES[plan.aspect_ratio] ? plan.aspect_ratio : '9:16', [W, H] = SIZES[aspect];
@@ -188,14 +268,14 @@ export function templateFilm({ plan = {}, brief = {}, assets = [], themeColors =
 const TPL_FONTS = { 'type-reactor': ["'Anton'", "'Inter'"], 'luxury-product': ["'Playfair Display'", "'DM Sans'"], 'hud-tech': ["'Orbitron'", "'Space Grotesk'"], 'liquid-chrome': ["'Syne'", "'Inter'"], 'sports-hype': ["'Oswald'", "'Inter'"], 'swiss-editorial': ["'Archivo Black'", "'Inter'"], visualizer: ["'Unbounded'", "'Inter'"], 'cinematic-logo': ["'Cinzel'", "'Inter'"] };
 
 export function piecesHtml(cfg, music = null) {
-  const fams = [cfg.look.display, cfg.look.ui].map((f) => String(f).split("'")[1]).filter(Boolean);
-  const fontLink = fontsUrl(fams) || `https://fonts.googleapis.com/css2?${fams.map((f) => `family=${f.replace(/ /g, '+')}:wght@400;500;600;700;800`).join('&')}&display=block`;
-  const est = cfg.template ? cfg.template.duration : cfg.target ? Math.round(cfg.target) : Math.round(cfg.scenes.reduce((a, s) => a + (DUR[s.piece] || 3.8), 0) * 0.95);
+  const fams = cfg.fams || [cfg.look.display, cfg.look.ui].map((f) => String(f).split("'")[1]).filter(Boolean);
+  const fontLink = cfg.fontUrl || fontsUrl(fams) || `https://fonts.googleapis.com/css2?${fams.map((f) => `family=${f.replace(/ /g, '+')}:wght@400;500;600;700;800`).join('&')}&display=block`;
+  const est = cfg.story ? cfg.story.target : cfg.template ? cfg.template.duration : cfg.target ? Math.round(cfg.target) : Math.round(cfg.scenes.reduce((a, s) => a + (DUR[s.piece] || 3.8), 0) * 0.95);
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="adflash" content="width=${cfg.W},height=${cfg.H},duration=${est},fps=30,engine=pieces-v1">
+<meta name="adflash" content="width=${cfg.W},height=${cfg.H},duration=${est},fps=30,engine=${cfg.story ? 'story-v1' : 'pieces-v1'}">
 <title>${String(cfg.brand || 'Animora video').replace(/[<>&]/g, '')}</title>
 <link href="${fontLink.replace(/&/g, '&amp;')}" rel="stylesheet">
 <style>*{box-sizing:border-box;margin:0;padding:0}html,body{width:${cfg.W}px;height:${cfg.H}px;overflow:hidden;background:#000;-webkit-font-smoothing:antialiased}</style>
@@ -203,7 +283,7 @@ export function piecesHtml(cfg, music = null) {
 <body>
 <div id="stage"></div>
 <script src="${GSAP_CDN}/gsap.min.js"></script>
-<script>
+${cfg.story ? `<script src="${GSAP_CDN}/MorphSVGPlugin.min.js"></script>\n<script src="${GSAP_CDN}/MotionPathPlugin.min.js"></script>\n` : ''}<script>
 window.PIECES_FILM = ${esc(JSON.stringify(cfg))};
 window.ADFLASH_DATA = ${esc(JSON.stringify({ music }))};
 </script>
@@ -212,11 +292,16 @@ ${runtime()}
 </script>
 <script>
 (function(){ var F = window.PIECES_FILM, fams = ${JSON.stringify(fams)};
-  var load = document.fonts && document.fonts.load ? Promise.all(fams.flatMap(function(f){ return ['400','600','700','800'].map(function(w){ return document.fonts.load(w + ' 80px "' + f + '"').catch(function(){}); }); })) : Promise.resolve();
+  var load = document.fonts && document.fonts.load ? Promise.all(fams.flatMap(function(f){ return ['400','600','700','800','italic 600'].map(function(w){ return document.fonts.load(w + ' 80px "' + f + '"').catch(function(){}); }); })) : Promise.resolve();
   var fail = function(e){ try { window.dispatchEvent(new ErrorEvent('error', { message: 'The film could not start: ' + String((e && e.message) || e) })); } catch(_) {} };
   // if the animation library did not arrive (blocked or slow network), try a second source before giving up
   var needGsap = new Promise(function(res){ if (window.gsap) return res(); var s = document.createElement('script'); s.src = 'https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js'; s.onload = s.onerror = function(){ res(); }; document.head.appendChild(s); setTimeout(res, 8000); });
-  Promise.race([load, new Promise(function(r){ setTimeout(r, 4000); })]).then(function(){ return needGsap; }).then(function(){ if (!window.gsap) throw new Error('the animation library did not load. Check your internet connection and press Regenerate'); if (F.template) TEMPLATE_FILM(F.template); else PIECE_SEQUENCE(F); if (F.sound === 'none') window.__sfx = []; }).catch(fail);
+  Promise.race([load, new Promise(function(r){ setTimeout(r, 4000); })]).then(function(){ return needGsap; }).then(function(){
+    // the shape and path plugins are optional extras for Story films: try a second source, never wait long
+    if (!F.story || !window.gsap) return;
+    var want = ['MorphSVGPlugin', 'MotionPathPlugin'].filter(function(n){ return !window[n]; });
+    return Promise.race([Promise.all(want.map(function(n){ return new Promise(function(res){ var s = document.createElement('script'); s.src = 'https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/' + n + '.min.js'; s.onload = s.onerror = function(){ res(); }; document.head.appendChild(s); }); })), new Promise(function(r){ setTimeout(r, 4000); })]);
+  }).then(function(){ if (!window.gsap) throw new Error('the animation library did not load. Check your internet connection and press Regenerate'); if (F.story) STORY_FILM(F.story); else if (F.template) TEMPLATE_FILM(F.template); else PIECE_SEQUENCE(F); if (F.sound === 'none') window.__sfx = []; }).catch(fail);
 })();
 </script>
 </body>
@@ -229,6 +314,7 @@ export async function piecesEdit({ html, instruction, useAi = true }) {
   const cfg = readPieces(html); if (!cfg) throw new Error('Not a Pieces film');
   const say = String(instruction || '').toLowerCase();
   const next = JSON.parse(JSON.stringify(cfg)); const done = [];
+  if (cfg.story) return storyEdit({ cfg, next, say, instruction, useAi, html });
   if (cfg.template) return templateEdit({ cfg, next, say, instruction, useAi, html });
   if (useAi) {
     try {

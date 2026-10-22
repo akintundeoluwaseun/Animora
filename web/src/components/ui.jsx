@@ -1,6 +1,7 @@
 import { publicMessage } from '../lib/errors.js';
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { useAuth, api, DEVELOPER } from '../lib.jsx';
 import { useInstall } from './InstallApp.jsx';
 
@@ -13,6 +14,7 @@ export function Logo({ light = false }) {
   );
 }
 
+const SPRING = { type: 'spring', stiffness: 520, damping: 30, mass: 0.6 };
 export function Button({ as: As = 'button', variant = 'primary', size = 'md', className = '', loading, children, ...rest }) {
   const v = {
     primary: 'bg-danfo text-white hover:bg-danfo-deep',
@@ -24,8 +26,17 @@ export function Button({ as: As = 'button', variant = 'primary', size = 'md', cl
     money: 'bg-money text-white hover:brightness-95',
   }[variant];
   const s = { sm: 'h-9 px-3.5 text-sm', md: 'h-11 px-5 text-[15px]', lg: 'h-12 px-6 text-base' }[size];
+  const cls = `press inline-flex items-center justify-center gap-2 rounded-[10px] font-semibold tracking-[-0.01em] disabled:opacity-50 ${v} ${s} ${className}`;
+  const off = loading || rest.disabled;
+  // real buttons get a springy press and a small lift on hover
+  if (As === 'button') return (
+    <motion.button className={cls.replace('press ', '')} disabled={off} whileHover={off ? undefined : { y: -1.5 }} whileTap={off ? undefined : { scale: 0.96 }} transition={SPRING} {...rest}>
+      {loading && <Spinner className="size-4" />}
+      {children}
+    </motion.button>
+  );
   return (
-    <As className={`press inline-flex items-center justify-center gap-2 rounded-[10px] font-semibold tracking-[-0.01em] disabled:opacity-50 ${v} ${s} ${className}`} disabled={loading || rest.disabled} {...rest}>
+    <As className={cls} disabled={off} {...rest}>
       {loading && <Spinner className="size-4" />}
       {children}
     </As>
@@ -68,14 +79,19 @@ export function Modal({ open, onClose, children, label, wide }) {
     document.body.style.overflow = 'hidden';
     return () => { window.removeEventListener('keydown', onKey); document.body.style.overflow = ''; };
   }, [open, onClose]);
-  if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/55 p-0 backdrop-blur-sm sm:items-center sm:p-6" onClick={onClose}>
-      <div role="dialog" aria-modal="true" aria-label={label} onClick={(e) => e.stopPropagation()}
-        className={`max-h-[92vh] w-full overflow-auto rounded-t-4xl bg-white p-6 text-ink shadow-2xl sm:rounded-4xl sm:p-8 ${wide === 'xl' ? 'sm:max-w-6xl' : wide ? 'sm:max-w-3xl' : 'sm:max-w-md'}`}>
-        {children}
-      </div>
-    </div>
+    <AnimatePresence>
+      {open && (
+        <motion.div key="modal" className="fixed inset-0 z-50 flex items-end justify-center bg-ink/55 p-0 backdrop-blur-sm sm:items-center sm:p-6" onClick={onClose}
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
+          <motion.div role="dialog" aria-modal="true" aria-label={label} onClick={(e) => e.stopPropagation()}
+            initial={{ opacity: 0, y: 40, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 24, scale: 0.98 }} transition={{ type: 'spring', stiffness: 380, damping: 32 }}
+            className={`max-h-[92vh] w-full overflow-auto rounded-t-4xl bg-white p-6 text-ink shadow-2xl sm:rounded-4xl sm:p-8 ${wide === 'xl' ? 'sm:max-w-6xl' : wide ? 'sm:max-w-3xl' : 'sm:max-w-md'}`}>
+            {children}
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }
 
@@ -229,7 +245,7 @@ export function DeveloperSignature() {
             <a href={DEVELOPER.whatsapp} target="_blank" rel="noopener" className="dev-sign-btn dev-sign-btn-gold press">{WA_ICON}Chat on WhatsApp</a>
             <a href={DEVELOPER.website} target="_blank" rel="noopener" className="dev-sign-btn dev-sign-btn-line press">{GLOBE_ICON}Visit website</a>
           </div>
-          <p className="dev-sign-phone tabular-nums">{DEVELOPER.phone}</p>
+          <p className="dev-sign-phone tabular-nums">{DEVELOPER.handle}</p>
         </div>
       </div>
     </div>
@@ -249,7 +265,7 @@ export function DeveloperCard({ wide = false }) {
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
-          <a href={DEVELOPER.whatsapp} target="_blank" rel="noopener" className="press flex h-11 items-center gap-2 rounded-full bg-[#25D366] px-5 font-semibold text-[#06351B] hover:brightness-105">{WA_ICON}WhatsApp {DEVELOPER.phone}</a>
+          <a href={DEVELOPER.whatsapp} target="_blank" rel="noopener" className="press flex h-11 items-center gap-2 rounded-full bg-[#25D366] px-5 font-semibold text-[#06351B] hover:brightness-105">{WA_ICON}WhatsApp {DEVELOPER.handle}</a>
           <a href={DEVELOPER.website} target="_blank" rel="noopener" className="press flex h-11 items-center gap-2 rounded-full border border-white/20 px-5 font-semibold text-white hover:bg-white/10">{GLOBE_ICON}Visit website</a>
         </div>
       </div>
@@ -265,10 +281,10 @@ export function DeveloperCard({ wide = false }) {
         </div>
       </div>
       <div className="mt-3 grid grid-cols-2 gap-1.5">
-        <a href={DEVELOPER.whatsapp} target="_blank" rel="noopener" className="press flex h-9 items-center justify-center gap-1.5 rounded-[9px] bg-[#25D366] text-[13px] font-semibold text-[#06351B] hover:brightness-105" aria-label={`WhatsApp ${DEVELOPER.phone}`}>{WA_ICON}Chat</a>
+        <a href={DEVELOPER.whatsapp} target="_blank" rel="noopener" className="press flex h-9 items-center justify-center gap-1.5 rounded-[9px] bg-[#25D366] text-[13px] font-semibold text-[#06351B] hover:brightness-105" aria-label={`WhatsApp ${DEVELOPER.handle}`}>{WA_ICON}Chat</a>
         <a href={DEVELOPER.website} target="_blank" rel="noopener" className="press flex h-9 items-center justify-center gap-1.5 rounded-[9px] bg-white/10 text-[13px] font-semibold text-white hover:bg-white/15">{GLOBE_ICON}Website</a>
       </div>
-      <p className="mt-2 text-center text-[11px] tabular-nums text-white/45">{DEVELOPER.phone}</p>
+      <p className="mt-2 text-center text-[11px] tabular-nums text-white/45">{DEVELOPER.handle}</p>
     </div>
   );
 }

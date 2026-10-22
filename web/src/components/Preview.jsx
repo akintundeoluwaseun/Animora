@@ -23,7 +23,7 @@ const BRIDGE = `<script>(function(){
   window.addEventListener('load', function(){ var n=0; (function wait(){ tl=window.__timeline;
     if(tl){ tl.pause(); if(window.gsap&&gsap.globalTimeline){ gsap.globalTimeline.getChildren(false,true,true).forEach(function(c){ if(c!==tl) c.pause(); }); }
       tl.seek(0,false); post('ready',{d:tl.duration(), sfx:(window.__sfx||[]), music:((window.ADFLASH_DATA||{}).music||null)}); }
-    else if(n++<120) setTimeout(wait,50); else post('error',{message:'The animation has no timeline.'}); })(); });
+    else if(n++<400) setTimeout(wait,50); else post('error',{message:'The animation has no timeline.'}); })(); });
 })();<\/script>`;
 
 export function prepareHtml(html) {

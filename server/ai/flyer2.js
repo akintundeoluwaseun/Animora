@@ -383,7 +383,7 @@ ${treat}
     var h=document.querySelector('h1');
     while(over() && i++<30){ var gone=false; for(var k=0;k<drop.length;k++){ var el=document.querySelector(drop[k]); if(el){ el.remove(); gone=true; break; } } if(!gone) break; }
     while(h && over() && j++<30){ h.style.fontSize=(parseFloat(getComputedStyle(h).fontSize)*0.94)+'px'; } }
-  function ready(){ fitOne(); fit(); guard(); window.__timeline = gsap.timeline({ paused:true }); window.__timeline.set({}, {}, 0.1); window.__flyer = true; }
+  function ready(){ var de=document.documentElement, z0=de.style.zoom; de.style.zoom='1'; try { fitOne(); fit(); guard(); } finally { de.style.zoom=z0; } window.__timeline = gsap.timeline({ paused:true }); window.__timeline.set({}, {}, 0.1); window.__flyer = true; }
   var imgs=[].slice.call(document.images).map(function(im){ return im.complete ? null : new Promise(function(r){ im.onload=im.onerror=r; }); }).filter(Boolean);
   var fonts = document.fonts && document.fonts.load ? Promise.all(['${look.dw || 800} 80px "${look.display || 'Inter'}"','700 40px "${look.ui || 'Inter'}"','500 40px "${look.ui || 'Inter'}"'].map(function(f){ return document.fonts.load(f,'Aa1₦').catch(function(){}); })) : null;
   Promise.race([Promise.all([fonts, document.fonts ? document.fonts.ready : null].concat(imgs)), new Promise(function(r){ setTimeout(r, 6000); })]).then(ready);

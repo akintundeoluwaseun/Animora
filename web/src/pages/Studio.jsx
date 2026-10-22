@@ -2,6 +2,7 @@ import { announceKind } from '../components/Shell.jsx';
 import { publicMessage } from '../lib/errors.js';
 // Page 2: live preview + edit by prompt + code view.
 import { useEffect, useRef, useState } from 'react';
+import { motion } from 'motion/react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { api, ASPECTS, duration, shrinkImage } from '../lib.jsx';
 import { Alert, Button, Modal, PageLoader, Spinner } from '../components/ui.jsx';
@@ -44,10 +45,11 @@ function Feedback({ open, onClose }) {
   useEffect(() => { if (!open) return undefined; const t = setTimeout(onClose, 9000); return () => clearTimeout(t); }, [open, onClose]);
   if (!open) return null;
   return (
-    <div role="status" className="fixed bottom-4 left-1/2 z-40 flex w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 items-center gap-3 rounded-[14px] bg-ink px-4 py-3 text-sm text-white shadow-lg">
+    <motion.div role="status" className="fixed bottom-4 left-1/2 z-40 flex w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 items-center gap-3 rounded-[14px] bg-ink px-4 py-3 text-sm text-white shadow-lg"
+      initial={{ opacity: 0, y: 28, scale: 0.96 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ type: 'spring', stiffness: 420, damping: 28 }}>
       <p className="min-w-0 flex-1">Ready. If you have any edits, go down and tell me what to change.</p>
       <button type="button" onClick={onClose} aria-label="Close" className="shrink-0 rounded-full px-2 py-1 text-white/70 hover:text-white">&#10005;</button>
-    </div>
+    </motion.div>
   );
 }
 

@@ -2,7 +2,8 @@ import { Component, StrictMode, lazy, Suspense } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Analytics } from '@vercel/analytics/react';
 import { initTheme } from './components/ThemeToggle.jsx';
-import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useParams, useLocation } from 'react-router-dom';
+import { MotionConfig, motion } from 'motion/react';
 import './styles.css';
 import { AuthProvider, useAuth } from './lib.jsx';
 import { PageLoader } from './components/ui.jsx';
@@ -10,6 +11,12 @@ import Shell from './components/Shell.jsx';
 import Home from './pages/Home.jsx';
 import ExportScreen from './components/ExportScreen.jsx';
 import InstallPrompt from './components/InstallApp.jsx';
+
+// every page fades in softly (opacity only, so fixed toasts and dialogs inside keep their place)
+function PageFade({ children }) {
+  const { pathname } = useLocation();
+  return <motion.div key={pathname} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.28, ease: 'easeOut' }}>{children}</motion.div>;
+}
 
 function Keyed({ el: Page }) { const { id } = useParams(); return <Page key={id} />; }
 
@@ -71,12 +78,14 @@ function DashboardRedirect() { return <Navigate to={`/videos${window.location.se
 
 function App() {
   return (
+    <MotionConfig reducedMotion="user">
     <BrowserRouter>
       <AuthProvider>
         <Shell>
           <ExportScreen />
           <ErrorBoundary>
           <Suspense fallback={<PageLoader />}>
+            <PageFade>
             <Routes>
               <Route path="/" element={<Home />} />
               <Route path="/about" element={<Navigate to="/" replace />} />
@@ -97,12 +106,14 @@ function App() {
               <Route path="/admin" element={<Admin />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
+            </PageFade>
           </Suspense>
           </ErrorBoundary>
         <InstallPrompt />
         </Shell>
       </AuthProvider>
     </BrowserRouter>
+    </MotionConfig>
   );
 }
 

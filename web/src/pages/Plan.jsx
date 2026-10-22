@@ -4,6 +4,7 @@
 import { announceKind } from '../components/Shell.jsx';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { motion } from 'motion/react';
 import { api, ASPECTS, duration, shrinkImage, imageLook } from '../lib.jsx';
 import { Alert, Button, PageLoader, Spinner } from '../components/ui.jsx';
 import MicButton from '../components/MicButton.jsx';
@@ -362,7 +363,7 @@ export default function Plan() {
       const files = [...(e.clipboardData?.files || [])].filter((f) => f.type.startsWith('image/'));
       if (!files.length) return;
       e.preventDefault();
-      upload(files.map((f, i) => new File([f], f.name && f.name !== 'image.png' ? f.name : `pasted picture ${Date.now() % 10000}${i ? `-${i}` : ''}.png`, { type: f.type })), q?.id === 'pictures' && !logo ? null : 'photo');
+      upload(files.map((f, i) => new File([f], f.name && f.name !== 'image.png' ? f.name : `pasted picture ${Date.now() % 10000}${i ? `-${i}` : ''}.png`, { type: f.type })), q?.id === 'pictures' ? (!logo ? null : 'photo') : null);
     };
     window.addEventListener('paste', onPaste);
     return () => window.removeEventListener('paste', onPaste);
@@ -415,7 +416,7 @@ export default function Plan() {
         if (bRef.current.name) {
           setReading(false);
           // the logo and photos matter, so ask for them once (skippable), then make the video without any other question
-          if (!pics.length) { autoMake.current = true; setStep(Math.max(0, QS.findIndex((qq) => qq.id === 'pictures'))); return; }
+          if (!logo) { autoMake.current = true; setStep(Math.max(0, QS.findIndex((qq) => qq.id === 'pictures'))); return; }
           return makeNow();
         }
         advance(next);
@@ -551,7 +552,9 @@ export default function Plan() {
             <p>{finished ? 'All done' : `${group} · ${pos + 1} of ${shownQs.length}`}</p>
           </div>
 
-          <form className="wiz-card" key={finished ? 'end' : q.id} onSubmit={onContinue}>
+          {/* each question slides in from the side it comes from */}
+          <motion.form className="wiz-card" key={finished ? 'end' : q.id} onSubmit={onContinue}
+            initial={{ opacity: 0, x: backMode ? -36 : 36 }} animate={{ opacity: 1, x: 0 }} transition={{ type: 'spring', stiffness: 340, damping: 32 }}>
             {!finished && q && (
               <>
                 <h2 className="wiz-q">{q.ask(b)}</h2>
@@ -710,7 +713,7 @@ export default function Plan() {
                 </div>
               )}
             </div>
-          </form>
+          </motion.form>
         </section>
 
         {/* right: your ad so far */}

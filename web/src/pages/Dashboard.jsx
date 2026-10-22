@@ -1,5 +1,6 @@
 import { publicMessage } from '../lib/errors.js';
 import { useEffect, useRef, useState } from 'react';
+import { motion } from 'motion/react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { api, ago, duration, naira, otherDeviceLink, useAuth, usePolling } from '../lib.jsx';
 import { Alert, Button, Empty, Modal, PageLoader, PlanBadge, Spinner } from '../components/ui.jsx';
@@ -162,7 +163,7 @@ function TileMenu({ p, onDelete, onFull }) {
     catch { navigate(`/p/${p.id}/render`); } finally { setPct(null); }
   };
   const items = flyer
-    ? [designed && ['Open flyer', 'edit', () => go(`/p/${p.id}/studio`)], designed && ['Full screen', 'full', () => { setOpen(false); onFull(p); }], !designed && ['Continue', 'edit', () => go(`/p/${p.id}/plan`)]]
+    ? [designed && ['Edit flyer', 'edit', () => go(`/p/${p.id}/studio`)], designed && ['Full screen', 'full', () => { setOpen(false); onFull(p); }], !designed && ['Continue', 'edit', () => go(`/p/${p.id}/plan`)]]
     : designed
       ? [busy ? ['See progress', 'play', () => go(`/p/${p.id}/render`)] : ['Generate video', 'play', () => go(`/p/${p.id}/render?new=1`)],
         !busy && ['Generate & download', 'down', () => go(`/p/${p.id}/render?new=1&download=1`)],
@@ -319,11 +320,11 @@ export default function Dashboard({ kind = 'video' }) {   // /videos shows video
               </span>
             </button>
           </li>
-          {projects.map((p) => {
+          {projects.map((p, i) => {
             const st = statusLabel(p);
             const tile = p.aspect_ratio === '16:9' ? 'aspect-video' : p.aspect_ratio === '1:1' ? 'aspect-square' : p.aspect_ratio === 'A4' ? 'aspect-[1240/1754]' : p.aspect_ratio === '4:5' ? 'aspect-[4/5]' : 'aspect-[9/14]';
             return (
-              <li key={p.id} className="group">
+              <motion.li key={p.id} className="group" initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ type: 'spring', stiffness: 300, damping: 28, delay: Math.min(i, 12) * 0.035 }}>
                 <Link to={nextStep(p)} className="block">
                   <div className={`relative grid ${tile} place-items-center overflow-hidden ${p.kind === 'flyer' ? 'rounded-md bg-[#F4EFE8] p-2 ring-2 ring-flyer/35' : 'rounded-xl bg-[#0B0A12] ring-2 ring-video/30'} transition-transform duration-200 group-hover:-translate-y-0.5`}>
                     <div className={`relative size-full overflow-hidden ${p.kind === 'flyer' ? 'shadow-md' : ''}`}>
@@ -347,7 +348,7 @@ export default function Dashboard({ kind = 'video' }) {   // /videos shows video
                   <span>{p.kind === 'flyer' ? 'Flyer' : duration(p.duration_seconds)}, {p.aspect_ratio}, {ago(p.updated_at)}</span>
                   <TileMenu p={p} onDelete={remove} onFull={openFull} />
                 </div>
-              </li>
+              </motion.li>
             );
           })}
         </ul>

@@ -270,3 +270,6 @@ html[data-theme="dark"] .segmented { background: #221F3F; }
 html[data-theme="dark"] .segmented > button { color: var(--color-ink-soft); }
 html[data-theme="dark"] .segmented > button[aria-selected="true"] { background: #3A3570; color: var(--color-ink); }
 html[data-theme="dark"] .chip { background: #1F1C3A; border-color: rgba(236, 234, 251, .16); color: var(--color-ink-soft); }
+html[data-theme="dark"] .wiz-now { background: #1F1C3A; color: var(--color-ink); border-color: rgba(236, 234, 251, .28); }
+html[data-theme="dark"] .wiz-now:hover:not(:disabled) { border-color: var(--color-ink); background: #2A2650; }
+html[data-theme="dark"] .wiz-skip { color: var(--color-ink-soft); }

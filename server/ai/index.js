@@ -131,11 +131,11 @@ export async function generateCode({ plan, style, assets, brief = null, previous
   const motion = CODE_MODE !== 'html' && process.env.ANIMORA_ENGINE !== 'cinema' && MOTION_ASPECTS.includes(planWithAssets.aspect_ratio || '9:16');
   // Vertical videos are spelled from the premium motion library: a different mix of pieces for every business and every Regenerate.
   // ANIMORA_ENGINE=motion (or cinema) switches back to the older engines.
-  const pieces = CODE_MODE !== 'html' && !['motion', 'cinema'].includes(process.env.ANIMORA_ENGINE) && (PIECES_ASPECTS.includes(planWithAssets.aspect_ratio || '9:16') || (isTemplateBrief(brief) && ['16:9', '1:1', '4:5'].includes(planWithAssets.aspect_ratio)));
+  const pieces = CODE_MODE !== 'html' && !['motion', 'cinema'].includes(process.env.ANIMORA_ENGINE) && (PIECES_ASPECTS.includes(planWithAssets.aspect_ratio || '9:16') || ['16:9', '1:1', '4:5'].includes(planWithAssets.aspect_ratio));
   if (pieces) {
     try {
       onStatus?.('Building your film');
-      const r = piecesFilm({ plan: planWithAssets, brief: brief || {}, assets: planWithAssets.assets, style, themeColors: THEMES[themeKey]?.colors || {}, salt: previous ? String(Date.now()) : '' });
+      const r = piecesFilm({ plan: planWithAssets, brief: brief || {}, assets: planWithAssets.assets, style, themeColors: THEMES[themeKey]?.colors || {}, salt: previous ? String(Date.now()) : '', previous });
       return { html: r.html, source: 'template', problems: [] };
     } catch (e) { console.warn('[pieces] failed, using Motion:', e.message); }
   }

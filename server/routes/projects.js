@@ -178,6 +178,12 @@ r.post('/:id/assets', upload.single('file'), async (req, res) => {
   // Role: what the AI should treat it as. Logos are placed uncropped; photos are hero images.
   let role = ['logo', 'photo', 'music'].includes(req.body.role) ? req.body.role : null;
   if (!role) role = kind === 'audio' ? 'music' : /logo/i.test(f.originalname + (req.body.name || '')) ? 'logo' : 'photo';
+  // A picture with a see-through background, or a small near-square one, is almost always the logo (photos are big and opaque). Only when none is set yet.
+  if (kind === 'image' && role === 'photo' && !req.body.role) {
+    const hasLogo = await one("SELECT 1 AS x FROM assets WHERE project_id=$1 AND role='logo' LIMIT 1", [p.id]);
+    const ratio = meta.width && meta.height ? meta.width / meta.height : 0;
+    if (!hasLogo && (meta.hasAlpha === true || (ratio > 0.7 && ratio < 1.45 && Math.max(meta.width, meta.height) <= 700))) role = 'logo';
+  }
   let label = (req.body.name || (role === 'logo' ? 'logo' : f.originalname.replace(/\.[^.]+$/, ''))).replace(/[^\w\s&'-]+/g, ' ').trim().slice(0, 50) || role;
   const taken = new Set((await q('SELECT lower(name) AS n FROM assets WHERE project_id=$1', [p.id])).map((r) => r.n));
   for (let k = 2, base = label; taken.has(label.toLowerCase()); k++) label = `${base} ${k}`;
