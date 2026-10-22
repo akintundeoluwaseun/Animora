@@ -107,8 +107,36 @@ export function composePieces({ facts: f, duration = 24, seed = 1, energy = 'med
   return { scenes: all, energy };
 }
 
-export function piecesFilm({ plan = {}, brief = {}, assets = [], style = null, themeColors = {}, salt = '' }) {
-  if (isTemplateBrief(brief)) return templateFilm({ plan, brief, assets, themeColors, salt });
+// The computer chooses the direction. People never pick a template: the business decides what fits, the seed decides the rest,
+// and every Regenerate suggests a different direction than the last one (read back from a marker left in the previous film).
+const AFFINITY = [
+  [/jewel|watch|perfum|fragrance|fashion|luxur|boutique|cosmetic|skin|beauty|salon|spa|furniture|interior|car|auto/i, ['luxury-product', 'liquid-chrome', 'cinematic-logo', 'swiss-editorial']],
+  [/tech|software|app\b|laptop|computer|phone|gadget|it |digital|data|cyber|crypto|fintech|ai\b|repair|electronic/i, ['hud-tech', 'liquid-chrome', 'type-reactor', 'cinematic-logo']],
+  [/gym|fitness|sport|football|training|boxing|athlet|run|yoga|health club/i, ['sports-hype', 'type-reactor', 'hud-tech']],
+  [/music|dj|party|event|concert|club|church|festival|show|ticket|artist|band|studio/i, ['visualizer', 'type-reactor', 'sports-hype', 'cinematic-logo']],
+  [/real estate|property|architect|design|agency|consult|school|education|law|finance|account|photograph|media|brand/i, ['swiss-editorial', 'cinematic-logo', 'type-reactor']],
+  [/food|bake|cake|restaurant|cafe|kitchen|chop|grill|drink|juice|catering|pharmacy|clinic|shop|store|market|fresh/i, ['type-reactor', 'swiss-editorial', 'luxury-product']],
+];
+function pickDirection({ brief, plan, salt, previous, aspect }) {
+  const text = [brief.category, brief.name, plan?.business?.category, [].concat(brief.features || []).join(' ')].filter(Boolean).join(' ');
+  const fits = new Set(AFFINITY.filter(([re]) => re.test(text)).flatMap(([, ids]) => ids));
+  const prev = (String(previous || '').match(/animora-direction:([a-z-]+);/) || [])[1];
+  const options = [...(SIZES[aspect] ? [['mix', 4]] : []), ...(TPL_SIZES[aspect] ? TEMPLATE_IDS.map((id) => [id, fits.has(id) ? 3 : 0.3]) : [])].filter(([id]) => id !== prev);
+  const r = mulberry(hashStr(`${brief.name}|${text}|${salt}|dir`) % 2147483647 || 5)();
+  let t = r * options.reduce((n, [, w]) => n + w, 0);
+  for (const [id, w] of options) { t -= w; if (t <= 0) return id; }
+  return options[0][0];
+}
+export function piecesFilm({ plan = {}, brief = {}, assets = [], style = null, themeColors = {}, salt = '', previous = null }) {
+  const aspect = TPL_SIZES[plan.aspect_ratio] ? plan.aspect_ratio : '9:16';
+  const dir = !salt && isTemplateBrief(brief) ? brief.template : pickDirection({ brief, plan, salt, previous, aspect });
+  const out = dir !== 'mix' && TEMPLATE_IDS.includes(dir)
+    ? templateFilm({ plan, brief: { ...brief, template: dir, intensity: 'auto' }, assets, themeColors, salt })
+    : mixFilm({ plan, brief, assets, style, themeColors, salt });
+  out.html = out.html.includes('</body>') ? out.html.replace('</body>', `<!--animora-direction:${dir};--></body>`) : `${out.html}<!--animora-direction:${dir};-->`;
+  return out;
+}
+function mixFilm({ plan = {}, brief = {}, assets = [], style = null, themeColors = {}, salt = '' }) {
   const aspect = SIZES[plan.aspect_ratio] ? plan.aspect_ratio : '9:16', [W, H] = SIZES[aspect];
   const look0 = lookFor(style?.slug || style?.palette?.theme || '', { ...(style?.palette || {}), ...themeColors });
   const colors = { ...themeColors, ...(plan.style?.colors || {}) };
