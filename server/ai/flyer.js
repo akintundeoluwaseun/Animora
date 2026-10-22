@@ -10,7 +10,8 @@ import { lookFor } from './motion/looks.js';
 
 export const FLYER_LAYOUTS = ['hero', 'grid', 'split', 'type'];
 const PHONE_RE = /(\+?234[\s-]?|0)[789][01]\d[\s-]?\d{3}[\s-]?\d{4}/;
-const str = (v, max = 120) => (v == null ? '' : String(v).replace(/\s+/g, ' ').trim().slice(0, max));
+// cut at a whole word, never in the middle of one ("This flyer was mad", "fix your devi")
+const str = (v, max = 120) => { const t = v == null ? '' : String(v).replace(/\s+/g, ' ').trim(); if (t.length <= max) return t; const c = t.slice(0, max), sp = c.lastIndexOf(' '); return (sp > max * 0.5 ? c.slice(0, sp) : c).replace(/[\s,;:&–—-]+$/, ''); };
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
 function luminance(hex) {
   const n = parseInt(String(hex || '#000000').slice(1), 16);
@@ -115,7 +116,7 @@ Short words beat long sentences. Pick the layout that suits what the flyer is fo
     return {
       ...base,
       layout: okLayouts.includes(o.layout) ? o.layout : base.layout,
-      headline: str(o.headline, 60) || base.headline, highlight: str(o.highlight, 30), subhead: str(o.subhead, 110), badge: str(o.badge, 18),
+      headline: str(o.headline, 60) || base.headline, highlight: str(o.highlight, 30), subhead: str(o.subhead, 110), badge: str(o.badge, 26),
       items: (Array.isArray(o.items) ? o.items : []).slice(0, 8).map((it) => ({ title: str(it?.title, 40), price: str(it?.price, 20), img: pick(it?.img) })).filter((it) => it.title),
       features: (Array.isArray(o.features) ? o.features : []).slice(0, 4).map((f) => str(f, 34)).filter(Boolean),
       heroImg: pick(o.heroImg) || base.heroImg, cta: str(o.cta, 30) || base.cta, contact: str(o.contact, 120) || base.contact,
@@ -392,7 +393,7 @@ Change only what was asked. Picture NAMES must come from the list, and a picture
   const next = {
     ...data, colors,
     layout: LAYS.includes(o.layout) ? o.layout : data.layout,
-    headline: str(o.headline, 60) || data.headline, highlight: str(o.highlight, 30), subhead: str(o.subhead, 110), badge: str(o.badge, 18),
+    headline: str(o.headline, 60) || data.headline, highlight: str(o.highlight, 30), subhead: str(o.subhead, 110), badge: str(o.badge, 26),
     items: Array.isArray(o.items) ? o.items.slice(0, 8).map((it) => ({ title: str(it?.title, 40), price: str(it?.price, 20), img: pick(it?.img) })).filter((it) => it.title) : data.items,
     features: Array.isArray(o.features) ? o.features.slice(0, 4).map((f) => str(f, 34)).filter(Boolean) : data.features,
     heroImg: pick(o.heroImg) || data.heroImg, cta: str(o.cta, 30) || data.cta, contact: str(o.contact, 120) || data.contact,

@@ -64,9 +64,14 @@ export function chooseFlyerLayout({ kinds = [], pref = '', photos = 0, items = 0
   add('poster', 3);
   if (offer || priced) add('price', 2);
   let s = seed; const rnd = () => ((s = (s * 16807) % 2147483647) / 2147483647);
-  const total = cands.reduce((a, [, w]) => a + w * w, 0);
+  // gentle weights: the business's signals still lead, but another good layout can win, so flyers stop looking alike
+  if (photos >= 1) { add('photo', 2); add('diagonal', 2); }
+  if (photos >= 2) add('collage', 2);
+  if (offer || priced) add('price', 2);
+  if (features + items >= 3) add('services', 2);
+  const total = cands.reduce((a, [, w]) => a + w, 0);
   let r = rnd() * total;
-  for (const [l, w] of cands) { r -= w * w; if (r <= 0) return l; }
+  for (const [l, w] of cands) { r -= w; if (r <= 0) return l; }
   return cands[0]?.[0] || 'poster';
 }
 
