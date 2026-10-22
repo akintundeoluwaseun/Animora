@@ -203,7 +203,10 @@ ${runtime()}
 <script>
 (function(){ var F = window.PIECES_FILM, fams = ${JSON.stringify(fams)};
   var load = document.fonts && document.fonts.load ? Promise.all(fams.flatMap(function(f){ return ['400','600','700','800'].map(function(w){ return document.fonts.load(w + ' 80px "' + f + '"').catch(function(){}); }); })) : Promise.resolve();
-  Promise.race([load, new Promise(function(r){ setTimeout(r, 4000); })]).then(function(){ if (F.template) TEMPLATE_FILM(F.template); else PIECE_SEQUENCE(F); if (F.sound === 'none') window.__sfx = []; });
+  var fail = function(e){ try { window.dispatchEvent(new ErrorEvent('error', { message: 'The film could not start: ' + String((e && e.message) || e) })); } catch(_) {} };
+  // if the animation library did not arrive (blocked or slow network), try a second source before giving up
+  var needGsap = new Promise(function(res){ if (window.gsap) return res(); var s = document.createElement('script'); s.src = 'https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js'; s.onload = s.onerror = function(){ res(); }; document.head.appendChild(s); setTimeout(res, 8000); });
+  Promise.race([load, new Promise(function(r){ setTimeout(r, 4000); })]).then(function(){ return needGsap; }).then(function(){ if (!window.gsap) throw new Error('the animation library did not load. Check your internet connection and press Regenerate'); if (F.template) TEMPLATE_FILM(F.template); else PIECE_SEQUENCE(F); if (F.sound === 'none') window.__sfx = []; }).catch(fail);
 })();
 </script>
 </body>
