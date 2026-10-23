@@ -63,7 +63,7 @@ export function mixSfx(events, duration, { timeScale = 1, gain = 0.6, music = nu
   if (music?.length) { const bed = musicBed(music, n, SR, events, { timeScale }); for (let i = 0; i < n; i++) mix[i] += bed[i]; }
   // master: glue, loudness to the social-media level (about -14 LUFS measured; the built-in meter reads ~1.5 dB low), peaks under -1.5 dBFS
   // with music the whole mix goes to the social-media level; effects alone stay gentle (lifting sparse effects to -14 LUFS made them harsh)
-  masterTrack(mix, SR, { target: music?.length ? -12.5 : -18.5 });
+  masterTrack(mix, SR, { target: music?.length ? -15 : -18.5 });
   const pcm = Buffer.alloc(44 + n * 2);
   for (let i = 0; i < n; i++) pcm.writeInt16LE(Math.round(Math.max(-1, Math.min(1, mix[i])) * 32767), 44 + i * 2);
   pcm.write('RIFF', 0); pcm.writeUInt32LE(36 + n * 2, 4); pcm.write('WAVE', 8); pcm.write('fmt ', 12);

@@ -117,7 +117,7 @@ export function LivePreview({ html, aspect = '9:16', autoPlay = true, maxWidth =
         setReady(true); setD(m.d); sfxRef.current = m.sfx || []; lastT.current = 0;
         // background music: an <audio> element kept in step with the timeline
         if (musicRef.current) { musicRef.current.pause(); musicRef.current = null; }
-        if (m.music?.url) { const a = new Audio(m.music.url); a.loop = true; a.volume = 0.6; a.preload = 'auto'; musicRef.current = a; }
+        if (m.music?.url) { const a = new Audio(m.music.url); a.loop = true; a.volume = 0.32; a.preload = 'auto'; musicRef.current = a; }
         if (ctx()) [...new Set(sfxRef.current.map((e) => e.k))].forEach((k) => sound(k));
         if (autoPlay) send({ cmd: 'play' });
       }
@@ -131,7 +131,7 @@ export function LivePreview({ html, aspect = '9:16', autoPlay = true, maxWidth =
           if (m.playing && soundRef.current && audio?.state === 'running') {
             if (mu.paused || Math.abs(mu.currentTime - m.t) > 0.25) { try { mu.currentTime = m.t % (mu.duration || 1e9); } catch { /* not loaded yet */ } }
             if (mu.paused) mu.play().catch(() => {});
-            mu.volume = Math.max(0, 0.6 * Math.min(1, (m.d - m.t) / 2) * (m.t < duckUntil.current ? 0.67 : 1));   // fade out at the end and dip under effects, like the MP4
+            mu.volume = Math.max(0, 0.32 * Math.min(1, (m.d - m.t) / 2) * (m.t < duckUntil.current ? 0.67 : 1));   // fade out at the end and dip under effects, like the MP4
           } else if (!mu.paused) mu.pause();
         }
         lastT.current = m.t;

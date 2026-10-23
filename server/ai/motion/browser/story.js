@@ -28,7 +28,8 @@
     const gsap = window.gsap;
     const { W, H } = cfg;
     const U = Math.min(W, H) / 1080, port = H / W > 1.2, land = W / H > 1.2;
-    const TU = U * (port ? 1.36 : land ? 1.34 : 1.2) * (cfg.textScale || 1);   // type is set larger than layout so it reads on a phone
+    const tallK = Math.max(0, Math.min(1, (H / W - 1.25) / (16 / 9 - 1.25)));   // 0 at 4:5, 1 at 9:16
+    const TU = U * (port ? 1.24 + 0.12 * tallK : land ? 1.34 : 1.2) * (cfg.textScale || 1);   // type is set larger than layout so it reads on a phone
     const M = Math.round((port ? 0.085 : land ? 0.065 : 0.08) * W);
     const CW = W - 2 * M;
     const L0 = cfg.look;
@@ -105,6 +106,8 @@
     }
     function fadeUp(nodes, t, o = {}) { [].concat(nodes).forEach((n) => { const pl = n && n.dataset && n.dataset.pill ? n.querySelector('.pill') : null; if (pl) tl.fromTo(pl, { clipPath: 'inset(0 100% 0 0 round 999px)' }, { clipPath: 'inset(0 0% 0 0 round 999px)', duration: 0.7, ease: 'expo.out' }, t); }); if (L0.id === 'tech') [].concat(nodes).forEach((n) => { if (n && n.dataset && n.dataset.lab) scramble(n, t, 0.8); }); tl.fromTo(nodes, { opacity: 0, y: (o.dy || 24) * U }, { opacity: o.to || 1, y: 0, duration: o.dur || 0.8, ease: 'power2.out', stagger: o.stagger || 0.08 }, t); }
     // a quiet drift so a held frame never looks frozen
+    // centre a block on a line by its measured height (no CSS translate, which a later tween could undo)
+    function centreY(node, mid = H / 2) { node.style.transform = ''; node.style.top = `${mid - node.offsetHeight / 2}px`; return node; }
     function drift(node, t, d, o = {}) { tl.fromTo(node, { scale: o.from || 1, y: 0 }, { scale: o.to || 1.035, y: (o.y || -10) * U, duration: Math.max(0.5, d), ease: 'none' }, t); }
 
     // ---------- effects
@@ -205,6 +208,7 @@
     function label(parent, text, css, color) {
       const n = el('div', `position:absolute;${css};font-family:${ui};font-weight:600;font-size:${Math.round((land ? 24 : 26) * TU)}px;letter-spacing:.22em;text-transform:uppercase;color:${color || A};white-space:nowrap;`, parent, esc(text));
       n.dataset.lab = '1';
+      n.above = (y, gap = 24 * U) => { n.style.top = `${y - n.offsetHeight - gap}px`; return n; };
       // auto-sized pill behind the words (Fresh, Clean): it grows with the text
       if ((L0.id === 'fresh' || L0.id === 'clean') && color !== '#FFFFFF' && !/font-size:\$\{22/.test(css)) {
         const right = /text-align:right/.test(css), centre = /text-align:center/.test(css);
@@ -216,8 +220,20 @@
     function rule(parent, css, color) { return el('div', `position:absolute;${css};height:${Math.max(2, Math.round(2.5 * U))}px;background:${color || A};transform-origin:left center;`, parent); }
 
     // ---------- photos: full bleed with a slow camera move, or whole on a soft copy of itself when the picture is small or oddly shaped
+    // a picture's own shape (width / height), when the upload told us
+    function ratioOf(src) { return Number(((cfg.facts || {}).ratios || {})[src]) || 0; }
+    // shrink a box so its shape stays close to the picture's (at most ~20% of the picture cropped), centred where it was
+    function shapeBox(b, ri, slack = 1.25) {
+      if (!ri) return b; const rb = b.w / b.h;
+      if (rb > ri * slack) { const w = b.h * ri * slack; return { ...b, l: b.l + (b.w - w) / 2, w }; }
+      if (rb < ri / slack) { const h = (b.w * slack) / ri; return { ...b, t: b.t + (b.h - h) / 2, h }; }
+      return b;
+    }
     function photo(parent, src, fit, t, d, o = {}) {
       const box = el('div', `position:absolute;${o.css || 'inset:0'};overflow:hidden;${o.radius ? `border-radius:${o.radius}px;` : ''}background:#111;`, parent);
+      // a picture that would lose more than half of itself to the crop is shown whole on a soft copy of itself instead
+      const ri = ratioOf(src), bw = box.offsetWidth || W, bh = box.offsetHeight || H;
+      if (fit !== 'contain' && ri && !o.forceCover && Math.min(ri / (bw / bh), (bw / bh) / ri) < 0.5) fit = 'contain';
       if (fit === 'contain') {
         const back = el('div', `position:absolute;inset:-8%;background:url("${src}") center/cover;filter:blur(${40 * U}px) brightness(.55) saturate(1.15);`, box);
         const front = el('img', `position:absolute;left:8%;top:8%;width:84%;height:84%;object-fit:contain;filter:drop-shadow(0 ${30 * U}px ${50 * U}px rgba(0,0,0,.45));`, box);
@@ -371,9 +387,13 @@
           tl.fromTo(pb, { clipPath: port ? 'inset(100% 0 0 0)' : 'inset(0 0 0 100%)' }, { clipPath: 'inset(0% 0 0 0%)', duration: 1.2, ease: 'expo.inOut' }, t);
           const tx = port ? { left: M, top: H * 0.56 + 70 * U, w: CW, h: H * 0.44 - 70 * U - M } : { left: M, top: M, w: W * 0.5 - M * 1.6, h: H - 2 * M };
           const lab = label(Lr, data.label || cfg.brand, `left:${tx.left}px;top:${tx.top}px`, S.acc);
-          const hb = textBlock(Lr, data.headline, { w: tx.w, size: (port ? 112 : 104) * TU, min: 40 * TU, maxLines: port ? 3 : 4, maxH: tx.h - 120 * U, color: S.ink, accent: L0.accentWord, accentCss: acc(S), upper: L0.upper, css: `left:${tx.left}px;top:${tx.top + 60 * U}px` });
+          const hb = textBlock(Lr, data.headline, { w: tx.w, size: (port ? 112 : 104) * TU, min: 40 * TU, maxLines: port ? 3 : 4, maxH: tx.h - lab.offsetHeight - 60 * U, color: S.ink, accent: L0.accentWord, accentCss: acc(S), upper: L0.upper, css: `left:${tx.left}px;top:${tx.top + lab.offsetHeight + 22 * U}px` });
           fadeUp(lab, t + 0.6); reveal(hb, t + 0.75);
-          if (data.sub) { const sb = textBlock(Lr, data.sub, { w: tx.w, size: 34 * TU, min: 24 * TU, maxLines: 3, font: ui, weight: 500, lh: 1.35, ls: '0', color: S.mute, css: `left:${tx.left}px;top:${tx.top + 60 * U + hb.offsetHeight + 36 * U}px` }); reveal(sb, t + 1.3, { soft: true }); }
+          const sb = data.sub ? textBlock(Lr, data.sub, { w: tx.w, size: 34 * TU, min: 24 * TU, maxLines: 3, font: ui, weight: 500, lh: 1.35, ls: '0', color: S.mute, css: `left:${tx.left}px;top:${tx.top + lab.offsetHeight + 22 * U + hb.offsetHeight + 36 * U}px` }) : null;
+          if (sb) reveal(sb, t + 1.3, { soft: true });
+          // the words sit in the middle of their half, not stuck to its top edge
+          const group = lab.offsetHeight + 22 * U + hb.offsetHeight + (sb ? 36 * U + sb.offsetHeight : 0), off = Math.max(0, (tx.h - group) / 2);
+          [lab, hb, sb].forEach((n) => { if (n) n.style.top = `${parseFloat(n.style.top) + off}px`; });
           sound(t + 0.1, 'hook', 0.9);
           return;
         }
@@ -381,11 +401,10 @@
         decor(Lr, t, d, S.kind);
         const center = L0.center || !port;
         const w = land ? W * 0.72 : CW;
-        const hb = textBlock(Lr, data.headline, { w, size: (port ? 150 : land ? 136 : 124) * TU, min: 50 * TU, maxLines: port ? 5 : 3, color: S.ink, accent: L0.accentWord, accentCss: acc(S), upper: L0.upper, align: center ? 'center' : 'left', css: center ? `left:${(W - w) / 2}px;top:50%` : `left:${M}px;top:50%` });
-        hb.style.transform = `translateY(-50%)`;
-        if (L0.id === 'bold' && port) { hb.style.top = `${H * 0.4}px`; }
+        const hb = textBlock(Lr, data.headline, { w, size: (port ? 150 : land ? 136 : 124) * TU, min: 50 * TU, maxLines: port ? 5 : 3, maxH: H - 2 * M - 220 * U, color: S.ink, accent: L0.accentWord, accentCss: acc(S), upper: L0.upper, align: center ? 'center' : 'left', css: center ? `left:${(W - w) / 2}px;top:50%` : `left:${M}px;top:50%` });
+        centreY(hb, L0.id === 'bold' && port ? H * 0.4 : H / 2);
         const midY = L0.id === 'bold' && port ? H * 0.4 : H / 2;
-        const lab = label(Lr, data.label || cfg.brand, center ? `left:0;right:0;text-align:center;top:${midY - hb.offsetHeight / 2 - 70 * U}px` : `left:${M}px;top:${midY - hb.offsetHeight / 2 - 70 * U}px`, S.acc);
+        const lab = label(Lr, data.label || cfg.brand, center ? `left:0;right:0;text-align:center;top:0` : `left:${M}px;top:0`, S.acc); lab.above(midY - hb.offsetHeight / 2);
         fadeUp(lab, t + 0.3);
         reveal(hb, t + 0.4, { tilt: L0.id === 'bold', track: L0.id === 'noir' }); polish(hb, t + 0.4, d, S); if (L0.id === 'noir' || L0.id === 'tech') flare(Lr, t + 0.6, midY); underline(hb, t + 1.25, L0.id === 'bold' ? (S.kind === 'accent' ? onColor(A) : A2) : S.acc);
         if (data.sub && L0.id !== 'bold') { const sw = land ? W * 0.55 : CW; const sb = textBlock(Lr, data.sub, { w: sw, size: 36 * TU, min: 24 * TU, maxLines: 2, font: ui, weight: 500, lh: 1.35, ls: '0', color: S.mute, align: center ? 'center' : 'left', css: center ? `left:${(W - sw) / 2}px;top:${H / 2 + hb.offsetHeight / 2 + 50 * U}px` : `left:${M}px;top:${H / 2 + hb.offsetHeight / 2 + 50 * U}px` }); reveal(sb, t + 1.2, { soft: true }); }
@@ -396,7 +415,7 @@
       sting(Lr, t, d, data, v, S) {
         decor(Lr, t, d, S.kind);
         const name = textBlock(Lr, cfg.brand, { w: CW * 0.9, size: (port ? 110 : 120) * TU, min: 40 * TU, maxLines: 2, color: S.ink, upper: true, ls: '0.06em', align: 'center', css: `left:${(W - CW * 0.9) / 2}px;top:50%` });
-        name.style.transform = 'translateY(-50%)';
+        centreY(name);
         if (cfg.logo) { mark(Lr, 150 * U, `left:${W / 2 - 75 * U}px;top:${H / 2 - name.offsetHeight / 2 - 190 * U}px`, t + 0.1); }
         if (L0.id === 'tech') name.querySelectorAll('.w').forEach((w, i) => scramble(w, t + 0.15 + i * 0.12, 1.1));
         else if (L0.id === 'bold') revealChars(name, t + 0.15);
@@ -408,7 +427,8 @@
         const contain = data.fit === 'contain';
         if (v === 'frame' || contain) {
           if (L0.id !== 'bold') decor(Lr, t, d, S.kind);
-          const box = !data.caption ? (land ? { l: W * 0.2, t: M * 1.6, w: W * 0.6, h: H - 3.2 * M } : { l: M, t: (H - (port ? H * 0.62 : H - 2.4 * M)) / 2, w: CW, h: port ? H * 0.62 : H - 2.4 * M }) : port ? { l: M, t: H * 0.13, w: CW, h: H * 0.56 } : land ? { l: W * 0.42, t: M, w: W * 0.58 - M, h: H - 2 * M } : { l: M, t: M, w: CW, h: H * 0.6 };
+          const box = !data.caption ? (land ? { l: W * 0.15, t: M * 1.3, w: W * 0.7, h: H - 2.6 * M } : { l: port ? M * 0.6 : M, t: (H - (port ? H * 0.62 : H - 2.4 * M)) / 2, w: port ? W - M * 1.2 : CW, h: port ? H * 0.62 : H - 2.4 * M }) : port ? { l: M, t: H * 0.13, w: CW, h: H * 0.56 } : land ? { l: W * 0.42, t: M, w: W * 0.58 - M, h: H - 2 * M } : { l: M, t: M, w: CW, h: H * 0.6 };
+          if (!contain) { const sb = shapeBox(box, ratioOf(data.photo)); box.l = sb.l; box.t = sb.t; box.w = sb.w; box.h = sb.h; }
           const back = el('div', `position:absolute;left:${box.l + 26 * U}px;top:${box.t + 26 * U}px;width:${box.w}px;height:${box.h}px;background:${S.acc};border-radius:${L0.radius * U}px;`, Lr);
           tl.fromTo(back, { opacity: 0, x: -30 * U, y: -30 * U }, { opacity: 1, x: 0, y: 0, duration: 1, ease: EASE }, t + 0.3);
           const pb = photo(Lr, data.photo, data.fit, t - 0.3, d + 1, { css: `left:${box.l}px;top:${box.t}px;width:${box.w}px;height:${box.h}px`, radius: L0.radius * U, pos: data.pos, zoomFrom: 1.12 });
@@ -417,7 +437,7 @@
           tl.fromTo([pb, back], { rotateY: land ? -10 : 8, transformPerspective: 1600 * U }, { rotateY: 0, duration: 1.6, ease: 'expo.out' }, t + 0.05);
           if (data.caption) {
             const tx = port ? { l: M, tp: box.t + box.h + 80 * U, w: CW } : land ? { l: M, tp: H * 0.36, w: W * 0.42 - M * 1.6 } : { l: M, tp: box.t + box.h + 64 * U, w: CW };
-            if (data.label) { const lb = label(Lr, data.label, `left:${tx.l}px;top:${tx.tp - 50 * U}px`, S.acc); fadeUp(lb, t + 0.7); }
+            if (data.label) { const lb = label(Lr, data.label, `left:${tx.l}px;top:0`, S.acc).above(tx.tp); fadeUp(lb, t + 0.7); }
             const cb = textBlock(Lr, data.caption, { w: tx.w, size: (land ? 84 : 76) * TU, min: 34 * TU, maxLines: 3, color: S.ink, accent: L0.accentWord, accentCss: acc(S), upper: L0.upper, css: `left:${tx.l}px;top:${tx.tp}px` });
             reveal(cb, t + 0.8);
           }
@@ -459,13 +479,15 @@
           items.forEach((it, i) => {
             const ti = t + 0.3 + i * per;
             const w = land ? W * 0.7 : CW;
-            const b = textBlock(Lr, it, { w, size: (port ? 120 : 112) * TU, min: 44 * TU, maxLines: 3, color: S.ink, upper: L0.upper, align: 'center', css: `left:${(W - w) / 2}px;top:50%` });
-            b.style.transform = 'translateY(-50%)';
+            const b = textBlock(Lr, it, { w, size: (port ? 120 : 112) * TU, min: 44 * TU, maxLines: 3, maxH: H * 0.42, color: S.ink, upper: L0.upper, align: 'center', css: `left:${(W - w) / 2}px;top:50%` });
+            centreY(b);
             reveal(b, ti);
             const c = el('span', 'position:absolute;left:0;right:0;opacity:0', count, `${String(i + 1).padStart(2, '0')} / ${String(n).padStart(2, '0')}`);
             tl.set(c, { opacity: 1 }, ti); if (i < n - 1) tl.set(c, { opacity: 0 }, ti + per);
             if (i < n - 1) tl.to(b._lines, { yPercent: -140, opacity: 0, duration: 0.5, ease: 'power3.in', stagger: 0.04 }, ti + per - 0.5);
             sound(ti, 'tick');
+            count.style.top = `${Math.max(parseFloat(count.style.top), H / 2 + b.offsetHeight / 2 + 50 * U)}px`;
+            { const lim = H / 2 - b.offsetHeight / 2 - 30 * U; if (parseFloat(head.style.top) + head.offsetHeight > lim) head.above(lim, 0); }
           });
           return;
         }
@@ -481,7 +503,7 @@
         const heights = blocks.map((b) => b.offsetHeight + gapR);
         const total = heights.reduce((n, h) => n + h, 0);
         let y = (H - total) / 2 + (port ? 50 : 36) * U;
-        const head = label(Lr, data.title || cfg.brand, `left:${left}px;top:${y - 100 * U}px`, S.acc); fadeUp(head, t + 0.2);
+        const head = label(Lr, data.title || cfg.brand, `left:${left}px;top:0`, S.acc).above(y, 34 * U); fadeUp(head, t + 0.2);
         items.forEach((it, i) => {
           const tb = blocks[i], rowH = heights[i], ti = t + 0.45 + i * Math.min(0.5, (d - 1.6) / Math.max(1, items.length));
           tb.style.top = y + 'px';
@@ -506,9 +528,9 @@
         decor(Lr, t, d, S.kind);
         const w = land ? W * 0.7 : CW;
         const lab = label(Lr, data.label || 'Special offer', `left:0;right:0;text-align:center;top:0`, S.acc);
-        const ob = textBlock(Lr, data.offer, { w, size: (port ? 130 : 118) * TU, min: 46 * TU, maxLines: port ? 4 : 3, color: S.ink, upper: L0.upper, align: 'center', css: `left:${(W - w) / 2}px;top:50%` });
-        ob.style.transform = 'translateY(-50%)';
-        lab.style.top = `${H / 2 - ob.offsetHeight / 2 - 80 * U}px`;
+        const ob = textBlock(Lr, data.offer, { w, size: (port ? 130 : 118) * TU, min: 46 * TU, maxLines: port ? 4 : 3, maxH: H - 2 * M - 260 * U, color: S.ink, upper: L0.upper, align: 'center', css: `left:${(W - w) / 2}px;top:50%` });
+        centreY(ob);
+        lab.above(H / 2 - ob.offsetHeight / 2);
         // a sweep of light across the words
         const bar = el('div', `position:absolute;left:${(W - w) / 2 - 30 * U}px;width:${w + 60 * U}px;top:${H / 2 + ob.offsetHeight / 2 + 30 * U}px;height:${Math.max(3, 5 * U)}px;background:${S.acc};transform-origin:center;`, Lr);
         fadeUp(lab, t + 0.25);
@@ -543,7 +565,7 @@
           const pw = pr.querySelector('.pw');
           while (pw.offsetWidth > (land ? W * 0.7 : CW) && parseFloat(pr.style.fontSize) > 60 * U) pr.style.fontSize = parseFloat(pr.style.fontSize) * 0.93 + 'px';
           // the name sits just above the price, the pair centred
-          const ph = pr.offsetHeight, th = tb.offsetHeight, gap = 40 * U, top = (H - (th + gap + ph)) / 2;
+          const ph = pr.offsetHeight, th = tb.offsetHeight, gap = 64 * U, top = (H - (th + gap + ph)) / 2;
           tb.style.top = top + 'px'; pr.style.top = top + th + gap + 'px';
           reveal(tb, t + 0.3, { soft: true });
           const m = String(it.price || '').match(/^(\D*?)([\d,]+(?:\.\d+)?)(\D*)$/);
@@ -562,7 +584,7 @@
         }
         const colW = land ? W * 0.62 : CW, left = (W - colW) / 2, rowH = (port ? 150 : 124) * TU;
         const top0 = (H - items.length * rowH) / 2 + 30 * U;
-        const head = label(Lr, data.title || 'Prices', `left:${left}px;top:${top0 - 80 * U}px`, S.acc); fadeUp(head, t + 0.2);
+        const head = label(Lr, data.title || 'Prices', `left:${left}px;top:0`, S.acc).above(top0, 30 * U); fadeUp(head, t + 0.2);
         const rowsEls = [];
         items.forEach((it, i) => {
           const y = top0 + i * rowH, ti = t + 0.4 + i * 0.32;
@@ -619,9 +641,9 @@
       statement(Lr, t, d, data, v, S) {
         decor(Lr, t, d, S.kind);
         const w = land ? W * 0.72 : CW;
-        const b = textBlock(Lr, data.text, { w, size: (port ? 120 : 110) * TU, min: 44 * TU, maxLines: port ? 5 : 3, color: S.ink, accent: L0.accentWord, accentCss: acc(S), upper: L0.upper, align: L0.center || land ? 'center' : 'left', css: L0.center || land ? `left:${(W - w) / 2}px;top:50%` : `left:${M}px;top:50%` });
-        b.style.transform = 'translateY(-50%)';
-        if (data.label) { const lb = label(Lr, data.label, L0.center || land ? `left:0;right:0;text-align:center;top:${H / 2 - b.offsetHeight / 2 - 80 * U}px` : `left:${M}px;top:${H / 2 - b.offsetHeight / 2 - 80 * U}px`, S.acc); fadeUp(lb, t + 0.2); }
+        const b = textBlock(Lr, data.text, { w, size: (port ? 120 : 110) * TU, min: 44 * TU, maxLines: port ? 5 : 3, maxH: H - 2 * M - 200 * U, color: S.ink, accent: L0.accentWord, accentCss: acc(S), upper: L0.upper, align: L0.center || land ? 'center' : 'left', css: L0.center || land ? `left:${(W - w) / 2}px;top:50%` : `left:${M}px;top:50%` });
+        centreY(b);
+        if (data.label) { const lb = label(Lr, data.label, L0.center || land ? `left:0;right:0;text-align:center;top:0` : `left:${M}px;top:0`, S.acc).above(H / 2 - b.offsetHeight / 2); fadeUp(lb, t + 0.2); }
         reveal(b, t + 0.35, { stagger: 0.12, track: L0.id === 'noir' || L0.id === 'editorial' }); polish(b, t + 0.35, d, S); underline(b, t + 1.2, L0.id === 'bold' ? (S.kind === 'accent' ? onColor(A) : A2) : S.acc);
         drift(b, t + 1.3, d - 1.1, { from: 1, to: 1.03, y: 0 });
       },
@@ -629,8 +651,8 @@
       stack(Lr, t, d, data, v, S) {
         decor(Lr, t, d, S.kind);
         const w = land ? W * 0.74 : CW;
-        const hb = textBlock(Lr, data.headline, { w: w * 0.92, size: (port ? 150 : 128) * TU, min: 50 * TU, maxLines: port ? 5 : 3, color: S.ink, upper: true, lh: 1.08, align: 'left', css: `left:${(W - w) / 2}px;top:50%` });
-        hb.style.transform = 'translateY(-50%)';
+        const hb = textBlock(Lr, data.headline, { w: w * 0.92, size: (port ? 150 : 128) * TU, min: 50 * TU, maxLines: port ? 5 : 3, maxH: H - 2 * M - 200 * U, color: S.ink, upper: true, lh: 1.08, align: 'left', css: `left:${(W - w) / 2}px;top:50%` });
+        centreY(hb);
         const cols = [S.kind === 'accent' ? '#111111' : A, readable(A2, S.bg) === A2 ? A2 : (S.kind === 'accent' ? '#FFFFFF' : S.ink), S.kind === 'accent' ? '#FFFFFF' : S.ink];
         (hb._lines || []).forEach((ln, i) => {
           const bgc = cols[i % cols.length];
@@ -642,7 +664,7 @@
         });
         if (hb._lines) hb._lines.forEach((ln) => { ln.parentElement.style.overflow = 'visible'; });
         hb.style.transform = ''; const top0 = (H - hb.offsetHeight) / 2; hb.style.top = top0 + 'px';
-        const lab = label(Lr, data.label || cfg.brand, `left:${(W - w) / 2}px;top:${top0 - 80 * U}px`, S.acc); fadeUp(lab, t + 0.2);
+        const lab = label(Lr, data.label || cfg.brand, `left:${(W - w) / 2}px;top:0`, S.acc).above(top0); fadeUp(lab, t + 0.2);
         drift(hb, t + 1.2, d - 1, { from: 1, to: 1.03, y: 0 });
       },
       // photo inside the type: a giant word filled with the picture, then the camera flies through it into the full photo
@@ -657,7 +679,7 @@
         const widest = () => Math.max(...[...wd.children].filter((c) => c.tagName === 'SPAN').map((c) => c.offsetWidth));
         for (let k = 0; k < 40 && (widest() > CW || wd.offsetHeight > H * (port ? 0.5 : 0.62)); k++) { fs *= 0.94; wd.style.fontSize = fs + 'px'; }
         wd.style.top = (H - wd.offsetHeight) / 2 + 'px';
-        const lab = label(Lr, data.label || cfg.category || '', `left:0;right:0;text-align:center;top:${H / 2 - wd.offsetHeight / 2 - 70 * U}px`, S.acc); fadeUp(lab, t + 0.2);
+        const lab = label(Lr, data.label || cfg.category || '', `left:0;right:0;text-align:center;top:0`, S.acc).above(H / 2 - wd.offsetHeight / 2, 16 * U); fadeUp(lab, t + 0.2);
         tl.fromTo(wd, { opacity: 0, scale: 0.85, backgroundPosition: '20% 50%' }, { opacity: 1, scale: 1, backgroundPosition: '60% 50%', duration: 1.3, ease: 'expo.out' }, t + 0.15);
         tl.to(wd, { scale: 9, opacity: 0, duration: 0.9, ease: 'power3.in', transformOrigin: '50% 50%' }, t + 1.45);
         tl.to(lab, { opacity: 0, duration: 0.3 }, t + 1.4);
@@ -689,9 +711,11 @@
       },
       // picture in picture: one photo softly out of focus behind, the second floats in front as a card that turns towards us
       pip(Lr, t, d, data, v, S) {
-        const back = photo(Lr, data.photo, data.fit, t - 0.6, d + 1.4, { pos: data.pos, focus: false });
+        const back = photo(Lr, data.photo, data.fit, t - 0.6, d + 1.4, { pos: data.pos, focus: false, forceCover: true });
         tl.fromTo(back.firstChild, { filter: 'blur(0px) brightness(1)' }, { filter: `blur(${14 * U}px) brightness(.62)`, duration: 1, ease: 'power2.inOut' }, t + 0.1);
-        const cw = port ? CW * 0.82 : land ? W * 0.36 : CW * 0.62, ch = cw * (port ? 1.15 : 0.95);
+        const r2 = Math.max(0.72, Math.min(1.45, ratioOf(data.photo2) || (port ? 0.87 : 1.05)));
+        let cw = port ? CW * 0.82 : land ? W * 0.36 : CW * 0.62, ch = cw / r2;
+        if (ch > H * (port ? 0.56 : 0.72)) { ch = H * (port ? 0.56 : 0.72); cw = ch * r2; }
         const cx = land ? W - M - cw : (W - cw) / 2, cy = port ? H * 0.2 : (H - ch) / 2 - 20 * U;
         const card = photo(Lr, data.photo2, data.fit2, t, d, { css: `left:${cx}px;top:${cy}px;width:${cw}px;height:${ch}px`, radius: Math.max(12, L0.radius) * U, pos: '50% 50%', zoomFrom: 1.1, focusAt: 0.3 });
         card.style.boxShadow = `0 ${4 * U}px ${8 * U}px rgba(0,0,0,.2), 0 ${24 * U}px ${48 * U}px rgba(0,0,0,.35), 0 ${60 * U}px ${100 * U}px rgba(0,0,0,.3)`;
@@ -721,7 +745,7 @@
         tl.to(img, { y: -14 * U, duration: Math.max(1, d - 2), ease: 'sine.inOut' }, t + 1.9);
         if (data.caption) {
           const tx = land ? { l: M, tp: H * 0.38, w: W * 0.45 } : { l: M, tp: fy + fh + 70 * U, w: CW };
-          if (data.label) { const lb = label(Lr, data.label, `left:${tx.l}px;top:${tx.tp - 50 * U}px`, S.acc); fadeUp(lb, t + 1); }
+          if (data.label) { const lb = label(Lr, data.label, `left:${tx.l}px;top:0`, S.acc).above(tx.tp); fadeUp(lb, t + 1); }
           const cb = textBlock(Lr, data.caption, { w: tx.w, size: (land ? 84 : 80) * TU, min: 34 * TU, maxLines: 3, color: S.ink, accent: L0.accentWord, accentCss: acc(S), upper: L0.upper, css: `left:${tx.l}px;top:${tx.tp}px` });
           reveal(cb, t + 1.15);
         }
@@ -730,11 +754,23 @@
       // phone mock-up: the picture on a phone screen with the brand's own bar and button, turning in 3D
       phone(Lr, t, d, data, v, S) {
         decor(Lr, t, d, S.kind);
-        const ph = port ? H * 0.62 : H * 0.8, pw = ph * 0.49, px = land ? W * 0.6 - pw / 2 : (W - pw) / 2, py = port ? H * 0.1 : (H - ph) / 2;
+        const ph = port ? H * 0.62 : land ? H * 0.8 : H * 0.66, pw = ph * 0.49, px = land ? W * 0.6 - pw / 2 : port ? (W - pw) / 2 : W * 0.72 - pw / 2, py = port ? H * 0.1 : (H - ph) / 2;
         const body = el('div', `position:absolute;left:${px}px;top:${py}px;width:${pw}px;height:${ph}px;border-radius:${pw * 0.14}px;background:#0E0E10;padding:${pw * 0.035}px;box-shadow:0 ${30 * U}px ${80 * U}px rgba(0,0,0,.45), inset 0 0 0 ${2 * U}px #3A3A40;`, Lr);
         const scr = el('div', `position:relative;width:100%;height:100%;border-radius:${pw * 0.11}px;overflow:hidden;background:#000;`, body);
-        const shot = photo(scr, data.photo, data.fit, t, d + 0.5, { css: `left:0;top:${pw * 0.2}px;width:100%;height:${ph * 1.05}px`, zoomFrom: 1, zoomTo: 1, focusAt: 0.6 });
-        tl.fromTo(shot, { y: 0 }, { y: -ph * 0.18, duration: Math.max(1, d - 1), ease: 'power1.inOut' }, t + 1);
+        const ri = ratioOf(data.photo), sw = pw * 0.93;
+        if (ri > 0.75) {
+          // a wide picture shows as a post in the app's feed, whole, with the brand above it and the post text below
+          scr.style.background = '#FFFFFF';
+          const top = pw * 0.2, av = pw * 0.1;
+          const who = el('div', `position:absolute;left:${pw * 0.05}px;top:${top + pw * 0.03}px;display:flex;align-items:center;gap:${pw * 0.03}px;font-family:${ui};font-weight:700;font-size:${pw * 0.045}px;color:#111;white-space:nowrap;`, scr, `<span style="width:${av}px;height:${av}px;border-radius:50%;background:${A};display:inline-block"></span>${esc(cfg.brand)}`);
+          const ih = sw / ri, it = top + av + pw * 0.06;
+          const shot = photo(scr, data.photo, data.fit, t, d + 0.5, { css: `left:0;top:${it}px;width:100%;height:${ih}px`, zoomFrom: 1.08, zoomTo: 1, focusAt: 0.6, forceCover: true });
+          [0.8, 0.62, 0.7].forEach((k, i) => el('div', `position:absolute;left:${pw * 0.05}px;top:${it + ih + pw * (0.06 + i * 0.07)}px;width:${sw * k - pw * 0.1}px;height:${pw * 0.032}px;border-radius:${pw * 0.016}px;background:${i ? '#E6E6EA' : rgba(A, 0.35)};`, scr));
+          tl.fromTo([who, shot], { opacity: 0, y: 30 * U }, { opacity: 1, y: 0, duration: 0.7, ease: EASE, stagger: 0.1 }, t + 0.6);
+        } else {
+          const shot = photo(scr, data.photo, data.fit, t, d + 0.5, { css: `left:0;top:${pw * 0.2}px;width:100%;height:${ph * 1.05}px`, zoomFrom: 1, zoomTo: 1, focusAt: 0.6 });
+          tl.fromTo(shot, { y: 0 }, { y: -ph * 0.18, duration: Math.max(1, d - 1), ease: 'power1.inOut' }, t + 1);
+        }
         const bar = el('div', `position:absolute;left:0;right:0;top:0;height:${pw * 0.2}px;background:${S.kind === 'accent' ? '#111' : A};display:flex;align-items:flex-end;padding:0 ${pw * 0.07}px ${pw * 0.04}px;font-family:${ui};font-weight:700;font-size:${pw * 0.055}px;color:${onColor(S.kind === 'accent' ? '#111' : A)};white-space:nowrap;overflow:hidden;`, scr, esc(cfg.brand));
         el('div', `position:absolute;left:50%;top:${pw * 0.025}px;width:${pw * 0.28}px;height:${pw * 0.065}px;margin-left:-${pw * 0.14}px;border-radius:${pw * 0.04}px;background:#0E0E10;`, scr);
         const btn = el('div', `position:absolute;left:${pw * 0.08}px;right:${pw * 0.08}px;bottom:${pw * 0.08}px;height:${pw * 0.15}px;border-radius:${pw * 0.075}px;background:${A2};color:${onColor(A2)};display:grid;place-items:center;font-family:${ui};font-weight:700;font-size:${pw * 0.05}px;white-space:nowrap;`, scr, esc(data.cta || cfg.brand));
@@ -743,8 +779,8 @@
         tl.to(body, { rotateY: land ? -4 : 6, y: -18 * U, duration: Math.max(1, d - 1.4), ease: 'sine.inOut' }, t + 1.4);
         tl.fromTo(btn, { scale: 0.6, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.6, ease: 'back.out(2)' }, t + 1.2);
         if (data.caption) {
-          const tx = land ? { l: M, tp: H * 0.36, w: W * 0.4 } : { l: M, tp: py + ph + 60 * U, w: CW };
-          const cb = textBlock(Lr, data.caption, { w: tx.w, size: (land ? 80 : 68) * TU, min: 32 * TU, maxLines: land ? 4 : 2, maxH: land ? H * 0.5 : H - tx.tp - M, color: S.ink, accent: L0.accentWord, accentCss: acc(S), upper: L0.upper, align: land ? 'left' : 'center', css: `left:${tx.l}px;top:${tx.tp}px` });
+          const tx = land ? { l: M, tp: H * 0.36, w: W * 0.4 } : !port ? { l: M, tp: H * 0.34, w: px - M - 50 * U } : { l: M, tp: py + ph + 60 * U, w: CW };
+          const cb = textBlock(Lr, data.caption, { w: tx.w, size: (land ? 80 : 68) * TU, min: 32 * TU, maxLines: !port ? 4 : 2, maxH: !port ? H * 0.5 : H - tx.tp - M, color: S.ink, accent: L0.accentWord, accentCss: acc(S), upper: L0.upper, align: !port ? 'left' : 'center', css: `left:${tx.l}px;top:${tx.tp}px` });
           reveal(cb, t + 0.9);
         }
         sound(t + 0.1, 'reveal'); sound(t + 1.2, 'click', 0.8);
@@ -762,7 +798,7 @@
         const top0 = (port ? H * 0.12 : M) + fsz * 2.6;
         const gap = 26 * U, per = Math.max(0.75, (d - 1.2) / Math.max(1, msgs.length));
         let y = top0;
-        const list = el('div', `position:absolute;left:0;top:0;width:${W}px;height:${H}px;`, Lr);
+        const clip = el('div', 'position:absolute;inset:0;', Lr), list = el('div', `position:absolute;left:0;top:0;width:${W}px;height:${H}px;`, clip);
         msgs.forEach((m, i) => {
           const ti = t + 0.5 + i * per;
           const b = el('div', `position:absolute;left:${cx}px;top:${y}px;max-width:${cw * 0.86}px;padding:${0.55 * fsz}px ${0.75 * fsz}px;border-radius:${0.5 * fsz}px ${0.5 * fsz}px ${0.5 * fsz}px ${0.12 * fsz}px;background:${m.cta ? A : bubBg};color:${m.cta ? onColor(A) : bubInk};font-family:${ui};font-weight:${m.cta ? 700 : 500};font-size:${fsz}px;line-height:1.25;box-shadow:0 ${4 * U}px ${14 * U}px rgba(0,0,0,.12);transform-origin:0% 100%;`, list, esc(m.text));
@@ -778,6 +814,8 @@
         const total = y - gap - (port ? H * 0.12 : M), shift = Math.max(0, (H - total) / 2 - (port ? H * 0.12 : M));
         if (shift > 0) { head.style.top = parseFloat(head.style.top) + shift + 'px'; list.style.top = shift + 'px'; }
         const over = y + shift - (H - M);
+        // messages scroll up under the header, never over it
+        if (over > 0) clip.style.clipPath = `inset(${top0 + shift - gap * 0.6}px 0 0 0)`;
         if (over > 0) tl.to(list, { y: -over, duration: per * 0.8, ease: 'power2.inOut' }, t + 0.5 + (msgs.length - 1.4) * per);
       },
       // the close: mark, name, the action, how to reach them. It keeps breathing until the last frame.

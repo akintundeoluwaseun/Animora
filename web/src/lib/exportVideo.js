@@ -58,7 +58,7 @@ async function mixAudio(sfx, music, duration) {
   const mb = musicUrl ? await load(musicUrl) : null;
   if (mb) { const bed = musicBed(mb.getChannelData(0), n, SR, sfx); for (let i = 0; i < n; i++) mix[i] += bed[i]; }
   if (!sfx?.length && !mb) return null;
-  masterTrack(mix, SR, { target: mb ? -12.5 : -18.5 });   // same mastering as the server MP4 (gentler when there is no music)
+  masterTrack(mix, SR, { target: mb ? -15 : -18.5 });   // same mastering as the server MP4 (gentler when there is no music)
   return mix;
 }
 

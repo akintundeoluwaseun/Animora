@@ -88,18 +88,25 @@ export function composeStory({ facts: f, duration, seed, look: lookId, aspect, o
   const L = { id: lookId, ...LOOKS[lookId] };
   const head = f.heads[0] || f.name;
   const cuts = new Set(f.cutouts || []);
-  const photos = f.photos.map((url) => ({ url, fit: f.fits[url] || 'cover', cut: cuts.has(url), pos: `${45 + Math.round(r() * 10)}% ${40 + Math.round(r() * 20)}%` }));
+  // how much of each picture survives a full-screen crop at this size (1 = all of it; unknown sizes count as fine)
+  const [aw, ah] = String(aspect || '9:16').split(':').map(Number), rb = aw / ah || 9 / 16;
+  const keptAt = (ri, box) => (ri ? Math.min(ri / box, box / ri) : 1);
+  const photos = f.photos.map((url) => ({ url, ratio: (f.ratios || {})[url] || 0, fit: f.fits[url] || 'cover', cut: cuts.has(url), pos: `${45 + Math.round(r() * 10)}% ${40 + Math.round(r() * 20)}%` }));
   const beats = [];
   const add = (type, data, keep, v, extra = {}) => beats.push({ type, data, keep, v, ...extra });
   const keyWord = (t) => String(t).split(/\s+/).map((w) => w.replace(/[^\p{L}\p{N}&'-]/gu, '')).filter(Boolean).sort((x, y) => y.length - x.length)[0] || f.name;
   // the opening: a photo when there is a good one (full, split, magazine cover or photo-in-type), otherwise type (plain or stacked blocks)
-  const p0 = photos.find((p) => p.fit === 'cover' && !p.cut) || null;
+  photos.forEach((p) => { p.full = keptAt(p.ratio, rb); });
+  // the opening picture: the one that fills this frame best
+  const p0 = photos.filter((p) => p.fit === 'cover' && !p.cut).sort((a, b) => (b.full >= 0.55) - (a.full >= 0.55))[0] || null;
   let hookType = 'hook', hookV = 'type';
   if (p0) {
-    hookV = pick(['full', 'full', 'split']);
+    // a picture that would lose most of itself full screen (a wide shot in a tall frame) opens as a split instead
+    const fillsFrame = p0.full >= 0.55;
+    hookV = fillsFrame ? pick(['full', 'full', 'split']) : 'split';
     const roll = r();
-    if (L.id === 'editorial' && roll < 0.4) hookType = 'cover';
-    else if ((L.id === 'noir' || L.id === 'clean' || L.id === 'fresh') && roll < 0.35) hookType = 'matte';
+    if (fillsFrame && L.id === 'editorial' && roll < 0.4) hookType = 'cover';
+    else if (fillsFrame && (L.id === 'noir' || L.id === 'clean' || L.id === 'fresh') && roll < 0.35) hookType = 'matte';
   } else if (['bold', 'fresh', 'tech'].includes(L.id) && r() < 0.55) hookType = 'stack';
   const feats = f.features.slice(0, 4);
   const word = f.name.length <= 12 ? f.name : keyWord(head);
@@ -119,7 +126,9 @@ export function composeStory({ facts: f, duration, seed, look: lookId, aspect, o
     if (f.appy && !usedPhone && p.fit === 'cover') { usedPhone = true; return add('phone', { photo: p.url, fit: p.fit, caption: caption || head, cta: f.cta }, keep); }
     const q = rest.find((x) => !x.cut);
     if (q && r() < 0.5) { rest.splice(rest.indexOf(q), 1); return add('pip', { photo: p.url, fit: p.fit, pos: p.pos, photo2: q.url, fit2: q.fit, caption, label }, keep); }
-    add('photo', { photo: p.url, fit: p.fit, pos: p.pos, caption, label, treat: L.id === 'bold' ? pick(['duotone', 'halftone', 'none']) : 'none' }, keep, forceV || pick(['full', 'frame']));
+    // full screen only when the picture keeps most of itself at this size; otherwise it sits in a frame shaped like it
+    const v = p.full < 0.55 ? 'frame' : forceV || pick(['full', 'frame']);
+    add('photo', { photo: p.url, fit: p.fit, pos: p.pos, caption, label, treat: L.id === 'bold' ? pick(['duotone', 'halftone', 'none']) : 'none' }, keep, v);
   };
   let used = 0;
   photoBeat(hookType === 'hook' && hookV === 'type' ? (f.sub && f.sub !== head ? f.sub : '') : '', f.category || '', 6);
@@ -142,7 +151,7 @@ export function composeStory({ facts: f, duration, seed, look: lookId, aspect, o
   if (f.place && !f.when) ideas.push(() => ({ type: 'info', data: { place: f.place }, keep: 3 }));
   if (f.heads[1] && f.heads[1] !== head) ideas.push(() => ({ type: 'statement', data: { text: f.heads[1], label: f.name }, keep: 3 }));
   if (f.sub && f.sub !== head && hookV !== 'type') ideas.push(() => ({ type: 'statement', data: { text: f.sub, label: f.name }, keep: 3 }));
-  photos.forEach((p, i) => ideas.push(() => (p.cut ? { type: 'popout', data: { photo: p.url, caption: feats[(i + 1) % Math.max(1, feats.length)] || '', label: f.name }, keep: 2 } : { type: 'photo', data: { photo: p.url, fit: p.fit, pos: `${30 + Math.round(r() * 40)}% ${30 + Math.round(r() * 40)}%`, caption: feats[(i + 1) % Math.max(1, feats.length)] || '', label: f.name }, keep: 2, v: pick(['frame', 'full']) })));
+  photos.forEach((p, i) => ideas.push(() => (p.cut ? { type: 'popout', data: { photo: p.url, caption: feats[(i + 1) % Math.max(1, feats.length)] || '', label: f.name }, keep: 2 } : { type: 'photo', data: { photo: p.url, fit: p.fit, pos: `${30 + Math.round(r() * 40)}% ${30 + Math.round(r() * 40)}%`, caption: feats[(i + 1) % Math.max(1, feats.length)] || '', label: f.name }, keep: 2, v: p.full < 0.55 ? 'frame' : pick(['frame', 'full']) })));
   feats.forEach((x) => ideas.push(() => ({ type: 'statement', data: { text: x, label: f.category || f.name }, keep: 2 })));
   priced.forEach((p) => ideas.push(() => ({ type: 'products', data: { items: [p], title: 'Prices' }, keep: 2, v: 'hero' })));
   if (f.offer) ideas.push(() => ({ type: 'offer', data: { offer: f.offer, label: 'Special offer' }, keep: 2, surface: 'accent' }));

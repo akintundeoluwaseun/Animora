@@ -89,7 +89,7 @@ export function masterTrack(x, sr, { target = -14 } = {}) {
  *  - faded in quickly and out over the last 2 seconds;
  *  - gently ducked (about -3.5 dB) under each sound effect so whooshes and chimes read clearly.
  */
-export function musicBed(music, n, sr, events = [], { timeScale = 1, level = -28 } = {}) {
+export function musicBed(music, n, sr, events = [], { timeScale = 1, level = -34 } = {}) {
   const out = new Float32Array(n);
   const len = music.length; if (!len) return out;
   // loudness-ish level: RMS over the first minute
