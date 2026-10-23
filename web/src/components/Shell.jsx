@@ -69,20 +69,20 @@ function SiteBar({ onCreate }) {
     on(); window.addEventListener('scroll', on, { passive: true });
     return () => window.removeEventListener('scroll', on);
   }, []);
-  const link = ({ isActive }) => `rounded-lg px-3 py-2 text-[15px] font-medium transition-colors ${isActive ? 'text-white' : 'text-white/60 hover:text-white'}`;
+  const link = ({ isActive }) => `rounded-lg px-3 py-2 text-[15px] font-medium transition-colors ${isActive ? 'text-ink' : 'text-ink-mute hover:text-ink'}`;
   return (
-    <header className={`sticky top-0 z-40 transition-colors ${solid ? 'bg-[#0B0A12]/85 backdrop-blur-xl border-b border-white/8' : 'bg-[#0B0A12] border-b border-transparent'}`}>
+    <header className={`sticky top-0 z-40 transition-colors site-bar ${solid ? 'site-bar-solid' : ''}`}>
       <div className="mx-auto flex h-16 max-w-[1180px] items-center gap-2 px-6 sm:px-10">
-        <Logo light />
+        <Logo />
         <nav className="ml-8 hidden items-center gap-1 sm:flex" aria-label="Main">
           <NavLink to="/styles" className={link}>Styles</NavLink>
           <NavLink to="/pricing" className={link}>Pricing</NavLink>
           {!user && <NavLink to="/videos" className={link}>My work</NavLink>}
         </nav>
         <div className="ml-auto flex items-center gap-2">
-          <ThemeToggle onDark />
-          {user && <Link to={lastLib()} className="rounded-lg px-3 py-2 text-[15px] font-medium text-white/70 hover:text-white">My work</Link>}
-          <button onClick={onCreate} className="press flex h-10 items-center gap-1.5 rounded-[10px] bg-white px-4 text-[15px] font-semibold text-ink hover:bg-white/90"><Icon k="plus" size={17} />Create</button>
+          <ThemeToggle />
+          {user && <Link to={lastLib()} className="rounded-lg px-3 py-2 text-[15px] font-medium text-ink-soft hover:text-ink">My work</Link>}
+          <button onClick={onCreate} className="press flex h-10 items-center gap-1.5 rounded-[10px] bg-ink px-4 text-[15px] font-semibold text-white hover:opacity-90"><Icon k="plus" size={17} />Create</button>
         </div>
       </div>
     </header>

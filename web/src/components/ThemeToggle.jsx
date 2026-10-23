@@ -6,13 +6,14 @@ export const currentTheme = () => (typeof document !== 'undefined' && document.d
 export function applyTheme(t) {
   document.documentElement.dataset.theme = t;
   try { localStorage.setItem(KEY, t); } catch { /* private mode: it still works for this visit */ }
-  const m = document.querySelector('meta[name="theme-color"]'); if (m) m.setAttribute('content', t === 'dark' ? '#08070F' : '#08070F');
+  const m = document.querySelector('meta[name="theme-color"]'); if (m) m.setAttribute('content', t === 'dark' ? '#0B0A12' : '#F7F6FD');
 }
 // first paint: the saved choice, otherwise the device's own light/dark setting
 export function initTheme() {
   const saved = read();
   const t = saved || (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
   document.documentElement.dataset.theme = t;
+  const m = document.querySelector('meta[name="theme-color"]'); if (m) m.setAttribute('content', t === 'dark' ? '#0B0A12' : '#F7F6FD');
 }
 
 export default function ThemeToggle({ className = '', onDark = false }) {

@@ -14,15 +14,15 @@ const STEPS = [
 function StartCard({ kind }) {
   const flyer = kind === 'flyer';
   return (
-    <Link to={`/new/${kind}`} className={`press group flex items-center gap-3.5 rounded-2xl p-3.5 pr-4 transition-colors ${flyer ? 'bg-white/[0.06] ring-1 ring-white/12 hover:bg-white/[0.1]' : 'bg-white text-ink hover:bg-white/90'}`}>
-      <span className={`grid size-12 shrink-0 place-items-center rounded-xl text-white ${flyer ? 'bg-flyer' : 'bg-video'}`}>
+    <Link to={`/new/${kind}`} className={`press group flex items-center gap-3.5 rounded-2xl p-3.5 pr-4 transition-colors ${flyer ? 'home-card-alt' : 'bg-video text-white hover:brightness-110'}`}>
+      <span className={`grid size-12 shrink-0 place-items-center rounded-xl text-white ${flyer ? 'bg-flyer' : 'bg-white/18'}`}>
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{flyer ? <path d="M5 3h14v18H5zM8 15l3-3 2 2 3-3M9 7.5h.01" /> : <path d="M4 5h16v14H4zM10 9l5 3-5 3z" />}</svg>
       </span>
       <span className="min-w-0 flex-1 leading-tight">
         <b className="block text-[17px] font-semibold tracking-[-0.02em]">{flyer ? 'Make a flyer' : 'Make a video'}</b>
-        <span className={`mt-0.5 block text-[13px] ${flyer ? 'text-white/55' : 'text-ink-mute'}`}>{flyer ? 'A still design to post or print' : 'Motion ad, downloads as MP4'}</span>
+        <span className={`mt-0.5 block text-[13px] ${flyer ? 'text-ink-mute' : 'text-white/75'}`}>{flyer ? 'A still design to post or print' : 'Motion ad, downloads as MP4'}</span>
       </span>
-      <span aria-hidden="true" className={`text-lg transition-transform group-hover:translate-x-0.5 ${flyer ? 'text-white/50' : 'text-ink-mute'}`}>→</span>
+      <span aria-hidden="true" className={`text-lg transition-transform group-hover:translate-x-0.5 ${flyer ? 'text-ink-mute' : 'text-white/70'}`}>→</span>
     </Link>
   );
 }
@@ -40,18 +40,18 @@ export default function Home() {
 
   return (
     <div>
-      <section className="bg-[#0B0A12] text-white">
+      <section className="home-hero">
         <div className="mx-auto grid max-w-[1180px] items-center gap-12 px-6 py-16 sm:px-10 lg:grid-cols-[minmax(0,1fr)_380px] lg:py-24">
           <div>
             <h1 className="max-w-[14ch] text-[2.75rem] font-bold leading-[1] tracking-[-0.045em] sm:text-[4.25rem]">Motion-design video ads for your business.</h1>
-            <p className="mt-6 max-w-[46ch] text-lg leading-relaxed text-white/65">
+            <p className="mt-6 max-w-[46ch] text-lg leading-relaxed text-ink-soft">
               Tell Animora about your business. Its AI director plans every shot, and you download a finished MP4 in a few minutes. Need something to post or print? It designs flyers too.
             </p>
             <div className="mt-9 grid max-w-[520px] gap-3 sm:grid-cols-2">
               <StartCard kind="video" />
               <StartCard kind="flyer" />
             </div>
-            <Link to="/styles" className="mt-5 inline-flex items-center gap-1.5 text-[15px] font-semibold text-white/60 hover:text-white">Browse all the styles <span aria-hidden="true">→</span></Link>
+            <Link to="/styles" className="mt-5 inline-flex items-center gap-1.5 text-[15px] font-semibold text-ink-mute hover:text-ink">Browse all the styles <span aria-hidden="true">→</span></Link>
           </div>
           <figure className="mx-auto w-full max-w-[380px]" aria-label="Frames from videos made with Animora">
             <div className="ring-stage" aria-hidden="true">
@@ -64,7 +64,7 @@ export default function Home() {
               </div>
               <div className="ring-floor" />
             </div>
-            <figcaption className="mt-2 text-center text-sm text-white/45">{reel.length ? `${reel.length} of the ${styles.length} looks, all made with Animora` : '\u00a0'}</figcaption>
+            <figcaption className="mt-2 text-center text-sm text-ink-mute">{reel.length ? `${reel.length} of the ${styles.length} looks, all made with Animora` : '\u00a0'}</figcaption>
           </figure>
         </div>
       </section>
