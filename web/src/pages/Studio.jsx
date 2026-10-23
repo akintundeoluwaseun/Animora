@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import { motion } from 'motion/react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { api, ASPECTS, duration, shrinkImage } from '../lib.jsx';
-import { Alert, Button, Modal, PageLoader, Spinner } from '../components/ui.jsx';
+import { Alert, Button, Modal, PageLoader, ProjectTabs, Spinner } from '../components/ui.jsx';
 import MicButton from '../components/MicButton.jsx';
 import { FullView, LivePreview, goFull } from '../components/Preview.jsx';
 import VoicePanel from '../components/VoicePanel.jsx';
@@ -351,6 +351,7 @@ export default function Studio() {
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-5">
+      <ProjectTabs project={project} current="edit" className="mb-4" />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2"><KindBadge kind={project.kind} className="shrink-0" /><h1 className="truncate text-xl font-extrabold sm:text-2xl">{project.title}</h1></div>

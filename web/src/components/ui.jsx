@@ -171,6 +171,28 @@ export function Nav() {
   );
 }
 
+// Chat / Edit / Video: move between a project's pages at any time, so the questions and the edits are never lost behind you.
+export function ProjectTabs({ project, current, className = '' }) {
+  if (!project?.id || !project.plan) return null;
+  const id = project.id, flyer = project.kind === 'flyer';
+  const tabs = [
+    { key: 'chat', label: 'Chat', to: `/p/${id}/plan`, on: true, d: 'M4 5.5h16v11H10L5.5 20v-3.5H4z' },
+    { key: 'edit', label: 'Edit', to: `/p/${id}/studio`, on: true, d: 'M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4' },
+    !flyer && { key: 'video', label: 'Video', to: `/p/${id}/render`, on: !!project.code, d: 'M4 5h16v14H4zM10 9l5 3-5 3z' },
+  ].filter(Boolean);
+  return (
+    <nav aria-label="Project" className={`project-tabs inline-flex rounded-full border border-ink/10 bg-white p-1 ${className}`}>
+      {tabs.map((t) => {
+        const icon = <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={t.d} /></svg>;
+        const cls = 'flex h-9 items-center gap-1.5 rounded-full px-3.5 text-sm font-semibold transition-colors';
+        if (t.key === current) return <span key={t.key} aria-current="page" className={`${cls} bg-ink text-white`}>{icon}{t.label}</span>;
+        if (!t.on) return <span key={t.key} className={`${cls} text-ink-mute opacity-50`} title="Make the video first">{icon}{t.label}</span>;
+        return <Link key={t.key} to={t.to} className={`press ${cls} text-ink-soft hover:bg-ink/5 hover:text-ink`}>{icon}{t.label}</Link>;
+      })}
+    </nav>
+  );
+}
+
 // Plan -> Preview -> Video progress shown on the three main pages.
 export function Steps({ current, projectId, hasPlan, hasCode }) {
   const steps = [

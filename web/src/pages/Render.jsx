@@ -4,7 +4,7 @@ import { publicMessage } from '../lib/errors.js';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { api, ASPECTS, clock, duration, naira, useAuth, usePolling } from '../lib.jsx';
-import { Alert, Button, Modal, PageLoader, Spinner } from '../components/ui.jsx';
+import { Alert, Button, Modal, PageLoader, ProjectTabs, Spinner } from '../components/ui.jsx';
 import { VideoPhone } from '../components/Preview.jsx';
 import { downloadVideo, fetchVideo } from '../lib/videoFile.js';
 
@@ -194,6 +194,7 @@ export default function Render() {
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-5">
+      <ProjectTabs project={project} current="video" className="mb-4" />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="truncate text-xl font-extrabold sm:text-2xl">{project.title}</h1>
       </div>

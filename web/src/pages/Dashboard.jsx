@@ -135,6 +135,7 @@ export function KindBadge({ kind, className = '' }) {
 
 // The ⋯ menu on a tile: make the MP4, make it and download it, download the last one, edit, delete.
 const MI = {
+  chat: <path d="M4 5.5h16v11H10L5.5 20v-3.5H4z" />,
   play: <path d="M7 4.5v15l12-7.5z" />, down: <path d="M12 4v11M7 10.5l5 5 5-5M5 20h14" />, edit: <path d="M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4" />,
   trash: <path d="M5 7h14M10 7V4.5h4V7M7 7l1 13h8l1-13M10.5 11v5.5M13.5 11v5.5" />, full: <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />, more: <path d="M5 12h.01M12 12h.01M19 12h.01" />,
 };
@@ -163,12 +164,13 @@ function TileMenu({ p, onDelete, onFull }) {
     catch { navigate(`/p/${p.id}/render`); } finally { setPct(null); }
   };
   const items = flyer
-    ? [designed && ['Edit flyer', 'edit', () => go(`/p/${p.id}/studio`)], designed && ['Full screen', 'full', () => { setOpen(false); onFull(p); }], !designed && ['Continue', 'edit', () => go(`/p/${p.id}/plan`)]]
+    ? [designed && ['Edit flyer', 'edit', () => go(`/p/${p.id}/studio`)], designed && ['Open chat', 'chat', () => go(`/p/${p.id}/plan`)], designed && ['Full screen', 'full', () => { setOpen(false); onFull(p); }], !designed && ['Continue', 'edit', () => go(`/p/${p.id}/plan`)]]
     : designed
       ? [busy ? ['See progress', 'play', () => go(`/p/${p.id}/render`)] : ['Generate video', 'play', () => go(`/p/${p.id}/render?new=1`)],
         !busy && ['Generate & download', 'down', () => go(`/p/${p.id}/render?new=1&download=1`)],
         done && ['Download MP4', 'down', download],
-        ['Edit video', 'edit', () => go(`/p/${p.id}/studio`)]]
+        ['Edit video', 'edit', () => go(`/p/${p.id}/studio`)],
+        ['Open chat', 'chat', () => go(`/p/${p.id}/plan`)]]
       : [['Continue planning', 'edit', () => go(`/p/${p.id}/plan`)]];
   return (
     <div ref={ref} className="relative ml-auto">

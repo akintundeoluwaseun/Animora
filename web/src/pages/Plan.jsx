@@ -6,7 +6,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { api, ASPECTS, duration, shrinkImage, imageLook } from '../lib.jsx';
-import { Alert, Button, PageLoader, Spinner } from '../components/ui.jsx';
+import { Alert, Button, PageLoader, ProjectTabs, Spinner } from '../components/ui.jsx';
 import MicButton from '../components/MicButton.jsx';
 import { StylePicker } from './Dashboard.jsx';
 
@@ -512,6 +512,7 @@ export default function Plan() {
 
   return (
     <div className="wiz">
+      {project?.plan && <div className="mx-auto flex max-w-6xl justify-center px-4 pt-4"><ProjectTabs project={project} current="chat" /></div>}
 
       <div className="wiz-grid">
         {/* left: where you are */}
