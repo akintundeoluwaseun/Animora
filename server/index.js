@@ -19,7 +19,7 @@ import projectRoutes from './routes/projects.js';
 import renderRoutes from './routes/renders.js';
 import moneyRoutes from './routes/money.js';
 import transcribeRoutes from './routes/transcribe.js';
-import renderJobRoutes from './routes/renderJobs.js';
+import renderJobRoutes, { clearOldVideos } from './routes/renderJobs.js';
 import creditRoutes from './routes/credits.js';
 import adminRoutes from './routes/admin.js';
 
@@ -62,6 +62,8 @@ export async function createApp() {
   // phone notifications (Web Push)
   app.get('/api/push/key', async (req, res, next) => { try { const { publicKey } = await import('./push.js'); res.json({ key: await publicKey() }); } catch (e) { next(e); } });
   app.post('/api/push/subscribe', requireAuth, async (req, res, next) => { try { const { saveSubscription } = await import('./push.js'); await saveSubscription(req.user.id, req.body?.subscription); res.json({ ok: true }); } catch (e) { next(e); } });
+  // once a minute, while the site is in use, expired MP4s and leftovers are deleted (nothing waits for it)
+  app.use('/api', (req, res, next) => { clearOldVideos().catch((e) => console.warn('[renders] cleanup:', e.message)); next(); });
   app.use('/api/auth', authRoutes);
   app.use('/api/projects', projectRoutes);
   app.use('/api', renderRoutes);

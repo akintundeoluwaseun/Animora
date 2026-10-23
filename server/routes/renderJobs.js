@@ -8,7 +8,7 @@ import { Router, raw } from 'express';
 import { randomBytes } from 'node:crypto';
 import { config } from '../config.js';
 import { one, q } from '../db/index.js';
-import { putObject, getDbObject } from '../storage.js';
+import { putObject, getDbObject, deleteObjects, keyOf } from '../storage.js';
 import { settleRender, refundRender } from '../billing.js';
 import { notifyUser } from '../push.js';
 
@@ -68,6 +68,8 @@ r.post('/render-jobs/:id/part/:n', raw({ type: '*/*', limit: '4.4mb' }), async (
 r.post('/render-jobs/:id/thumb', raw({ type: '*/*', limit: '1mb' }), async (req, res) => {
   const j = await job(req, res); if (!j) return;
   const url = await putObject(`renders/${j.id}.jpg`, req.body, 'image/jpeg');
+  const old = await one('SELECT thumbnail_url FROM projects WHERE id=$1', [j.project_id]).catch(() => null);
+  if (old?.thumbnail_url && old.thumbnail_url !== url) await deleteObjects([keyOf(old.thumbnail_url)]);   // only the newest cover is kept
   await q('UPDATE renders SET thumbnail_url=$2 WHERE id=$1', [j.id, url]);
   await q('UPDATE projects SET thumbnail_url=$2 WHERE id=$1', [j.project_id, url]);
   res.json({ ok: true });
@@ -95,26 +97,31 @@ r.post('/render-jobs/:id/fail', async (req, res) => {
   res.json({ ok: true });
 });
 
-// Keep the free database small: an MP4 is cleared 2 hours after it was downloaded, or 1 day after it was made
-// if nobody downloaded it. The video's design (its code) stays, so the owner can make the MP4 again for free.
-const AFTER_DOWNLOAD_H = Number(process.env.MP4_KEEP_AFTER_DOWNLOAD_HOURS) || 2;
-const KEEP_H = Number(process.env.MP4_KEEP_HOURS) || 24;
+// Nothing is kept: an MP4 lives for a few minutes after it is made (5 by default), long enough to download it,
+// then it is deleted. While a download is still running it waits for it to finish. The video's design (its code)
+// stays, so the owner can make the same MP4 again, free, whenever they want it.
+export const KEEP_MIN = Number(process.env.MP4_KEEP_MINUTES) || 5;
+const GRACE_MIN = 2;   // after the last piece was sent, so a slow download is never cut off
 let lastSweep = 0;
 export async function clearOldVideos({ force = false } = {}) {
-  if (!force && Date.now() - lastSweep < 10 * 60 * 1000) return;   // at most every 10 minutes
+  if (!force && Date.now() - lastSweep < 60 * 1000) return;   // at most once a minute
   lastSweep = Date.now();
-  const old = await q(`SELECT id FROM renders WHERE status='done' AND chunk_count > 0 AND (
-      (downloaded_at IS NOT NULL AND downloaded_at < now() - ($1 || ' hours')::interval)
-      OR finished_at < now() - ($2 || ' hours')::interval) LIMIT 100`, [String(AFTER_DOWNLOAD_H), String(KEEP_H)]);
+  const old = await q(`SELECT id FROM renders WHERE status='done' AND finished_at < now() - ($1 || ' minutes')::interval
+      AND (served_at IS NULL OR served_at < now() - ($2 || ' minutes')::interval) LIMIT 200`, [String(KEEP_MIN), String(GRACE_MIN)]);
   for (const { id } of old) {
-    await q("DELETE FROM files WHERE key LIKE $1", [`renders/${id}.mp4%`]);
+    await deleteObjects([], { prefix: `renders/${id}.mp4` });
     // expired quietly: no "failed", no message; the project simply goes back to "ready" (its design is kept)
-    const x = await one("UPDATE renders SET status='failed', chunk_count=0, video_url=NULL, error='expired' WHERE id=$1 RETURNING project_id", [id]);
+    const x = await one("UPDATE renders SET status='failed', chunk_count=0, video_url=NULL, error='expired', code_html='' WHERE id=$1 RETURNING project_id", [id]);
     if (x) await q("UPDATE projects SET status='ready' WHERE id=$1 AND status='rendered' AND NOT EXISTS (SELECT 1 FROM renders WHERE project_id=$1 AND status='done')", [x.project_id]);
   }
-  // older MP4s cleared before this change: tidy their projects too
+  // pieces left by renders that failed, were cancelled or got stuck: nobody can download them, so they go too
+  await q(`DELETE FROM files f WHERE f.key LIKE 'renders/%.mp4%' AND NOT EXISTS (
+      SELECT 1 FROM renders r WHERE r.id::text = split_part(substr(f.key, 9), '.', 1)
+        AND (r.status = 'done' OR (r.status IN ('queued','rendering') AND r.created_at > now() - interval '2 hours')))`).catch(() => {});
+  // finished-with renders don't need their copy of the video code any more
+  await q("UPDATE renders SET code_html='' WHERE status IN ('failed','cancelled') AND code_html <> '' AND (finished_at IS NULL OR finished_at < now() - interval '10 minutes')").catch(() => {});
   await q("UPDATE projects p SET status='ready' WHERE status='rendered' AND NOT EXISTS (SELECT 1 FROM renders r WHERE r.project_id=p.id AND r.status='done')").catch(() => {});
-  if (old.length) console.log(`[renders] cleared ${old.length} old MP4(s)`);
+  if (old.length) console.log(`[renders] cleared ${old.length} MP4(s)`);
 }
 
 // The finished MP4, served in ranges of at most 4 MB (players and our download button ask for the next part).
@@ -135,13 +142,12 @@ r.get('/render-file/:id', async (req, res) => {
     chunks.push(f.data.subarray(Math.max(0, start - s0), Math.min(f.data.length, end - s0 + 1)));
   }
   const body = Buffer.concat(chunks);
-  if (end >= size - 1 && req.query.dl) {   // the last part of a Download / Share went out
-    q('UPDATE renders SET downloaded_at=now() WHERE id=$1 AND downloaded_at IS NULL', [j.id]).catch(() => {});
-  }
+  // every piece sent pushes the clean-up back a little, so a download in progress is never cut off
+  q(`UPDATE renders SET served_at=now()${end >= size - 1 && req.query.dl ? ', downloaded_at=COALESCE(downloaded_at, now())' : ''} WHERE id=$1`, [j.id]).catch(() => {});
   clearOldVideos().catch(() => {});
   res.status(206).set({
     'Content-Type': 'video/mp4', 'Accept-Ranges': 'bytes', 'Content-Range': `bytes ${start}-${start + body.length - 1}/${size}`,
-    'Content-Length': body.length, 'Cache-Control': 'public, max-age=31536000, immutable', 'CDN-Cache-Control': 'public, max-age=31536000, immutable', 'Access-Control-Allow-Origin': '*',
+    'Content-Length': body.length, 'Cache-Control': 'private, max-age=600', 'CDN-Cache-Control': 'no-store', 'Access-Control-Allow-Origin': '*',
   }).send(body);
 });
 

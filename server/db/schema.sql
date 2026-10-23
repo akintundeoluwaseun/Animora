@@ -265,3 +265,8 @@ ALTER TABLE app_state ENABLE ROW LEVEL SECURITY;
 
 -- v11: when the owner downloaded the MP4 (it is cleared 2 hours later; the design stays)
 ALTER TABLE renders ADD COLUMN IF NOT EXISTS downloaded_at timestamptz;
+
+-- v12: MP4s are deleted 5 minutes after they are made. served_at: the last piece sent (a download in progress is never cut off).
+-- code_md5: which version of the video the MP4 was, so making the same one again after it expired is free.
+ALTER TABLE renders ADD COLUMN IF NOT EXISTS served_at timestamptz;
+ALTER TABLE renders ADD COLUMN IF NOT EXISTS code_md5 text;

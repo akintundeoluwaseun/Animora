@@ -1,6 +1,6 @@
 // File storage for uploads and finished MP4s.
 // Supabase Storage when SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY are set, local disk otherwise.
-import { mkdir, writeFile, readFile, copyFile } from 'node:fs/promises';
+import { mkdir, writeFile, readFile, copyFile, readdir, unlink } from 'node:fs/promises';
 import path from 'node:path';
 import { config } from './config.js';
 import { q, one } from './db/index.js';
@@ -56,6 +56,38 @@ export async function putObject(key, source, contentType) {
   });
   if (!res.ok) throw new Error(`Upload failed (${res.status}): ${(await res.text()).slice(0, 200)}`);
   return `${config.supabaseUrl}/storage/v1/object/public/${config.supabaseBucket}/${key}`;
+}
+
+/** The storage key behind one of our file URLs (null for outside links). */
+export function keyOf(url) {
+  const s = String(url || '');
+  const m = s.match(/\/files\/(.+)$/) || s.match(/\/storage\/v1\/object\/public\/[^/]+\/(.+)$/);
+  return m ? decodeURIComponent(m[1].split('?')[0]) : null;
+}
+
+/** Delete stored files: exact keys, or every key that starts with a prefix ({ prefix: 'renders/abc.mp4' }). Never throws. */
+export async function deleteObjects(keys = [], { prefix = null } = {}) {
+  keys = keys.filter(Boolean);
+  try {
+    if (config.storageMode === 'db') {
+      if (keys.length) await q('DELETE FROM files WHERE key = ANY($1)', [keys]);
+      if (prefix) await q('DELETE FROM files WHERE key LIKE $1', [prefix.replace(/[%_]/g, '\\$&') + '%']);
+      return;
+    }
+    if (config.storageMode === 'local') {
+      for (const k of keys) await unlink(localPathFor(k)).catch(() => {});
+      if (prefix) {
+        const dir = path.dirname(localPathFor(prefix)), base = path.basename(prefix);
+        for (const f of await readdir(dir).catch(() => [])) if (f.startsWith(base)) await unlink(path.join(dir, f)).catch(() => {});
+      }
+      return;
+    }
+    if (keys.length) {
+      await fetch(`${config.supabaseUrl}/storage/v1/object/${config.supabaseBucket}`, {
+        method: 'DELETE', headers: supabaseHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify({ prefixes: keys }),
+      });
+    }
+  } catch (e) { console.warn('[storage] delete:', e.message); }
 }
 
 /** Read a file stored in the database (storage mode 'db'). */

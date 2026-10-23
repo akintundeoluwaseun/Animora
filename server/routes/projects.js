@@ -3,7 +3,7 @@ import multer from 'multer';
 import { randomBytes } from 'node:crypto';
 import { one, q } from '../db/index.js';
 import { requireAuth } from '../auth.js';
-import { putObject } from '../storage.js';
+import { putObject, deleteObjects, keyOf } from '../storage.js';
 import { waitUntil } from '@vercel/functions';
 import { notifyUser } from '../push.js';
 import { chatTurn, generateCode, editCode, limitsFor, aiMode } from '../ai/index.js';
@@ -151,9 +151,13 @@ r.patch('/:id', async (req, res) => {
 
 r.delete('/:id', async (req, res) => {
   const p = await loadProject(req, res); if (!p) return;
-  // its MP4s and thumbnails go too, so deleted videos don't keep using the free database space
+  // everything it stored goes too (MP4s, thumbnails, pictures, music, narration), so nothing is left using space
   const rs = await q('SELECT id FROM renders WHERE project_id=$1', [p.id]).catch(() => []);
-  for (const { id } of rs) await q('DELETE FROM files WHERE key LIKE $1', [`renders/${id}.%`]).catch(() => {});
+  for (const { id } of rs) await deleteObjects([], { prefix: `renders/${id}.` });
+  // pictures shared with another project (a flyer made from a video copies them) stay for that one
+  const files = await q('SELECT a.url FROM assets a WHERE a.project_id=$1 AND NOT EXISTS (SELECT 1 FROM assets b WHERE b.url=a.url AND b.project_id<>$1)', [p.id]).catch(() => []);
+  await deleteObjects([...files.map((a) => keyOf(a.url)), keyOf(p.voice_url), keyOf(p.thumbnail_url)]);
+  await deleteObjects([], { prefix: `thumbs/${p.id}-` }); await deleteObjects([], { prefix: `voice/${p.id}-` });
   await q('DELETE FROM renders WHERE project_id=$1', [p.id]).catch(() => {});
   await q('DELETE FROM projects WHERE id=$1', [p.id]);
   res.json({ ok: true });
@@ -208,12 +212,15 @@ r.post('/:id/thumbnail', upload.single('file'), async (req, res) => {
   if (!req.file || !/^image\/(jpeg|png|webp)$/.test(req.file.mimetype) || req.file.size > 600e3) return res.status(400).json({ error: 'Bad thumbnail' });
   const url = await putObject(`thumbs/${p.id}-${randomBytes(3).toString('hex')}.jpg`, req.file.buffer, req.file.mimetype);
   await q('UPDATE projects SET thumbnail_url=$2 WHERE id=$1', [p.id, url]);
+  if (p.thumbnail_url && p.thumbnail_url !== url) await deleteObjects([keyOf(p.thumbnail_url)]);   // only the newest cover is kept
   res.json({ thumbnailUrl: url });
 });
 
 r.delete('/:id/assets/:assetId', async (req, res) => {
   const p = await loadProject(req, res); if (!p) return;
-  await q('DELETE FROM assets WHERE id=$1 AND project_id=$2', [req.params.assetId, p.id]);
+  const a = await one('DELETE FROM assets WHERE id=$1 AND project_id=$2 RETURNING url', [req.params.assetId, p.id]);
+  // the file goes too, unless the video or flyer already made still shows it
+  if (a?.url && !String(p.code_html || '').includes(a.url) && !(await one('SELECT 1 AS x FROM assets WHERE url=$1 LIMIT 1', [a.url]))) await deleteObjects([keyOf(a.url)]);
   res.json({ ok: true });
 });
 
@@ -430,8 +437,10 @@ r.get('/:id/voiceover', async (req, res) => {
 
 async function saveVoice(p, mp3, duration, source) {
   const url = await putObject(`voice/${p.id}-${Date.now()}.mp3`, mp3, 'audio/mpeg');
-  return one(`UPDATE projects SET voice_url=$2, voice_duration=$3, voice_source=$4, fit_to_voice=false, updated_at=now() WHERE id=$1 RETURNING *`,
+  const u = await one(`UPDATE projects SET voice_url=$2, voice_duration=$3, voice_source=$4, fit_to_voice=false, updated_at=now() WHERE id=$1 RETURNING *`,
     [p.id, url, duration, source]);
+  if (p.voice_url && p.voice_url !== url) await deleteObjects([keyOf(p.voice_url)]);   // the old narration is replaced, not kept
+  return u;
 }
 
 r.post('/:id/voiceover/generate', async (req, res) => {
@@ -490,6 +499,7 @@ r.patch('/:id/voiceover', async (req, res) => {
 r.delete('/:id/voiceover', async (req, res) => {
   const p = await loadProject(req, res); if (!p) return;
   const u = await one('UPDATE projects SET voice_url=NULL, voice_duration=NULL, voice_source=NULL, fit_to_voice=false WHERE id=$1 RETURNING *', [p.id]);
+  if (p.voice_url) await deleteObjects([keyOf(p.voice_url)]);
   res.json({ project: shape(u) });
 });
 

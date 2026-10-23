@@ -147,6 +147,16 @@ export default function Render() {
   }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const active = render && ['queued', 'rendering'].includes(render.status);
+  // the MP4 is only kept a few minutes: count down, then show "Make your MP4" again (free)
+  const [now, setNow] = useState(Date.now());
+  const expiresAt = render?.status === 'done' && render.expiresAt ? new Date(render.expiresAt).getTime() : 0;
+  useEffect(() => { if (!expiresAt) return undefined; const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, [expiresAt]);
+  const left = expiresAt ? Math.max(0, Math.round((expiresAt - now) / 1000)) : null;
+  useEffect(() => {
+    if (left !== 0 || !render) return;
+    const t = setTimeout(() => { loadRender(render.id).then(() => api(`/projects/${id}/render-check`).then(setCheck)).catch(() => {}); }, 150 * 1000);   // a download still running keeps it a little longer
+    return () => clearTimeout(t);
+  }, [left === 0]); // eslint-disable-line react-hooks/exhaustive-deps
   // "Generate & download" from the library: save the MP4 as soon as it is ready
   const autoDl = useRef(false);
   useEffect(() => {
@@ -221,6 +231,11 @@ export default function Render() {
                   : <Button as={Link} to={`/p/${id}/studio`} variant="outline" size="lg">Open narration script</Button>)}
                 {canShare && <Button variant="outline" size="lg" onClick={async () => setCanShare(await shareVideo(render, project.title))}>Share to WhatsApp</Button>}
               </div>
+              {left !== null && (
+                <p className={`mt-4 rounded-xl px-3.5 py-2.5 text-sm font-semibold ${left > 60 ? 'bg-lilac text-ink-soft' : 'bg-alert/10 text-alert'}`} role="status">
+                  {left > 0 ? `Download it now: this MP4 is deleted in ${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}. You can make it again for free.` : 'This MP4 is being deleted. Make it again any time, for free.'}
+                </p>
+              )}
               {scriptError && <p className="mt-2 text-sm text-alert">Could not load the narration script: {scriptError}</p>}
               {!canShare && <p className="mt-2 text-sm text-ink-mute">Sharing isn't supported on this device. Download the MP4, then post it from your gallery.</p>}
               <div className="mt-10 flex flex-wrap gap-3 border-t border-ink/10 pt-6">
@@ -236,6 +251,8 @@ export default function Render() {
             {render?.status === 'failed' && <div className="mb-4"><Alert>{publicMessage(render.error)}</Alert></div>}
             <div className="surface p-6 sm:p-8">
               <h2 className="text-2xl font-extrabold">Make your MP4</h2>
+              {check.redo && <p className="mt-2 text-sm font-semibold text-money">Free: you made this video before. Its MP4 was deleted to save space, so it's made again at no cost.</p>}
+              <p className="mt-2 text-sm text-ink-mute">MP4s are kept for {check.keepMinutes || 5} minutes after they're ready, so download it straight away.</p>
               <dl className="mt-5 space-y-3 text-[15px]">
                 <div className="flex justify-between"><dt className="text-ink-soft">Length</dt><dd className="font-semibold">{duration(project.durationSeconds)}</dd></div>
                 <div className="flex justify-between gap-3"><dt className="text-ink-soft">Audio</dt><dd className="text-right font-semibold">{project.sfx === false ? 'None (sound is off)' : 'Included, as in the preview'}</dd></div>

@@ -27,6 +27,13 @@ export function renderAllowance(user, durationSeconds) {
   return { ok: true, needsAd: proLeft === 0, proLeft };
 }
 
+/** Was this exact version of the video made before and deleted after its few minutes? Then making it again is free. */
+export async function freeRedo(userId, project) {
+  if (!project?.code_html) return null;
+  return one(`SELECT id, paid_via FROM renders WHERE project_id=$1 AND user_id=$2 AND error='expired' AND code_md5=md5($3)
+    ORDER BY created_at DESC LIMIT 1`, [project.id, userId, project.code_html]).catch(() => null);
+}
+
 /** Start an ad view: pick an active ad (round robin by least shown). */
 export async function startAdView(user, projectId) {
   const ad = await one(`SELECT a.*, (SELECT count(*) FROM ad_views v WHERE v.ad_id=a.id) AS shown
@@ -56,6 +63,14 @@ export async function completeAdView(user, viewId) {
 export async function createRender(user, project, { adViewId } = {}) {
   if (!project.code_html) throw Object.assign(new Error('Generate the animation code first.'), { status: 400 });
   const outSeconds = project.duration_seconds;
+  // the same video again after its MP4 was deleted: no credit, no ad
+  const redo = await freeRedo(user.id, project);
+  if (redo) {
+    return one(`INSERT INTO renders (project_id, user_id, style_id, code_html, code_md5, aspect_ratio, duration_seconds,
+        total_frames, music_url, voice_url, time_scale, paid_via, ad_view_id, revenue_ngn, sfx_on)
+      VALUES ($1,$2,$3,$4,md5($4),$5,$6,$7,NULL,NULL,1,$8,NULL,0,$9) RETURNING *`,
+    [project.id, user.id, project.style_id, project.code_html, project.aspect_ratio, outSeconds, outSeconds * 30, redo.paid_via, project.sfx_on !== false]);
+  }
   const allowance = renderAllowance(user, outSeconds);
   if (!allowance.ok) throw Object.assign(new Error(allowance.error), { status: 402, code: allowance.code });
 
@@ -82,9 +97,9 @@ export async function createRender(user, project, { adViewId } = {}) {
       viewId = view.id;
     }
 
-    const render = await t.one(`INSERT INTO renders (project_id, user_id, style_id, code_html, aspect_ratio, duration_seconds,
+    const render = await t.one(`INSERT INTO renders (project_id, user_id, style_id, code_html, code_md5, aspect_ratio, duration_seconds,
         total_frames, music_url, voice_url, time_scale, paid_via, ad_view_id, revenue_ngn, sfx_on)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,NULL,NULL,1,$8,$9,$10,$11) RETURNING *`,
+      VALUES ($1,$2,$3,$4,md5($4),$5,$6,$7,NULL,NULL,1,$8,$9,$10,$11) RETURNING *`,
     [project.id, u.id, project.style_id, project.code_html, project.aspect_ratio, outSeconds,
       outSeconds * 30, paidVia, viewId, revenue, project.sfx_on !== false]);
     if (viewId) await t.q('UPDATE ad_views SET render_id=$2 WHERE id=$1', [viewId, render.id]);
@@ -111,7 +126,7 @@ export async function settleRender(renderId) {
 /** Failed/cancelled renders give the video credit back. */
 export async function refundRender(renderId) {
   await q(`UPDATE users SET videos_used_this_month = GREATEST(0, videos_used_this_month - 1)
-    WHERE id = (SELECT user_id FROM renders WHERE id=$1)`, [renderId]);
+    WHERE id = (SELECT user_id FROM renders WHERE id=$1 AND revenue_ngn > 0)`, [renderId]);   // a free re-make used no credit
 }
 
 export function publicPricing() {

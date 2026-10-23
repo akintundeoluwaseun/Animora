@@ -1,10 +1,10 @@
 import { Router } from 'express';
 import { one, q } from '../db/index.js';
 import { requireAuth, publicUser, loadUser } from '../auth.js';
-import { createRender, startAdView, completeAdView, renderAllowance } from '../billing.js';
+import { createRender, startAdView, completeAdView, renderAllowance, freeRedo } from '../billing.js';
 import { queuePosition } from '../worker.js';
 import { config } from '../config.js';
-import { dispatchRender } from './renderJobs.js';
+import { dispatchRender, KEEP_MIN } from './renderJobs.js';
 
 const r = Router();
 r.use(['/projects', '/renders', '/ads'], requireAuth);
@@ -15,16 +15,21 @@ function shape(x, extra = {}) {
     totalFrames: x.total_frames, etaSeconds: x.eta_seconds, videoUrl: x.video_url, thumbnailUrl: x.thumbnail_url,
     fileSize: x.file_size, error: x.error, paidVia: x.paid_via, adViewId: x.ad_view_id, aspectRatio: x.aspect_ratio,
     durationSeconds: x.duration_seconds, createdAt: x.created_at, startedAt: x.started_at, finishedAt: x.finished_at,
-    stale: x.stale === true, ...extra,   // stale: the video has been edited since this MP4 was made
+    stale: x.stale === true,
+    // when this MP4 is deleted (it can be made again, free)
+    expiresAt: x.status === 'done' && x.finished_at ? new Date(new Date(x.finished_at).getTime() + KEEP_MIN * 60e3).toISOString() : null,
+    ...extra,   // stale: the video has been edited since this MP4 was made
   };
 }
 
 // What does the user need to do before rendering this project?
 r.get('/projects/:id/render-check', async (req, res) => {
-  const p = await one(`SELECT id, duration_seconds, code_html IS NOT NULL AS has_code
+  const p = await one(`SELECT id, duration_seconds, code_html, code_html IS NOT NULL AS has_code
     FROM projects WHERE id=$1 AND user_id=$2`, [req.params.id, req.user.id]);
   if (!p) return res.status(404).json({ error: 'Project not found.' });
-  res.json({ ...renderAllowance(req.user, p.duration_seconds), hasCode: p.has_code, user: publicUser(req.user) });
+  const redo = await freeRedo(req.user.id, p);
+  const allow = renderAllowance(req.user, p.duration_seconds);
+  res.json({ ...allow, ...(redo ? { ok: true, needsAd: false, redo: true } : {}), keepMinutes: KEEP_MIN, hasCode: p.has_code, user: publicUser(req.user) });
 });
 
 r.post('/projects/:id/renders', async (req, res) => {
@@ -63,7 +68,7 @@ r.post('/renders/:id/cancel', async (req, res) => {
     WHERE id=$1 AND user_id=$2 AND status IN ('queued','rendering') RETURNING *`, [req.params.id, req.user.id]);
   if (!x) return res.status(400).json({ error: 'This render cannot be cancelled.' });
   // Queued jobs never reach the worker, so give the credit back here. Rendering jobs are refunded by the worker.
-  if (x.started_at === null) await q('UPDATE users SET videos_used_this_month = GREATEST(0, videos_used_this_month-1) WHERE id=$1', [req.user.id]);
+  if (x.started_at === null && Number(x.revenue_ngn) > 0) await q('UPDATE users SET videos_used_this_month = GREATEST(0, videos_used_this_month-1) WHERE id=$1', [req.user.id]);
   res.json({ render: shape(x) });
 });
 

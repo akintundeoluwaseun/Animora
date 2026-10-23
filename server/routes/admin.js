@@ -5,6 +5,7 @@ import { Router } from 'express';
 import { timingSafeEqual } from 'node:crypto';
 import { config } from '../config.js';
 import { q, one } from '../db/index.js';
+import { clearOldVideos } from './renderJobs.js';
 
 const r = Router();
 
@@ -56,6 +57,28 @@ r.get('/admin/stats', adminOnly, async (req, res) => {
     daily: { users: series(uDay), videos: series(vDay), flyers: series(fDay), renders: series(rDay) },
     failures, recent, styles, aspects,
   });
+});
+
+// What is using the database space, and a button to give it back.
+async function storageReport() {
+  const total = await safe(() => one('SELECT pg_database_size(current_database())::bigint AS b'), {});
+  const tables = await safe(() => q(`SELECT relname AS name, pg_total_relation_size(c.oid)::bigint AS bytes FROM pg_class c
+      JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relkind='r' ORDER BY 2 DESC LIMIT 12`), []);
+  const files = await safe(() => q(`SELECT CASE WHEN key LIKE 'renders/%.mp4%' THEN 'MP4 videos' WHEN key LIKE 'renders/%' OR key LIKE 'thumbs/%' THEN 'Covers'
+      WHEN key LIKE 'uploads/%' THEN 'Pictures and music people uploaded' WHEN key LIKE 'voice/%' THEN 'Narration'
+      WHEN key LIKE 'styles/%' THEN 'Style previews' ELSE 'Other' END AS name, count(*)::int AS n, COALESCE(sum(octet_length(data)), 0)::bigint AS bytes
+      FROM files GROUP BY 1 ORDER BY 3 DESC`), []);
+  return { total: num(total.b), tables: tables.map((x) => ({ name: x.name, bytes: num(x.bytes) })), files: files.map((x) => ({ name: x.name, n: x.n, bytes: num(x.bytes) })) };
+}
+
+r.get('/admin/storage', adminOnly, async (req, res) => res.json(await storageReport()));
+
+// Delete expired MP4s and leftovers now, then hand the freed space back (VACUUM FULL rewrites the tables, which takes a moment).
+r.post('/admin/storage/clean', adminOnly, async (req, res) => {
+  const before = await storageReport();
+  await clearOldVideos({ force: true }).catch((e) => console.warn('[admin] clean:', e.message));
+  for (const t of ['files', 'renders']) await q(`VACUUM FULL ${t}`).catch((e) => console.warn('[admin] vacuum', t, e.message));
+  res.json({ before: before.total, ...(await storageReport()) });
 });
 
 export default r;

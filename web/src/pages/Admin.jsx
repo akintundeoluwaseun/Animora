@@ -41,6 +41,44 @@ function List({ title, rows, empty }) {
   );
 }
 
+const size = (b) => (b >= 1e9 ? `${(b / 1e9).toFixed(2)} GB` : b >= 1e6 ? `${(b / 1e6).toFixed(1)} MB` : `${Math.round(b / 1e3)} KB`);
+
+// What is using the database space, and one button that deletes the leftovers and gives the space back.
+function Storage({ adminKey }) {
+  const [st, setSt] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState('');
+  const call = useCallback(async (method) => {
+    const res = await fetch(method === 'POST' ? '/api/admin/storage/clean' : '/api/admin/storage', { method, headers: { 'x-admin-key': adminKey } });
+    if (!res.ok) throw new Error('Could not read the storage.');
+    return res.json();
+  }, [adminKey]);
+  useEffect(() => { call('GET').then(setSt).catch((e) => setMsg(e.message)); }, [call]);
+  const clean = async () => {
+    setBusy(true); setMsg('');
+    try { const j = await call('POST'); setSt(j); setMsg(j.before > j.total ? `Freed ${size(j.before - j.total)}.` : 'Already clean.'); }
+    catch (e) { setMsg(e.message); } finally { setBusy(false); }
+  };
+  return (
+    <section className="mt-5 rounded-[14px] border border-ink/10 bg-white p-4" aria-label="Storage">
+      <div className="flex flex-wrap items-center gap-3">
+        <div><p className="text-[14px] font-semibold">Database space</p><p className="text-[13px] text-ink-mute">MP4s are deleted 5 minutes after they are made. People can make them again for free.</p></div>
+        <p className="text-[26px] font-bold tabular-nums tracking-tight sm:ml-auto">{st ? size(st.total) : '…'}</p>
+        <button onClick={clean} disabled={busy} className="press h-10 w-full rounded-full bg-ink px-4 text-[14px] font-semibold text-white disabled:opacity-50 sm:w-auto">{busy ? 'Cleaning…' : 'Free up space now'}</button>
+      </div>
+      {msg && <p className="mt-2 text-[13px] font-semibold text-money" role="status">{msg}</p>}
+      {st && (
+        <div className="mt-3 grid gap-4 md:grid-cols-2">
+          <div><p className="text-[12px] font-semibold uppercase tracking-[0.08em] text-ink-mute">Stored files</p>
+            <ul className="mt-1 divide-y divide-ink/8 text-[14px]">{st.files.length ? st.files.map((f) => <li key={f.name} className="flex justify-between gap-3 py-1.5"><span>{f.name} <span className="text-ink-mute">· {f.n}</span></span><b className="tabular-nums">{size(f.bytes)}</b></li>) : <li className="py-1.5 text-ink-mute">None.</li>}</ul></div>
+          <div><p className="text-[12px] font-semibold uppercase tracking-[0.08em] text-ink-mute">Tables</p>
+            <ul className="mt-1 divide-y divide-ink/8 text-[14px]">{st.tables.slice(0, 6).map((t) => <li key={t.name} className="flex justify-between gap-3 py-1.5"><span>{t.name}</span><b className="tabular-nums">{size(t.bytes)}</b></li>)}</ul></div>
+        </div>
+      )}
+    </section>
+  );
+}
+
 export default function Admin() {
   const [key, setKey] = useState(read());
   const [typed, setTyped] = useState('');
@@ -113,6 +151,8 @@ export default function Admin() {
         <List title="Sizes people pick" rows={data.aspects.map((x) => [x.name, x.n])} empty="Nothing yet." />
         <List title="Why MP4s failed (30 days)" rows={data.failures.map((x) => [x.msg, x.n])} empty="No failures. 🎉" />
       </section>
+
+      <Storage adminKey={key} />
 
       <section className="mt-5 rounded-[14px] border border-ink/10 bg-white p-4" aria-label="Latest">
         <p className="text-[14px] font-semibold">Latest made</p>
