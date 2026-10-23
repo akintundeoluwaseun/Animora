@@ -5,7 +5,7 @@ import { writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
-import { masterTrack } from './master.js';
+import { masterTrack, musicBed } from './master.js';
 
 export const SFX_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../assets/sfx');
 export const MUSIC_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../assets/music');
@@ -45,8 +45,8 @@ function decode(src) {
     p.on('close', (c) => { if (c) return reject(new Error(`decode: ${err}`)); const b = Buffer.concat(out); resolve(new Float32Array(b.buffer, b.byteOffset, Math.floor(b.length / 4))); });
   });
 }
-// Only the owner's own uploaded music is mixed in; the built-in background songs are retired (effects only).
-// built-in library tracks (/music/piano.mp3, /music/soft.mp3) are read from disk; anything else is a URL
+// Music: the owner's own upload, or a CC0 bed from assets/music chosen to suit the film's look.
+// library tracks (/music/<name>.mp3) are read from disk; anything else is a URL
 const musicSource = (m) => { const u = m?.url || null; return u && /^\/music\/[\w-]+\.mp3$/.test(u) ? path.join(MUSIC_DIR, path.basename(u)) : u; };
 
 /** Mix the cues into a WAV buffer (mono, 44.1 kHz) of `duration` seconds. timeScale stretches cue times. */
@@ -60,16 +60,10 @@ export function mixSfx(events, duration, { timeScale = 1, gain = 0.6, music = nu
   }
   // music (the owner's own) sits under the effects before mastering
   // the music bed sits underneath: looped, faded in and out, about -10 dB at its peak
-  if (music?.length) {
-    let mp = 0; for (let i = 0; i < music.length; i++) mp = Math.max(mp, Math.abs(music[i]));
-    const g = mp > 0 ? 0.22 / mp : 0, fin = SR * 0.4, fout = SR * 1.6;
-    for (let i = 0; i < n; i++) {
-      const fade = Math.min(1, i / fin, (n - i) / fout);
-      mix[i] += music[i % music.length] * g * fade;
-    }
-  }
+  if (music?.length) { const bed = musicBed(music, n, SR, events, { timeScale }); for (let i = 0; i < n; i++) mix[i] += bed[i]; }
   // master: glue, loudness to the social-media level (about -14 LUFS measured; the built-in meter reads ~1.5 dB low), peaks under -1.5 dBFS
-  masterTrack(mix, SR, { target: -12.5 });
+  // with music the whole mix goes to the social-media level; effects alone stay gentle (lifting sparse effects to -14 LUFS made them harsh)
+  masterTrack(mix, SR, { target: music?.length ? -12.5 : -18.5 });
   const pcm = Buffer.alloc(44 + n * 2);
   for (let i = 0; i < n; i++) pcm.writeInt16LE(Math.round(Math.max(-1, Math.min(1, mix[i])) * 32767), 44 + i * 2);
   pcm.write('RIFF', 0); pcm.writeUInt32LE(36 + n * 2, 4); pcm.write('WAVE', 8); pcm.write('fmt ', 12);

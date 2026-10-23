@@ -8,7 +8,7 @@ import path from 'node:path';
 import { GSAP_CDN } from '../../engine/prompts.js';
 import { lookFor, fontsUrl } from '../motion/looks.js';
 import { geminiGenerate } from '../../engine/gemini.js';
-import { composeStory, pickLook, lookFor as storyLook, fontLink as storyFonts, fontFamilies as storyFams, LOOK_IDS } from '../story/index.js';
+import { composeStory, pickLook, lookFor as storyLook, fontLink as storyFonts, fontFamilies as storyFams, LOOK_IDS, LOOKS as STORY_LOOKS, pickTrack, trackMusic, snapToBeats, musicLibrary } from '../story/index.js';
 
 const dir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'motion', 'browser');
 let RUNTIME = null;
@@ -52,7 +52,10 @@ function factsOf(plan = {}, brief = {}, assets = []) {
     || segs.find((x) => !/\d{6,}|\d[\d\s-]{7,}\d|@|https?:|www\.|\.com|whats\s?app|instagram|ig:|email/i.test(x) && /\p{L}{3,}/u.test(x));
   const place = str(brief.address || placeSeg || '', 60);
   const whatsapp = /whats\s?app|wa\.me/i.test(String(brief.contact || '') + ' ' + String(brief.cta || ''));
-  return { whatsapp, fits, name, mono: name.replace(/[^\p{L}\p{N} ]/gu, '').split(/\s+/).filter((w) => !/^(the|and|of)$/i.test(w)).slice(0, 2).map((w) => w[0]).join('').toUpperCase() || 'A', heads, features, products, priced, offer: str(brief.offer, 30), when: str(brief.when, 60), cta: str(brief.cta || [].concat(brief.ctas || [])[0] || 'Order now', 28), phone, place, photos, logo, category: str(brief.category, 40), sub: str(heads[1] || brief.goal || '', 90) };
+  // pictures with a see-through background (product cut-outs) can step out of a frame
+  const cutouts = assets.filter((a) => (a.kind || 'image') === 'image' && a.role !== 'logo' && !/logo/i.test(a.name || '') && (a.transparent || a.has_alpha)).map((a) => a.url);
+  const appy = /\b(app|apps|software|saas|platform|online store|e-?commerce|delivery app|mobile app|website|web ?site|game|gaming|fintech|payments?)\b/i.test([brief.category, brief.name, ...[].concat(brief.features || [])].join(' ')) && !/repair|fix|service centre|service center/i.test(brief.category || '');
+  return { cutouts, appy, whatsapp, fits, name, mono: name.replace(/[^\p{L}\p{N} ]/gu, '').split(/\s+/).filter((w) => !/^(the|and|of)$/i.test(w)).slice(0, 2).map((w) => w[0]).join('').toUpperCase() || 'A', heads, features, products, priced, offer: str(brief.offer, 30), when: str(brief.when, 60), cta: str(brief.cta || [].concat(brief.ctas || [])[0] || 'Order now', 28), phone, place, photos, logo, category: str(brief.category, 40), sub: str(heads[1] || brief.goal || '', 90) };
 }
 const split2 = (t) => { const w = String(t).split(/\s+/); if (w.length < 3) return w.join(' '); const k = Math.ceil(w.length / 2); return w.slice(0, k).join(' ') + '|' + w.slice(k).join(' '); };
 
@@ -167,37 +170,47 @@ export function storyFilm({ plan = {}, brief = {}, assets = [], style = null, sa
   // the owner's own colours lead; a style they picked gives its accent; otherwise the look keeps its house colours
   const own = { ...(brief.colorMode && brief.colorMode !== 'style' ? brief.colors || {} : {}), ...(plan.style?.colors && brief.colorMode && brief.colorMode !== 'style' ? plan.style.colors : {}) };
   if (!HEX.test(own.primary || '') && style && !brief.styleAuto && HEX.test(style.palette?.primary || '')) own.primary = style.palette.primary;
-  const sound = plan.sound || (plan.sfx === false ? 'none' : 'sfx');
-  const music = sound === 'own' && plan.music_url ? { url: plan.music_url } : sound === 'piano' || sound === 'soft' ? { url: `/music/${sound}.mp3`, builtin: sound } : null;
-  const cfg = buildStory({ facts, lookId, own, seed, duration, aspect, sound: sound === 'none' ? 'none' : 'on' });
-  return { html: piecesHtml(cfg, music), data: cfg };
+  // sound: 'all' (default) = music that suits the look + effects; 'sfx' = effects only; 'own' = the owner's track + effects; 'none' = silent
+  const mode = soundMode(plan, brief);
+  const prevTrack = (String(previous || '').match(/"music":\{"url":"\/music\/([\w-]+)\.mp3"/) || [])[1] || null;
+  const cfg = buildStory({ facts, lookId, own, seed, duration, aspect, mode, ownMusic: plan.music_url || null, avoidTrack: prevTrack, pool: ['piano', 'soft'].includes(plan.sound) ? plan.sound : null });
+  return { html: piecesHtml(cfg, cfg.music), data: cfg };
 }
-function buildStory({ facts, lookId, own = {}, seed, duration, aspect, sound = 'on', tweak = {} }) {
+const soundMode = (plan = {}, brief = {}) => { const s = plan.sound || brief.sound || (plan.sfx === false ? 'none' : 'all'); return s === 'own' ? (plan.music_url ? 'own' : 'all') : ['none', 'sfx'].includes(s) ? s : 'all'; };
+function buildStory({ facts, lookId, own = {}, seed, duration, aspect, sound, mode = null, tweak = {}, ownMusic = null, trackId = null, avoidTrack = null, pool = null }) {
   const [W, H] = TPL_SIZES[aspect] || TPL_SIZES['9:16'];
+  mode = mode || (sound === 'none' ? 'none' : 'sfx');
   const look = storyLook(lookId, own);
   if (tweak.motion) look.motion = tweak.motion;
-  const beats = composeStory({ facts, duration, seed, look: lookId, aspect });
-  const story = { W, H, seed, target: duration, aspect, own, tweak, textScale: tweak.textScale || 1, facts, look, beats, brand: facts.name, category: facts.category, logo: facts.logo, mono: facts.mono, sound, overlap: 0.7 };
-  return { W, H, seed, story, brand: facts.name, sound, fontUrl: storyFonts(look), fams: storyFams(look), look: { display: look.display, ui: look.ui } };
+  let beats = composeStory({ facts, duration, seed, look: lookId, aspect });
+  // music: a library bed for the look (cuts land on its beat), the owner's own track, or none
+  const track = mode === 'all' ? (trackId && trackMusic(trackId) ? trackId : pickTrack({ look: lookId, seed, avoid: avoidTrack, pool })) : null;
+  if (track) beats = snapToBeats(beats, track, duration, 0.7);
+  const music = mode === 'own' && ownMusic ? { url: ownMusic } : track ? trackMusic(track) : null;
+  const snd = mode === 'none' ? 'none' : 'on';
+  const story = { W, H, seed, target: duration, aspect, own, tweak, textScale: tweak.textScale || 1, facts, look, beats, brand: facts.name, category: facts.category, logo: facts.logo, mono: facts.mono, sound: snd, mode, track, ownMusic: mode === 'own' ? ownMusic : null, music: !!music, overlap: 0.7 };
+  return { W, H, seed, story, brand: facts.name, sound: snd, music, fontUrl: storyFonts(look), fams: storyFams(look), look: { display: look.display, ui: look.ui } };
 }
 // Plain-words change to a Story film: the AI edits the owner's words, the look, the accent colour or the length; the film is then re-told.
 async function storyEdit({ cfg, say, instruction, useAi, html }) {
   const S = cfg.story, f = JSON.parse(JSON.stringify(S.facts || {}));
   let lookId = S.look.id, own = { ...(S.own || {}) }, seed = S.seed, duration = S.target, summary = '';
   const tweak = { ...(S.tweak || {}) };
+  let musicMode = null, newTrack = false;
   const bigger = () => { tweak.textScale = Math.min(1.35, +((tweak.textScale || 1) * 1.15).toFixed(2)); }, smaller = () => { tweak.textScale = Math.max(0.75, +((tweak.textScale || 1) / 1.15).toFixed(2)); };
   const COL = { red: '#E5383B', green: '#1F8A4C', blue: '#1F6FEB', yellow: '#FFC93C', gold: '#C9A45C', orange: '#E8530E', purple: '#7B2CBF', pink: '#E83E8C', teal: '#0FA3A3', black: '#111111', brown: '#7A4A2A' };
   if (useAi) {
     try {
       const { text } = await geminiGenerate({
-        system: `You edit a short video ad for a small business. It is described as JSON: { look: one of ${LOOK_IDS.join(', ')} (${LOOK_IDS.map((id) => `${id}`).join('/')}: editorial = warm paper and serif, noir = black and gold luxury, bold = loud colour blocks, fresh = light and friendly, tech = dark blue digital, clean = white and simple), accent: hex colour or null, seconds: number, text: "bigger"|"smaller"|"same", pace: "calmer"|"faster"|"same", words: { name, headlines: [..], sub, category, features: [..up to 4], products: [{ title, price }], offer, when, place, phone, cta } }. Change only what the owner asks for. Never invent prices, phone numbers, addresses or claims. Keep words short (headline under 8 words, features under 4 words). Return the same JSON plus "summary": one short friendly sentence of what you changed.`,
-        messages: [{ role: 'user', text: `VIDEO: ${JSON.stringify({ look: lookId, accent: own.primary || null, seconds: duration, text: 'same', pace: 'same', words: { name: f.name, headlines: f.heads, sub: f.sub, category: f.category, features: f.features, products: f.products, offer: f.offer, when: f.when, place: f.place, phone: f.phone, cta: f.cta } })}\n\nCHANGE: ${instruction}` }],
+        system: `You edit a short video ad for a small business. It is described as JSON: { look: one of ${LOOK_IDS.join(', ')} (${LOOK_IDS.map((id) => `${id}`).join('/')}: editorial = warm paper and serif, noir = black and gold luxury, bold = loud colour blocks, fresh = light and friendly, tech = dark blue digital, clean = white and simple), accent: hex colour or null, seconds: number, text: "bigger"|"smaller"|"same", pace: "calmer"|"faster"|"same", music: "same"|"another song"|"off"|"on"|"silent", words: { name, headlines: [..], sub, category, features: [..up to 4], products: [{ title, price }], offer, when, place, phone, cta } }. Change only what the owner asks for. Never invent prices, phone numbers, addresses or claims. Keep words short (headline under 8 words, features under 4 words). Return the same JSON plus "summary": one short friendly sentence of what you changed.`,
+        messages: [{ role: 'user', text: `VIDEO: ${JSON.stringify({ look: lookId, accent: own.primary || null, seconds: duration, text: 'same', pace: 'same', music: 'same', words: { name: f.name, headlines: f.heads, sub: f.sub, category: f.category, features: f.features, products: f.products, offer: f.offer, when: f.when, place: f.place, phone: f.phone, cta: f.cta } })}\n\nCHANGE: ${instruction}` }],
         temperature: 0.4, maxOutputTokens: 3000, json: true, timeoutMs: 45000, thinking: 'low',
       });
       const o = JSON.parse(String(text).match(/\{[\s\S]*\}/)[0]);
       if (LOOK_IDS.includes(o.look)) lookId = o.look;
       if (o.text === 'bigger') bigger(); else if (o.text === 'smaller') smaller();
       if (o.pace === 'calmer') tweak.motion = 'calm'; else if (o.pace === 'faster') tweak.motion = 'snap';
+      if (o.music === 'another song') { newTrack = true; musicMode = 'all'; } else if (o.music === 'off') musicMode = 'sfx'; else if (o.music === 'on') musicMode = 'all'; else if (o.music === 'silent') musicMode = 'none';
       if (o.accent === null) delete own.primary; else if (HEX.test(o.accent || '')) own.primary = o.accent;
       const sec = Math.round(Number(o.seconds)); if (sec >= 6 && sec <= 120) duration = sec;
       const w = o.words || {};
@@ -210,20 +223,27 @@ async function storyEdit({ cfg, say, instruction, useAi, html }) {
   }
   if (!summary) {
     const done = [];
-    if (/different|another|new look|remix|shuffle|change (it|the look|style)/.test(say)) { seed = (seed * 7 + 13) % 2147483647; lookId = LOOK_IDS[(LOOK_IDS.indexOf(lookId) + 1 + (seed % (LOOK_IDS.length - 1))) % LOOK_IDS.length]; done.push(`a new look (${lookId})`); }
+    // music first, so "another song" is not read as "another look"
+    let musicSaid = true;
+    if (/no sound|mute (it|everything|all)|silent|without sound/.test(say)) { musicMode = 'none'; done.push('no sound'); }
+    else if (/(no|remove|without|stop|off).{0,12}music|music.{0,8}off/.test(say)) { musicMode = 'sfx'; done.push('no music (sound effects stay)'); }
+    else if (/(another|different|new|change|other|switch).{0,12}(song|music|track|beat|tune)/.test(say)) { musicMode = 'all'; newTrack = true; done.push('a different song'); }
+    else if (/(add|put|with|turn on|bring back|want).{0,12}music|music back/.test(say)) { musicMode = 'all'; done.push('background music'); }
+    else musicSaid = false;
+    if (!musicSaid && /different|another|new look|remix|shuffle|change (it|the look|style)/.test(say)) { seed = (seed * 7 + 13) % 2147483647; lookId = LOOK_IDS[(LOOK_IDS.indexOf(lookId) + 1 + (seed % (LOOK_IDS.length - 1))) % LOOK_IDS.length]; done.push(`a new look (${lookId})`); }
     const named = LOOK_IDS.find((id) => new RegExp(`\\b${id}\\b`).test(say)); if (named) { lookId = named; done.push(`the ${named} look`); }
     if (/\bdark|black background|night/.test(say) && !named) { lookId = ['noir', 'tech', 'bold'].find((x) => x !== lookId); done.push('a darker look'); }
     else if (/\blight|bright|white background/.test(say) && !named) { lookId = ['clean', 'fresh', 'editorial'].find((x) => x !== lookId); done.push('a lighter look'); }
     const c = Object.keys(COL).find((x) => new RegExp(`\\b${x}\\b`).test(say)); if (c) { own.primary = COL[c]; done.push(`${c} accents`); }
     if (/(bigger|larger|increase).*(text|word|font|letter)|(text|word|font|letter)s?.*(bigger|larger)/.test(say)) { bigger(); done.push('bigger text'); }
     else if (/(smaller|reduce).*(text|word|font|letter)|(text|word|font|letter)s?.*smaller/.test(say)) { smaller(); done.push('smaller text'); }
-    if (/calm|slow|smooth|soft/.test(say)) { tweak.motion = 'calm'; done.push('calmer motion'); } else if (/fast|energ|punch|snappy|quick/.test(say)) { tweak.motion = 'snap'; done.push('snappier motion'); }
+    if (!musicSaid && /calm|slow|smooth|soft/.test(say)) { tweak.motion = 'calm'; done.push('calmer motion'); } else if (/fast|energ|punch|snappy|quick/.test(say)) { tweak.motion = 'snap'; done.push('snappier motion'); }
     const n = Number((say.match(/\b(\d{1,3})\s*(s|sec|secs|seconds)\b/) || [])[1]); if (n >= 6 && n <= 120) { duration = n; done.push(`${n} seconds long`); }
     if (!done.length) return null;
     summary = `Done: ${done.join(', ')}.`;
   }
-  const next = buildStory({ facts: f, lookId, own, seed, duration, aspect: S.aspect || '9:16', sound: S.sound, tweak });
-  const out = piecesHtml(next, readMusic(html)).replace('</body>', `<!--animora-direction:story-${lookId};--></body>`);
+  const next = buildStory({ facts: f, lookId, own, seed, duration, aspect: S.aspect || '9:16', sound: S.sound, mode: musicMode || S.mode, tweak, ownMusic: S.ownMusic || (readMusic(html)?.url && !readMusic(html)?.id ? readMusic(html).url : null), trackId: newTrack ? null : S.track, avoidTrack: S.track });
+  const out = piecesHtml(next, next.music).replace('</body>', `<!--animora-direction:story-${lookId};--></body>`);
   return { html: out, summary: summary || 'Done! Check the video.' };
 }
 function mixFilm({ plan = {}, brief = {}, assets = [], style = null, themeColors = {}, salt = '' }) {
@@ -373,3 +393,35 @@ async function templateEdit({ cfg, next, say, instruction, useAi, html }) {
   return { html: piecesHtml(next, readMusic(html)), summary: `Done: ${done.join(', ')}.` };
 }
 const readMusic = (html) => { const m = String(html || '').match(/window\.ADFLASH_DATA = (.*);\n/); try { return m ? JSON.parse(m[1]).music : null; } catch { return null; } };
+
+// ---------------------------------------------------------------- the editor's Adjust panel for Story films (instant, no AI)
+export function storyLookInfo(html) {
+  const cfg = readPieces(html); if (!cfg?.story) return null;
+  const S = cfg.story, t = S.track ? musicLibrary()[S.track] : null;
+  return {
+    flyer: false, story: true, theme: S.look.id,
+    themes: LOOK_IDS.map((id) => ({ key: id, label: STORY_LOOKS[id].label, colors: { background: STORY_LOOKS[id].bg, primary: STORY_LOOKS[id].A, secondary: STORY_LOOKS[id].A2 } })),
+    music: S.mode || (S.sound === 'none' ? 'none' : S.ownMusic ? 'own' : 'sfx'), song: t ? `${t.title} by ${t.artist}` : null,
+    colors: { primary: S.look.A, secondary: S.look.A2 }, scale: S.textScale || 1,
+  };
+}
+export function storyAdjust(html, changes = {}) {
+  const cfg = readPieces(html); if (!cfg?.story) return null;
+  const S = cfg.story, done = [];
+  let lookId = S.look.id, aspect = S.aspect || '9:16', mode = S.mode || (S.sound === 'none' ? 'none' : 'sfx'), trackId = S.track, avoid = null;
+  const own = { ...(S.own || {}) }, tweak = { ...(S.tweak || {}) };
+  if (changes.aspect && TPL_SIZES[changes.aspect] && changes.aspect !== aspect) { aspect = changes.aspect; done.push(`size ${aspect}`); }
+  if (changes.theme && LOOK_IDS.includes(changes.theme) && changes.theme !== lookId) { lookId = changes.theme; trackId = null; done.push(`the ${STORY_LOOKS[lookId].label} look`); }
+  const c = changes.colors || {};
+  if (HEX.test(c.primary || '')) { own.primary = c.primary; done.push('main colour'); }
+  if (HEX.test(c.secondary || '')) { own.secondary = c.secondary; done.push('second colour'); }
+  const ts = Number(changes.textScale); if (ts > 0.4 && ts < 2.5 && ts !== 1) { tweak.textScale = Math.max(0.75, Math.min(1.35, +((tweak.textScale || 1) * ts).toFixed(2))); done.push(ts > 1 ? 'bigger text' : 'smaller text'); }
+  const sp = Number(changes.speed); if (sp > 0.4 && sp < 2.5 && sp !== 1) { tweak.motion = sp > 1 ? 'snap' : 'calm'; done.push(sp > 1 ? 'snappier motion' : 'calmer motion'); }
+  if (['all', 'another', 'sfx', 'none'].includes(changes.music)) {
+    if (changes.music === 'another') { mode = 'all'; avoid = trackId; trackId = null; done.push('a different song'); }
+    else if (changes.music !== mode) { mode = changes.music; done.push(mode === 'all' ? 'background music' : mode === 'sfx' ? 'sound effects only' : 'no sound'); }
+  }
+  if (!done.length) throw new Error('Nothing to change.');
+  const next = buildStory({ facts: S.facts, lookId, own, seed: S.seed, duration: S.target, aspect, mode, tweak, ownMusic: S.ownMusic, trackId, avoidTrack: avoid || trackId });
+  return { html: piecesHtml(next, next.music).replace('</body>', `<!--animora-direction:story-${lookId};--></body>`), aspect: aspect !== (S.aspect || '9:16') ? aspect : null, summary: `Changed: ${done.join(', ')}.` };
+}

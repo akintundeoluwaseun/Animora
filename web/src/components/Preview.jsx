@@ -77,6 +77,7 @@ function playSfx(e) {
 
 export function LivePreview({ html, aspect = '9:16', autoPlay = true, maxWidth = 340, onError, sound: soundOn = true, onSoundChange, still = false, onEnded, exact = false }) {
   const sfxRef = useRef([]);
+  const duckUntil = useRef(0);
   const musicRef = useRef(null);
   useEffect(() => () => { musicRef.current?.pause(); }, []);
   const lastT = useRef(0);
@@ -116,21 +117,21 @@ export function LivePreview({ html, aspect = '9:16', autoPlay = true, maxWidth =
         setReady(true); setD(m.d); sfxRef.current = m.sfx || []; lastT.current = 0;
         // background music: an <audio> element kept in step with the timeline
         if (musicRef.current) { musicRef.current.pause(); musicRef.current = null; }
-        if (m.music?.url) { const a = new Audio(m.music.url); a.loop = true; a.volume = 0.45; a.preload = 'auto'; musicRef.current = a; }
+        if (m.music?.url) { const a = new Audio(m.music.url); a.loop = true; a.volume = 0.6; a.preload = 'auto'; musicRef.current = a; }
         if (ctx()) [...new Set(sfxRef.current.map((e) => e.k))].forEach((k) => sound(k));
         if (autoPlay) send({ cmd: 'play' });
       }
       if (m.type === 'time') {
         // play every sound cue the playhead just passed (only while playing forward, not when scrubbing)
         if (m.playing && soundRef.current && m.t > lastT.current && m.t - lastT.current < 0.5) {
-          for (const ev of sfxRef.current) if (ev.t > lastT.current && ev.t <= m.t) playSfx(ev);
+          for (const ev of sfxRef.current) if (ev.t > lastT.current && ev.t <= m.t) { playSfx(ev); if ((ev.v || 1) >= 0.5) duckUntil.current = m.t + 0.4; }
         }
         const mu = musicRef.current;
         if (mu) {
           if (m.playing && soundRef.current && audio?.state === 'running') {
             if (mu.paused || Math.abs(mu.currentTime - m.t) > 0.25) { try { mu.currentTime = m.t % (mu.duration || 1e9); } catch { /* not loaded yet */ } }
             if (mu.paused) mu.play().catch(() => {});
-            mu.volume = Math.min(0.45, 0.45 * Math.min(1, (m.d - m.t) / 1.5));   // fade out at the end, like the MP4
+            mu.volume = Math.max(0, 0.6 * Math.min(1, (m.d - m.t) / 2) * (m.t < duckUntil.current ? 0.67 : 1));   // fade out at the end and dip under effects, like the MP4
           } else if (!mu.paused) mu.pause();
         }
         lastT.current = m.t;

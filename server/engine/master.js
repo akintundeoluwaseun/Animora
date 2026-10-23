@@ -49,7 +49,7 @@ function compress(x, sr, { threshold = -20, ratio = 2.5, attack = 0.006, release
   return x;
 }
 
-function limit(x, sr, ceiling = lin(-1.5), lookMs = 5, releaseMs = 80) {   // -1.5 dB leaves room for the AAC encoder
+function limit(x, sr, ceiling = lin(-2.2), lookMs = 5, releaseMs = 80) {   // -2.2 dB leaves room for the AAC encoder (its overshoot reached +0.6 dB at -1.5)
   const look = Math.max(1, Math.round(sr * lookMs / 1000)), aR = Math.exp(-1 / (sr * releaseMs / 1000));
   const n = x.length, need = new Float32Array(n);
   for (let i = 0; i < n; i++) { const a = Math.abs(x[i]); need[i] = a > ceiling ? ceiling / a : 1; }
@@ -73,11 +73,45 @@ function limit(x, sr, ceiling = lin(-1.5), lookMs = 5, releaseMs = 80) {   // -1
 /** Master a mono effects track in place. Returns { gainDb, lufs } for logging. */
 export function masterTrack(x, sr, { target = -14 } = {}) {
   if (!x?.length) return { gainDb: 0, lufs: -70 };
-  compress(x, sr);
+  compress(x, sr, { attack: 0.018, release: 0.16 });   // a slower attack lets the start of each effect through, so it reads over the music
   const before = loudness(x, sr);
   const gainDb = before > -69 ? Math.max(-12, Math.min(24, target - before)) : 0;
   const g = lin(gainDb);
   for (let i = 0; i < x.length; i++) x[i] *= g;
   limit(x, sr);
   return { gainDb, lufs: loudness(x, sr) };
+}
+
+/**
+ * The music bed under the effects (same code on the server and in the phone export):
+ *  - levelled by its loudness (not its peak) so every song sits at the same place under the effects;
+ *  - looped with a 2-second crossfade if the film is longer than the song (no click at the seam);
+ *  - faded in quickly and out over the last 2 seconds;
+ *  - gently ducked (about -3.5 dB) under each sound effect so whooshes and chimes read clearly.
+ */
+export function musicBed(music, n, sr, events = [], { timeScale = 1, level = -28 } = {}) {
+  const out = new Float32Array(n);
+  const len = music.length; if (!len) return out;
+  // loudness-ish level: RMS over the first minute
+  const m = Math.min(len, sr * 60); let e = 0; for (let i = 0; i < m; i++) e += music[i] * music[i];
+  const rms = Math.sqrt(e / Math.max(1, m)), g = rms > 1e-6 ? lin(level) / rms : 0;
+  const xf = Math.min(Math.floor(len / 4), sr * 2);
+  for (let i = 0; i < n; i++) {
+    if (len >= n || i < len - xf) { out[i] = music[i % len]; continue; }
+    // past the first pass: crossfade the tail into the start, then keep looping the same way
+    const period = len - xf, k = (i - (len - xf)) % period, inFade = k < xf;
+    const a = inFade ? music[len - xf + k] : 0, b = music[k];
+    out[i] = inFade ? a * Math.cos((k / xf) * Math.PI / 2) + b * Math.sin((k / xf) * Math.PI / 2) : b;
+  }
+  const fin = sr * 0.25, fout = sr * 2;
+  const duck = new Float32Array(n).fill(1), depth = lin(-3.5), att = sr * 0.05, hold = sr * 0.3, rel = sr * 0.35;
+  for (const ev of events || []) {
+    const s = Math.round((Number(ev.t) || 0) * timeScale * sr) - att, w = (Number(ev.v) || 1) >= 0.5 ? 1 : 0.5;
+    for (let i = Math.max(0, s); i < Math.min(n, s + att + hold + rel); i++) {
+      const p = i - s, amt = p < att ? p / att : p < att + hold ? 1 : 1 - (p - att - hold) / rel;
+      const gg = 1 - (1 - depth) * amt * w; if (gg < duck[i]) duck[i] = gg;
+    }
+  }
+  for (let i = 0; i < n; i++) out[i] *= g * duck[i] * Math.min(1, i / fin, (n - i) / fout);
+  return out;
 }

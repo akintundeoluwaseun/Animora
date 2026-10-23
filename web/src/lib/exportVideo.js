@@ -1,4 +1,4 @@
-import { masterTrack } from '../../../server/engine/master.js';
+import { masterTrack, musicBed } from '../../../server/engine/master.js';
 // Make the MP4 in the browser, straight from the video's code: no video server and nothing stored online.
 // The animation plays frame by frame in a hidden frame; each frame is drawn to a canvas (fastCapture.js),
 // encoded to H.264 with the browser's WebCodecs encoder, and the music + sound effects are mixed and
@@ -54,16 +54,11 @@ async function mixAudio(sfx, music, duration) {
     const s = b.getChannelData(0), start = Math.round(e.t * SR), v = (Number(e.v) || 1) * 0.6;
     for (let i = 0; i < s.length && start + i < n; i++) if (start + i >= 0) mix[start + i] += s[i] * v;
   }
-  const musicUrl = music?.url || null;   // built-in songs retired: effects only, or the owner's own music
+  const musicUrl = music?.url || null;   // the film's music bed (a CC0 library track or the owner's own)
   const mb = musicUrl ? await load(musicUrl) : null;
-  if (mb) {
-    const m = mb.getChannelData(0);
-    let mp = 0; for (let i = 0; i < m.length; i++) mp = Math.max(mp, Math.abs(m[i]));
-    const g = mp > 0 ? 0.22 / mp : 0, fin = SR * 0.4, fout = SR * 1.6;
-    for (let i = 0; i < n; i++) mix[i] += m[i % m.length] * g * Math.min(1, i / fin, (n - i) / fout);
-  }
+  if (mb) { const bed = musicBed(mb.getChannelData(0), n, SR, sfx); for (let i = 0; i < n; i++) mix[i] += bed[i]; }
   if (!sfx?.length && !mb) return null;
-  masterTrack(mix, SR, { target: -12.5 });   // same mastering as the server MP4
+  masterTrack(mix, SR, { target: mb ? -12.5 : -18.5 });   // same mastering as the server MP4 (gentler when there is no music)
   return mix;
 }
 

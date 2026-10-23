@@ -7,7 +7,7 @@
 import { CANVAS } from './renderer.js';
 
 export const GSAP_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/gsap/3.13.0';
-export const ALLOWED_PLUGINS = ['TextPlugin', 'MotionPathPlugin', 'CustomEase', 'SplitText'];
+export const ALLOWED_PLUGINS = ['TextPlugin', 'MotionPathPlugin', 'CustomEase', 'SplitText', 'MorphSVGPlugin', 'DrawSVGPlugin'];
 
 export const PLAN_LIMITS = {
   free: { minSeconds: 15, maxSeconds: 60 },

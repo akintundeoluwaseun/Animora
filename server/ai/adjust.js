@@ -5,6 +5,7 @@ import { templateFromPlan } from './templates.js';
 import { readData } from './director.js';
 import { readFlyer, flyerHtml, isFlyer } from './flyer.js';
 import { THEMES } from './themes.js';
+import { storyLookInfo, storyAdjust } from './pieces/index.js';
 
 const HEX = /^#[0-9a-f]{6}$/i;
 const VIDEO_SIZES = ['9:16', '1:1', '4:5', '16:9'];
@@ -18,6 +19,7 @@ const MUSIC = { piano: { url: '/music/piano.mp3', builtin: 'piano' }, soft: { ur
 
 /** What the panel shows as the current values. */
 export function currentLook(html) {
+  const story = storyLookInfo(html); if (story) return story;
   if (isFlyer(html)) {
     const d = readFlyer(html) || {};
     return { flyer: true, theme: d.theme, themes: THEME_LIST, colors: { primary: d.colors?.primary, secondary: d.colors?.secondary, background: d.colors?.background, text: d.colors?.text } };
@@ -35,6 +37,7 @@ export function currentLook(html) {
  * Returns { html, aspect, summary } ; throws a plain message when nothing could change.
  */
 export function adjustDesign({ html, plan = {}, assets = [], changes = {} }) {
+  const story = storyAdjust(html, changes); if (story) return story;   // Story films are re-told from their own recipe
   const done = [];
   const colors = Object.fromEntries(Object.entries(changes.colors || {}).filter(([, v]) => HEX.test(String(v || ''))));
 

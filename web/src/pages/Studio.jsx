@@ -193,7 +193,19 @@ function AdjustPanel({ project, onUpdate }) {
           </div>
         </div>
       )}
-      {!flyer && look && (
+      {!flyer && look?.story && (
+        <div>
+          <h3 className="font-bold">Sound</h3>
+          <p className="text-sm text-ink-mute">{look.music === 'all' && look.song ? `Playing "${look.song}". Free to use (public domain).` : 'Free songs that suit your video, cut on the beat.'}</p>
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            {[['all', 'Music + effects'], ['another', 'Another song'], ['sfx', 'Effects only'], ['none', 'No sound']].map(([v, l]) => {
+              const on = v !== 'another' && look.music === v;
+              return <button key={v} type="button" disabled={!!busy || on || (v === 'another' && look.music !== 'all')} onClick={() => apply('music', { music: v })} className={chip(on)} aria-pressed={on}><span className="block text-center font-semibold">{busy === 'music' ? '…' : l}</span></button>;
+            })}
+          </div>
+        </div>
+      )}
+      {!flyer && look && !look.story && (
         <div>
           <h3 className="font-bold">Background music</h3>
           <p className="text-sm text-ink-mute">Plays quietly under the sound effects.</p>
@@ -208,7 +220,7 @@ function AdjustPanel({ project, onUpdate }) {
       <div>
         <h3 className="font-bold">Colours</h3>
         <div className="mt-3 grid grid-cols-2 gap-2">
-          {COLOR_FIELDS.map(([k, l]) => (
+          {COLOR_FIELDS.filter(([k]) => !look?.story || ['primary', 'secondary'].includes(k)).map(([k, l]) => (
             <label key={k} className="flex items-center gap-2 rounded-xl border border-ink/12 bg-white px-2.5 py-2 text-sm">
               <input type="color" value={cols[k] && /^#[0-9a-f]{6}$/i.test(cols[k]) ? cols[k] : '#000000'} onChange={(e) => setCols((c) => ({ ...c, [k]: e.target.value }))} className="size-8 cursor-pointer rounded-lg border-0 bg-transparent p-0" aria-label={l} />
               <span>{l}</span>

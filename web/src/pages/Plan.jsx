@@ -176,7 +176,7 @@ const label = (q, v, b, styles) => {
   if (q.id === 'aspect') return ASPECT_OPTS.find((o) => o.v === v)?.l || v;
   if (q.id === 'duration') return `${v} seconds`;
   if (q.id === 'voiceover') return v === true || v === 'yes' ? 'Yes, write me a script' : 'No script';
-  if (q.id === 'sound') return { all: 'Sound effects', sfx: 'Sound effects', none: 'No sound', own: 'My own music', piano: 'Soft piano', soft: 'Soft music' }[v] || v;
+  if (q.id === 'sound') return { all: 'Music + sound effects', sfx: 'Sound effects only', none: 'No sound', own: 'My own music', piano: 'Music + sound effects', soft: 'Music + sound effects' }[v] || v;
   if (q.id === 'style') return b.styleAuto ? 'Let Animora choose' : styles?.find((s) => s.id === v)?.name || 'Chosen';
   if (q.id === 'colors') return v === 'style' ? "The style's colours" : v === 'logo' ? 'Matched to my logo' : 'My own colours';
   if (q.id === 'pictures') return `${v} picture${v === 1 ? '' : 's'}`;
@@ -638,9 +638,8 @@ export default function Plan() {
                       try { const form = new FormData(); form.append('file', f); form.append('role', 'music'); form.append('name', 'my music'); await api(`/projects/${id}/assets`, { method: 'POST', form }); answer('own'); }
                       catch (err) { setError(err.message); } finally { setUploading(false); e.target.value = ''; }
                     }} />
-                    <Chip sub="Smooth whooshes, pops and clicks timed to the motion" onClick={() => answer('sfx')}>Sound effects</Chip>
-                    <Chip sub="Gentle piano under the effects" onClick={() => answer('piano')}>Soft piano</Chip>
-                    <Chip sub="Light, calm background music under the effects" onClick={() => answer('soft')}>Soft music</Chip>
+                    <Chip sub="A song that suits your video, cut on the beat, with soft sound effects (recommended)" onClick={() => answer('all')}>Music + sound effects</Chip>
+                    <Chip sub="Whooshes, pops and chimes timed to the motion, no music" onClick={() => answer('sfx')}>Sound effects only</Chip>
                     <Chip sub="Upload an MP3 or WAV" onClick={() => musicRef.current?.click()}>{uploading ? 'Uploading…' : 'Use my own music'}</Chip>
                     <Chip onClick={() => answer('none')}>No sound</Chip>
                   </div>
