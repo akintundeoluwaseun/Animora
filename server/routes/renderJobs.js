@@ -122,6 +122,18 @@ export async function clearOldVideos({ force = false } = {}) {
   await q("UPDATE renders SET code_html='' WHERE status IN ('failed','cancelled') AND code_html <> '' AND (finished_at IS NULL OR finished_at < now() - interval '10 minutes')").catch(() => {});
   await q("UPDATE projects p SET status='ready' WHERE status='rendered' AND NOT EXISTS (SELECT 1 FROM renders r WHERE r.project_id=p.id AND r.status='done')").catch(() => {});
   if (old.length) console.log(`[renders] cleared ${old.length} MP4(s)`);
+  sweepLeftovers().catch(() => {});
+}
+
+// Files nobody can use any more: pictures and covers whose project was deleted. At most once an hour.
+let lastLeftovers = 0;
+async function sweepLeftovers() {
+  if (Date.now() - lastLeftovers < 60 * 60 * 1000) return;
+  lastLeftovers = Date.now();
+  await q(`DELETE FROM files f WHERE f.key LIKE 'uploads/%' AND f.created_at < now() - interval '1 hour'
+      AND NOT EXISTS (SELECT 1 FROM projects p WHERE p.id::text = split_part(f.key, '/', 3))`).catch(() => {});
+  await q(`DELETE FROM files f WHERE f.key LIKE 'thumbs/%' AND f.created_at < now() - interval '1 hour'
+      AND NOT EXISTS (SELECT 1 FROM projects p WHERE p.thumbnail_url LIKE '%' || f.key)`).catch(() => {});
 }
 
 // The finished MP4, served in ranges of at most 4 MB (players and our download button ask for the next part).

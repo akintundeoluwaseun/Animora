@@ -131,19 +131,25 @@ export function usePolling(fn, ms, active) {
  * Shrink a picture before upload: phone photos are often 4-10 MB, and the server (Vercel) accepts about 4.5 MB.
  * Keeps PNGs as PNG (logos keep their transparent background); other pictures become JPEG. Max side 1920 px.
  */
-export async function shrinkImage(file, maxSide = 1920) {
-  if (!file?.type?.startsWith('image/') || /svg|gif/.test(file.type) || file.size < 1.2e6) return file;
+// Pictures are made small before they are uploaded (the free database stays tiny): at most 1600 px on the long side,
+// saved as WebP (much smaller than PNG/JPEG and it keeps see-through logo backgrounds). Falls back to JPEG / PNG.
+export async function shrinkImage(file, maxSide = 1600) {
+  if (!file?.type?.startsWith('image/') || /svg|gif/.test(file.type) || file.size < 250e3) return file;
   try {
     const bmp = await createImageBitmap(file);
     const k = Math.min(1, maxSide / Math.max(bmp.width, bmp.height));
     const canvas = document.createElement('canvas');
     canvas.width = Math.round(bmp.width * k); canvas.height = Math.round(bmp.height * k);
     canvas.getContext('2d').drawImage(bmp, 0, 0, canvas.width, canvas.height);
-    const png = file.type === 'image/png';
-    let blob = await new Promise((r) => canvas.toBlob(r, png ? 'image/png' : 'image/jpeg', 0.85));
-    if (png && blob && blob.size > 3.5e6) blob = await new Promise((r) => canvas.toBlob(r, 'image/jpeg', 0.85));
+    const make = (type, q) => new Promise((r) => canvas.toBlob(r, type, q));
+    let blob = await make('image/webp', 0.82);
+    if (!blob || blob.type !== 'image/webp') {   // older phones can't write WebP
+      const png = file.type === 'image/png';
+      blob = await make(png ? 'image/png' : 'image/jpeg', 0.85);
+      if (png && blob && blob.size > 1.5e6) blob = await make('image/jpeg', 0.85);
+    }
     if (!blob || blob.size >= file.size) return file;
-    const ext = blob.type === 'image/png' ? 'png' : 'jpg';
+    const ext = { 'image/webp': 'webp', 'image/png': 'png' }[blob.type] || 'jpg';
     return new File([blob], `${file.name.replace(/\.[^.]+$/, '') || 'picture'}.${ext}`, { type: blob.type });
   } catch {
     return file;

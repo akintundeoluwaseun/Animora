@@ -28,7 +28,7 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 
 const IMAGE = /^image\/(png|jpe?g|webp|gif|svg\+xml)$/;
 const AUDIO = /^audio\/(mpeg|mp3|wav|x-wav|aac|mp4|x-m4a|ogg)$/;
 
-const MAX_VERSIONS = 15;
+const MAX_VERSIONS = 5;   // Undo steps kept per design (each one is a full copy, so few keeps the database small)
 
 async function loadProject(req, res) {
   const p = await one('SELECT * FROM projects WHERE id=$1 AND user_id=$2', [req.params.id, req.user.id]);
