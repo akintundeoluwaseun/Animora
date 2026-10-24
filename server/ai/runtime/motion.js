@@ -11,7 +11,7 @@
  */
 (function () {
   const DATA = window.ADFLASH_DATA;
-  const W = DATA.W, H = DATA.H, DURATION = DATA.duration, WIDE = W > H, SQUARE = W === H, U = Math.min(W, H) / 1080 * (WIDE ? 1.18 : 1);   // landscape: bigger pieces so the width is used
+  const W = DATA.W, H = DATA.H, DURATION = DATA.duration, WIDE = W > H, SQUARE = W === H, U = Math.min(W, H) / 1080 * (WIDE ? 1.4 : 1);   // landscape: bigger pieces so the width is used (same factor as the CSS)
   const TH = DATA.theme;
   const SP = (typeof SPEED === 'number' && SPEED > 0) ? SPEED : 1;
   const ENERGY = TH.energy || 2;
@@ -224,7 +224,7 @@
     if (L) {
       m.classList.add('logo');
       if (boxed) {
-        m.classList.add('card', 'photo'); m.style.borderRadius = N(side * 0.16) + 'px';
+        m.classList.add('card', 'photo'); m.style.borderRadius = N(side * 0.09) + 'px';   // gentle corners: logos often have letters near the edge
       } else {
         // a card behind a see-through logo only when its colours would vanish on this background
         const bgHex = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim().replace('#', '');
@@ -552,7 +552,9 @@
     const box = el('div', 'fitbox phone-wrap' + (WIDE ? ' row' : ''), bi);
     if (b.title) { const t = el('div', 'tx-line small phone-title', box, wordsHtml(b.title, null, TH.accentStyle === 'marker')); t.style.fontSize = FS(sizeFor(b.title, 1700, 50, 86)); textEnter(t, b.in + 0.1, 'rise'); }
     const ph = el('div', 'phone', box);
-    const pw = Math.min(N(WIDE ? 420 : 520), H * 0.66 / 2.02); ph.style.width = pw + 'px'; ph.style.height = pw * 2.02 + 'px';
+    // landscape: draw the phone at its full design size, then zoom the whole phone (screen included) to fit the height
+    const pw = WIDE ? N(470) : Math.min(N(520), H * 0.66 / 2.02); ph.style.width = pw + 'px'; ph.style.height = pw * 2.02 + 'px';
+    if (WIDE) ph.style.zoom = String(Math.min(1, (H * 0.8) / (pw * 2.02)));
     el('i', 'notch', ph);
     const scr = el('div', 'scr', ph);
     const head = el('div', 'scr-head', scr); mark(head, 86); el('span', 'scr-name', head, esc(DATA.brand || ''));
@@ -1896,6 +1898,7 @@
     const c = b.cut, d = (c.d || 0.3) / SP, nx = beats[i + 1];
     const dOut = Math.min(d, (b.t1 - b.t0) * 0.35), dIn = Math.min(0.55, (nx.t1 - nx.t0) * 0.4);
     exitBeat(b._el, c.type, b.t1, dOut);
+    if (c.type === 'iris') tl.to(b._el.bx, { opacity: 0, duration: dIn * 0.7, ease: 'power2.out' }, b.t1);   // the old scene fades as the circle opens (scenes are see-through, so it must not stay under)
     enterBeat(nx._el, c.type, b.t1, dIn);
     if (BLURRY.includes(c.type)) { blurWindow(b._el, b.t1 - dOut - 0.01, b.t1 + 0.01); blurWindow(nx._el, b.t1 - 0.01, b.t1 + dIn + 0.02); }
     else if (c.type === 'glitch') { filterWindow(b._el, b.t1 - dOut - 0.01, b.t1 + 0.01, chroma(1.4)); filterWindow(nx._el, b.t1 - 0.01, b.t1 + dIn + 0.02, chroma(1.4)); }
