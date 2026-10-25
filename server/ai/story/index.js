@@ -153,7 +153,7 @@ export function composeStory({ facts: f, duration, seed, look: lookId, aspect, o
   if (f.offer) add('offer', { offer: f.offer, label: 'Special offer' }, 9, 'center', { surface: 'accent' });
   photoBeat('', '', 4, 'full');
   if (f.when) add('info', { when: f.when, place: f.place }, 6);
-  add('end', { cta: f.cta, phone: f.phone, whatsapp: f.whatsapp, place: f.place }, 10, L.center ? 'center' : pick(['center', 'left']));
+  add('end', { cta: f.cta, phone: f.phone, whatsapp: f.whatsapp, place: f.place, link: f.link, note: f.note }, 10, L.center ? 'center' : pick(['center', 'left']));
   if (duration >= 20 && (L.id === 'noir' || r() < 0.4)) beats.unshift({ type: 'sting', data: {}, keep: 2 });
 
   // material for long films, best first; when it runs out the list starts again with new crops and layouts

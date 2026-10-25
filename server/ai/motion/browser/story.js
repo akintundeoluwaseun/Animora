@@ -15,6 +15,7 @@
   // ---------------------------------------------------------------- icons (stroke, drawn on)
   const ICON = {
     pin: '<path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.6"/>',
+    globe: '<circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.6 2.4 3.9 5.2 3.9 8.5s-1.3 6.1-3.9 8.5c-2.6-2.4-3.9-5.2-3.9-8.5s1.3-6.1 3.9-8.5z"/>',
     phone: '<path d="M5 3.5h3.2l1.6 4.2-2 1.4a11 11 0 0 0 7.1 7.1l1.4-2 4.2 1.6V19a1.5 1.5 0 0 1-1.6 1.5A16.5 16.5 0 0 1 3.5 5.1 1.5 1.5 0 0 1 5 3.5z"/>',
     chat: '<path d="M4.5 19.5l1.2-3.7A8 8 0 1 1 8.6 18.6z"/>',
     cal: '<rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/>',
@@ -816,7 +817,7 @@
         if (desk) {
           pw = port ? W * 0.9 : land ? W * 0.6 : W * 0.84; barH = pw * 0.045;
           sw = pw - 2 * pw * 0.012; sh = Math.min(sw / r0, (port ? H * 0.38 : H * 0.62)); pad = pw * 0.012;
-          ph = sh + barH + 2 * pad; px = port ? (W - pw) / 2 : land ? W * 0.64 - pw / 2 : (W - pw) / 2; py = port ? H * 0.16 : (H - ph) / 2 - H * 0.03;
+          ph = sh + barH + 2 * pad; px = port ? (W - pw) / 2 : land ? W * 0.685 - pw / 2 : (W - pw) / 2; py = port ? H * 0.16 : (H - ph) / 2 - H * 0.03;
         } else {
           ph = port ? H * 0.6 : land ? H * 0.82 : H * 0.68; pw = ph * 0.49;
           px = port ? (W - pw) / 2 : land ? W * 0.68 - pw / 2 : W * 0.7 - pw / 2; py = port ? H * 0.08 : (H - ph) / 2;
@@ -888,8 +889,8 @@
         const at = (pt) => ({ x: px + pad + pt.x * sw, y: py + pad + barH + pt.y * sh });
         tl.set(finger, { x: px + pw * 1.3, y: py + ph * 1.05 }, t);
         // steps: dots + "Step 1 of 4" + the caption, beside (wide) or under (tall) the phone
-        const capBox = port ? { l: M, tp: py + ph + (desk ? 110 : 46) * U, w: CW } : land ? { l: M, tp: H * 0.3, w: px - M - 80 * U } : { l: M, tp: H * 0.3, w: px - M - 60 * U };
-        const dots = el('div', `position:absolute;left:${capBox.l}px;top:${capBox.tp - 40 * U}px;width:${capBox.w}px;display:flex;gap:${10 * U}px;justify-content:${port ? 'center' : 'flex-start'};align-items:center;font-family:${ui};font-weight:700;font-size:${22 * TU}px;letter-spacing:.06em;color:${rgba(S.ink, 0.55)};`, Lr);
+        const capBox = port ? { l: M, tp: py + ph + (desk ? 110 : 46) * U, w: CW } : land ? { l: M, tp: H * 0.3, w: px - M - (desk ? 200 : 80) * U } : { l: M, tp: H * 0.3, w: px - M - 60 * U };
+        const dots = el('div', `position:absolute;z-index:30;left:${capBox.l}px;top:${capBox.tp - 40 * U}px;width:${capBox.w}px;display:flex;gap:${10 * U}px;justify-content:${port ? 'center' : 'flex-start'};align-items:center;font-family:${ui};font-weight:700;font-size:${22 * TU}px;letter-spacing:.06em;color:${rgba(S.ink, 0.55)};`, Lr);
         const dotEls = shots.map(() => el('i', `display:block;width:${12 * U}px;height:${12 * U}px;border-radius:${6 * U}px;background:${rgba(S.ink, 0.22)};`, dots));
         const stepTxt = el('span', `margin-${port ? 'left' : 'left'}:${12 * U}px;`, dots, '');
         tl.fromTo(dots, { opacity: 0, y: 20 * U }, { opacity: 1, y: 0, duration: 0.6, ease: 'power2.out' }, t + 0.8);
@@ -912,6 +913,7 @@
           // caption for this step
           if (shot.caption) {
             const cb = textBlock(Lr, shot.caption, { w: capBox.w, size: (land ? 74 : 64) * TU, min: 30 * TU, maxLines: port ? 2 : 3, maxH: port ? H - capBox.tp - M : H * 0.4, color: S.ink, accent: L0.accentWord, accentCss: acc(S), upper: L0.upper, align: port ? 'center' : 'left', css: `left:${capBox.l}px;top:${capBox.tp}px` });
+            cb.style.zIndex = '30';
             reveal(cb, s0 + 0.05, { soft: true, dy: 26 }); lastCap = cb;
             if (i < n - 1) tl.to(cb, { opacity: 0, y: -18 * U, duration: 0.3, ease: 'power2.in' }, s0 + seg - 0.45);
           }
@@ -926,16 +928,17 @@
           tl.fromTo(ring, { scale: 0.6, opacity: 0.9 }, { scale: 2.4, opacity: 0, duration: 0.6, ease: 'power2.out' }, tapAt);
           sound(tapAt, 'click');
           // camera leans in on the tap, then settles back before the next screen
-          const zoom = desk ? (port ? 1.4 : 1.35) : port ? 1.18 : 1.2;
+          const zoom = desk ? (port ? 1.4 : land ? 1.25 : 1.35) : port ? 1.18 : 1.2;
           const oy = port ? Math.max(P.y, py + ph * 0.8) : P.y;   // tall videos: the phone grows upwards, the caption below stays clear
-          tl.to(cam, { scale: zoom, transformOrigin: `${(P.x / W) * 100}% ${(oy / H) * 100}%`, duration: 0.7, ease: 'power3.inOut' }, tapAt + 0.12);
+          const ox = port ? P.x : Math.max(P.x, px + pw * (desk ? 0.5 : 0.3));   // wide videos: it grows to the right, the captions on the left stay clear
+          tl.to(cam, { scale: zoom, transformOrigin: `${(ox / W) * 100}% ${(oy / H) * 100}%`, duration: 0.7, ease: 'power3.inOut' }, tapAt + 0.12);
           tl.to(cam, { scale: 1, duration: 0.6, ease: 'power3.inOut' }, s0 + seg - 0.75);
           // every other step: a part of the screen lifts out in 3D (same picture, cropped), then settles back
           if (i % 2 === 0) {
             const hot = shot.hot && shot.hot.w ? shot.hot : HOTS[(i / 2) % HOTS.length];
             const card = el('div', `position:absolute;left:${px + pad + hot.x * sw}px;top:${py + pad + barH + hot.y * sh}px;width:${hot.w * sw}px;height:${hot.h * sh}px;border-radius:${14 * U}px;background:#fff url("${String(shot.photo).replace(/"/g, '%22')}") no-repeat ${-hot.x * sw}px ${-hot.y * sh}px / ${sw}px ${bgH}px;box-shadow:0 ${30 * U}px ${70 * U}px rgba(0,0,0,.38);z-index:15;opacity:0;`, cam);
             const liftAt = tapAt + 0.75;
-            tl.fromTo(card, { opacity: 0, scale: 1, x: 0 }, { opacity: 1, scale: 1.16, x: port ? 0 : -pw * 0.12, duration: 0.55, ease: 'back.out(1.6)' }, liftAt);
+            tl.fromTo(card, { opacity: 0, scale: 1, x: 0 }, { opacity: 1, scale: 1.16, x: port || desk ? 0 : -pw * 0.12, duration: 0.55, ease: 'back.out(1.6)' }, liftAt);
             tl.to(card, { opacity: 0, scale: 1, x: 0, duration: 0.4, ease: 'power2.in' }, s0 + seg - 0.85);
             sound(liftAt, 'pop', 0.7);
           } else if (extra > 8 * U) {
@@ -1001,7 +1004,7 @@
         tl.fromTo(glow, { scale: 0.85, opacity: 0 }, { scale: 1.15, opacity: 1, duration: d, ease: 'none' }, t);
         const leftA = v === 'left' && !land;
         const mk = (port ? 200 : 160) * TU;
-        const contacts = [data.phone && [data.whatsapp ? 'chat' : 'phone', data.phone], data.place && ['pin', data.place]].filter(Boolean);
+        const contacts = [data.phone && [data.whatsapp ? 'chat' : 'phone', data.phone], data.link && ['globe', data.link], data.place && ['pin', data.place]].filter(Boolean);
         // measure the stack first so it sits centred
         const nameW = land ? W * 0.7 : CW;
         const nb = textBlock(Lr, cfg.brand, { w: nameW, size: (port ? 96 : 88) * TU, min: 40 * TU, maxLines: 2, color: S.ink, upper: L0.upper, align: leftA ? 'left' : 'center', css: leftA ? `left:${M}px;top:0` : `left:${(W - nameW) / 2}px;top:0` });
@@ -1047,6 +1050,10 @@
           row.innerHTML = icon(ic, 38 * TU, S.acc, 2) + `<span>${esc(text)}</span>`;
           fadeUp(row, tb + 0.4 + i * 0.15);
         });
+        if (data.note) {   // a small closing line, e.g. "This video was made with Animora"
+          const nt = el('div', `position:absolute;left:${M}px;right:${M}px;bottom:${M * 0.9}px;text-align:center;font-family:${ui};font-weight:600;font-size:${(port ? 30 : 26) * TU}px;letter-spacing:.04em;color:${rgba(S.ink, 0.78)};`, Lr, esc(data.note));
+          fadeUp(nt, tb + 1.3);
+        }
         sound(t - 0.9, 'swell'); sound(t + 0.5, 'end');
       },
     };
