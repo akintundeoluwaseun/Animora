@@ -71,14 +71,15 @@ function limit(x, sr, ceiling = lin(-2.2), lookMs = 5, releaseMs = 80) {   // -2
 }
 
 /** Master a mono effects track in place. Returns { gainDb, lufs } for logging. */
-export function masterTrack(x, sr, { target = -14 } = {}) {
+// true peaks stay under -4 dBFS (measured on the exported AAC), as the sound-pass method asks, so phone speakers never crackle
+export function masterTrack(x, sr, { target = -14, ceilingDb = -4.6 } = {}) {
   if (!x?.length) return { gainDb: 0, lufs: -70 };
   compress(x, sr, { attack: 0.018, release: 0.16 });   // a slower attack lets the start of each effect through, so it reads over the music
   const before = loudness(x, sr);
   const gainDb = before > -69 ? Math.max(-12, Math.min(24, target - before)) : 0;
   const g = lin(gainDb);
   for (let i = 0; i < x.length; i++) x[i] *= g;
-  limit(x, sr);
+  limit(x, sr, lin(ceilingDb));
   return { gainDb, lufs: loudness(x, sr) };
 }
 

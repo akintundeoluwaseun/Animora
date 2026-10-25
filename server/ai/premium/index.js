@@ -83,7 +83,7 @@ const PATCH = {
 const FRIENDS = ['Tolu', 'Amaka', 'Chidi', 'Zainab', 'Bisi', 'Ifeoma', 'Kemi', 'Tunde'];
 const BLOCKS = {
   'notification-cascade': {
-    meta: mNotif, sound: 'ping', html: notificationCascade, fits: () => true,
+    meta: mNotif, sfx: { appear: 'ding' }, html: notificationCascade, fits: () => true,
     fill(f, r) {
       const p = points(f), head = f.heads[0] || f.sub || f.cta;
       const [top, acc] = halves(head);
@@ -96,7 +96,7 @@ const BLOCKS = {
     },
   },
   'message-thread-reveal': {
-    meta: mThread, sound: 'pop-soft', html: messageThread, fits: (f) => f.photos.length >= 1,
+    meta: mThread, sfx: {}, html: messageThread, fits: (f) => f.photos.length >= 1,
     fill(f, r) {
       const t = thing(f), p = points(f), friend = FRIENDS[Math.floor(r() * FRIENDS.length)];
       const ec = (f.features.length ? f.features : p).slice(0, 3).map((x) => { const [a, b] = labelValue(x); return b ? `${a}|${b}` : `${a}|`; });
@@ -117,7 +117,7 @@ const BLOCKS = {
     },
   },
   'notes-reveal': {
-    meta: mNotes, sound: 'tick', html: notesReveal, fits: (f) => f.features.length + f.products.length >= 2,
+    meta: mNotes, sfx: { appear: 'tick' }, html: notesReveal, fits: (f) => f.features.length + f.products.length >= 2,
     fill(f) {
       const t = thing(f), p = points(f), head = f.heads[0] || f.sub || f.name;
       const words = clean(head, 40).toUpperCase().split(' ');
@@ -136,7 +136,7 @@ const BLOCKS = {
     },
   },
   'ai-chat-reveal': {
-    meta: mChat, sound: 'pop-soft', html: aiChat, fits: (f) => f.features.length + f.products.length >= 1,
+    meta: mChat, sfx: {}, html: aiChat, fits: (f) => f.features.length + f.products.length >= 1,
     fill(f) {
       const t = thing(f), p = points(f), city = cityOf(f), head = f.heads[0] || f.sub || f.name;
       const bullets = p.slice(0, 3); while (bullets.length < 3) bullets.push([f.cta, f.place && `In ${f.place}`, f.phone && `Call ${f.phone}`].filter(Boolean)[bullets.length] || clean(f.category || f.name, 40));
@@ -150,7 +150,7 @@ const BLOCKS = {
     },
   },
   'share-sheet-carousel': {
-    meta: mShare, sound: 'swipe', html: shareSheet, fits: (f) => f.photos.length >= 2,
+    meta: mShare, sfx: {}, html: shareSheet, fits: (f) => f.photos.length >= 2,
     fill(f) {
       const ph = f.photos; const pick = (i) => ph[i % ph.length];
       return {
@@ -163,10 +163,10 @@ const BLOCKS = {
 };
 // Landscape scenes: joined into one film (see filmHtml). They are never used alone for tall videos.
 const CAROUSELS = { 'carousel-text-circle-1': [ctc1, mC1], 'carousel-text-circle-2': [ctc2, mC2], 'carousel-text-circle-3': [ctc3, mC3], 'carousel-text-circle-4': [ctc4, mC4], 'carousel-text-circle-5': [ctc5, mC5] };
-for (const [id, [html, meta]] of Object.entries(CAROUSELS)) BLOCKS[id] = { meta, html, wide: true, sound: 'swish' };
-BLOCKS['mk-specs-list'] = { meta: mSpecs, html: specsList, wide: true, sound: 'tick' };
-BLOCKS['logo-outro'] = { meta: mOutro, html: logoOutro, wide: true, sound: 'pop-soft' };
-BLOCKS['weight-wave'] = { meta: mWave, html: weightWave, wide: true, sound: 'swish' };
+for (const [id, [html, meta]] of Object.entries(CAROUSELS)) BLOCKS[id] = { meta, html, wide: true, sfx: {} };
+BLOCKS['mk-specs-list'] = { meta: mSpecs, html: specsList, wide: true, sfx: { appear: 'tick' } };
+BLOCKS['logo-outro'] = { meta: mOutro, html: logoOutro, wide: true, sfx: {} };
+BLOCKS['weight-wave'] = { meta: mWave, html: weightWave, wide: true, sfx: {} };
 
 export const PREMIUM_BLOCKS = Object.keys(BLOCKS).filter((k) => !BLOCKS[k].wide);
 
@@ -181,7 +181,35 @@ U.forEach(function(r){var idle=r[0]-pos;o+=Math.min(idle,pos===0?0.5:MAX);K.push
 o+=Math.min(D-pos,END);K.push([o,D]);
 return {D:K[K.length-1][0],f:function(t){if(t<=0)return 0;for(var j=1;j<K.length;j++){if(t<=K[j][0]){var a=K[j-1],b=K[j];return a[1]+(b[1]-a[1])*((t-a[0])/((b[0]-a[0])||1));}}return K[K.length-1][1];},g:function(x){for(var j=1;j<K.length;j++){if(x<=K[j][1]){var a=K[j-1],b=K[j];return a[0]+(b[0]-a[0])*((x-a[1])/((b[1]-a[1])||1));}}return K[K.length-1][0];}};}
 function wrap(tl,m){return {_t:0,seek:function(t){this._t=+t||0;var x=m.f(this._t);tl.seek(x,false);if(window.__clipSync)window.__clipSync(x);return this;},time:function(){return this._t;},duration:function(){return m.D;},pause:function(){return this;},paused:function(){return true;},play:function(){return this;},repeat:function(){return 0;},progress:function(){return this._t/m.D;}};}`;
-const SFX_FN = `function cues(tl,SND){var ts=[];tl.getChildren(true,true,false).forEach(function(c){var v=c.vars||{},a=v.autoAlpha!=null?v.autoAlpha:v.opacity;if(a==null||+a<0.5)return;var st=c.startTime(),p=c.parent;while(p&&p!==tl){st+=p.startTime();p=p.parent;}if(st>0.25)ts.push(st);});ts.sort(function(a,b){return a-b;});var out=[],last=-9,d=tl.duration();ts.forEach(function(t){if(t-last>=0.45&&t<d-0.3&&out.length<24){out.push({t:+t.toFixed(3),k:SND,v:0.55});last=t;}});if(out.length){var e=out[out.length-1];if(e.t>d*0.55){e.k='shimmer';e.v=0.7;}}return out;}`;
+// Sound design, worked out from the template's own motion (the "sound pass" method from github.com/Barty-Bart/motion-graphics):
+// a whoosh starts 2 frames before anything that travels, sized to the move; a pop lands on the frame something appears;
+// typing runs under typed text; the final big reveal gets an impact with a soft riser leading into it. Sounds: CC0 kit (assets/sfx/mg-*).
+const SFX_FN = `var KIT={whoosh:{s:['mg-whoosh-5','mg-whoosh-8'],m:['mg-whoosh-1','mg-whoosh-6','mg-whoosh-4','mg-whoosh-7'],l:['mg-whoosh-3']},pop:['mg-pop-1','mg-pop-3','mg-pop-7','mg-pop-10','mg-pop-11'],ding:['mg-ding-4','mg-ding-6','mg-ding-8'],tick:['mg-tick-2','mg-tick-3','mg-click-1'],impact:['mg-impact-1','mg-impact-5','mg-impact-6'],riser:['mg-riser-1','mg-riser-13'],typing:['mg-typing-4','mg-typing-1']},VOL={whoosh:0.5,pop:0.45,ding:0.5,tick:0.32,impact:0.85,riser:0.3,typing:0.26},PRI={impact:5,whoosh:3,ding:2,pop:2,tick:1,typing:1,riser:0},ROT={};
+function take(cat,len){var L=cat==='whoosh'?KIT.whoosh[len||'m']:KIT[cat];ROT[cat+(len||'')]=((ROT[cat+(len||'')]||0)+1)%L.length;return L[ROT[cat+(len||'')]];}
+function cues(tl,P){P=P||{};var W=innerWidth||1920,H=innerHeight||1080,D=tl.duration(),raw=[],sets=[],moves=[],cuts=[];var num=function(x){return typeof x==='number'?x:(typeof x==='string'&&/^-?[\\d.]+(px)?$/.test(x)?parseFloat(x):null);};
+ tl.getChildren(true,true,false).forEach(function(c){if(c.getChildren)return;var v=c.vars||{},s=v.startAt||{},d=c.duration(),st=c.startTime(),p=c.parent;while(p&&p!==tl){st+=p.startTime();p=p.parent;}if(st>D)return;
+  var el=(c.targets&&c.targets()[0])||null,r=el&&el.getBoundingClientRect?el.getBoundingClientRect():{width:0,height:0},area=(r.width*r.height)/(W*H);
+  if(!(d>0)){if(st>0.2){if(v.x!=null||v.y!=null||v.xPercent!=null||v.yPercent!=null)moves.push(st);else if(v.autoAlpha!=null||v.opacity!=null||v.visibility!=null||v.display!=null)cuts.push(st);else sets.push(st);}return;}
+  var mv=0;['x','y'].forEach(function(k){var a=num(v[k]),b=num(s[k]);if(a!=null||b!=null)mv=Math.max(mv,Math.abs((a||0)-(b||0)));});['xPercent','yPercent'].forEach(function(k){var a=num(v[k]),b=num(s[k]);if(a!=null||b!=null)mv=Math.max(mv,Math.abs((a||0)-(b||0))/100*(k==='xPercent'?(r.width||W):(r.height||H)));});
+  if(mv>=140&&d>=0.18&&d<=1.8)raw.push({t:st-0.067,c:'whoosh',len:d<0.3?'s':d<=1.2?'m':'l',soft:mv<320});
+  var A=v.autoAlpha!=null?v.autoAlpha:v.opacity,F=s.autoAlpha!=null?s.autoAlpha:s.opacity,enter=v.runBackwards?(A!=null&&+A<0.5):(A!=null&&+A>=0.5&&(F==null||+F<0.5));
+  var sc=num(v.scale),sf=num(s.scale),grow=v.runBackwards?(sc!=null&&sc<0.8):(sf!=null&&sf<0.8&&(sc==null||sc>=0.95));
+  if((enter||grow)&&st>0.15){raw.push({t:st+0.01,c:(area>0.22&&st>D*0.55)?'reveal':(P.appear||'pop'),area:area});}
+ });
+ // instant changes in quick runs are typed text
+ sets.sort(function(a,b){return a-b;});for(var i=0;i<sets.length;){var j=i;while(j+1<sets.length&&sets[j+1]-sets[j]<0.22)j++;if(j-i>=4&&sets[j]-sets[i]>=0.35)raw.push({t:sets[i],c:'typing',dur:sets[j]-sets[i]+0.15});i=j+1;}
+ // stepped moves (a run of instant position changes) whoosh once at their start; hard picture swaps get a soft tick
+ moves.sort(function(a,b){return a-b;});for(var q=0;q<moves.length;){var z=q;while(z+1<moves.length&&moves[z+1]-moves[z]<0.12)z++;if(z>q)raw.push({t:moves[q]-0.067,c:'whoosh',len:'m'});q=z+1;}
+ cuts.sort(function(a,b){return a-b;});var lc=-9;cuts.forEach(function(t){if(t-lc>0.2){raw.push({t:t,c:'tick'});lc=t;}});
+ raw.sort(function(a,b){return a.t-b.t;});
+ // the final big reveal: one impact, a soft riser into it; earlier "reveals" are just appearances
+ var rev=raw.filter(function(e){return e.c==='reveal';});rev.forEach(function(e,k){if(k<rev.length-1)e.c=P.appear||'pop';else{e.c='impact';if(e.t>2.4)raw.push({t:e.t-2.0,c:'riser'});}});
+ raw.sort(function(a,b){return a.t-b.t;});
+ var out=[],lastBy={},GAP={pop:0.14,ding:0.4,tick:0.1,whoosh:0.28,typing:0.6,impact:1,riser:2};
+ raw.forEach(function(e){if(e.t<0||e.t>D-0.05)return;if(lastBy[e.c]!=null&&e.t-lastBy[e.c]<GAP[e.c])return;
+  var prev=out[out.length-1];if(prev&&Math.abs(prev.t-e.t)<0.05&&e.c!=='typing'&&prev.c!=='typing'){if((PRI[e.c]||0)<=(PRI[prev.c]||0))return;out.pop();}
+  lastBy[e.c]=e.t;var o={t:+Math.max(0,e.t).toFixed(3),k:take(e.c,e.len),v:e.soft?VOL[e.c]*0.55:VOL[e.c]};if(e.c==='typing'){o.len=+e.dur.toFixed(2);}out.push(o);});
+ return out.slice(0,48);}`;
 
 /** One template as a page: its slots, the slot binder, and (standalone) the hand-off of its timeline to the renderer. */
 function blockPage(block, vars, { standalone = true, data = null } = {}) {
@@ -199,7 +227,7 @@ function blockPage(block, vars, { standalone = true, data = null } = {}) {
 // sound effects: a soft hit each time something new appears (one per half second at most), a shimmer on the closing card
 ${SFX_FN}
 ${REMAP_FN}
-(function wait(){var t=window.__timelines&&window.__timelines[id];if(t){t.pause(0);var m=remap(t);try{window.__sfx=cues(t,${JSON.stringify(b.sound || 'pop-soft')}).map(function(e){return {t:+m.g(e.t).toFixed(3),k:e.k,v:e.v};});}catch(e){window.__sfx=[];}t.seek(0,false);window.__timeline=wrap(t,m);return;}if(++n<400)setTimeout(wait,25);})();})();</script>` : bind;
+(function wait(){var t=window.__timelines&&window.__timelines[id];if(t){t.pause(0);var m=remap(t);try{window.__sfx=cues(t,${JSON.stringify(b.sfx || {})}).map(function(e){var o={t:+m.g(e.t).toFixed(3),k:e.k,v:e.v};if(e.len)o.len=+(m.g(e.t+e.len)-m.g(e.t)).toFixed(2);return o;});}catch(e){window.__sfx=[];}t.seek(0,false);window.__timeline=wrap(t,m);return;}if(++n<400)setTimeout(wait,25);})();})();</script>` : bind;
   return html.replace(/<head>/i, `<head>${head}`).replace(/<body([^>]*)>/i, `<body$1><div id="stage" style="position:absolute;left:0;top:0;width:${b.meta.width}px;height:${b.meta.height}px;overflow:hidden">`)
     .replace(/<\/body>/i, `</div>${tail}</body>`);
 }
@@ -214,7 +242,7 @@ export function premiumHtml({ block, vars }) { return blockPage(block, vars); }
 const XF = 0.4;
 export function filmHtml({ film, W = 1920, H = 1080 }) {
   // scene lengths are worked out in the page, after the dead air in each scene has been taken out
-  const scenes = film.map((s) => ({ cap: Number(s.dur) || BLOCKS[s.block].meta.duration, id: s.block, snd: BLOCKS[s.block].sound || 'pop-soft' }));
+  const scenes = film.map((s) => ({ cap: Number(s.dur) || BLOCKS[s.block].meta.duration, id: s.block, snd: BLOCKS[s.block].sfx || {} }));
   const docs = film.map((s) => blockPage(s.block, s.vars, { standalone: false }));
   const data = JSON.stringify({ film }).replace(/</g, '\\u003c');
   const docsJson = JSON.stringify(docs).replace(/</g, '\\u003c').replace(/[\u2028\u2029]/g, '');
@@ -237,8 +265,10 @@ var n=0;(function wait(){var ok=SC.every(function(s,i){return !!child(i);});
   if(ok){var docsReady=frames.map(function(f){var d=f.contentDocument;return Promise.race([Promise.all([d.fonts?d.fonts.ready:null].concat([].map.call(d.images,function(im){return im.complete?null:new Promise(function(r){im.onload=im.onerror=r;});}))),new Promise(function(r){setTimeout(r,8000);})]);});
     Promise.all(docsReady).then(function(){var sfx=[],at=0;
       SC.forEach(function(s,i){var c=child(i);c.pause(0);s.m=remap(c,s.cap,i===SC.length-1?2.2:1.1);s.dur=s.m.D;s.start=i?at-XF:0;at=s.start+s.dur;
-        try{cues(c,s.snd).forEach(function(e){if(e.t>s.cap)return;var tt=s.m.g(e.t)+s.start;sfx.push({t:+tt.toFixed(3),k:e.k==='shimmer'&&i<SC.length-1?s.snd:e.k,v:e.v});});}catch(e){}
-        if(i)sfx.push({t:+(s.start).toFixed(3),k:'trans-soft-1',v:0.5});});
+        try{cues(c,s.snd).forEach(function(e){if(e.t>s.cap)return;var tt=s.m.g(e.t)+s.start,o={t:+tt.toFixed(3),k:e.k,v:e.v};if(e.len)o.len=e.len;sfx.push(o);});}catch(e){}
+        if(i)sfx.push({t:+Math.max(0,s.start-0.067).toFixed(3),k:'mg-whoosh-1',v:0.55});});
+      // the ending lands: the first thing to appear in the last scene gets the impact, with a soft riser into it
+      var L=SC[SC.length-1],hit=null;sfx.forEach(function(e){if(!hit&&e.t>=L.start+0.05&&/^mg-(pop|tick|ding|click)/.test(e.k))hit=e;});if(hit&&!sfx.some(function(e){return /impact/.test(e.k);})){hit.k='mg-impact-1';hit.v=0.85;if(hit.t>2.4)sfx.push({t:+(hit.t-2.0).toFixed(3),k:'mg-riser-13',v:0.3});}
       D=at;sfx=sfx.filter(function(e){return e.t<D-0.2;}).sort(function(a,b){return a.t-b.t;});window.__sfx=sfx;apply(0);window.__timeline=T;});return;}
   if(++n<600)setTimeout(wait,25);})();
 })();</script></body></html>`;

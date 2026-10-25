@@ -72,7 +72,8 @@ function playSfx(e) {
   const c = ctx(); const b = buffers[e.k];
   if (!c || c.state !== 'running' || !b) return;
   const src = c.createBufferSource(); const g = c.createGain();
-  g.gain.value = Math.min(1.2, (e.v || 1) * 0.8); src.buffer = b; src.connect(g).connect(master(c)); src.start();
+  g.gain.value = Math.min(1.2, (e.v || 1) * 0.8); src.buffer = b; src.connect(g).connect(master(c));
+  if (Number(e.len) > 0) { src.loop = Number(e.len) > b.duration; src.start(); src.stop(c.currentTime + Number(e.len)); } else src.start();
 }
 
 export function LivePreview({ html, aspect = '9:16', autoPlay = true, maxWidth = 340, onError, sound: soundOn = true, onSoundChange, still = false, onEnded, exact = false }) {
