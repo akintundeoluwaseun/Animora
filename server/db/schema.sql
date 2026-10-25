@@ -270,3 +270,6 @@ ALTER TABLE renders ADD COLUMN IF NOT EXISTS downloaded_at timestamptz;
 -- code_md5: which version of the video the MP4 was, so making the same one again after it expired is free.
 ALTER TABLE renders ADD COLUMN IF NOT EXISTS served_at timestamptz;
 ALTER TABLE renders ADD COLUMN IF NOT EXISTS code_md5 text;
+
+-- v12: where a finger / mouse taps on an app screenshot ("x,y" 0..1), measured in the browser at upload
+ALTER TABLE assets ADD COLUMN IF NOT EXISTS focus text;

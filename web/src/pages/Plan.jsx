@@ -488,6 +488,7 @@ export default function Plan() {
         if (role) form.append('role', role);
         const look = await imageLook(small);
         if (look.alpha !== undefined) form.append('alpha', String(look.alpha));
+        if (look.focus) form.append('focus', look.focus);
         if (look.light !== undefined && look.light !== null) form.append('light', String(look.light));
         form.append('name', role === 'logo' ? 'logo' : f.name.replace(/\.[^.]+$/, '').slice(0, 40));
         const { asset } = await api(`/projects/${id}/assets`, { method: 'POST', form });

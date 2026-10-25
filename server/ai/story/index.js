@@ -138,7 +138,7 @@ export function composeStory({ facts: f, duration, seed, look: lookId, aspect, o
     // one continuous scene: the device stays, a finger (phone) or mouse (desktop) taps through every screen, A to Z
     const shots = rest.filter((p) => !p.cut).slice(0, 6);
     shots.forEach((p) => rest.splice(rest.indexOf(p), 1));
-    add('walk', { title: f.name, shots: shots.map((p, i) => ({ photo: p.url, ratio: p.ratio || 0, caption: (f.steps || [])[i] || feats[i] || (i === shots.length - 1 ? head : '') })) }, 10);
+    add('walk', { title: f.name, shots: shots.map((p, i) => ({ photo: p.url, ratio: p.ratio || 0, tap: (f.taps || {})[p.url] || null, caption: (f.steps || [])[i] || feats[i] || (i === shots.length - 1 ? head : '') })) }, 10);
     if ((f.steps || []).length) used = Math.min(feats.length, shots.length);
   }
   photoBeat(hookType === 'hook' && hookV === 'type' ? (f.sub && f.sub !== head ? f.sub : '') : '', f.category || '', 6);

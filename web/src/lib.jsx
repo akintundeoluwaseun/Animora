@@ -169,6 +169,35 @@ export async function imageLook(file) {
       if (d[i + 3] < 200) { clear++; continue; }
       n++; lum += (0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]) / 255;
     }
-    return { alpha: clear > d.length / 4 * 0.02, light: n ? lum / n > 0.72 : null };
+    return { alpha: clear > d.length / 4 * 0.02, light: n ? lum / n > 0.72 : null, focus: tapSpot(bmp) };
   } catch { return {}; }
+}
+
+// Where a finger or mouse should tap on an app screenshot, found for free (no AI): the boldest compact block of colour,
+// which is usually the main button. Full-width coloured bars (headers, banners) count much less. Returns "x,y" (0..1) or null.
+export function tapSpot(bmp) {
+  try {
+    const k = 90 / bmp.width, w = 90, h = Math.max(1, Math.round(bmp.height * k));
+    const c = document.createElement('canvas'); c.width = w; c.height = h;
+    const g = c.getContext('2d'); g.drawImage(bmp, 0, 0, w, h);
+    const d = g.getImageData(0, 0, w, h).data, C = 6, cols = Math.floor(w / C), rows = Math.floor(h / C);
+    const hit = (x, y) => { const i = (y * w + x) * 4, mx = Math.max(d[i], d[i + 1], d[i + 2]), mn = Math.min(d[i], d[i + 1], d[i + 2]); return mx > 90 && mx && (mx - mn) / mx > 0.42; };
+    const cell = [], rowFill = [];
+    for (let r = 0; r < rows; r++) {
+      let rowHits = 0;
+      for (let q = 0; q < cols; q++) {
+        let n = 0; for (let y = r * C; y < r * C + C; y++) for (let x = q * C; x < q * C + C; x++) if (hit(x, y)) n++;
+        cell.push(n / (C * C)); rowHits += n / (C * C);
+      }
+      rowFill.push(rowHits / cols);
+    }
+    let best = -1, at = -1;
+    for (let r = Math.ceil(rows * 0.06); r < rows; r++) for (let q = 0; q < cols; q++) {
+      const v = cell[r * cols + q] * (rowFill[r] > 0.7 ? 0.25 : 1);
+      if (v > best) { best = v; at = r * cols + q; }
+    }
+    if (best < 0.3 || at < 0) return null;
+    const x = ((at % cols) + 0.5) * C / w, y = (Math.floor(at / cols) + 0.5) * C / h;
+    return `${x.toFixed(3)},${y.toFixed(3)}`;
+  } catch { return null; }
 }
