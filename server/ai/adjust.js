@@ -6,6 +6,7 @@ import { readData } from './director.js';
 import { readFlyer, flyerHtml, isFlyer } from './flyer.js';
 import { THEMES } from './themes.js';
 import { storyLookInfo, storyAdjust } from './pieces/index.js';
+import { isPremium } from './premium/index.js';
 
 const HEX = /^#[0-9a-f]{6}$/i;
 const VIDEO_SIZES = ['9:16', '1:1', '4:5', '16:9'];
@@ -38,6 +39,7 @@ export function currentLook(html) {
  */
 export function adjustDesign({ html, plan = {}, assets = [], changes = {} }) {
   const story = storyAdjust(html, changes); if (story) return story;   // Story films are re-told from their own recipe
+  if (isPremium(html)) throw new Error('This premium design keeps its own size, colours and timing. Type the change you want (for example "change the headline"), or press Regenerate for a different design.');
   const done = [];
   const colors = Object.fromEntries(Object.entries(changes.colors || {}).filter(([, v]) => HEX.test(String(v || ''))));
 

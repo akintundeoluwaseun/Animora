@@ -34,7 +34,7 @@ const lum = (h) => { const n = parseInt(String(h || '#777777').slice(1), 16); co
 const HEX = /^#[0-9a-f]{6}$/i;
 
 // the facts a video may use, taken from the owner's answers (never invented)
-function factsOf(plan = {}, brief = {}, assets = []) {
+export function factsOf(plan = {}, brief = {}, assets = []) {
   const photos = assets.filter((a) => (a.kind || 'image') === 'image' && a.role !== 'logo' && !/logo/i.test(a.name || '')).map((a) => a.url);
   // What each picture can honestly do: small, very wide/tall or flat pictures are shown whole on a dimmed copy of themselves, never cropped into a circle or blown up.
   const fitOf = (m) => { const w = Number(m.width) || 0, h = Number(m.height) || 0; if (!w || !h) return 'cover'; const ratio = w / h; return Math.min(w, h) < 600 || ratio > 2.1 || ratio < 0.48 ? 'contain' : 'cover'; };
