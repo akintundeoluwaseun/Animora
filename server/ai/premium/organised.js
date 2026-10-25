@@ -2,12 +2,12 @@
 // (dnyxstudios). Fixed design, fixed timing; only the slots change: logo, brand, phone screen, app tiles,
 // three cards, the title and the two-word tagline.
 //   0.0  phone turns in on a soft studio white
-//   3.4  app tiles pop out around it, float, fly back in (7.0)
-//  10.3  the phone whips out right (motion blur)
-//  11.0  pastel cards slide in one by one and stack, the camera drifts along the stack
-//  15.8  the title arrives above the stack (second word lighter)
-//  18.6  the stack smears out sideways
-//  19.2  logo alone; "Word." then "Word." slide in beside it; slow pull back; hold to the end
+//   1.2  app tiles pop out around it, float, fly back in (3.1)
+//   4.2  the phone whips out right (motion blur)
+//   4.6  pastel cards slide in one by one and stack, the camera follows
+//   7.0  the title arrives above the stack (second word lighter)
+//   8.6  the stack smears out sideways
+//   9.0  logo alone; "Word." then "Word." slide in beside it; gentle pull back to 14 s
 import { GSAP_CDN } from '../../engine/prompts.js';
 
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -47,7 +47,7 @@ export function organisedHtml(data = {}) {
   const tiles = [0, 1, 2, 3, 4].map((i) => ({ g: ['doc', 'chart', 'chat', 'cal', 'check'][i], c: TILE[i] }));
   return `<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
-<meta name="adflash" content="width=${W},height=${H},duration=27.5,fps=30,engine=premium-organised-v1">
+<meta name="adflash" content="width=${W},height=${H},duration=14,fps=30,engine=premium-organised-v1">
 <title>${esc(D.brand)}</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=block" rel="stylesheet">
 <style>
@@ -93,8 +93,8 @@ window.TPL = ${JSON.stringify({ D, tiles }).replace(/</g, '\\u003c')};
   // ---- studio background: soft white light drifting over a pale grey
   var b1 = el('bg', 'width:' + W * 0.9 + 'px;height:' + W * 0.9 + 'px;left:' + (-W * 0.15) + 'px;top:' + (-H * 0.35) + 'px;background:#fff;opacity:.9');
   var b2 = el('bg', 'width:' + W * 0.7 + 'px;height:' + W * 0.7 + 'px;right:' + (-W * 0.2) + 'px;bottom:' + (-H * 0.45) + 'px;background:#fff;opacity:.75');
-  tl.fromTo(b1, { x: 0, y: 0 }, { x: W * 0.08, y: H * 0.05, duration: 27.5, ease: 'sine.inOut' }, 0);
-  tl.fromTo(b2, { x: 0, y: 0 }, { x: -W * 0.06, y: -H * 0.04, duration: 27.5, ease: 'sine.inOut' }, 0);
+  tl.fromTo(b1, { x: 0, y: 0 }, { x: W * 0.08, y: H * 0.05, duration: 14, ease: 'sine.inOut' }, 0);
+  tl.fromTo(b2, { x: 0, y: 0 }, { x: -W * 0.06, y: -H * 0.04, duration: 14, ease: 'sine.inOut' }, 0);
 
   // ================= 1. the phone
   var ph = port ? H * 0.36 : H * 0.62, pw = ph * 0.487;
@@ -113,9 +113,9 @@ window.TPL = ${JSON.stringify({ D, tiles }).replace(/</g, '\\u003c')};
   }
   if (D.screen) el('', 'position:absolute;inset:0;background:linear-gradient(115deg,rgba(255,255,255,0) 40%,rgba(255,255,255,.18) 50%,rgba(255,255,255,0) 60%);z-index:2', scr);
   // turns in from a three-quarter view, settles, keeps breathing
-  tl.fromTo(phone, { rotateY: -48, rotateX: 18, rotateZ: -14, y: H * 0.18, scale: 0.86, opacity: 0 }, { rotateY: -8, rotateX: 6, rotateZ: -6, y: 0, scale: 1, opacity: 1, duration: 2.2, ease: 'expo.out' }, 0.1);
-  tl.to(phone, { rotateY: 8, rotateX: 2, rotateZ: 4, duration: 3.4, ease: 'sine.inOut' }, 2.3);
-  tl.to(phone, { rotateY: -6, rotateZ: -2, y: -H * 0.01, duration: 3.6, ease: 'sine.inOut' }, 5.7);
+  tl.fromTo(phone, { rotateY: -48, rotateX: 18, rotateZ: -14, y: H * 0.18, scale: 0.86, opacity: 0 }, { rotateY: -8, rotateX: 6, rotateZ: -6, y: 0, scale: 1, opacity: 1, duration: 1.5, ease: 'expo.out' }, 0.05);
+  tl.to(phone, { rotateY: 8, rotateX: 2, rotateZ: 4, duration: 1.7, ease: 'sine.inOut' }, 1.5);
+  tl.to(phone, { rotateY: -6, rotateZ: -2, y: -H * 0.01, duration: 1.2, ease: 'sine.inOut' }, 3.1);
   snd(0.15, 'whoosh-low', 0.7);
 
   // ================= 2. app tiles pop out around the phone, float, then fly back in
@@ -126,21 +126,21 @@ window.TPL = ${JSON.stringify({ D, tiles }).replace(/</g, '\\u003c')};
   T.forEach(function (t, i) {
     var x = W / 2 + spots[i][0] * (port ? W : H * 1.3) - ts / 2, y = H / 2 + spots[i][1] * (port ? H * 0.55 : H) - ts / 2;
     var tile = el('tile', 'left:' + x + 'px;top:' + y + 'px;width:' + ts + 'px;height:' + ts + 'px;background:linear-gradient(150deg,' + t.c[1] + ',' + t.c[0] + ');filter:url(#mbt)', null, svg(t.g));
-    var dx = W / 2 - (x + ts / 2), dy = H / 2 - (y + ts / 2), at = 3.4 + i * 0.12;
-    tl.fromTo(tile, { x: dx, y: dy, scale: 0.2, rotate: -20 + i * 9, opacity: 0 }, { x: 0, y: 0, scale: 1, rotate: -8 + i * 4, opacity: 1, duration: 0.9, ease: 'back.out(1.5)' }, at);
-    tl.to(tile, { y: -14 * u * (i % 2 ? 1 : -1), rotate: '+=' + (i % 2 ? 4 : -4), duration: 2.4, ease: 'sine.inOut' }, at + 0.9);
-    tl.to(tile, { x: dx, y: dy, scale: 0.25, rotate: 0, opacity: 0, duration: 0.6, ease: 'power3.in' }, 6.5 + i * 0.06);
+    var dx = W / 2 - (x + ts / 2), dy = H / 2 - (y + ts / 2), at = 1.15 + i * 0.08;
+    tl.fromTo(tile, { x: dx, y: dy, scale: 0.2, rotate: -20 + i * 9, opacity: 0 }, { x: 0, y: 0, scale: 1, rotate: -8 + i * 4, opacity: 1, duration: 0.7, ease: 'back.out(1.5)' }, at);
+    tl.to(tile, { y: -14 * u * (i % 2 ? 1 : -1), rotate: '+=' + (i % 2 ? 4 : -4), duration: 1.1, ease: 'sine.inOut' }, at + 0.7);
+    tl.to(tile, { x: dx, y: dy, scale: 0.25, rotate: 0, opacity: 0, duration: 0.45, ease: 'power3.in' }, 3.05 + i * 0.04);
     snd(at, 'pop', 0.55);
   });
-  tl.fromTo('#mbtd', { attr: { stdDeviation: '6 6' } }, { attr: { stdDeviation: '0 0' }, duration: 0.5, ease: 'power2.out' }, 3.4);
-  tl.to('#mbtd', { attr: { stdDeviation: '5 5' }, duration: 0.5, ease: 'power2.in' }, 6.5);
-  snd(6.5, 'swish', 0.6);
+  tl.fromTo('#mbtd', { attr: { stdDeviation: '6 6' } }, { attr: { stdDeviation: '0 0' }, duration: 0.45, ease: 'power2.out' }, 1.15);
+  tl.to('#mbtd', { attr: { stdDeviation: '5 5' }, duration: 0.4, ease: 'power2.in' }, 3.05);
+  snd(3.05, 'swish', 0.6);
 
   // phone whips out to the right with motion blur
   pwrap.style.filter = 'url(#mbx)';
-  tl.to(pwrap, { x: W * 0.75, duration: 0.55, ease: 'power3.in' }, 10.1);
-  tl.to('#mbxd', { attr: { stdDeviation: (60 * u) + ' 0' }, duration: 0.5, ease: 'power2.in' }, 10.1);
-  snd(10.05, 'whoosh', 0.8);
+  tl.to(pwrap, { x: W * 0.75, duration: 0.45, ease: 'power3.in' }, 4.15);
+  tl.to('#mbxd', { attr: { stdDeviation: (60 * u) + ' 0' }, duration: 0.4, ease: 'power2.in' }, 4.15);
+  snd(4.1, 'whoosh', 0.8);
 
   // ================= 3. the card stack
   var cw = port ? W * 0.72 : W * 0.3, chh = cw * 0.25, gap = chh * 0.28;
@@ -155,26 +155,26 @@ window.TPL = ${JSON.stringify({ D, tiles }).replace(/</g, '\\u003c')};
   // the camera follows each new card: the whole stack shifts so the newest card sits in the middle
   tl.set(stack, { y: 0, scale: 1.7 }, 0);
   cardEls.forEach(function (e, i) {
-    var at = 11.0 + i * 1.25;
-    tl.fromTo(e, { x: i === 0 ? -W * 0.5 : 0, y: i === 0 ? 0 : chh * 0.9, opacity: 0 }, { x: 0, y: 0, opacity: 1, duration: i === 0 ? 0.9 : 0.75, ease: 'expo.out' }, at);
-    if (i > 0) tl.to(stack, { y: -i * (chh + gap) * 1.7 + (i === 2 ? (chh + gap) * 0.9 : 0) + (i === 1 ? (chh + gap) * 0.45 : 0), duration: 0.9, ease: 'power3.inOut' }, at - 0.05);
+    var at = 4.55 + i * 0.7;
+    tl.fromTo(e, { x: i === 0 ? -W * 0.5 : 0, y: i === 0 ? 0 : chh * 0.9, opacity: 0 }, { x: 0, y: 0, opacity: 1, duration: i === 0 ? 0.75 : 0.6, ease: 'expo.out' }, at);
+    if (i > 0) tl.to(stack, { y: -i * (chh + gap) * 1.7 + (i === 2 ? (chh + gap) * 0.9 : 0) + (i === 1 ? (chh + gap) * 0.45 : 0), duration: 0.6, ease: 'power3.inOut' }, at - 0.05);
     snd(at, i === 0 ? 'whoosh' : 'swish', 0.6);
   });
-  tl.fromTo('#mbcd', { attr: { stdDeviation: (40 * u) + ' 0' } }, { attr: { stdDeviation: '0 0' }, duration: 0.7, ease: 'power2.out' }, 11.0);
+  tl.fromTo('#mbcd', { attr: { stdDeviation: (40 * u) + ' 0' } }, { attr: { stdDeviation: '0 0' }, duration: 0.6, ease: 'power2.out' }, 4.55);
   // pull back: the whole stack in view, the title above it
-  tl.to(stack, { y: -(chh + gap) + chh * 0.55, scale: 1.12, duration: 1.4, ease: 'power3.inOut' }, 14.9);
+  tl.to(stack, { y: -(chh + gap) + chh * 0.55, scale: 1.12, duration: 1.0, ease: 'power3.inOut' }, 6.65);
   var ttl = el('ttl', 'top:' + (H / 2 - (chh + gap) * 1.12 * 1.5 + chh * 0.55 - chh * 0.95) + 'px;font-size:' + chh * 0.5 + 'px', null,
     '<span>' + esc(D.title[0]) + '</span> <span style="font-weight:400;color:#2b2b30">' + esc(D.title[1] || '') + '</span>');
   var tw = ttl.querySelectorAll('span');
-  tl.fromTo(tw[0], { opacity: 0, y: 24 * u, filter: 'blur(' + 10 * u + 'px)' }, { opacity: 1, y: 0, filter: 'blur(0px)', duration: 0.7, ease: 'power3.out' }, 15.8);
-  tl.fromTo(tw[1], { opacity: 0, y: 24 * u, x: 20 * u, filter: 'blur(' + 10 * u + 'px)' }, { opacity: 1, y: 0, x: 0, filter: 'blur(0px)', duration: 0.7, ease: 'power3.out' }, 16.1);
-  snd(15.8, 'swish', 0.4);
+  tl.fromTo(tw[0], { opacity: 0, y: 24 * u, filter: 'blur(' + 10 * u + 'px)' }, { opacity: 1, y: 0, filter: 'blur(0px)', duration: 0.6, ease: 'power3.out' }, 7.0);
+  tl.fromTo(tw[1], { opacity: 0, y: 24 * u, x: 20 * u, filter: 'blur(' + 10 * u + 'px)' }, { opacity: 1, y: 0, x: 0, filter: 'blur(0px)', duration: 0.6, ease: 'power3.out' }, 7.2);
+  snd(7.0, 'swish', 0.4);
   // everything smears out sideways
-  tl.to([stack, ttl], { x: -W * 0.7, duration: 0.6, ease: 'power3.in' }, 18.6);
-  tl.to('#mbcd', { attr: { stdDeviation: (80 * u) + ' 0' }, duration: 0.5, ease: 'power2.in' }, 18.6);
-  tl.to(ttl, { opacity: 0, duration: 0.4 }, 18.7);
-  tl.to(stack, { opacity: 0, duration: 0.25 }, 18.95);
-  snd(18.55, 'whoosh', 0.85);
+  tl.to([stack, ttl], { x: -W * 0.7, duration: 0.5, ease: 'power3.in' }, 8.55);
+  tl.to('#mbcd', { attr: { stdDeviation: (80 * u) + ' 0' }, duration: 0.4, ease: 'power2.in' }, 8.55);
+  tl.to(ttl, { opacity: 0, duration: 0.3 }, 8.6);
+  tl.to(stack, { opacity: 0, duration: 0.2 }, 8.85);
+  snd(8.5, 'whoosh', 0.85);
 
   // ================= 4. the lockup: logo alone, then "Word." and "Word." slide in beside it
   var ls = port ? W * 0.13 : H * 0.12, fz = ls * 0.6;
@@ -186,15 +186,15 @@ window.TPL = ${JSON.stringify({ D, tiles }).replace(/</g, '\\u003c')};
   var full = lock.offsetWidth, lgCx = ls / 2;
   var left0 = W / 2 - full / 2; lock.style.left = left0 + 'px';
   var shiftAlone = W / 2 - (left0 + lgCx), shiftOne = W / 2 - (left0 + (ls + ls * 0.38 + w1.offsetWidth) / 2);
-  tl.fromTo(lg, { opacity: 0, scale: 0.7 }, { opacity: 1, scale: 1, duration: 0.8, ease: 'expo.out' }, 19.2);
+  tl.fromTo(lg, { opacity: 0, scale: 0.7 }, { opacity: 1, scale: 1, duration: 0.6, ease: 'expo.out' }, 8.95);
   tl.set(lock, { x: shiftAlone }, 0);
-  tl.to(lock, { x: shiftOne, duration: 0.8, ease: 'power3.inOut' }, 21.6);
-  tl.fromTo(w1, { opacity: 0, x: 30 * u, filter: 'blur(' + 8 * u + 'px)' }, { opacity: 1, x: 0, filter: 'blur(0px)', duration: 0.7, ease: 'power3.out' }, 21.8);
-  tl.to(lock, { x: 0, duration: 0.8, ease: 'power3.inOut' }, 22.3);
-  tl.fromTo(w2, { opacity: 0, x: 60 * u, filter: 'blur(' + 12 * u + 'px)' }, { opacity: 1, x: 0, filter: 'blur(0px)', duration: 0.75, ease: 'power3.out' }, 22.4);
-  tl.fromTo(lock, { scale: 1 }, { scale: 0.86, duration: 4.6, ease: 'sine.inOut' }, 22.9);
-  snd(19.2, 'chime', 0.55); snd(21.75, 'swish', 0.45); snd(22.35, 'swish', 0.5);
-  tl.to({}, { duration: 0.01 }, 27.49);
+  tl.to(lock, { x: shiftOne, duration: 0.6, ease: 'power3.inOut' }, 9.6);
+  tl.fromTo(w1, { opacity: 0, x: 30 * u, filter: 'blur(' + 8 * u + 'px)' }, { opacity: 1, x: 0, filter: 'blur(0px)', duration: 0.55, ease: 'power3.out' }, 9.75);
+  tl.to(lock, { x: 0, duration: 0.6, ease: 'power3.inOut' }, 10.2);
+  tl.fromTo(w2, { opacity: 0, x: 60 * u, filter: 'blur(' + 12 * u + 'px)' }, { opacity: 1, x: 0, filter: 'blur(0px)', duration: 0.6, ease: 'power3.out' }, 10.3);
+  tl.fromTo(lock, { scale: 1 }, { scale: 0.88, duration: 3.1, ease: 'sine.inOut' }, 10.9);
+  snd(8.95, 'chime', 0.55); snd(9.7, 'swish', 0.45); snd(10.25, 'swish', 0.5);
+  tl.to({}, { duration: 0.01 }, 13.99);
 })();
 </script>
 </body></html>`;
