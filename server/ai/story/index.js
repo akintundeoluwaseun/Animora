@@ -135,12 +135,10 @@ export function composeStory({ facts: f, duration, seed, look: lookId, aspect, o
   let used = 0;
   if (walk) {
     // A to Z: every screenshot on a phone, in the order they were added, captioned with the matching step
+    // one continuous scene: the device stays, a finger (phone) or mouse (desktop) taps through every screen, A to Z
     const shots = rest.filter((p) => !p.cut).slice(0, 6);
-    shots.forEach((p, i) => {
-      rest.splice(rest.indexOf(p), 1);
-      const caption = (f.steps || [])[i] || feats[i] || (i === shots.length - 1 ? head : '');
-      add('phone', { photo: p.url, fit: p.ratio && p.ratio < 0.75 ? 'cover' : 'contain', caption, cta: f.cta, real: !p.ratio || p.ratio < 0.75 }, 9 - Math.min(3, i));
-    });
+    shots.forEach((p) => rest.splice(rest.indexOf(p), 1));
+    add('walk', { title: f.name, shots: shots.map((p, i) => ({ photo: p.url, ratio: p.ratio || 0, caption: (f.steps || [])[i] || feats[i] || (i === shots.length - 1 ? head : '') })) }, 10);
     if ((f.steps || []).length) used = Math.min(feats.length, shots.length);
   }
   photoBeat(hookType === 'hook' && hookV === 'type' ? (f.sub && f.sub !== head ? f.sub : '') : '', f.category || '', 6);
@@ -171,7 +169,7 @@ export function composeStory({ facts: f, duration, seed, look: lookId, aspect, o
   ideas.push(() => ({ type: 'statement', data: { text: head, label: f.category || f.name }, keep: 2 }));
   if (!beats.some((b) => b.type === 'sting')) ideas.push(() => ({ type: 'sting', data: {}, keep: 2 }));
 
-  const base = (b) => (b.type === 'features' ? featDur(b.data.items.length, b.v) : b.type === 'chat' ? 1.6 + 1.05 * (b.data.items.length + (b.data.cta ? 1 : 0)) : b.type === 'products' ? prodDur(b.data.items.length) : BASE[b.type]);
+  const base = (b) => (b.type === 'features' ? featDur(b.data.items.length, b.v) : b.type === 'chat' ? 1.6 + 1.05 * (b.data.items.length + (b.data.cta ? 1 : 0)) : b.type === 'products' ? prodDur(b.data.items.length) : b.type === 'walk' ? 3.8 + 3.3 * b.data.shots.length : BASE[b.type]);
   beats.forEach((b) => { b.dur = base(b); });
   const total = () => beats.reduce((n, b) => n + b.dur, 0) - overlap * (beats.length - 1);
   // too long: drop the least important beats, then tighten

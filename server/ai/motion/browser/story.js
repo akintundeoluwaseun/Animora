@@ -799,6 +799,170 @@
         sound(t + 0.1, 'reveal'); sound(t + 1.2, 'click', 0.8);
       },
       // chat takeover: the business answering in a chat, one message at a time with a typing indicator
+      // App walkthrough: ONE phone stays on screen while a finger taps through the real screenshots, A to Z.
+      // Each step: the finger glides and taps (ripple), the camera leans in on the tap, a part of the screen lifts out
+      // in 3D (every other step), tall screens scroll, then the next screen pushes in like iOS. Caption + step dots change per step.
+      walk(Lr, t, d, data, v, S) {
+        decor(Lr, t, d, S.kind);
+        const all = (data.shots || []).filter((x) => x && x.photo).slice(0, 6);
+        if (!all.length) return;
+        const rOf = (x) => Number(x.ratio) || ratioOf(x.photo) || 0.46;
+        const deskFirst = rOf(all[0]) > 1.15;
+        const shots = all.filter((x) => (rOf(x) > 1.15) === deskFirst), others = all.filter((x) => (rOf(x) > 1.15) !== deskFirst), n = shots.length;
+        const together = others.length ? 2.4 : 0;   // desktop + phone side by side before the end
+        // wide screenshots = a desktop app / website: a browser window on a laptop and a mouse pointer; tall ones = a phone and a finger
+        const r0 = rOf(shots[0]), desk = r0 > 1.15;
+        let pw, ph, px, py, pad, sw, sh, barH = 0;
+        if (desk) {
+          pw = port ? W * 0.9 : land ? W * 0.6 : W * 0.84; barH = pw * 0.045;
+          sw = pw - 2 * pw * 0.012; sh = Math.min(sw / r0, (port ? H * 0.38 : H * 0.62)); pad = pw * 0.012;
+          ph = sh + barH + 2 * pad; px = port ? (W - pw) / 2 : land ? W * 0.64 - pw / 2 : (W - pw) / 2; py = port ? H * 0.16 : (H - ph) / 2 - H * 0.03;
+        } else {
+          ph = port ? H * 0.6 : land ? H * 0.82 : H * 0.68; pw = ph * 0.49;
+          px = port ? (W - pw) / 2 : land ? W * 0.68 - pw / 2 : W * 0.7 - pw / 2; py = port ? H * 0.08 : (H - ph) / 2;
+          pad = pw * 0.035; sw = pw - 2 * pad; sh = ph - 2 * pad;
+        }
+        // camera rig: everything that zooms (phone + finger) lives in here; captions stay still outside it
+        const cam = el('div', `position:absolute;left:0;top:0;width:${W}px;height:${H}px;transform-origin:50% 50%;`, Lr);
+        const body = el('div', desk
+          ? `position:absolute;left:${px}px;top:${py}px;width:${pw}px;height:${ph}px;border-radius:${pw * 0.018}px;background:#1C1C20;padding:${pad}px;padding-top:${pad + barH}px;box-shadow:0 ${40 * U}px ${100 * U}px rgba(0,0,0,.4), inset 0 0 0 ${2 * U}px #34343A;`
+          : `position:absolute;left:${px}px;top:${py}px;width:${pw}px;height:${ph}px;border-radius:${pw * 0.14}px;background:#0E0E10;padding:${pad}px;box-shadow:0 ${36 * U}px ${90 * U}px rgba(0,0,0,.42), inset 0 0 0 ${2 * U}px #3A3A40;`, cam);
+        if (desk) {
+          // window bar: three dots + an address pill with the brand
+          const bar = el('div', `position:absolute;left:0;right:0;top:0;height:${barH + pad}px;display:flex;align-items:center;gap:${pw * 0.008}px;padding:0 ${pw * 0.015}px;`, body);
+          ['#FF5F57', '#FEBC2E', '#28C840'].forEach((c) => el('i', `display:block;width:${barH * 0.32}px;height:${barH * 0.32}px;border-radius:50%;background:${c};`, bar));
+          el('div', `margin-left:auto;margin-right:auto;width:${pw * 0.34}px;height:${barH * 0.56}px;border-radius:${barH * 0.28}px;background:#2C2C32;display:grid;place-items:center;font-family:${ui};font-size:${barH * 0.3}px;color:#9A9AA6;white-space:nowrap;overflow:hidden;`, bar, esc(String(cfg.brand || '').toLowerCase().replace(/[^a-z0-9]+/g, '') + '.app'));
+          // laptop base under the window
+          const base = el('div', `position:absolute;left:${px - pw * 0.06}px;top:${py + ph}px;width:${pw * 1.12}px;height:${pw * 0.022}px;border-radius:0 0 ${pw * 0.03}px ${pw * 0.03}px;background:linear-gradient(#C9CAD0,#8E9097);box-shadow:0 ${20 * U}px ${40 * U}px rgba(0,0,0,.3);`, cam);
+          tl.fromTo(base, { opacity: 0, y: 40 * U }, { opacity: 1, y: 0, duration: 1.1, ease: 'expo.out' }, t + 0.9);
+        }
+        const scr = el('div', `position:relative;width:100%;height:100%;border-radius:${desk ? pw * 0.006 : pw * 0.11}px;overflow:hidden;background:#000;`, body);
+        const glare = el('div', `position:absolute;inset:0;pointer-events:none;background:linear-gradient(115deg,rgba(255,255,255,0) 35%,rgba(255,255,255,.16) 48%,rgba(255,255,255,0) 60%);z-index:5;`, scr);
+        if (!desk) el('div', `position:absolute;left:50%;top:${pw * 0.025}px;width:${pw * 0.28}px;height:${pw * 0.065}px;margin-left:-${pw * 0.14}px;border-radius:${pw * 0.04}px;background:#0E0E10;z-index:6;`, scr);
+        // where to tap / what to lift on each screen (% of the screen): given by the director, or common app spots
+        const TAPS = [{ x: 0.5, y: 0.86 }, { x: 0.5, y: 0.52 }, { x: 0.8, y: 0.2 }, { x: 0.3, y: 0.66 }, { x: 0.5, y: 0.36 }, { x: 0.72, y: 0.8 }];
+        const HOTS = [{ x: 0.06, y: 0.2, w: 0.88, h: 0.2 }, { x: 0.06, y: 0.44, w: 0.88, h: 0.18 }, { x: 0.06, y: 0.3, w: 0.88, h: 0.22 }];
+        const intro = data.intro !== false && d > n * 2.4 + 2.6 + together ? (cfg.logo ? 2.2 : 1.5) : 0;
+        const seg = Math.max(2.2, (d - 1.5 - intro - together) / n), t0 = t + 1.1 + intro;
+        if (intro && cfg.logo) {
+          // restrained particles drift; the real logo turns in, a light sweep crosses it, a soft glow; then it rises away
+          const dark = !!L0.dark;
+          for (let k = 0; k < 14; k++) {
+            const pz = 3 + ((k * 37) % 5) * 1.6, p = el('i', `position:absolute;left:${((k * 61) % 100)}%;top:${((k * 43) % 100)}%;width:${pz * U}px;height:${pz * U}px;border-radius:50%;background:${dark ? 'rgba(255,255,255,.7)' : rgba(A, 0.5)};filter:blur(${0.6 * U}px);`, Lr);
+            tl.fromTo(p, { opacity: 0, y: 30 * U }, { opacity: 0.25 + (k % 4) * 0.12, y: -60 * U - k * 4 * U, duration: intro + 1.2, ease: 'none' }, t);
+            tl.to(p, { opacity: 0, duration: 0.6 }, t + intro + 0.6);
+          }
+          const ls = Math.min(W, H) * 0.24;
+          const lg = el('div', `position:absolute;left:${W / 2 - ls / 2}px;top:${H * 0.42 - ls / 2}px;width:${ls}px;height:${ls}px;`, Lr);
+          const glow = el('div', `position:absolute;inset:-35%;border-radius:50%;background:radial-gradient(circle, ${rgba(A, dark ? 0.55 : 0.3)} 0%, transparent 65%);opacity:0;`, lg);
+          const img = el('img', 'position:absolute;inset:0;width:100%;height:100%;object-fit:contain;', lg); img.src = cfg.logo;
+          const sweep = el('div', `position:absolute;inset:0;overflow:hidden;-webkit-mask:url("${String(cfg.logo).replace(/"/g, '%22')}") center/contain no-repeat;mask:url("${String(cfg.logo).replace(/"/g, '%22')}") center/contain no-repeat;`, lg);
+          const band = el('div', 'position:absolute;top:-20%;bottom:-20%;width:40%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.85),transparent);', sweep);
+          tl.fromTo(lg, { opacity: 0, rotateY: -55, scale: 0.82, transformPerspective: 1200 * U }, { opacity: 1, rotateY: 0, scale: 1, duration: 1.1, ease: 'expo.out' }, t + 0.1);
+          tl.fromTo(band, { left: '-50%' }, { left: '120%', duration: 0.9, ease: 'power2.inOut' }, t + 0.55);
+          tl.fromTo(glow, { opacity: 0, scale: 0.6 }, { opacity: 1, scale: 1, duration: 0.8, ease: 'power2.out' }, t + 0.7);
+          const nm = textBlock(Lr, data.title || cfg.brand || '', { w: CW, size: 96 * TU, min: 48 * TU, maxLines: 2, color: S.ink, accent: false, upper: L0.upper, align: 'center', css: `left:${M}px;top:${H * 0.42 + ls / 2 + 40 * U}px` });
+          reveal(nm, t + 0.9, { track: true });
+          tl.to([lg, nm], { opacity: 0, y: -70 * U, filter: `blur(${12 * U}px)`, duration: 0.45, ease: 'power2.in' }, t + intro - 0.5);
+          sound(t + 0.1, 'reveal'); sound(t + 0.55, 'swell', 0.6);
+        } else if (intro) {
+          // "Introducing" + the name, big in the middle; it rises away as the device turns around to face us
+          const lab = el('div', `position:absolute;left:${M}px;width:${CW}px;top:${H * 0.4}px;text-align:center;font-family:${ui};font-weight:600;font-size:${30 * TU}px;letter-spacing:.24em;text-transform:uppercase;color:${rgba(S.ink, 0.6)};`, Lr, 'Introducing');
+          const nm = textBlock(Lr, data.title || cfg.brand || '', { w: CW, size: 130 * TU, min: 60 * TU, maxLines: 2, color: S.ink, accent: false, upper: L0.upper, align: 'center', css: `left:${M}px;top:${H * 0.4 + 54 * TU}px` });
+          tl.fromTo(lab, { opacity: 0, letterSpacing: '0.5em' }, { opacity: 1, letterSpacing: '0.24em', duration: 0.8, ease: 'expo.out' }, t + 0.05);
+          reveal(nm, t + 0.25, { track: true });
+          tl.to([lab, nm], { opacity: 0, y: -60 * U, filter: `blur(${12 * U}px)`, duration: 0.5, ease: 'power2.in' }, t + intro - 0.1);
+          sound(t + 0.1, 'reveal');
+        }
+        // the device arrives once, turning around in 3D to face us
+        tl.fromTo(body, { y: H * 0.35, rotateY: desk ? -70 : -150, rotateX: 16, transformPerspective: 2000 * U, opacity: 0 }, { y: 0, rotateY: desk ? (land ? -8 : -4) : (land ? -10 : -6), rotateX: desk ? 6 : 3, opacity: 1, duration: 1.5, ease: 'expo.out' }, t + Math.max(0, intro - 0.1) + 0.05);
+        tl.to(body, { rotateY: desk ? (land ? -2 : 2) : (land ? -3 : 4), y: -14 * U, duration: Math.max(1, d - 1.6 - intro), ease: 'sine.inOut' }, t + intro + 1.5);
+        tl.fromTo(glare, { xPercent: -60 }, { xPercent: 60, duration: d, ease: 'none' }, t);
+        sound(t + Math.max(0, intro - 0.1) + 0.1, 'trans');
+        // the finger: a soft white touch dot with a shadow, like a screen recording with touches shown
+        const fs = pw * 0.15;
+        const cs = 46 * U;   // mouse pointer size (desktop)
+        const finger = desk
+          ? el('div', `position:absolute;left:0;top:0;width:${cs}px;height:${cs * 1.4}px;z-index:20;opacity:0;transform-origin:0 0;filter:drop-shadow(0 ${6 * U}px ${10 * U}px rgba(0,0,0,.35));`, cam, '<svg viewBox="0 0 20 28" width="100%" height="100%"><path d="M1 1 L1 22 L6.5 16.8 L10.2 25.6 L14 24 L10.4 15.4 L18 15.4 Z" fill="#111" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/></svg>')
+          : el('div', `position:absolute;left:0;top:0;width:${fs}px;height:${fs}px;margin:-${fs / 2}px 0 0 -${fs / 2}px;border-radius:50%;background:rgba(255,255,255,.82);box-shadow:0 ${10 * U}px ${26 * U}px rgba(0,0,0,.35), inset 0 0 0 ${3 * U}px rgba(0,0,0,.08);z-index:20;opacity:0;`, cam);
+        const at = (pt) => ({ x: px + pad + pt.x * sw, y: py + pad + barH + pt.y * sh });
+        tl.set(finger, { x: px + pw * 1.3, y: py + ph * 1.05 }, t);
+        // steps: dots + "Step 1 of 4" + the caption, beside (wide) or under (tall) the phone
+        const capBox = port ? { l: M, tp: py + ph + (desk ? 110 : 46) * U, w: CW } : land ? { l: M, tp: H * 0.3, w: px - M - 80 * U } : { l: M, tp: H * 0.3, w: px - M - 60 * U };
+        const dots = el('div', `position:absolute;left:${capBox.l}px;top:${capBox.tp - 40 * U}px;width:${capBox.w}px;display:flex;gap:${10 * U}px;justify-content:${port ? 'center' : 'flex-start'};align-items:center;font-family:${ui};font-weight:700;font-size:${22 * TU}px;letter-spacing:.06em;color:${rgba(S.ink, 0.55)};`, Lr);
+        const dotEls = shots.map(() => el('i', `display:block;width:${12 * U}px;height:${12 * U}px;border-radius:${6 * U}px;background:${rgba(S.ink, 0.22)};`, dots));
+        const stepTxt = el('span', `margin-${port ? 'left' : 'left'}:${12 * U}px;`, dots, '');
+        tl.fromTo(dots, { opacity: 0, y: 20 * U }, { opacity: 1, y: 0, duration: 0.6, ease: 'power2.out' }, t + 0.8);
+        let prevLayer = null, prevPt = null, lastCap = null;
+        shots.forEach((shot, i) => {
+          const s0 = t0 + i * seg, ri = Number(shot.ratio) || ratioOf(shot.photo) || 0.46;
+          const bgH = sw / ri, extra = Math.max(0, bgH - sh);   // how much a tall screenshot can scroll
+          const layer = el('div', `position:absolute;inset:0;background:#fff url("${String(shot.photo).replace(/"/g, '%22')}") no-repeat 0 0 / ${sw}px ${bgH}px;`, scr);
+          if (i === 0) tl.fromTo(layer, { opacity: 0 }, { opacity: 1, duration: 0.5 }, t + 0.3);
+          else {
+            // iOS push: the new screen slides in, the old one slides a little and dims
+            tl.fromTo(layer, { xPercent: 100 }, { xPercent: 0, duration: 0.6, ease: 'power3.inOut' }, s0 - 0.35);
+            if (prevLayer) tl.to(prevLayer, { xPercent: -30, filter: 'brightness(0.6)', duration: 0.6, ease: 'power3.inOut' }, s0 - 0.35);
+            sound(s0 - 0.35, 'trans', 0.6);
+          }
+          // step dots + label
+          tl.to(dotEls[i], { width: 34 * U, background: A, duration: 0.4, ease: 'power2.out' }, s0 - 0.2);
+          if (i > 0) tl.to(dotEls[i - 1], { width: 12 * U, background: rgba(S.ink, 0.35), duration: 0.4 }, s0 - 0.2);
+          tl.call(() => { stepTxt.textContent = `STEP ${i + 1} OF ${n}`; }, null, s0 - 0.2);
+          // caption for this step
+          if (shot.caption) {
+            const cb = textBlock(Lr, shot.caption, { w: capBox.w, size: (land ? 74 : 64) * TU, min: 30 * TU, maxLines: port ? 2 : 3, maxH: port ? H - capBox.tp - M : H * 0.4, color: S.ink, accent: L0.accentWord, accentCss: acc(S), upper: L0.upper, align: port ? 'center' : 'left', css: `left:${capBox.l}px;top:${capBox.tp}px` });
+            reveal(cb, s0 + 0.05, { soft: true, dy: 26 }); lastCap = cb;
+            if (i < n - 1) tl.to(cb, { opacity: 0, y: -18 * U, duration: 0.3, ease: 'power2.in' }, s0 + seg - 0.45);
+          }
+          // the finger glides to the tap point and presses
+          const DESK_TAPS = [{ x: 0.12, y: 0.1 }, { x: 0.5, y: 0.45 }, { x: 0.86, y: 0.08 }, { x: 0.3, y: 0.62 }, { x: 0.7, y: 0.75 }];
+          const tp = shot.tap && shot.tap.x != null ? shot.tap : (desk ? DESK_TAPS : TAPS)[i % (desk ? DESK_TAPS : TAPS).length], P = at(tp);
+          const glideAt = s0 + 0.35, tapAt = glideAt + 0.65;
+          tl.to(finger, { opacity: 1, duration: 0.25 }, glideAt - 0.1);
+          tl.to(finger, { x: P.x, y: P.y, duration: 0.65, ease: prevPt ? 'power2.inOut' : 'power3.out' }, glideAt);
+          tl.to(finger, { scale: desk ? 0.86 : 0.78, duration: 0.09, yoyo: true, repeat: 1, ease: 'power2.inOut' }, tapAt);
+          const ring = el('div', `position:absolute;left:${P.x}px;top:${P.y}px;width:${fs}px;height:${fs}px;margin:-${fs / 2}px 0 0 -${fs / 2}px;border-radius:50%;border:${3 * U}px solid ${A};z-index:19;opacity:0;`, cam);
+          tl.fromTo(ring, { scale: 0.6, opacity: 0.9 }, { scale: 2.4, opacity: 0, duration: 0.6, ease: 'power2.out' }, tapAt);
+          sound(tapAt, 'click');
+          // camera leans in on the tap, then settles back before the next screen
+          const zoom = desk ? (port ? 1.4 : 1.35) : port ? 1.18 : 1.2;
+          const oy = port ? Math.max(P.y, py + ph * 0.8) : P.y;   // tall videos: the phone grows upwards, the caption below stays clear
+          tl.to(cam, { scale: zoom, transformOrigin: `${(P.x / W) * 100}% ${(oy / H) * 100}%`, duration: 0.7, ease: 'power3.inOut' }, tapAt + 0.12);
+          tl.to(cam, { scale: 1, duration: 0.6, ease: 'power3.inOut' }, s0 + seg - 0.75);
+          // every other step: a part of the screen lifts out in 3D (same picture, cropped), then settles back
+          if (i % 2 === 0) {
+            const hot = shot.hot && shot.hot.w ? shot.hot : HOTS[(i / 2) % HOTS.length];
+            const card = el('div', `position:absolute;left:${px + pad + hot.x * sw}px;top:${py + pad + barH + hot.y * sh}px;width:${hot.w * sw}px;height:${hot.h * sh}px;border-radius:${14 * U}px;background:#fff url("${String(shot.photo).replace(/"/g, '%22')}") no-repeat ${-hot.x * sw}px ${-hot.y * sh}px / ${sw}px ${bgH}px;box-shadow:0 ${30 * U}px ${70 * U}px rgba(0,0,0,.38);z-index:15;opacity:0;`, cam);
+            const liftAt = tapAt + 0.75;
+            tl.fromTo(card, { opacity: 0, scale: 1, x: 0 }, { opacity: 1, scale: 1.16, x: port ? 0 : -pw * 0.12, duration: 0.55, ease: 'back.out(1.6)' }, liftAt);
+            tl.to(card, { opacity: 0, scale: 1, x: 0, duration: 0.4, ease: 'power2.in' }, s0 + seg - 0.85);
+            sound(liftAt, 'pop', 0.7);
+          } else if (extra > 8 * U) {
+            // a tall screen scrolls, like a thumb flicking down the page
+            tl.to(finger, { y: P.y - sh * 0.22, duration: 0.6, ease: 'power2.inOut' }, tapAt + 0.4);
+            tl.to(layer, { backgroundPositionY: -Math.min(extra, sh * 0.45), duration: 1.0, ease: 'power3.out' }, tapAt + 0.45);
+          }
+          prevLayer = layer; prevPt = P;
+        });
+        tl.to(finger, { opacity: 0, duration: 0.3 }, t0 + n * seg - 0.5);
+        if (together) {
+          const T = t0 + n * seg - 0.3, o = others[0], ro = rOf(o);
+          // second device: a phone beside a laptop, or a laptop behind a phone
+          const oph = desk ? (port ? H * 0.34 : H * 0.62) : 0, opw = desk ? oph * 0.49 : (port ? W * 0.86 : W * 0.5);
+          const oh = desk ? oph : opw / ro + opw * 0.045;
+          const ox = desk ? (port ? W * 0.52 : W * 0.6) : (port ? (W - opw) / 2 : W * 0.3 - opw / 2), oy2 = desk ? (port ? H * 0.3 : H * 0.2) : (port ? H * 0.12 : H * 0.18);
+          const dev = el('div', `position:absolute;left:${ox}px;top:${oy2}px;width:${opw}px;height:${oh}px;border-radius:${desk ? opw * 0.14 : opw * 0.018}px;background:${desk ? '#0E0E10' : '#1C1C20'};padding:${desk ? opw * 0.035 : opw * 0.012}px;${desk ? '' : `padding-top:${opw * 0.057}px;`}box-shadow:0 ${36 * U}px ${90 * U}px rgba(0,0,0,.42), inset 0 0 0 ${2 * U}px #3A3A40;z-index:${desk ? 12 : 0};`, Lr);
+          const oscr = el('div', `position:relative;width:100%;height:100%;border-radius:${desk ? opw * 0.11 : opw * 0.006}px;overflow:hidden;background:#fff url("${String(o.photo).replace(/"/g, '%22')}") no-repeat 0 0 / 100% auto;`, dev);
+          void oscr;
+          if (lastCap) tl.to(lastCap, { opacity: 0, y: -18 * U, duration: 0.35, ease: 'power2.in' }, T);
+          tl.to(dots, { opacity: 0, duration: 0.35 }, T);
+          tl.to(cam, { scale: desk ? 0.78 : 0.72, x: desk ? -W * (port ? 0.12 : 0.12) : W * (port ? 0 : 0.14), y: port ? (desk ? H * 0.02 : H * 0.16) : 0, transformOrigin: '50% 50%', duration: 1.1, ease: 'power3.inOut' }, T);
+          tl.fromTo(dev, { opacity: 0, x: desk ? W * 0.3 : -W * 0.3, rotateY: desk ? -40 : 30, transformPerspective: 1800 * U }, { opacity: 1, x: 0, rotateY: desk ? -10 : 8, duration: 1.2, ease: 'expo.out' }, T + 0.25);
+          tl.to(dev, { y: -12 * U, duration: 1.4, ease: 'sine.inOut' }, T + 1.4);
+          sound(T + 0.25, 'trans', 0.7);
+        }
+      },
       chat(Lr, t, d, data, v, S) {
         decor(Lr, t, d, S.kind);
         const cw = land ? W * 0.46 : CW, cx = land ? W * 0.5 - cw / 2 + W * 0.12 : M;
