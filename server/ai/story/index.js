@@ -98,7 +98,9 @@ export function composeStory({ facts: f, duration, seed, look: lookId, aspect, o
   // the opening: a photo when there is a good one (full, split, magazine cover or photo-in-type), otherwise type (plain or stacked blocks)
   photos.forEach((p) => { p.full = keptAt(p.ratio, rb); });
   // the opening picture: the one that fills this frame best
-  const p0 = photos.filter((p) => p.fit === 'cover' && !p.cut).sort((a, b) => (b.full >= 0.55) - (a.full >= 0.55))[0] || null;
+  // an app with screenshots: the film walks through them in order (one phone scene each), so none is used as the opening picture
+  const walk = f.appy && photos.filter((p) => !p.cut).length >= 2;
+  const p0 = walk ? null : photos.filter((p) => p.fit === 'cover' && !p.cut).sort((a, b) => (b.full >= 0.55) - (a.full >= 0.55))[0] || null;
   let hookType = 'hook', hookV = 'type';
   if (p0) {
     // a picture that would lose most of itself full screen (a wide shot in a tall frame) opens as a split instead
@@ -131,6 +133,16 @@ export function composeStory({ facts: f, duration, seed, look: lookId, aspect, o
     add('photo', { photo: p.url, fit: p.fit, pos: p.pos, caption, label, treat: L.id === 'bold' ? pick(['duotone', 'halftone', 'none']) : 'none' }, keep, v);
   };
   let used = 0;
+  if (walk) {
+    // A to Z: every screenshot on a phone, in the order they were added, captioned with the matching step
+    const shots = rest.filter((p) => !p.cut).slice(0, 6);
+    shots.forEach((p, i) => {
+      rest.splice(rest.indexOf(p), 1);
+      const caption = (f.steps || [])[i] || feats[i] || (i === shots.length - 1 ? head : '');
+      add('phone', { photo: p.url, fit: p.ratio && p.ratio < 0.75 ? 'cover' : 'contain', caption, cta: f.cta, real: !p.ratio || p.ratio < 0.75 }, 9 - Math.min(3, i));
+    });
+    if ((f.steps || []).length) used = Math.min(feats.length, shots.length);
+  }
   photoBeat(hookType === 'hook' && hookV === 'type' ? (f.sub && f.sub !== head ? f.sub : '') : '', f.category || '', 6);
   if (feats.length >= 2) {
     if (f.whatsapp && r() < 0.6) add('chat', { items: feats, cta: f.cta }, 8);

@@ -16,6 +16,10 @@ const URL_RE = /\b((?:https?:\/\/)?(?:www\.)?[a-z0-9-]+\.(?:com|ng|com\.ng|space
 // cut at a whole word, never in the middle of one ("This flyer was mad", "fix your devi")
 const str = (v, max = 200) => { const t = v == null ? '' : String(v).replace(/\s+/g, ' ').trim(); if (t.length <= max) return t; const c = t.slice(0, max), sp = c.lastIndexOf(' '); return (sp > max * 0.5 ? c.slice(0, sp) : c).replace(/[\s,;:&–—-]+$/, ''); };
 const list = (v) => (Array.isArray(v) ? v : String(v || '').split(/\n|;/)).map((x) => str(x, 80)).filter(Boolean);
+// "anything", "whatever", "just make a demo"...: the owner wants us to choose. Never print these words in a video.
+const VAGUE = /^(?:(?:just\s+)?(?:do|make|use|put|write|create|show)?\s*(?:me\s+)?(?:any\s*thing|anything|something|whatever|any|random(?:\s+stuff)?|a\s+demo(?:\s+video)?|demo(?:\s+video)?|test(?:ing)?|sample|example)(?:\s+(?:at\s+all|you\s+like|you\s+want|is\s+fine|works|video|ad))?|you\s+(?:choose|decide|pick)|your\s+choice|surprise\s+me|suggest(?:\s+(?:one|something|anything))?|idk|i\s+don'?t\s+know|no\s+idea|not\s+sure|nothing|none|n\/?a|na|nil|\.+|-+|\?+)[\s.!?]*$/i;
+export const isVague = (s) => VAGUE.test(String(s || '').trim());
+const keep = (arr) => arr.filter((x) => !isVague(x));
 
 /** Keep only known fields, trimmed. */
 export function cleanBrief(b = {}) {
@@ -37,6 +41,7 @@ export function cleanBrief(b = {}) {
     scenes: (Array.isArray(b.scenes) ? b.scenes : []).map(String).filter((x) => WANT_IDS.includes(x) || x in MOTION_WANTS).slice(0, 8), sceneAuto: b.sceneAuto === undefined ? undefined : !!b.sceneAuto,
     // flyer-only answers
     flyerType: (Array.isArray(b.flyerType) ? list(b.flyerType) : b.flyerType ? [str(b.flyerType, 60)] : []).map((x) => str(x, 60)).filter(Boolean).slice(0, 3), offer: str(b.offer, 60), when: str(b.when, 120), layout: ['photo', 'type', 'price', 'auto'].includes(b.layout) ? b.layout : undefined,
+    steps: list(b.steps).slice(0, 8), lookAuto: ['auto', 'own'].includes(b.lookAuto) ? b.lookAuto : undefined,
     extra: str(b.extra, 3000), done: !!b.done, mode: ['steps', 'paste'].includes(b.mode) ? b.mode : undefined, pasted: b.pasted ? true : undefined, pasteText: str(b.pasteText, 6000),
     colorMode: ['style', 'logo', 'own'].includes(b.colorMode) ? b.colorMode : undefined, picturesDone: b.picturesDone ? true : undefined,
     // signature templates (After Effects-style recipes); 'auto' or empty means the library mixes its own film
@@ -46,12 +51,54 @@ export function cleanBrief(b = {}) {
     quality: ['preview', 'premium', 'max'].includes(b.quality) ? b.quality : undefined,
   };
   // optional questions the user skipped (so they are not asked again)
-  for (const k of ['features', 'products', 'contact', 'pictures', 'extra', 'scenes', 'category', 'goal', 'headline', 'cta', 'aspect', 'duration', 'colors', 'style', 'template', 'intensity', 'voiceover', 'sound', 'flyerType', 'layout', 'offer', 'when']) if (b[`${k}Skipped`] !== undefined) out[`${k}Skipped`] = !!b[`${k}Skipped`];
+  for (const k of ['steps', 'lookAuto', 'features', 'products', 'contact', 'pictures', 'extra', 'scenes', 'category', 'goal', 'headline', 'cta', 'aspect', 'duration', 'colors', 'style', 'template', 'intensity', 'voiceover', 'sound', 'flyerType', 'layout', 'offer', 'when']) if (b[`${k}Skipped`] !== undefined) out[`${k}Skipped`] = !!b[`${k}Skipped`];
   if (out.headlines.length) out.headline = out.headlines[0]; else delete out.headlines;
   if (out.ctas.length) out.cta = str(out.ctas[0], 60); else delete out.ctas;
   if (out.goals.length) out.goal = str(out.goals.join(' + '), 200); else delete out.goals;
   if (Array.isArray(out.flyerType) && !out.flyerType.length) delete out.flyerType;
+  // vague answers ("anything", "just make a demo") are dropped; demo = invent sample content for this kind of business
+  let vague = false;
+  for (const k of ['name', 'category', 'contact', 'extra', 'pasteText', 'offer', 'when', 'goal', 'headline', 'cta']) if (typeof out[k] === 'string' && isVague(out[k])) { out[k] = ''; vague = true; }
+  for (const k of ['goals', 'headlines', 'products', 'features', 'ctas', 'steps']) if (Array.isArray(out[k])) { const n = out[k].length; out[k] = keep(out[k]); if (out[k].length < n) vague = true; if (!out[k].length) delete out[k]; }
+  if (out.headline === '' && out.headlines?.length) out.headline = out.headlines[0];
+  if (out.cta === '' && out.ctas?.length) out.cta = str(out.ctas[0], 60);
+  if (vague || b.demo) out.demo = true;
   for (const k of Object.keys(out)) if (out[k] === undefined || out[k] === '') delete out[k];
+  return out;
+}
+
+// Sample content when the owner said "anything" / "make a demo": a believable business of the kind they chose
+// (the AI writes it; built-in samples without a key). Only fills what is missing: real answers always win.
+const SAMPLES = {
+  food: { name: 'Mama Tee Kitchen', category: 'Food & drinks', headlines: ['Hot meals, delivered fast', 'Taste the difference'], features: ['Fresh every day', 'Fast delivery', 'Fair prices'], products: ['Jollof rice ₦2,500', 'Fried rice ₦2,800', 'Small chops ₦1,500'], cta: 'Order on WhatsApp' },
+  tech: { name: 'Taskly', category: 'Tech & software', headlines: ['Your day, organised', 'Plan less, do more'], features: ['Smart reminders', 'Works offline', 'Team sharing'], products: [], cta: 'Download the app' },
+  fashion: { name: 'Adire House', category: 'Fashion & clothing', headlines: ['Wear your story', 'New collection is here'], features: ['Handmade prints', 'Custom fits', 'Nationwide delivery'], products: ['Adire shirt ₦12,000', 'Two-piece set ₦25,000'], cta: 'DM us on Instagram' },
+  beauty: { name: 'Glow Lounge', category: 'Beauty & salon', headlines: ['Look good, feel better', 'Your glow-up starts here'], features: ['Expert stylists', 'Clean studio', 'Easy booking'], products: ['Braids from ₦8,000', 'Facials from ₦10,000'], cta: 'Book now' },
+  generic: { name: 'Nova Studio', category: 'Services', headlines: ['Made for people who want more', 'Quality you can see'], features: ['Fast service', 'Trusted by customers', 'Fair prices'], products: [], cta: 'Call now' },
+};
+const sampleFor = (cat = '') => (/food|drink|restaurant|kitchen|cake/i.test(cat) ? SAMPLES.food : /tech|software|app/i.test(cat) ? SAMPLES.tech : /fashion|cloth/i.test(cat) ? SAMPLES.fashion : /beauty|salon|hair|spa/i.test(cat) ? SAMPLES.beauty : SAMPLES.generic);
+export async function fillDemoBrief(brief, { flyer = false } = {}) {
+  if (!brief?.demo) return brief;
+  let s = sampleFor(brief.category);
+  if (config.useGemini) {
+    try {
+      const { text } = await geminiGenerate({
+        system: `You invent believable sample content for a ${flyer ? 'flyer' : 'video ad'} demo for a Nigerian small business. Plain words, no marketing jargon, no fake numbers, reviews or awards. Return JSON only.`,
+        messages: [{ role: 'user', text: `Known: ${JSON.stringify({ name: brief.name, category: brief.category, products: brief.products, extra: brief.extra })}
+Invent what is missing. Return { "name": "", "category": "", "headlines": ["2-3 short messages, under 7 words"], "features": ["3 selling points, 2-4 words"], "products": ["0-3 'Item ₦price' lines, only if the business sells items"], "cta": "" }` }],
+        json: true, temperature: 0.9, timeoutMs: 25000, maxOutputTokens: 2048, thinking: 'low',
+      });
+      const g = JSON.parse(text);
+      if (g && g.name) s = { name: str(g.name, 60), category: str(g.category, 60) || s.category, headlines: list(g.headlines).slice(0, 3), features: list(g.features).slice(0, 4), products: list(g.products).slice(0, 3), cta: str(g.cta, 40) || s.cta };
+    } catch { /* built-in sample */ }
+  }
+  const out = { ...brief };
+  if (!out.name) out.name = s.name;
+  if (!out.category) out.category = s.category;
+  if (!out.headlines?.length) { out.headlines = s.headlines; out.headline = s.headlines[0]; }
+  if (!out.features?.length) out.features = s.features;
+  if (!out.products?.length && s.products?.length) out.products = s.products;
+  if (!out.ctas?.length) { out.ctas = [s.cta]; out.cta = s.cta; }
   return out;
 }
 

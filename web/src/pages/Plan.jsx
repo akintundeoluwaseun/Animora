@@ -86,6 +86,31 @@ export function lengthWarning(b, v) {
 }
 
 // The questions, in order. `show` hides a question that doesn't apply; `optional` adds a Skip button.
+// Each kind of business gets its own path: the questions that matter for it, worded for it. The rest are skipped.
+const groupOf = (b) => {
+  const c = `${b.category || ''} ${b.name || ''}`.toLowerCase();
+  if (/tech|software|app|saas|website|digital/.test(c)) return 'tech';
+  if (/event|party|wedding|concert|church|conference|program/.test(c)) return 'event';
+  if (/real estate|property|propert|house|land|apartment|rent/.test(c)) return 'property';
+  if (/beauty|salon|hair|spa|health|fitness|gym|clinic|service|school|training|tutor|repair|clean/.test(c)) return 'service';
+  if (/food|drink|restaurant|kitchen|cake|bakery|catering/.test(c)) return 'food';
+  return 'shop';
+};
+const PRODUCT_ASK = {
+  food: () => "What's on the menu? One item per line, with the price if you like.",
+  shop: () => 'Which items should we show? One per line, with the price if you like.',
+  service: () => 'Which services do you offer? One per line, with the price if you like.',
+  property: () => 'Which properties? One per line: type, location and price.',
+};
+const PRODUCT_HINT = {
+  food: 'Jollof rice ₦2,500\nFried rice ₦2,800\nSmall chops ₦1,500',
+  shop: 'Adire shirt ₦12,000\nTwo-piece set ₦25,000',
+  service: 'Braids from ₦8,000\nHome service available',
+  property: '3-bedroom flat, Ado Ekiti, ₦1.5m/year\nLand, 600 sqm, ₦4m',
+};
+// "Let Animora choose": one answer instead of four (colours, look, narration, sound)
+const lookAuto = (b) => b.lookAuto === 'auto';
+
 const QUESTIONS = [
   { id: 'mode', type: 'single', options: [
     { v: 'steps', l: 'Ask me one question at a time' },
@@ -94,19 +119,22 @@ const QUESTIONS = [
   { id: 'paste', type: 'long', show: (b) => b.mode === 'paste', ask: () => 'Paste or type everything about your business and the ad: name, what you sell, your message, prices, contact, where you\'ll post it, how long, anything special.', placeholder: 'e.g. My business is Oluwaseun Computers in Ado Ekiti. We sell and repair laptops. HP EliteBook ₦250,000, Dell ₦300,000. Call or WhatsApp 0807 691 1614. Landscape for YouTube, about 30 seconds, calm and premium.' },
   { id: 'name', type: 'text', ask: () => "What's your business name?", placeholder: 'e.g. Kemi Cakes' },
   { id: 'category', type: 'single', options: CATEGORIES, typed: true, ask: (b) => `Nice! What does ${b.name} do?`, placeholder: 'Or type it, e.g. "laptop repairs"' },
-  { id: 'goal', type: 'multi', max: 6, options: GOALS, typed: true, ask: () => "What's the goal of this ad?", placeholder: 'Or type your own goal' },
+  { id: 'goal', type: 'multi', max: 6, show: (b) => groupOf(b) !== 'event', options: GOALS, typed: true, ask: () => "What's the goal of this ad?", placeholder: 'Or type your own goal' },
   { id: 'headline', type: 'multi', max: 8, suggest: 'headline', typed: true, ask: () => "What's the main message of your ad?", hint: 'Pick as many as you like, or type your own. More messages make a longer video.', placeholder: 'Add your own message' },
   { id: 'features', type: 'multi', max: 8, suggest: 'features', typed: true, optional: true, ask: (b) => `What makes ${b.name} stand out?`, hint: 'Pick as many as you like, or type your own.', placeholder: 'Add your own' },
-  { id: 'products', type: 'long', optional: true, ask: () => 'Any products, services or prices to show? One per line.', placeholder: 'Jollof rice ₦2,500\nFried rice ₦2,800\nSmall chops ₦1,500' },
+  { id: 'steps', type: 'long', optional: true, show: (b) => groupOf(b) === 'tech', ask: (b) => `Walk me through ${b.name || 'your app'}: what does someone do, step by step? One step per line. Add your screenshots in the same order next.`, placeholder: 'Sign up in seconds\nAdd your tasks\nGet reminders\nShare with your team' },
+  { id: 'when', type: 'text', optional: true, show: (b) => groupOf(b) === 'event', ask: () => 'When and where is it? Date, time and venue.', placeholder: 'Sat 14 Dec, 4pm · Civic Centre, Ado Ekiti' },
+  { id: 'products', type: 'long', optional: true, show: (b) => !['tech', 'event'].includes(groupOf(b)), ask: (b) => (PRODUCT_ASK[groupOf(b)] || PRODUCT_ASK.shop)(b), placeholder: 'Jollof rice ₦2,500\nFried rice ₦2,800\nSmall chops ₦1,500', placeholderFor: (b) => PRODUCT_HINT[groupOf(b)] },
   { id: 'cta', type: 'multi', max: 5, options: CTAS, typed: true, ask: () => 'What should people do after watching?', placeholder: 'Or type your own, e.g. "Send us a DM"' },
   { id: 'contact', type: 'text', optional: true, ask: () => 'Your phone number, website or address for the end of the video?', placeholder: '0803 123 4567 · www.yoursite.com · 12 Allen Ave, Ikeja' },
   { id: 'aspect', type: 'single', options: ASPECT_OPTS, ask: () => 'Where will you post it?' },
   { id: 'duration', type: 'single', options: [15, 20, 25, 30, 40, 45, 60], ask: () => 'How long should it be?', hint: 'Any length works. A longer video gets more scenes, not slower ones.' },
-  { id: 'pictures', type: 'upload', optional: true, ask: () => `Add your logo and product photos if you have them (up to ${MAX_PICS}). Both are optional. You can also paste a picture with Ctrl+V.` },
-  { id: 'colors', type: 'colors', ask: () => 'Which colours should the video use?' },
-  { id: 'style', type: 'style', ask: () => 'Pick a look for your video, or let me choose one that fits.' },
-  { id: 'voiceover', type: 'single', options: [{ v: 'yes', l: 'Yes, write me a script', d: 'For ElevenLabs, CapCut and other voice apps' }, { v: 'no', l: 'No, just on-screen text' }], ask: () => 'Do you want a narration script for a voice-over app?' },
-  { id: 'sound', type: 'sound', ask: () => 'What sound should the video have?' },
+  { id: 'pictures', type: 'upload', optional: true, ask: (b) => (groupOf(b) === 'tech' ? `Add your logo and screenshots of your app, in the order people use it (up to ${MAX_PICS}). The video walks through them one by one.` : `Add your logo and product photos if you have them (up to ${MAX_PICS}). Both are optional. You can also paste a picture with Ctrl+V.`) },
+  { id: 'lookAuto', type: 'single', options: [{ v: 'auto', l: 'Yes, you choose', d: 'Look, colours and sound picked to fit your business' }, { v: 'own', l: "I'll choose myself" }], ask: () => 'Should I choose the look, colours and sound for you?' },
+  { id: 'colors', show: (b) => !lookAuto(b), type: 'colors', ask: () => 'Which colours should the video use?' },
+  { id: 'style', show: (b) => !lookAuto(b), type: 'style', ask: () => 'Pick a look for your video, or let me choose one that fits.' },
+  { id: 'voiceover', show: (b) => !lookAuto(b), type: 'single', options: [{ v: 'yes', l: 'Yes, write me a script', d: 'For ElevenLabs, CapCut and other voice apps' }, { v: 'no', l: 'No, just on-screen text' }], ask: () => 'Do you want a narration script for a voice-over app?' },
+  { id: 'sound', show: (b) => !lookAuto(b), type: 'sound', ask: () => 'What sound should the video have?' },
   { id: 'extra', type: 'long', optional: true, chips: EXTRA_CHIPS, ask: () => 'Last one: any other special instructions? Anything goes. You can paste pictures here too.', placeholder: 'e.g. "Start by zooming into the logo of the chatbot, then show the app screen"', done: true },
 ];
 // Flyers: the same questions minus length, narration and sound, with flyer wording and print sizes.
@@ -170,6 +198,7 @@ for (const qq of [...QUESTIONS, ...FLYER_QUESTIONS]) if (SKIPPABLE.has(qq.id)) q
 
 
 const label = (q, v, b, styles) => {
+  if (q.id === 'lookAuto') return v === 'auto' ? 'Animora chooses the look and sound' : "I'll choose myself";
   if (v == null || v === '' || (Array.isArray(v) && !v.length)) return 'Skipped';
   if (q.id === 'mode') return v === 'paste' ? "I'll paste everything at once" : 'One question at a time';
   if (q.id === 'paste') return 'My details (pasted)';
@@ -424,6 +453,7 @@ export default function Plan() {
       return;
     }
     if (q.id === 'voiceover') patch = { voiceover: value === 'yes' };
+    else if (q.id === 'lookAuto') patch = value === 'auto' ? { lookAuto: 'auto', styleAuto: true, colorMode: bRef.current.colorMode || 'style', voiceover: false, sound: bRef.current.sound || 'all' } : { lookAuto: 'own' };
 
     else if (q.id === 'duration') patch = { duration: Number(value) };
     else if (q.id === 'headline') patch = { headlines: value, headline: value[0] };
@@ -595,7 +625,7 @@ export default function Plan() {
                     <label className="wiz-label" htmlFor="wiz-in">{q.type === 'long' ? 'Your answer' : q.typed ? 'Or write your own' : 'Your answer'}</label>
                     <div className="wiz-box">
                       {q.type === 'long' ? (
-                        <textarea id="wiz-in" value={text} onChange={(e) => setText(e.target.value)} rows={q.id === 'paste' ? 8 : 4} placeholder={q.placeholder} className="wiz-input resize-none" />
+                        <textarea id="wiz-in" value={text} onChange={(e) => setText(e.target.value)} rows={q.id === 'paste' ? 8 : 4} placeholder={q.placeholderFor?.(b) || q.placeholder} className="wiz-input resize-none" />
                       ) : (
                         <input id="wiz-in" value={text} onChange={(e) => setText(e.target.value)} autoFocus placeholder={q.placeholder || (q.typed ? 'Type your own answer…' : 'Type your answer…')} className="wiz-input" />
                       )}

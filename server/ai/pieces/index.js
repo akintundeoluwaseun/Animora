@@ -55,7 +55,8 @@ function factsOf(plan = {}, brief = {}, assets = []) {
   // pictures with a see-through background (product cut-outs) can step out of a frame
   const cutouts = assets.filter((a) => (a.kind || 'image') === 'image' && a.role !== 'logo' && !/logo/i.test(a.name || '') && (a.transparent || a.has_alpha)).map((a) => a.url);
   const appy = /\b(app|apps|software|saas|platform|online store|e-?commerce|delivery app|mobile app|website|web ?site|game|gaming|fintech|payments?)\b/i.test([brief.category, brief.name, ...[].concat(brief.features || [])].join(' ')) && !/repair|fix|service centre|service center/i.test(brief.category || '');
-  return { cutouts, appy, whatsapp, fits, ratios, name, mono: name.replace(/[^\p{L}\p{N} ]/gu, '').split(/\s+/).filter((w) => !/^(the|and|of)$/i.test(w)).slice(0, 2).map((w) => w[0]).join('').toUpperCase() || 'A', heads, features, products, priced, offer: str(brief.offer, 30), when: str(brief.when, 60), cta: str(brief.cta || [].concat(brief.ctas || [])[0] || 'Order now', 28), phone, place, photos, logo, category: str(brief.category, 40), sub: str(heads[1] || brief.goal || '', 90) };
+  const steps = [].concat(brief.steps || []).map((x) => str(x, 40)).filter(Boolean).slice(0, 8);
+  return { steps, cutouts, appy: appy || steps.length > 0, whatsapp, fits, ratios, name, mono: name.replace(/[^\p{L}\p{N} ]/gu, '').split(/\s+/).filter((w) => !/^(the|and|of)$/i.test(w)).slice(0, 2).map((w) => w[0]).join('').toUpperCase() || 'A', heads, features, products, priced, offer: str(brief.offer, 30), when: str(brief.when, 60), cta: str(brief.cta || [].concat(brief.ctas || [])[0] || 'Order now', 28), phone, place, photos, logo, category: str(brief.category, 40), sub: str(heads[1] || brief.goal || '', 90) };
 }
 const split2 = (t) => { const w = String(t).split(/\s+/); if (w.length < 3) return w.join(' '); const k = Math.ceil(w.length / 2); return w.slice(0, k).join(' ') + '|' + w.slice(k).join(' '); };
 

@@ -767,10 +767,22 @@
           const shot = photo(scr, data.photo, data.fit, t, d + 0.5, { css: `left:0;top:${it}px;width:100%;height:${ih}px`, zoomFrom: 1.08, zoomTo: 1, focusAt: 0.6, forceCover: true });
           [0.8, 0.62, 0.7].forEach((k, i) => el('div', `position:absolute;left:${pw * 0.05}px;top:${it + ih + pw * (0.06 + i * 0.07)}px;width:${sw * k - pw * 0.1}px;height:${pw * 0.032}px;border-radius:${pw * 0.016}px;background:${i ? '#E6E6EA' : rgba(A, 0.35)};`, scr));
           tl.fromTo([who, shot], { opacity: 0, y: 30 * U }, { opacity: 1, y: 0, duration: 0.7, ease: EASE, stagger: 0.1 }, t + 0.6);
+        } else if (data.real) {
+          // a real app screenshot: the whole screen, nothing drawn over it; a soft tap shows where the step happens
+          const shot = photo(scr, data.photo, 'cover', t, d + 0.5, { css: 'left:0;top:0;width:100%;height:100%', zoomFrom: 1.04, zoomTo: 1, focusAt: 0.6, forceCover: true });
+          void shot;
+          const tap = el('div', `position:absolute;left:50%;top:58%;width:${pw * 0.16}px;height:${pw * 0.16}px;margin:-${pw * 0.08}px 0 0 -${pw * 0.08}px;border-radius:50%;background:rgba(255,255,255,.55);box-shadow:0 0 0 ${3 * U}px rgba(0,0,0,.18);opacity:0;`, scr);
+          tl.fromTo(tap, { scale: 0.4, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.25, ease: 'power2.out' }, t + 1.6);
+          tl.to(tap, { scale: 1.8, opacity: 0, duration: 0.5, ease: 'power2.out' }, t + 1.85);
         } else {
           const shot = photo(scr, data.photo, data.fit, t, d + 0.5, { css: `left:0;top:${pw * 0.2}px;width:100%;height:${ph * 1.05}px`, zoomFrom: 1, zoomTo: 1, focusAt: 0.6 });
           tl.fromTo(shot, { y: 0 }, { y: -ph * 0.18, duration: Math.max(1, d - 1), ease: 'power1.inOut' }, t + 1);
         }
+        if (data.real) {
+          el('div', `position:absolute;left:50%;top:${pw * 0.025}px;width:${pw * 0.28}px;height:${pw * 0.065}px;margin-left:-${pw * 0.14}px;border-radius:${pw * 0.04}px;background:#0E0E10;`, scr);
+          tl.fromTo(body, { y: H * 0.4, rotateY: -32, rotateX: 12, transformPerspective: 1800 * U, opacity: 0 }, { y: 0, rotateY: land ? -14 : -8, rotateX: 4, opacity: 1, duration: 1.3, ease: 'expo.out' }, t + 0.1);
+          tl.to(body, { rotateY: land ? -4 : 6, y: -18 * U, duration: Math.max(1, d - 1.4), ease: 'sine.inOut' }, t + 1.4);
+        } else {
         const bar = el('div', `position:absolute;left:0;right:0;top:0;height:${pw * 0.2}px;background:${S.kind === 'accent' ? '#111' : A};display:flex;align-items:flex-end;padding:0 ${pw * 0.07}px ${pw * 0.04}px;font-family:${ui};font-weight:700;font-size:${pw * 0.055}px;color:${onColor(S.kind === 'accent' ? '#111' : A)};white-space:nowrap;overflow:hidden;`, scr, esc(cfg.brand));
         el('div', `position:absolute;left:50%;top:${pw * 0.025}px;width:${pw * 0.28}px;height:${pw * 0.065}px;margin-left:-${pw * 0.14}px;border-radius:${pw * 0.04}px;background:#0E0E10;`, scr);
         const btn = el('div', `position:absolute;left:${pw * 0.08}px;right:${pw * 0.08}px;bottom:${pw * 0.08}px;height:${pw * 0.15}px;border-radius:${pw * 0.075}px;background:${A2};color:${onColor(A2)};display:grid;place-items:center;font-family:${ui};font-weight:700;font-size:${pw * 0.05}px;white-space:nowrap;`, scr, esc(data.cta || cfg.brand));
@@ -778,6 +790,7 @@
         tl.fromTo(body, { y: H * 0.4, rotateY: -32, rotateX: 12, transformPerspective: 1800 * U, opacity: 0 }, { y: 0, rotateY: land ? -14 : -8, rotateX: 4, opacity: 1, duration: 1.3, ease: 'expo.out' }, t + 0.1);
         tl.to(body, { rotateY: land ? -4 : 6, y: -18 * U, duration: Math.max(1, d - 1.4), ease: 'sine.inOut' }, t + 1.4);
         tl.fromTo(btn, { scale: 0.6, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.6, ease: 'back.out(2)' }, t + 1.2);
+        }
         if (data.caption) {
           const tx = land ? { l: M, tp: H * 0.36, w: W * 0.4 } : !port ? { l: M, tp: H * 0.34, w: px - M - 50 * U } : { l: M, tp: py + ph + 60 * U, w: CW };
           const cb = textBlock(Lr, data.caption, { w: tx.w, size: (land ? 80 : 68) * TU, min: 32 * TU, maxLines: !port ? 4 : 2, maxH: !port ? H * 0.5 : H - tx.tp - M, color: S.ink, accent: L0.accentWord, accentCss: acc(S), upper: L0.upper, align: !port ? 'left' : 'center', css: `left:${tx.l}px;top:${tx.tp}px` });

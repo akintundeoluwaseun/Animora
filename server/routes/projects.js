@@ -12,7 +12,7 @@ import { inspectAnimation, snapshotFrames } from '../engine/renderer.js';
 import { probeBuffer, toMp3 } from '../media.js';
 import { voiceoverFormats, generateVoiceTrack, VOICES, hasOfflineVoice } from '../ai/voice.js';
 import { config } from '../config.js';
-import { cleanBrief, briefToPlanRules, suggest, autoStyleSlug, parseBrief } from '../ai/brief.js';
+import { cleanBrief, briefToPlanRules, suggest, autoStyleSlug, parseBrief, fillDemoBrief } from '../ai/brief.js';
 import { makeFlyer, flyerFitNotice } from '../ai/flyer.js';
 import { adjustDesign, aspectOf, currentLook } from '../ai/adjust.js';
 import { useCredit, NEED_CREDITS } from '../billing.js';
@@ -259,8 +259,9 @@ r.post('/:id/suggest', async (req, res) => {
 // All questions answered: turn the brief into the plan (Gemini, or our rules), then the studio generates the video.
 r.post('/:id/build', async (req, res) => {
   const p = await loadProject(req, res); if (!p) return;
-  const brief = cleanBrief({ ...(p.brief_json || {}), ...(req.body?.brief || {}), done: true });
-  if (!brief.name) return res.status(400).json({ error: 'Tell me your business name first.' });
+  let brief = cleanBrief({ ...(p.brief_json || {}), ...(req.body?.brief || {}), done: true });
+  // "anything" / "make a demo": invent believable sample content instead of printing those words
+  if (brief.demo || !brief.name) brief = await fillDemoBrief({ ...brief, demo: true }, { flyer: p.kind === 'flyer' });
   let styleId = brief.styleId && !brief.styleAuto ? brief.styleId : null;
   if (!styleId) styleId = (await one("SELECT id FROM styles WHERE slug=$1 AND status='live'", [autoStyleSlug(brief)]))?.id || p.style_id;
   const style = await loadStyle(styleId);
