@@ -7,6 +7,37 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { renderVideo } from '../server/engine/renderer.js';
 import { addSfxToVideo } from '../server/engine/sfx.js';
+import { writeFile } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
+
+// Natural voice-over for premium films (scripts/voice.py, Kokoro on this machine). The script travels inside the film's code.
+function voiceSpec(html, sfx, duration) {
+  const m = String(html).match(/window\.ANIMORA_PREMIUM=(\{.*?\});window\.__hyperframes/);
+  let d = null; try { d = m ? JSON.parse(m[1]) : null; } catch { d = null; }
+  const v = d?.voice; if (!v?.lines?.length) return null;
+  // the first line opens the film, the last lands on the ending (the impact), the others on the moments in between
+  const hits = (sfx || []).map((e) => e.t).sort((a, b) => a - b);
+  const impact = (sfx || []).find((e) => /impact/.test(e.k))?.t;
+  const n = v.lines.length, last = Math.max(1.5, Math.min(duration - 3.2, impact ?? duration - 3.2));
+  const times = v.lines.map((_, i) => {
+    if (i === 0) return 0.4; if (i === n - 1) return last;
+    const want = 0.4 + (i * (last - 0.4)) / (n - 1);
+    const near = hits.find((t) => t >= want - 0.2 && t <= want + 0.8);
+    return near ?? want;
+  });
+  return { voice: v.voice, lines: v.lines, times, duration };
+}
+function makeVoice(spec, dir) {
+  return new Promise((resolve) => {
+    const file = path.join(dir, 'voice.wav'), specFile = path.join(dir, 'voice.json');
+    writeFile(specFile, JSON.stringify(spec)).then(() => {
+      const py = spawn('python3', [fileURLToPath(new URL('./voice.py', import.meta.url)), specFile, file], { stdio: ['ignore', 'pipe', 'pipe'] });
+      let out = ''; py.stdout.on('data', (d) => { out += d; }); py.stderr.on('data', (d) => { out += d; });
+      py.on('close', (code) => { console.log('voice:', out.trim().split('\n').pop()); resolve(code === 0 ? file : null); });
+      py.on('error', () => resolve(null));
+    });
+  });
+}
 
 const jobUrl = process.argv[2];
 if (!jobUrl) { console.error('usage: node scripts/render-job.js <job url>'); process.exit(2); }
@@ -48,8 +79,10 @@ try {
     },
   });
   // sound mixing and the thumbnail run side by side
-  const withSound = job.sfx && (result.sfx?.length || result.music)
-    ? addSfxToVideo(outFile, path.join(dir, 'video-sfx.mp4'), result.sfx || [], job.duration, { music: result.music }).catch((e) => { console.warn('sound skipped:', e.message); return outFile; })
+  const vSpec = voiceSpec(job.html, result.sfx, result.duration || job.duration);
+  const voiceFile = vSpec ? await makeVoice(vSpec, dir) : null;
+  const withSound = (job.sfx && (result.sfx?.length || result.music)) || voiceFile
+    ? addSfxToVideo(outFile, path.join(dir, 'video-sfx.mp4'), job.sfx ? result.sfx || [] : [], result.duration || job.duration, { music: job.sfx ? result.music : null, voiceFile }).catch((e) => { console.warn('sound skipped:', e.message); return outFile; })
     : Promise.resolve(outFile);
   const thumbSent = thumbFrom(outFile, Math.min(2, job.duration / 4)).then((t) => (t ? post('/thumb', t, 'image/jpeg') : null)).catch(() => {});
   const finalFile = await withSound;

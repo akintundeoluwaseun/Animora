@@ -398,7 +398,8 @@ export async function renderVideo(job) {
     if (info.pageErrors?.length) warnings.push(`Page errors: ${info.pageErrors.join(' | ')}`);
     if (info.repeat === -1 || !Number.isFinite(info.duration)) throw new Error('Timeline repeats forever; duration is not finite.');
 
-    const duration = job.duration ?? info.duration;
+    // premium films know their own length (dead air already taken out); a planned length would only freeze the last frame
+    const duration = /window\.ANIMORA_PREMIUM=/.test(html) ? info.duration : (job.duration ?? info.duration);
     if (!(duration > 0)) throw new Error(`Invalid duration ${duration}`);
     if (Math.abs(info.duration - duration) > 0.25) {
       warnings.push(`Timeline is ${info.duration.toFixed(2)}s but ${duration}s was requested; rendering ${duration}s.`);

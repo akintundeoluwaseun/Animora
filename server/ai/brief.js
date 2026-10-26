@@ -35,7 +35,8 @@ export function cleanBrief(b = {}) {
     contact: str(b.contact, 120), aspect: ['9:16', '16:9', '1:1', '4:5', 'A4'].includes(b.aspect) ? b.aspect : undefined,
     duration: Number(b.duration) || undefined, styleId: b.styleId ? String(b.styleId) : undefined, styleAuto: !!b.styleAuto,
     colors: b.colors && typeof b.colors === 'object' ? Object.fromEntries(Object.entries(b.colors).filter(([k, v]) => ['primary', 'secondary', 'background', 'text'].includes(k) && /^#[0-9a-f]{6}$/i.test(v))) : undefined,
-    voiceover: b.voiceover === undefined || b.voiceover === null ? undefined : b.voiceover === true || b.voiceover === 'yes',
+    voiceover: b.voiceover === undefined || b.voiceover === null ? undefined : [true, 'yes', 'female', 'male'].includes(b.voiceover),
+    voiceGender: b.voiceover === 'male' || b.voiceGender === 'male' ? 'male' : b.voiceover === 'female' || b.voiceGender === 'female' ? 'female' : undefined,
     sound: ['all', 'sfx', 'none', 'own'].includes(b.sound) ? b.sound : b.sfx === true || b.sfx === 'yes' ? 'all' : b.sfx === false || b.sfx === 'no' ? 'none' : undefined,
     // which scene styles the owner asked for (ids from the form's scene picker); sceneAuto = let the AI decide
     scenes: (Array.isArray(b.scenes) ? b.scenes : []).map(String).filter((x) => WANT_IDS.includes(x) || x in MOTION_WANTS).slice(0, 8), sceneAuto: b.sceneAuto === undefined ? undefined : !!b.sceneAuto,

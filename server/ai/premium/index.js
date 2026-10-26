@@ -7,6 +7,7 @@
 // The page keeps the block's own paused GSAP timeline (window.__timelines[id]) and hands it to the renderer as window.__timeline.
 import { config } from '../../config.js';
 import { factsOf } from '../pieces/index.js';
+import { speakable } from '../voice.js';
 import notificationCascade, { meta as mNotif } from './blocks/notification-cascade.js';
 import messageThread, { meta as mThread } from './blocks/message-thread-reveal.js';
 import notesReveal, { meta as mNotes } from './blocks/notes-reveal.js';
@@ -233,18 +234,18 @@ ${REMAP_FN}
 }
 
 /** The page the renderer and the preview play for one tall template. */
-export function premiumHtml({ block, vars }) { return blockPage(block, vars); }
+export function premiumHtml({ block, vars, voice = null }) { return blockPage(block, vars, { data: voice ? { block, vars, voice } : null }); }
 
 /**
  * Several templates played one after another (landscape films). Each scene runs in its own frame so their styles and
  * scripts never clash; one master clock seeks every scene, cross-fading 0.4 s between them.
  */
 const XF = 0.4;
-export function filmHtml({ film, W = 1920, H = 1080 }) {
+export function filmHtml({ film, W = 1920, H = 1080, voice = null }) {
   // scene lengths are worked out in the page, after the dead air in each scene has been taken out
   const scenes = film.map((s) => ({ cap: Number(s.dur) || BLOCKS[s.block].meta.duration, id: s.block, snd: BLOCKS[s.block].sfx || {} }));
   const docs = film.map((s) => blockPage(s.block, s.vars, { standalone: false }));
-  const data = JSON.stringify({ film }).replace(/</g, '\\u003c');
+  const data = JSON.stringify(voice ? { film, voice } : { film }).replace(/</g, '\\u003c');
   const docsJson = JSON.stringify(docs).replace(/</g, '\\u003c').replace(/[\u2028\u2029]/g, '');
   return `<!doctype html><html><head><meta charset="utf-8"><title>Animora</title>
 <script>window.${MARK}=${data};window.__hyperframes=null;</script>
@@ -298,20 +299,38 @@ function wideFilm(f, r) {
   return film;
 }
 
-/** Pick a template that fits this business (a different one on Regenerate) and fill it. */
+/**
+ * The narration for a premium film: a few short spoken lines from the owner's own details (no AI), read by the free
+ * Kokoro voice on the render server. The line breaks become real pauses; the last line lands on the film's ending.
+ */
+export function voiceScript(f, gender) {
+  const end = (t) => { t = clean(t, 120).replace(/[|]/g, ' '); return /[.!?]$/.test(t) ? t : `${t}.`; };
+  const lines = [];
+  const head = f.heads[0] || f.sub; if (head) lines.push(end(head));
+  const pts = [...f.features, ...f.products.map((p) => (p.price ? `${p.title}, ${p.price}` : p.title))].slice(0, 2);
+  if (pts.length) lines.push(pts.map(end).join(' '));
+  if (f.offer) lines.push(end(f.offer));
+  // the phone number stays on screen: read aloud it takes longer than the ending lasts
+  lines.push(end([f.name, f.cta].filter(Boolean).join('. ')));
+  return { voice: gender === 'male' ? 'am_michael' : 'af_heart', lines: lines.slice(0, 4).map(speakable) };
+}
+const wantsVoice = (brief) => [true, 'yes', 'female', 'male'].includes(brief?.voiceover);
+
+
 export function premiumFilm({ plan = {}, brief = {}, assets = [], salt = '', previous = null }) {
   const aspect = plan.aspect_ratio || '9:16';
   if (!PREMIUM_ASPECTS.includes(aspect)) throw new Error('No premium template for this size yet');
   const f = factsOf(plan, brief, assets);
   const r = mulberry(hash(`${f.name}|${salt}`));
-  if (aspect === '16:9') { const film = wideFilm(f, r); return { html: filmHtml({ film }), block: film.map((s) => s.block).join('+') }; }
+  const voice = wantsVoice(brief) ? voiceScript(f, brief.voiceGender || brief.voiceover) : null;
+  if (aspect === '16:9') { const film = wideFilm(f, r); return { html: filmHtml({ film, voice }), block: film.map((s) => s.block).join('+') }; }
   const prev = readPremium(previous)?.block;
   let options = PREMIUM_BLOCKS.filter((k) => BLOCKS[k].fits(f));
   if (options.length > 1 && prev) options = options.filter((k) => k !== prev);
   if (!options.length) throw new Error('No premium template fits these details');
   const block = options[Math.floor(r() * options.length)];
   const vars = BLOCKS[block].fill(f, r);
-  return { html: premiumHtml({ block, vars }), block, duration: BLOCKS[block].meta.duration };
+  return { html: premiumHtml({ block, vars, voice }), block, duration: BLOCKS[block].meta.duration };
 }
 
 /**
@@ -345,6 +364,6 @@ export async function premiumEdit({ html, instruction, useAi }) {
     if (k === 'rows') { if (sc.vars.rows?.[+j]) { sc.vars.rows[+j][part] = val; changed++; } } else { sc.vars[k] = val; changed++; }
   }
   if (!changed) return null;
-  const out = d.film ? filmHtml({ film: next }) : premiumHtml({ block: next[0].block, vars: next[0].vars });
+  const out = d.film ? filmHtml({ film: next, voice: d.voice }) : premiumHtml({ block: next[0].block, vars: next[0].vars, voice: d.voice });
   return { html: out, summary: clean(o.summary, 200) || 'Done! Check the video.' };
 }

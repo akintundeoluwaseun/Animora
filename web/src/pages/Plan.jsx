@@ -133,7 +133,7 @@ const QUESTIONS = [
   { id: 'lookAuto', type: 'single', options: [{ v: 'auto', l: 'Yes, you choose', d: 'Look, colours and sound picked to fit your business' }, { v: 'own', l: "I'll choose myself" }], ask: () => 'Should I choose the look, colours and sound for you?' },
   { id: 'colors', show: (b) => !lookAuto(b), type: 'colors', ask: () => 'Which colours should the video use?' },
   { id: 'style', show: (b) => !lookAuto(b), type: 'style', ask: () => 'Pick a look for your video, or let me choose one that fits.' },
-  { id: 'voiceover', show: (b) => !lookAuto(b), type: 'single', options: [{ v: 'yes', l: 'Yes, write me a script', d: 'For ElevenLabs, CapCut and other voice apps' }, { v: 'no', l: 'No, just on-screen text' }], ask: () => 'Do you want a narration script for a voice-over app?' },
+  { id: 'voiceover', type: 'single', options: [{ v: 'female', l: "Yes, a woman's voice", d: 'A natural voice reads your words, with real pauses' }, { v: 'male', l: "Yes, a man's voice", d: 'A natural voice reads your words, with real pauses' }, { v: 'no', l: 'No voice, just sound effects' }], ask: () => 'Do you want a voice in your video?' },
   { id: 'sound', show: (b) => !lookAuto(b), type: 'sound', ask: () => 'What sound should the video have?' },
   { id: 'extra', type: 'long', optional: true, chips: EXTRA_CHIPS, ask: () => 'Last one: any other special instructions? Anything goes. You can paste pictures here too.', placeholder: 'e.g. "Start by zooming into the logo of the chatbot, then show the app screen"', done: true },
 ];
@@ -204,7 +204,7 @@ const label = (q, v, b, styles) => {
   if (q.id === 'paste') return 'My details (pasted)';
   if (q.id === 'aspect') return ASPECT_OPTS.find((o) => o.v === v)?.l || v;
   if (q.id === 'duration') return `${v} seconds`;
-  if (q.id === 'voiceover') return v === true || v === 'yes' ? 'Yes, write me a script' : 'No script';
+  if (q.id === 'voiceover') return v === 'male' ? "A man's voice" : v === true || v === 'yes' || v === 'female' ? "A woman's voice" : 'No voice';
   if (q.id === 'sound') return { all: 'Music + sound effects', sfx: 'Sound effects only', none: 'No sound', own: 'My own music', piano: 'Music + sound effects', soft: 'Music + sound effects' }[v] || v;
   if (q.id === 'style') return b.styleAuto ? 'Let Animora choose' : styles?.find((s) => s.id === v)?.name || 'Chosen';
   if (q.id === 'colors') return v === 'style' ? "The style's colours" : v === 'logo' ? 'Matched to my logo' : 'My own colours';
@@ -227,7 +227,7 @@ function valueOf(q, b, pics) {
   if (q.id === 'style') return b.styleAuto ? 'auto' : b.styleId;
   if (q.id === 'colors') return b.colorMode;
   if (q.id === 'pictures') return b.picturesDone ? pics : undefined;
-  if (q.id === 'voiceover') return b.voiceover === undefined ? undefined : b.voiceover ? 'yes' : 'no';
+  if (q.id === 'voiceover') return b.voiceover === undefined ? undefined : b.voiceover ? (b.voiceGender === 'male' ? 'male' : 'female') : 'no';
   if (q.id === 'sound') return b.sound;
   if (q.id === 'scenes') return b.sceneAuto === undefined ? undefined : b.sceneAuto ? 'auto' : b.scenes;
   return b[q.id];
@@ -452,8 +452,8 @@ export default function Plan() {
       } catch (e) { setError(e.message); } finally { setReading(false); }
       return;
     }
-    if (q.id === 'voiceover') patch = { voiceover: value === 'yes' };
-    else if (q.id === 'lookAuto') patch = value === 'auto' ? { lookAuto: 'auto', styleAuto: true, colorMode: bRef.current.colorMode || 'style', voiceover: false, sound: bRef.current.sound || 'all' } : { lookAuto: 'own' };
+    if (q.id === 'voiceover') patch = { voiceover: value === 'female' || value === 'male', voiceGender: value === 'male' ? 'male' : value === 'female' ? 'female' : undefined };
+    else if (q.id === 'lookAuto') patch = value === 'auto' ? { lookAuto: 'auto', styleAuto: true, colorMode: bRef.current.colorMode || 'style', sound: bRef.current.sound || 'all' } : { lookAuto: 'own' };
 
     else if (q.id === 'duration') patch = { duration: Number(value) };
     else if (q.id === 'headline') patch = { headlines: value, headline: value[0] };
