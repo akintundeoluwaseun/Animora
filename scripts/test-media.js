@@ -10,6 +10,7 @@ import { spawnSync } from 'node:child_process';
 const dataDir = await mkdtemp(path.join(tmpdir(), 'adflash-media-'));
 const PORT = 3998;
 Object.assign(process.env, {
+  ANIMORA_ENGINE: 'motion',   // this file checks the Motion engine (captions, motion-v4); premium films are covered by test-audio.js
   DATA_DIR: dataDir, PORT: String(PORT), PUBLIC_BASE_URL: `http://localhost:${PORT}`, AI_MODE: 'offline', AUTH: 'off',
   DATABASE_URL: '', SUPABASE_URL: '', SEED_DEMO_HISTORY: 'false',
 });

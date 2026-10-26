@@ -13,7 +13,7 @@ import { fileURLToPath } from 'node:url';
 // Natural voice-over for premium films (scripts/voice.py, Kokoro on this machine). The script travels inside the film's code,
 // and the film shows every spoken line as on-screen captions; the voice's exact timing is put back into the page before recording.
 function voiceData(html) {
-  const m = String(html).match(/window\.ANIMORA_PREMIUM=(\{.*?\});window\.__hyperframes/);
+  const m = String(html).match(/window\.ANIMORA_PREMIUM=(\{.*?\});(?:\(function\(\)\{var a=|window\.__hyperframes)/);
   try { const d = m ? JSON.parse(m[1]) : null; return d?.voice?.lines?.length ? d.voice : null; } catch { return null; }
 }
 function makeVoice(spec, dir) {

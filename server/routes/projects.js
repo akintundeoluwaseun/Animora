@@ -15,6 +15,9 @@ import { config } from '../config.js';
 import { cleanBrief, briefToPlanRules, suggest, autoStyleSlug, parseBrief, fillDemoBrief } from '../ai/brief.js';
 import { makeFlyer, flyerFitNotice } from '../ai/flyer.js';
 import { adjustDesign, aspectOf, currentLook } from '../ai/adjust.js';
+import { isPremium, readPremium, premiumWithAudio, VOICE_LIBRARY, SOUND_REGISTRY } from '../ai/premium/index.js';
+import { beatsFor, alignMusic } from '../engine/sfx.js';
+import { readFileSync } from 'node:fs';
 import { useCredit, NEED_CREDITS } from '../billing.js';
 import { describeAssets } from '../ai/describe.js';
 import { loadImage } from '../ai/index.js';
@@ -425,6 +428,41 @@ r.put('/:id/code', async (req, res) => {
   const versions = [...(p.code_versions || []), p.code_html].filter(Boolean).slice(-MAX_VERSIONS);
   const u = await one(`UPDATE projects SET code_html=$2, code_versions=$3, updated_at=now() WHERE id=$1 RETURNING *`, [p.id, html, JSON.stringify(versions)]);
   res.json({ project: shape(u) });
+});
+
+// ---------------- sound: voice, captions, effects and music of premium films ----------------
+const MUSIC_LIST = (() => {
+  try {
+    const lib = JSON.parse(readFileSync(new URL('../../assets/music/library.json', import.meta.url), 'utf8')).tracks || {};
+    return Object.entries(lib).map(([id, t]) => ({ url: `/music/${id}.mp3`, title: t.title, artist: t.artist, mood: t.mood || t.look, bpm: Math.round(t.bpm || 0) }));
+  } catch { return []; }
+})();
+r.get('/:id/audio', async (req, res) => {
+  const p = await loadProject(req, res); if (!p) return;
+  if (!isPremium(p.code_html)) return res.json({ premium: false });
+  const d = readPremium(p.code_html) || {};
+  res.json({
+    premium: true, audio: d.audio || {}, voice: d.voice ? { on: true, id: d.voice.voice, captions: d.voice.captions !== false, lines: d.voice.show || d.voice.lines } : { on: false },
+    voices: VOICE_LIBRARY, music: MUSIC_LIST, sounds: SOUND_REGISTRY.map((s) => ({ key: s.key, role: s.role, useful: s.useful })),
+  });
+});
+r.patch('/:id/audio', async (req, res) => {
+  const p = await loadProject(req, res); if (!p) return;
+  if (!isPremium(p.code_html)) return res.status(400).json({ error: 'Sound settings work on the new premium videos. Press Regenerate to make this video with them.' });
+  const patch = { ...(req.body || {}) };
+  // music on the beat: the song's start is chosen so the film's big moments (hits, scene changes) land on beats.
+  // The editor sends the film's current sound events, so preview and MP4 use the same start.
+  let aligned = null;
+  if (patch.music && /^\/music\/[\w-]+\.mp3$/.test(patch.music)) {
+    const grid = beatsFor(patch.music.split('/').pop());
+    if (grid && Array.isArray(req.body.events)) { aligned = alignMusic(grid, req.body.events.slice(0, 400)); patch.musicOffset = aligned.offset; }
+    else patch.musicOffset = 0;
+  }
+  const html = premiumWithAudio(p.code_html, patch, { brief: p.brief_json || {}, plan: p.plan_json || {}, assets: await projectAssets(p.id) });
+  if (!html) return res.status(400).json({ error: 'This video has no sound settings.' });
+  const versions = [...(p.code_versions || []), p.code_html].filter(Boolean).slice(-MAX_VERSIONS);
+  const u = await one(`UPDATE projects SET code_html=$2, code_versions=$3, updated_at=now() WHERE id=$1 RETURNING *`, [p.id, html, JSON.stringify(versions)]);
+  res.json({ project: shape(u), aligned: aligned ? { offset: +aligned.offset.toFixed(3), errorMs: Math.round(aligned.errorMs), beforeMs: Math.round(aligned.baseMs) } : null });
 });
 
 // ---------------- voiceover ----------------

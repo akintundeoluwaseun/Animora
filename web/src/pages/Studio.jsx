@@ -9,6 +9,7 @@ import { Alert, Button, Modal, PageLoader, ProjectTabs, Spinner } from '../compo
 import MicButton from '../components/MicButton.jsx';
 import { FullView, LivePreview, goFull } from '../components/Preview.jsx';
 import VoicePanel from '../components/VoicePanel.jsx';
+import SoundPanel from '../components/SoundPanel.jsx';
 import DownloadVideo from '../components/DownloadVideo.jsx';
 import FlyerDownload from '../components/FlyerDownload.jsx';
 import BuyCredits from '../components/BuyCredits.jsx';
@@ -262,6 +263,11 @@ export default function Studio() {
   const [canRender, setCanRender] = useState(true);
   useEffect(() => { api('/status').then((st) => setCanRender(st.render !== false)).catch(() => {}); }, []);
   const [tab, setTab] = useState('edit');
+  const [pInfo, setPInfo] = useState(null);   // the preview's sound events and length (for the Sound tab)
+  const [pTime, setPTime] = useState(0);
+  const control = useRef(null);
+  const tabRef = useRef(tab); tabRef.current = tab;
+  const lastPT = useRef(0);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -285,7 +291,7 @@ export default function Studio() {
           clearInterval(poll.current); setGenerating(false); setParams({}, { replace: true });
           if (g?.state === 'failed') setError(g.error || "Your video didn't finish. Press Make my video to try again.");
           else if (g?.message) setNotice(g.message);
-          if (r.project.plan?.voiceover?.enabled) setTab('voice');
+          if (r.project.plan?.voiceover?.enabled) setTab(/ANIMORA_PREMIUM/.test(r.project.code || '') ? 'sound' : 'voice');
         }
       } catch { /* network blip: keep checking */ }
     }, 2500);
@@ -372,7 +378,7 @@ export default function Studio() {
           <section aria-label="Preview" className="stage flex flex-col justify-center px-4 py-8 sm:px-8">
             <LivePreview html={project.code} aspect={project.aspectRatio} maxWidth={project.aspectRatio === '16:9' ? 320 : flyer ? 340 : 290} still={flyer}
               onEnded={flyer ? undefined : () => { if (!full) ask(project.code); }}
-              sound={project.sfx !== false}
+              sound={project.sfx !== false} onInfo={setPInfo} onTime={(x) => { if (tabRef.current === 'sound' && Math.abs(x - lastPT.current) > 0.08) { lastPT.current = x; setPTime(x); } }} controlRef={control}
               onSoundChange={async (on) => { setProject((p) => ({ ...p, sfx: on })); try { const r = await api(`/projects/${id}`, { method: 'PATCH', body: { sfx: on } }); setProject((p) => ({ ...p, code: r.project.code, sfx: r.project.sfx })); } catch { /* keep the local choice */ } }} />
             {!flyer && <p className="mt-3 text-center text-xs text-white/55">{project.sfx !== false ? 'Sound is on. Tap play to hear it; the same sound effects go into your MP4.' : 'Sound is off for this video.'}</p>}
             <div className="mt-6 flex flex-wrap justify-center gap-2">
@@ -386,7 +392,7 @@ export default function Studio() {
 
           <section className="flex h-[calc(100vh-12rem)] min-h-[520px] flex-col overflow-hidden surface">
             <div className="segmented m-2" role="tablist">
-              {(flyer ? [['edit', 'Edit'], ['adjust', 'Size & look']] : [['edit', 'Edit'], ['adjust', 'Size & look'], ['voice', 'Script'], ['plan', 'Scenes']]).map(([k, l]) => (
+              {(flyer ? [['edit', 'Edit'], ['adjust', 'Size & look']] : /ANIMORA_PREMIUM/.test(project.code || '') ? [['edit', 'Edit'], ['sound', 'Sound & voice'], ['adjust', 'Size & look']] : [['edit', 'Edit'], ['adjust', 'Size & look'], ['sound', 'Sound'], ['voice', 'Script'], ['plan', 'Scenes']]).map(([k, l]) => (
                 <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)}
                   className="press">{l}</button>
               ))}
@@ -395,6 +401,7 @@ export default function Studio() {
               {tab === 'edit' && <EditPanel project={project} onUpdate={setProject} />}
               {tab === 'adjust' && <AdjustPanel project={project} onUpdate={setProject} />}
               {tab === 'voice' && <VoicePanel project={project} />}
+              {tab === 'sound' && <SoundPanel project={project} onUpdate={setProject} info={pInfo} time={pTime} control={control} />}
               {tab === 'plan' && (
                 <div className="h-full overflow-y-auto p-4">
                   <ol className="space-y-2">

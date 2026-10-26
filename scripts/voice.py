@@ -24,7 +24,7 @@ def say(text, speed):
     parts = [p.strip() for p in re.split(r'(?<=[.!?])\s+', text) if p.strip()]
     chunks, spans, at = [], [], 0
     for i, p in enumerate(parts):
-        a, _ = k.create(p, voice=voice, speed=speed, lang='en-us')
+        a, _ = k.create(p, voice=voice, speed=speed, lang='en-gb' if voice.startswith('b') else 'en-us')
         a = np.asarray(a, dtype=np.float32)
         idx = np.where(np.abs(a) > 0.01)[0]
         if len(idx): a = a[max(0, idx[0] - 600): idx[-1] + 1800]

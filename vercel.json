@@ -7,7 +7,7 @@
   "functions": {
     "api/index.js": {
       "maxDuration": 300,
-      "includeFiles": "{server/**,assets/music/tracks.json,assets/music/library.json,node_modules/gsap/dist/**}"
+      "includeFiles": "{server/**,assets/music/tracks.json,assets/music/library.json,assets/music/beats.json,assets/sfx/registry.json,node_modules/gsap/dist/**}"
     }
   },
   "rewrites": [

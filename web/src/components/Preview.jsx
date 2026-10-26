@@ -68,17 +68,26 @@ function master(c) {
   comp.connect(out).connect(c.destination);
   bus = comp; return bus;
 }
-function playSfx(e) {
+// Effects are scheduled on the audio clock a little ahead of the playhead (not fired when the playhead happens to pass
+// them), with the same length, ring-out and fades as the MP4 mixer, so what you hear here is what you download.
+function playSfx(e, when = 0) {
   const c = ctx(); const b = buffers[e.k];
-  if (!c || c.state !== 'running' || !b) return;
+  if (!c || c.state !== 'running' || !b || e.muted || !(Number(e.v) > 0)) return null;
+  const at = Math.max(c.currentTime, when || c.currentTime);
   const src = c.createBufferSource(); const g = c.createGain();
-  g.gain.value = Math.min(1.2, (e.v || 1) * 0.8); src.buffer = b; src.connect(g).connect(master(c));
-  if (Number(e.len) > 0) { src.loop = Number(e.len) > b.duration; src.start(); src.stop(c.currentTime + Number(e.len)); } else src.start();
+  const v = Math.min(1.2, Number(e.v) * 0.8); src.buffer = b; src.connect(g).connect(master(c));
+  const len = Number(e.len) > 0 ? Number(e.len) : Number(e.fo) > 0 ? Math.min(b.duration, Number(e.fo) / 1000) : 0;
+  g.gain.setValueAtTime(0, at); g.gain.linearRampToValueAtTime(v, at + 0.002);
+  if (len) { src.loop = Number(e.len) > b.duration; g.gain.setValueAtTime(v, at + Math.max(0.003, len - 0.06)); g.gain.linearRampToValueAtTime(0, at + len); src.start(at); src.stop(at + len + 0.01); }
+  else src.start(at);
+  return src;
 }
 
-export function LivePreview({ html, aspect = '9:16', autoPlay = true, maxWidth = 340, onError, sound: soundOn = true, onSoundChange, still = false, onEnded, exact = false }) {
+export function LivePreview({ html, aspect = '9:16', autoPlay = true, maxWidth = 340, onError, sound: soundOn = true, onSoundChange, still = false, onEnded, exact = false, onInfo, onTime, controlRef }) {
   const sfxRef = useRef([]);
   const duckUntil = useRef(0);
+  const scheduled = useRef(new Set());
+  const live = useRef([]);
   const musicRef = useRef(null);
   useEffect(() => () => { musicRef.current?.pause(); }, []);
   const lastT = useRef(0);
@@ -97,6 +106,8 @@ export function LivePreview({ html, aspect = '9:16', autoPlay = true, maxWidth =
   const scaleRef = useRef(scale);
   const wasPlaying = useRef(false);
   const onEndedRef = useRef(onEnded);
+  const onInfoRef = useRef(onInfo); const onTimeRef = useRef(onTime);
+  useEffect(() => { onInfoRef.current = onInfo; onTimeRef.current = onTime; }, [onInfo, onTime]);
   useEffect(() => { onEndedRef.current = onEnded; }, [onEnded]);
   useEffect(() => { scaleRef.current = scale; frameRef.current?.contentWindow?.postMessage({ __adflash: true, cmd: 'zoom', z: scale }, '*'); }, [scale]);
 
@@ -115,30 +126,41 @@ export function LivePreview({ html, aspect = '9:16', autoPlay = true, maxWidth =
       const m = e.data;
       if (m.type === 'ready') {
         send({ cmd: 'zoom', z: scaleRef.current });
-        setReady(true); setD(m.d); sfxRef.current = m.sfx || []; lastT.current = 0;
+        setReady(true); setD(m.d); sfxRef.current = m.sfx || []; lastT.current = 0; onInfoRef.current?.({ sfx: m.sfx || [], d: m.d, music: m.music || null });
         // background music: an <audio> element kept in step with the timeline
         if (musicRef.current) { musicRef.current.pause(); musicRef.current = null; }
-        if (m.music?.url) { const a = new Audio(m.music.url); a.loop = true; a.volume = 0.32; a.preload = 'auto'; musicRef.current = a; }
+        if (m.music?.url) { const a = new Audio(m.music.url); a.loop = true; a.volume = 0.32; a.preload = 'auto'; a.dataset.offset = String(Number(m.music.offset) || 0); a.dataset.gain = String(Math.pow(10, (Number(m.music.gain) || 0) / 20)); musicRef.current = a; }
+        scheduled.current.clear();
         if (ctx()) [...new Set(sfxRef.current.map((e) => e.k))].forEach((k) => sound(k));
         if (autoPlay) send({ cmd: 'play' });
       }
       if (m.type === 'time') {
         // play every sound cue the playhead just passed (only while playing forward, not when scrubbing)
-        if (m.playing && soundRef.current && m.t > lastT.current && m.t - lastT.current < 0.5) {
-          for (const ev of sfxRef.current) if (ev.t > lastT.current && ev.t <= m.t) { playSfx(ev); if ((ev.v || 1) >= 0.5) duckUntil.current = m.t + 0.4; }
+        // schedule every cue in the next 250 ms on the audio clock; a jump or a pause clears what was scheduled
+        const jumped = m.t < lastT.current - 0.01 || m.t - lastT.current > 0.5;
+        if (!m.playing || jumped) { scheduled.current.clear(); live.current.forEach((x) => { try { x.stop(); } catch { /* already ended */ } }); live.current = []; }
+        if (m.playing && soundRef.current && audio?.state === 'running') {
+          sfxRef.current.forEach((ev, i) => {
+            if (scheduled.current.has(i) || ev.t < m.t - 0.03 || ev.t > m.t + 0.25) return;
+            scheduled.current.add(i);
+            const src = playSfx(ev, audio.currentTime + Math.max(0, ev.t - m.t)); if (src) live.current.push(src);
+            if ((ev.v || 1) >= 0.5) duckUntil.current = ev.t + 0.4;
+          });
+          if (live.current.length > 64) live.current = live.current.slice(-64);
         }
         const mu = musicRef.current;
         if (mu) {
           if (m.playing && soundRef.current && audio?.state === 'running') {
-            if (mu.paused || Math.abs(mu.currentTime - m.t) > 0.25) { try { mu.currentTime = m.t % (mu.duration || 1e9); } catch { /* not loaded yet */ } }
+            const want = (m.t + Number(mu.dataset.offset || 0)) % (mu.duration || 1e9);   // the beat-aligned start chosen in the editor
+            if (mu.paused || Math.abs(mu.currentTime - want) > 0.25) { try { mu.currentTime = want; } catch { /* not loaded yet */ } }
             if (mu.paused) mu.play().catch(() => {});
-            mu.volume = Math.max(0, 0.32 * Math.min(1, (m.d - m.t) / 2) * (m.t < duckUntil.current ? 0.67 : 1));   // fade out at the end and dip under effects, like the MP4
+            mu.volume = Math.max(0, Math.min(1, 0.32 * Number(mu.dataset.gain || 1) * Math.min(1, (m.d - m.t) / 2) * (m.t < duckUntil.current ? 0.67 : 1)));   // fade out at the end and dip under effects, like the MP4
           } else if (!mu.paused) mu.pause();
         }
         lastT.current = m.t;
         if (!still && wasPlaying.current && !m.playing && m.d > 1 && m.t >= m.d - 0.05) onEndedRef.current?.();   // played to the end
         wasPlaying.current = m.playing;
-        setT(m.t); setD(m.d); setPlaying(m.playing);
+        setT(m.t); setD(m.d); setPlaying(m.playing); onTimeRef.current?.(m.t, m.playing);
       }
       if (m.type === 'error') { setError(m.message); onError?.(m.message); }
     };
@@ -150,6 +172,8 @@ export function LivePreview({ html, aspect = '9:16', autoPlay = true, maxWidth =
   useEffect(() => { soundRef.current = soundOn; }, [soundOn]);
   const send = (msg) => frameRef.current?.contentWindow?.postMessage({ __adflash: true, ...msg }, '*');
   const toggle = () => { unlock(); if (playing) send({ cmd: 'pause' }); else send({ cmd: 'play' }); };
+  // the sound panel can seek the preview and play from a sound's moment
+  if (controlRef) controlRef.current = { seek: (x) => { unlock(); send({ cmd: 'seek', t: x }); }, playFrom: (x) => { unlock(); send({ cmd: 'seek', t: Math.max(0, x) }); send({ cmd: 'play' }); }, pause: () => send({ cmd: 'pause' }) };
 
   useEffect(() => {
     const onKey = (e) => {

@@ -8,6 +8,22 @@
 import { config } from '../../config.js';
 import { factsOf } from '../pieces/index.js';
 import { speakable } from '../voice.js';
+import { VOICE_LIBRARY, isVoiceId, defaultVoice } from './voices.js';
+export { VOICE_LIBRARY };
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
+
+// the sound engine that runs in the film's page, and the measured sound registry it chooses from
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+const SOUND_JS = readFileSync(path.join(HERE, 'browser', 'sound.js'), 'utf8');
+const REG = (() => {
+  try {
+    const r = JSON.parse(readFileSync(path.join(HERE, '..', '..', '..', 'assets', 'sfx', 'registry.json'), 'utf8'));
+    return r.sounds.filter((x) => x.ok).map((x) => ({ key: x.key, role: x.role, useful: x.useful, intensity: x.intensity, transient: x.transient, tone: x.tone, attack: x.attack }));
+  } catch { return []; }
+})();
+export const SOUND_REGISTRY = REG;
 import notificationCascade, { meta as mNotif } from './blocks/notification-cascade.js';
 import messageThread, { meta as mThread } from './blocks/message-thread-reveal.js';
 import notesReveal, { meta as mNotes } from './blocks/notes-reveal.js';
@@ -24,6 +40,8 @@ import weightWave, { meta as mWave } from './blocks/weight-wave.js';
 
 export const PREMIUM_ASPECTS = ['9:16', '16:9'];
 const MARK = 'ANIMORA_PREMIUM';
+// background music chosen in the editor: the preview and the renderer both read window.ADFLASH_DATA.music
+const MUSIC_HOOK = `(function(){var a=(window.${MARK}.audio||{});if(a.music)window.ADFLASH_DATA={music:{url:a.music,offset:+a.musicOffset||0,gain:+a.musicGain||0}};})();`;
 
 const clean = (s, n = 80) => String(s ?? '').replace(/\s+/g, ' ').trim().slice(0, n);
 const lower1 = (s) => { s = clean(s); return s ? s[0].toLowerCase() + s.slice(1) : s; };
@@ -173,7 +191,7 @@ export const PREMIUM_BLOCKS = Object.keys(BLOCKS).filter((k) => !BLOCKS[k].wide)
 
 // Dead air: wherever nothing on screen starts or moves for more than MAX seconds, the film fast-forwards through it,
 // so the viewer never waits on a still frame. The closing card keeps a short hold so it can be read.
-const REMAP_FN = `function remap(tl,cap,endHold){var D=Math.min(tl.duration(),cap||1e9),iv=[];tl.getChildren(true,true,false).forEach(function(c){var d=c.duration?c.duration():0;if(c.getChildren&&d>0)return;if(!(d>0))d=0.06;var st=c.startTime(),p=c.parent;while(p&&p!==tl){st+=p.startTime();p=p.parent;}if(st<D)iv.push([st,Math.min(D,st+d),d>D*0.45]);});
+const REMAP_FN = `function remap(tl,cap,endHold){var D=Math.min(tl.duration(),cap||1e9),iv=[];tl.getChildren(true,true,false).forEach(function(c){var d=c.duration?c.duration():0;if(c.getChildren&&d>0)return;var tg=c.targets?c.targets():[],vv=c.vars||{};if((!tg.length||!tg[0]||!tg[0].nodeType)&&!vv.onUpdate&&!vv.onStart&&!vv.onComplete)return;if(!(d>0))d=0.06;var st=c.startTime(),p=c.parent;while(p&&p!==tl){st+=p.startTime();p=p.parent;}if(st<D)iv.push([st,Math.min(D,st+d),d>D*0.45]);});
 // slow background drifts don't count as action, unless they are the whole scene (a kinetic headline is one long move)
 var shortOnes=iv.filter(function(r){return !r[2];}),cov=0;shortOnes.forEach(function(r){cov+=r[1]-r[0];});if(cov>D*0.3)iv=shortOnes;iv.sort(function(a,b){return a[0]-b[0];});
 var U=[];iv.forEach(function(r){var l=U[U.length-1];if(l&&r[0]<=l[1]+0.05){if(r[1]>l[1])l[1]=r[1];}else U.push([r[0],r[1]]);});
@@ -182,9 +200,6 @@ U.forEach(function(r){var idle=r[0]-pos;o+=Math.min(idle,pos===0?0.5:MAX);K.push
 o+=Math.min(D-pos,END);K.push([o,D]);
 return {D:K[K.length-1][0],f:function(t){if(t<=0)return 0;for(var j=1;j<K.length;j++){if(t<=K[j][0]){var a=K[j-1],b=K[j];return a[1]+(b[1]-a[1])*((t-a[0])/((b[0]-a[0])||1));}}return K[K.length-1][1];},g:function(x){for(var j=1;j<K.length;j++){if(x<=K[j][1]){var a=K[j-1],b=K[j];return a[0]+(b[0]-a[0])*((x-a[1])/((b[1]-a[1])||1));}}return K[K.length-1][0];}};}
 function wrap(tl,m){return {_t:0,seek:function(t){this._t=+t||0;var x=m.f(this._t);tl.seek(x,false);if(window.__clipSync)window.__clipSync(x);return this;},time:function(){return this._t;},duration:function(){return m.D;},pause:function(){return this;},paused:function(){return true;},play:function(){return this;},repeat:function(){return 0;},progress:function(){return this._t/m.D;}};}`;
-// Sound design, worked out from the template's own motion (the "sound pass" method from github.com/Barty-Bart/motion-graphics):
-// a whoosh starts 2 frames before anything that travels, sized to the move; a pop lands on the frame something appears;
-// typing runs under typed text; the final big reveal gets an impact with a soft riser leading into it. Sounds: CC0 kit (assets/sfx/mg-*).
 // Spoken captions: when the film has a voice, every spoken line is also on screen as big motion text, word by word,
 // in the same moment the voice says it. The page plans the timing itself (so the preview shows it); the render server
 // replaces the estimate with the voice's exact timing (window.__captions) before recording.
@@ -204,32 +219,11 @@ function capsLayer(host,plan,wide){var box=document.createElement('div'),cur=-1,
   if(k!==cur){cur=k;inner.innerHTML='';spans=[];if(k>=0)plan[k].words.forEach(function(x){var s=document.createElement('span');s.textContent=x.w+' ';s.style.display='inline-block';s.style.whiteSpace='pre';inner.appendChild(s);spans.push(s);});}
   if(k<0){inner.style.opacity='0';return;}var L=plan[k],fin=Math.min(1,Math.max(0,(L.t1+0.45-t)/0.25)),fi=Math.min(1,Math.max(0,(t-L.t0+0.08)/0.16));inner.style.opacity=String(Math.min(fin,fi));inner.style.transform='translateY('+((1-fi)*18).toFixed(1)+'px)';
   L.words.forEach(function(x,j){var s=spans[j],p=Math.min(1,Math.max(0,(t-x.t+0.04)/0.14)),now=t>=x.t-0.04&&(j===L.words.length-1||t<L.words[j+1].t-0.04);s.style.opacity=String(0.18+0.82*p);s.style.transform='translateY('+((1-p)*14).toFixed(1)+'px) scale('+(0.86+0.14*p).toFixed(3)+')';s.style.color=now?'#FFD84D':'#fff';});};}`;
-const SFX_FN = `var KIT={whoosh:{s:['mg-whoosh-5','mg-whoosh-8'],m:['mg-whoosh-1','mg-whoosh-6','mg-whoosh-4','mg-whoosh-7'],l:['mg-whoosh-3']},pop:['mg-pop-1','mg-pop-3','mg-pop-7','mg-pop-10','mg-pop-11'],ding:['mg-ding-4','mg-ding-6','mg-ding-8'],tick:['mg-tick-2','mg-tick-3','mg-click-1'],impact:['mg-impact-1','mg-impact-5','mg-impact-6'],riser:['mg-riser-1','mg-riser-13'],typing:['mg-typing-4','mg-typing-1']},VOL={whoosh:0.5,pop:0.45,ding:0.5,tick:0.32,impact:0.85,riser:0.3,typing:0.26},PRI={impact:5,whoosh:3,ding:2,pop:2,tick:1,typing:1,riser:0},ROT={};
-function take(cat,len){var L=cat==='whoosh'?KIT.whoosh[len||'m']:KIT[cat];ROT[cat+(len||'')]=((ROT[cat+(len||'')]||0)+1)%L.length;return L[ROT[cat+(len||'')]];}
-function cues(tl,P){P=P||{};var W=innerWidth||1920,H=innerHeight||1080,D=tl.duration(),raw=[],sets=[],moves=[],cuts=[];var num=function(x){return typeof x==='number'?x:(typeof x==='string'&&/^-?[\\d.]+(px)?$/.test(x)?parseFloat(x):null);};
- tl.getChildren(true,true,false).forEach(function(c){if(c.getChildren)return;var v=c.vars||{},s=v.startAt||{},d=c.duration(),st=c.startTime(),p=c.parent;while(p&&p!==tl){st+=p.startTime();p=p.parent;}if(st>D)return;
-  var el=(c.targets&&c.targets()[0])||null,r=el&&el.getBoundingClientRect?el.getBoundingClientRect():{width:0,height:0},area=(r.width*r.height)/(W*H);
-  if(!(d>0)){if(st>0.2){if(v.x!=null||v.y!=null||v.xPercent!=null||v.yPercent!=null)moves.push(st);else if(v.autoAlpha!=null||v.opacity!=null||v.visibility!=null||v.display!=null)cuts.push(st);else sets.push(st);}return;}
-  var mv=0;['x','y'].forEach(function(k){var a=num(v[k]),b=num(s[k]);if(a!=null||b!=null)mv=Math.max(mv,Math.abs((a||0)-(b||0)));});['xPercent','yPercent'].forEach(function(k){var a=num(v[k]),b=num(s[k]);if(a!=null||b!=null)mv=Math.max(mv,Math.abs((a||0)-(b||0))/100*(k==='xPercent'?(r.width||W):(r.height||H)));});
-  if(mv>=140&&d>=0.18&&d<=1.8)raw.push({t:st-0.067,c:'whoosh',len:d<0.3?'s':d<=1.2?'m':'l',soft:mv<320});
-  var A=v.autoAlpha!=null?v.autoAlpha:v.opacity,F=s.autoAlpha!=null?s.autoAlpha:s.opacity,enter=v.runBackwards?(A!=null&&+A<0.5):(A!=null&&+A>=0.5&&(F==null||+F<0.5));
-  var sc=num(v.scale),sf=num(s.scale),grow=v.runBackwards?(sc!=null&&sc<0.8):(sf!=null&&sf<0.8&&(sc==null||sc>=0.95));
-  if((enter||grow)&&st>0.15){raw.push({t:st+0.01,c:(area>0.22&&st>D*0.55)?'reveal':(P.appear||'pop'),area:area});}
- });
- // instant changes in quick runs are typed text
- sets.sort(function(a,b){return a-b;});for(var i=0;i<sets.length;){var j=i;while(j+1<sets.length&&sets[j+1]-sets[j]<0.22)j++;if(j-i>=4&&sets[j]-sets[i]>=0.35)raw.push({t:sets[i],c:'typing',dur:sets[j]-sets[i]+0.15});i=j+1;}
- // stepped moves (a run of instant position changes) whoosh once at their start; hard picture swaps get a soft tick
- moves.sort(function(a,b){return a-b;});for(var q=0;q<moves.length;){var z=q;while(z+1<moves.length&&moves[z+1]-moves[z]<0.12)z++;if(z>q)raw.push({t:moves[q]-0.067,c:'whoosh',len:'m'});q=z+1;}
- cuts.sort(function(a,b){return a-b;});var lc=-9;cuts.forEach(function(t){if(t-lc>0.2){raw.push({t:t,c:'tick'});lc=t;}});
- raw.sort(function(a,b){return a.t-b.t;});
- // the final big reveal: one impact, a soft riser into it; earlier "reveals" are just appearances
- var rev=raw.filter(function(e){return e.c==='reveal';});rev.forEach(function(e,k){if(k<rev.length-1)e.c=P.appear||'pop';else{e.c='impact';if(e.t>2.4)raw.push({t:e.t-2.0,c:'riser'});}});
- raw.sort(function(a,b){return a.t-b.t;});
- var out=[],lastBy={},GAP={pop:0.14,ding:0.4,tick:0.1,whoosh:0.28,typing:0.6,impact:1,riser:2};
- raw.forEach(function(e){if(e.t<0||e.t>D-0.05)return;if(lastBy[e.c]!=null&&e.t-lastBy[e.c]<GAP[e.c])return;
-  var prev=out[out.length-1];if(prev&&Math.abs(prev.t-e.t)<0.05&&e.c!=='typing'&&prev.c!=='typing'){if((PRI[e.c]||0)<=(PRI[prev.c]||0))return;out.pop();}
-  lastBy[e.c]=e.t;var o={t:+Math.max(0,e.t).toFixed(3),k:take(e.c,e.len),v:e.soft?VOL[e.c]*0.55:VOL[e.c]};if(e.c==='typing'){o.len=+e.dur.toFixed(2);}out.push(o);});
- return out.slice(0,48);}`;
+// Sound design comes from the film's own timeline: browser/sound.js reads every visual event and picks a fitting,
+// measured sound for it (see assets/sfx/registry.json). cues() keeps the old call shape for the page code below.
+const SFX_FN = SOUND_JS + `
+var REG=${JSON.stringify(REG)};
+function audioOpts(){var a=(window.${MARK}||{}).audio||{};return {seed:a.seed||'animora',overrides:a};}`;
 
 /** One template as a page: its slots, the slot binder, and (standalone) the hand-off of its timeline to the renderer. */
 function blockPage(block, vars, { standalone = true, data = null } = {}) {
@@ -238,7 +232,7 @@ function blockPage(block, vars, { standalone = true, data = null } = {}) {
   if (PATCH[block]) html = PATCH[block](html);
   const json = JSON.stringify(data || { block, vars }).replace(/</g, '\\u003c');
   const head = standalone
-    ? `<script>window.${MARK}=${json};window.__hyperframes={getVariables:function(){return window.${MARK}.vars;}};window.__sfx=[];window.__timelines=window.__timelines||{};</script>`
+    ? `<script>window.${MARK}=${json};${MUSIC_HOOK}window.__hyperframes={getVariables:function(){return window.${MARK}.vars;}};window.__sfx=[];window.__timelines=window.__timelines||{};</script>`
     : `<script>window.__timelines=window.__timelines||{};window.__slots=${JSON.stringify(vars).replace(/</g, '\\u003c')};window.__hyperframes={getVariables:function(){return window.__slots;}};</script>`;
   const V = standalone ? `window.${MARK}.vars` : 'window.__slots';
   // the declarative slots HyperFrames' own runtime would fill: data-var-src (pictures), data-var-text (words) and --{slot} CSS values
@@ -251,27 +245,27 @@ ${CAPS_FN}
 (function wait(){var t=window.__timelines&&window.__timelines[id];if(t){t.pause(0);var m=remap(t),V=(window.${MARK}||{}).voice,hasV=!!(V&&V.lines&&V.lines.length);
 // with a voice, the film runs a little slower when needed so every spoken line fits
 if(hasV){var need=1.8;V.lines.forEach(function(l){need+=estLen(l)+0.5;});m=stretch(m,need);}
-try{window.__sfx=cues(t,${JSON.stringify(b.sfx || {})}).map(function(e){var o={t:+m.g(e.t).toFixed(3),k:e.k,v:e.v};if(e.len)o.len=+(m.g(e.t+e.len)-m.g(e.t)).toFixed(2);return o;});}catch(e){window.__sfx=[];}t.seek(0,false);var W=wrap(t,m);if(hasV){var plan=window.__captions||capsPlan(V.show||V.lines,window.__sfx,m.D);window.__capPlan=plan;var sync=capsLayer(document.getElementById('stage')||document.body,plan,innerWidth>innerHeight),sk=W.seek;W.seek=function(x){sk.call(W,x);sync(W._t);return W;};}window.__timeline=W;return;}if(++n<400)setTimeout(wait,25);})();})();</script>` : bind;
+try{var evs=AnimoraSound.remapEvents(AnimoraSound.events(t),m.g,0,'');window.__soundEvents=evs;window.__sfx=AnimoraSound.choose(evs,REG,${JSON.stringify(b.sfx || {})},audioOpts());}catch(e){console.error(e);window.__sfx=[];}t.seek(0,false);var W=wrap(t,m);if(hasV&&V.captions!==false){var plan=window.__captions||capsPlan(V.show||V.lines,window.__sfx,m.D);window.__capPlan=plan;var sync=capsLayer(document.getElementById('stage')||document.body,plan,innerWidth>innerHeight),sk=W.seek;W.seek=function(x){sk.call(W,x);sync(W._t);return W;};}window.__timeline=W;return;}if(++n<400)setTimeout(wait,25);})();})();</script>` : bind;
   return html.replace(/<head>/i, `<head>${head}`).replace(/<body([^>]*)>/i, `<body$1><div id="stage" style="position:absolute;left:0;top:0;width:${b.meta.width}px;height:${b.meta.height}px;overflow:hidden">`)
     .replace(/<\/body>/i, `</div>${tail}</body>`);
 }
 
 /** The page the renderer and the preview play for one tall template. */
-export function premiumHtml({ block, vars, voice = null }) { return blockPage(block, vars, { data: voice ? { block, vars, voice } : null }); }
+export function premiumHtml({ block, vars, voice = null, audio = null }) { return blockPage(block, vars, { data: { block, vars, ...(voice ? { voice } : {}), ...(audio ? { audio } : {}) } }); }
 
 /**
  * Several templates played one after another (landscape films). Each scene runs in its own frame so their styles and
  * scripts never clash; one master clock seeks every scene, cross-fading 0.4 s between them.
  */
 const XF = 0.4;
-export function filmHtml({ film, W = 1920, H = 1080, voice = null }) {
+export function filmHtml({ film, W = 1920, H = 1080, voice = null, audio = null }) {
   // scene lengths are worked out in the page, after the dead air in each scene has been taken out
   const scenes = film.map((s) => ({ cap: Number(s.dur) || BLOCKS[s.block].meta.duration, id: s.block, snd: BLOCKS[s.block].sfx || {} }));
   const docs = film.map((s) => blockPage(s.block, s.vars, { standalone: false }));
-  const data = JSON.stringify(voice ? { film, voice } : { film }).replace(/</g, '\\u003c');
+  const data = JSON.stringify({ film, ...(voice ? { voice } : {}), ...(audio ? { audio } : {}) }).replace(/</g, '\\u003c');
   const docsJson = JSON.stringify(docs).replace(/</g, '\\u003c').replace(/[\u2028\u2029]/g, '');
   return `<!doctype html><html><head><meta charset="utf-8"><title>Animora</title>
-<script>window.${MARK}=${data};window.__hyperframes=null;</script>
+<script>window.${MARK}=${data};${MUSIC_HOOK}window.__hyperframes=null;</script>
 <style>html,body{margin:0;background:#000;overflow:hidden}#stage{position:absolute;left:0;top:0;width:${W}px;height:${H}px;overflow:hidden;background:#000}#stage iframe{position:absolute;left:0;top:0;width:${W}px;height:${H}px;border:0;opacity:0}</style></head>
 <body><div id="stage"></div>
 <script>(function(){
@@ -288,20 +282,21 @@ function apply(t){SC.forEach(function(s,i){var lt=t-s.start,o=0;if(lt>=0&&lt<=s.
 var T={_t:0,seek:function(t){this._t=+t||0;apply(this._t);return this;},time:function(){return this._t;},duration:function(){return D;},pause:function(){return this;},paused:function(){return true;},play:function(){return this;},repeat:function(){return 0;},progress:function(){return this._t/D;}};
 var n=0;(function wait(){var ok=SC.every(function(s,i){return !!child(i);});
   if(ok){var docsReady=frames.map(function(f){var d=f.contentDocument;return Promise.race([Promise.all([d.fonts?d.fonts.ready:null].concat([].map.call(d.images,function(im){return im.complete?null:new Promise(function(r){im.onload=im.onerror=r;});}))),new Promise(function(r){setTimeout(r,8000);})]);});
-    Promise.all(docsReady).then(function(){var sfx=[],at=0;
+    Promise.all(docsReady).then(function(){var sfx=[],allEv=[],at=0;
       SC.forEach(function(s,i){var c=child(i);c.pause(0);s.m=remap(c,s.cap,i===SC.length-1?2.2:1.1);var VV=(window.${MARK}||{}).voice;if(VV&&VV.scenes&&VV.lines[i])s.m=stretch(s.m,estLen(VV.lines[i])+(i===SC.length-1?1.6:0.9));s.dur=s.m.D;s.start=i?at-XF:0;at=s.start+s.dur;
-        try{cues(c,s.snd).forEach(function(e){if(e.t>s.cap)return;var tt=s.m.g(e.t)+s.start,o={t:+tt.toFixed(3),k:e.k,v:e.v};if(e.len)o.len=e.len;sfx.push(o);});}catch(e){}
-        if(i)sfx.push({t:+Math.max(0,s.start-0.067).toFixed(3),k:'mg-whoosh-1',v:0.55});});
-      // the ending lands: the first thing to appear in the last scene gets the impact, with a soft riser into it
-      var L=SC[SC.length-1],hit=null;sfx.forEach(function(e){if(!hit&&e.t>=L.start+0.05&&/^mg-(pop|tick|ding|click)/.test(e.k))hit=e;});if(hit&&!sfx.some(function(e){return /impact/.test(e.k);})){hit.k='mg-impact-1';hit.v=0.85;if(hit.t>2.4)sfx.push({t:+(hit.t-2.0).toFixed(3),k:'mg-riser-13',v:0.3});}
-      D=at;sfx=sfx.filter(function(e){return e.t<D-0.2;}).sort(function(a,b){return a.t-b.t;});window.__sfx=sfx;var V=(window.${MARK}||{}).voice;if(V&&V.lines&&V.lines.length){var plan=window.__captions||capsPlan(V.show||V.lines,sfx,D,V.scenes?SC.map(function(x,i){return x.start+(i?0.35:0.4);}):null);window.__capPlan=plan;var sync=capsLayer(stage,plan,true),sk=T.seek;T.seek=function(x){sk.call(T,x);sync(T._t);return T;};}apply(0);T.seek(0);window.__timeline=T;});return;}
+        try{var ev=AnimoraSound.events(c).filter(function(e){return e.t<=s.cap*1000;});if(i<SC.length-1)ev.forEach(function(e){e.final=false;});ev.forEach(function(e){e.P=s.snd;});allEv=allEv.concat(AnimoraSound.remapEvents(ev,s.m.g,Math.round(s.start*1000),'s'+i+':'));}catch(e){console.error(e);}
+        if(i)allEv.push({kind:'scene',t:Math.round(s.start*1000),dur:Math.round(XF*1000),key:'scene',id:'scene@'+i+'#1',info:{area:1}});});
+      // the ending lands: if the last scene has no closing reveal of its own, its first appearance becomes it
+      var lastId='s'+(SC.length-1)+':';if(!allEv.some(function(e){return e.final&&e.id.indexOf(lastId)===0;})){var f0=allEv.filter(function(e){return e.id.indexOf(lastId)===0&&(e.kind==='appear'||e.kind==='slam');})[0];if(f0)f0.final=true;}
+      allEv.sort(function(a,b){return a.t-b.t;});window.__soundEvents=allEv;try{sfx=AnimoraSound.choose(allEv,REG,{},audioOpts());}catch(e){console.error(e);sfx=[];}
+      D=at;sfx=sfx.filter(function(e){return e.t<D-0.2;}).sort(function(a,b){return a.t-b.t;});window.__sfx=sfx;var V=(window.${MARK}||{}).voice;if(V&&V.lines&&V.lines.length&&V.captions!==false){var plan=window.__captions||capsPlan(V.show||V.lines,sfx,D,V.scenes?SC.map(function(x,i){return x.start+(i?0.35:0.4);}):null);window.__capPlan=plan;var sync=capsLayer(stage,plan,true),sk=T.seek;T.seek=function(x){sk.call(T,x);sync(T._t);return T;};}apply(0);T.seek(0);window.__timeline=T;});return;}
   if(++n<600)setTimeout(wait,25);})();
 })();</script></body></html>`;
 }
 
 export const isPremium = (html) => String(html || '').includes(`window.${MARK}=`);
 export function readPremium(html) {
-  const m = String(html || '').match(new RegExp(`window\\.${MARK}=(\\{.*?\\});window\\.__hyperframes`));
+  const m = String(html || '').match(new RegExp(`window\\.${MARK}=(\\{.*?\\});(?:\\(function\\(\\)\\{var a=|window\\.__hyperframes)`));
   try { return m ? JSON.parse(m[1]) : null; } catch { return null; }
 }
 
@@ -327,7 +322,7 @@ function wideFilm(f, r) {
  * The narration for a premium film: a few short spoken lines from the owner's own details (no AI), read by the free
  * Kokoro voice on the render server. The line breaks become real pauses; the last line lands on the film's ending.
  */
-export function voiceScript(f, gender) {
+export function voiceScript(f, gender, voiceId) {
   const end = (t) => { t = clean(t, 120).replace(/[|]/g, ' '); return /[.!?]$/.test(t) ? t : `${t}.`; };
   const lines = [];
   const head = f.heads[0] || f.sub; if (head) lines.push(end(head));
@@ -338,13 +333,13 @@ export function voiceScript(f, gender) {
   lines.push(end([f.name, f.cta].filter(Boolean).join('. ')));
   // what is said (numbers and prices in words) and what is shown on screen (as the owner wrote it)
   const keep = lines.slice(0, 4);
-  return { voice: gender === 'male' ? 'am_michael' : 'af_heart', lines: keep.map(speakable), show: keep };
+  return { voice: isVoiceId(voiceId) ? voiceId : defaultVoice(gender), lines: keep.map(speakable), show: keep };
 }
 const wantsVoice = (brief) => [true, 'yes', 'female', 'male'].includes(brief?.voiceover);
 
 
 /** Landscape films say exactly what each scene shows, as each scene starts (one line per scene). */
-function filmVoice(film, f, gender) {
+function filmVoice(film, f, gender, voiceId) {
   const end = (t) => { t = clean(String(t || '').replace(/[|]/g, ' '), 120); return !t ? '' : /[.!?]$/.test(t) ? t : `${t}.`; };
   const cap = (t) => { t = clean(t, 120).toLowerCase(); return t.charAt(0).toUpperCase() + t.slice(1); };
   const show = film.map((s) => {
@@ -355,7 +350,7 @@ function filmVoice(film, f, gender) {
     if (s.block === 'logo-outro') return [end(v.tagline), end(f.cta)].filter(Boolean).join(' ');
     return '';
   });
-  return { voice: gender === 'male' ? 'am_michael' : 'af_heart', lines: show.map(speakable), show, scenes: true };
+  return { voice: isVoiceId(voiceId) ? voiceId : defaultVoice(gender), lines: show.map(speakable), show, scenes: true };
 }
 
 /** Pick a template that fits this business (a different one on Regenerate) and fill it. */
@@ -364,8 +359,8 @@ export function premiumFilm({ plan = {}, brief = {}, assets = [], salt = '', pre
   if (!PREMIUM_ASPECTS.includes(aspect)) throw new Error('No premium template for this size yet');
   const f = factsOf(plan, brief, assets);
   const r = mulberry(hash(`${f.name}|${salt}`));
-  const voice = wantsVoice(brief) ? voiceScript(f, brief.voiceGender || brief.voiceover) : null;
-  if (aspect === '16:9') { const film = wideFilm(f, r); const fv = voice ? filmVoice(film, f, brief.voiceGender || brief.voiceover) : null; return { html: filmHtml({ film, voice: fv }), block: film.map((s) => s.block).join('+') }; }
+  const voice = wantsVoice(brief) ? voiceScript(f, brief.voiceGender || brief.voiceover, brief.voiceId) : null;
+  if (aspect === '16:9') { const film = wideFilm(f, r); const fv = voice ? filmVoice(film, f, brief.voiceGender || brief.voiceover, brief.voiceId) : null; return { html: filmHtml({ film, voice: fv }), block: film.map((s) => s.block).join('+') }; }
   const prev = readPremium(previous)?.block;
   let options = PREMIUM_BLOCKS.filter((k) => BLOCKS[k].fits(f));
   if (options.length > 1 && prev) options = options.filter((k) => k !== prev);
@@ -406,6 +401,41 @@ export async function premiumEdit({ html, instruction, useAi }) {
     if (k === 'rows') { if (sc.vars.rows?.[+j]) { sc.vars.rows[+j][part] = val; changed++; } } else { sc.vars[k] = val; changed++; }
   }
   if (!changed) return null;
-  const out = d.film ? filmHtml({ film: next, voice: d.voice }) : premiumHtml({ block: next[0].block, vars: next[0].vars, voice: d.voice });
+  const out = d.film ? filmHtml({ film: next, voice: d.voice, audio: d.audio }) : premiumHtml({ block: next[0].block, vars: next[0].vars, voice: d.voice, audio: d.audio });
   return { html: out, summary: clean(o.summary, 200) || 'Done! Check the video.' };
+}
+
+/**
+ * Sound settings changed in the editor: effects volume, density, muted or swapped effects (by visual-event id), a fresh
+ * pick of effects (seed), background music (+ its beat-aligned start), the voice and the captions. The film itself is
+ * untouched; the page is rebuilt with the new settings. Returns the new page or null if this isn't a premium film.
+ * voiceScript(): when a voice is switched on for a film that had none, the spoken lines come from `brief` details.
+ */
+export function premiumWithAudio(html, patch = {}, { brief = null, plan = {}, assets = [] } = {}) {
+  const d = readPremium(html); if (!d) return null;
+  const audio = { ...(d.audio || {}) };
+  if (typeof patch.sfxGain === 'number') audio.sfxGain = Math.max(-30, Math.min(6, patch.sfxGain));
+  if (['low', 'normal', 'high'].includes(patch.density)) audio.density = patch.density;
+  if (Array.isArray(patch.mute)) audio.mute = [...new Set(patch.mute.map(String))].slice(0, 200);
+  if (patch.swap && typeof patch.swap === 'object') audio.swap = Object.fromEntries(Object.entries(patch.swap).filter(([k, v]) => typeof v === 'string' && REG.some((r) => r.key === v)).slice(0, 200));
+  if (patch.reshuffle) { audio.seed = `s${Date.now().toString(36)}`; delete audio.swap; }
+  if ('music' in patch) { if (patch.music && /^\/music\/[\w-]+\.mp3$/.test(patch.music)) { audio.music = patch.music; audio.musicOffset = Math.max(0, Number(patch.musicOffset) || 0); } else { delete audio.music; delete audio.musicOffset; } }
+  if (typeof patch.musicGain === 'number') audio.musicGain = Math.max(-20, Math.min(6, patch.musicGain));
+  let voice = d.voice ? { ...d.voice } : null;
+  if (patch.voiceOn === false) voice = null;
+  if (patch.voiceOn === true && !voice) {
+    const f = factsOf(plan, brief || {}, assets);
+    voice = d.film ? filmVoice(d.film, f, 'female', patch.voice) : voiceScript(f, 'female', patch.voice);
+  }
+  if (voice && isVoiceId(patch.voice)) voice.voice = patch.voice;
+  if (voice && typeof patch.captions === 'boolean') voice.captions = patch.captions;
+  return d.film ? filmHtml({ film: d.film, voice, audio }) : premiumHtml({ block: d.block, vars: d.vars, voice, audio });
+}
+
+/** For tests: a tiny template made of your own HTML and GSAP code, run through the same page code as real templates. */
+export function registerTestBlock(id, { body, script, width = 1080, height = 1920, sfx = {}, gsapSrc }) {
+  BLOCKS[id] = {
+    meta: { id, title: id, width, height, duration: 0 }, sfx, wide: true,
+    html: `<!doctype html><html><head><meta charset="utf-8"><script src="${gsapSrc}"></script><style>html,body{margin:0;background:#fff}</style></head><body><div data-composition-id="${id}" style="position:relative;width:${width}px;height:${height}px">${body}</div><script>window.__timelines=window.__timelines||{};(function(){var tl=gsap.timeline({paused:true});${script};window.__timelines[${JSON.stringify(id)}]=tl;})();</script></body></html>`,
+  };
 }
