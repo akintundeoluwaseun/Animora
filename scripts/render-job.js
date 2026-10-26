@@ -5,27 +5,16 @@ import { mkdtemp, readFile, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
-import { renderVideo } from '../server/engine/renderer.js';
+import { renderVideo, inspectAnimation } from '../server/engine/renderer.js';
 import { addSfxToVideo } from '../server/engine/sfx.js';
-import { writeFile } from 'node:fs/promises';
+import { writeFile, readFile as readText } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
-// Natural voice-over for premium films (scripts/voice.py, Kokoro on this machine). The script travels inside the film's code.
-function voiceSpec(html, sfx, duration) {
+// Natural voice-over for premium films (scripts/voice.py, Kokoro on this machine). The script travels inside the film's code,
+// and the film shows every spoken line as on-screen captions; the voice's exact timing is put back into the page before recording.
+function voiceData(html) {
   const m = String(html).match(/window\.ANIMORA_PREMIUM=(\{.*?\});window\.__hyperframes/);
-  let d = null; try { d = m ? JSON.parse(m[1]) : null; } catch { d = null; }
-  const v = d?.voice; if (!v?.lines?.length) return null;
-  // the first line opens the film, the last lands on the ending (the impact), the others on the moments in between
-  const hits = (sfx || []).map((e) => e.t).sort((a, b) => a - b);
-  const impact = (sfx || []).find((e) => /impact/.test(e.k))?.t;
-  const n = v.lines.length, last = Math.max(1.5, Math.min(duration - 3.2, impact ?? duration - 3.2));
-  const times = v.lines.map((_, i) => {
-    if (i === 0) return 0.4; if (i === n - 1) return last;
-    const want = 0.4 + (i * (last - 0.4)) / (n - 1);
-    const near = hits.find((t) => t >= want - 0.2 && t <= want + 0.8);
-    return near ?? want;
-  });
-  return { voice: v.voice, lines: v.lines, times, duration };
+  try { const d = m ? JSON.parse(m[1]) : null; return d?.voice?.lines?.length ? d.voice : null; } catch { return null; }
 }
 function makeVoice(spec, dir) {
   return new Promise((resolve) => {
@@ -69,8 +58,22 @@ try {
   const outFile = path.join(dir, 'video.mp4');
   const controller = new AbortController();
   let last = 0;
+  // voice first: its exact timing decides when each caption word appears
+  let html = job.html, voiceFile = null;
+  const voice = voiceData(html);
+  if (voice) {
+    try {
+      const info = await inspectAnimation(html, { aspectRatio: job.aspectRatio });
+      const plan = info.caps || [];
+      voiceFile = await makeVoice({ voice: voice.voice, lines: voice.lines, show: voice.show, times: plan.map((c) => c.t0), duration: info.duration }, dir);
+      if (voiceFile) {
+        const caps = await readText(`${voiceFile}.captions.json`, 'utf8');
+        html = html.replace(/<head>/i, () => `<head><script>window.__captions=${caps.replace(/</g, '\\u003c')};</script>`);
+      }
+    } catch (e) { console.warn('voice skipped:', e.message); voiceFile = null; }
+  }
   const result = await renderVideo({
-    html: job.html, outFile, aspectRatio: job.aspectRatio, duration: job.duration, signal: controller.signal,
+    html, outFile, aspectRatio: job.aspectRatio, duration: job.duration, signal: controller.signal,
     onProgress: (p) => {
       if (Date.now() - last < 4000 && p.framesDone < p.totalFrames) return;   // progress every 4 s (fewer calls to the free server)
       last = Date.now();
@@ -79,8 +82,6 @@ try {
     },
   });
   // sound mixing and the thumbnail run side by side
-  const vSpec = voiceSpec(job.html, result.sfx, result.duration || job.duration);
-  const voiceFile = vSpec ? await makeVoice(vSpec, dir) : null;
   const withSound = (job.sfx && (result.sfx?.length || result.music)) || voiceFile
     ? addSfxToVideo(outFile, path.join(dir, 'video-sfx.mp4'), job.sfx ? result.sfx || [] : [], result.duration || job.duration, { music: job.sfx ? result.music : null, voiceFile }).catch((e) => { console.warn('sound skipped:', e.message); return outFile; })
     : Promise.resolve(outFile);

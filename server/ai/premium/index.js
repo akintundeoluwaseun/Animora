@@ -185,6 +185,25 @@ function wrap(tl,m){return {_t:0,seek:function(t){this._t=+t||0;var x=m.f(this._
 // Sound design, worked out from the template's own motion (the "sound pass" method from github.com/Barty-Bart/motion-graphics):
 // a whoosh starts 2 frames before anything that travels, sized to the move; a pop lands on the frame something appears;
 // typing runs under typed text; the final big reveal gets an impact with a soft riser leading into it. Sounds: CC0 kit (assets/sfx/mg-*).
+// Spoken captions: when the film has a voice, every spoken line is also on screen as big motion text, word by word,
+// in the same moment the voice says it. The page plans the timing itself (so the preview shows it); the render server
+// replaces the estimate with the voice's exact timing (window.__captions) before recording.
+const CAPS_FN = `function estLen(text){var parts=String(text||'').split(/(?<=[.!?])\\s+/),L=0;parts.forEach(function(p,k){L+=Math.max(0.5,p.split(/\\s+/).filter(Boolean).length/2.55)+(k<parts.length-1?0.34:0);});return L;}
+// slow a scene down (never more than 1.6x) so a spoken line fits it; motion keeps moving instead of freezing
+function stretch(m,need){if(!(need>m.D))return m;var k=Math.min(1.6,need/m.D),f=m.f,g=m.g;return {D:m.D*k,f:function(t){return f(t/k);},g:function(x){return g(x)*k;}};}
+function capsPlan(lines,sfx,D,AT){var hits=(sfx||[]).map(function(e){return e.t;}).sort(function(a,b){return a-b;}),imp=null;(sfx||[]).forEach(function(e){if(imp==null&&/impact/.test(e.k))imp=e.t;});
+ var n=lines.length,last=Math.max(1.5,Math.min(D-3.2,imp!=null?imp:D-3.2)),out=[],end=0;
+ lines.forEach(function(text,i){var want=AT&&AT[i]!=null?AT[i]:i===0?0.4:i===n-1?last:0.4+i*(last-0.4)/(n-1);if(!AT&&i>0&&i<n-1){var near=hits.filter(function(t){return t>=want-0.2&&t<=want+0.8;})[0];if(near!=null)want=near;}
+  var parts=text.split(/(?<=[.!?])\\s+/),len=0,seg=[];parts.forEach(function(p,k){var w=p.split(/\\s+/).filter(Boolean),d=Math.max(0.5,w.length/2.55);seg.push({p:p,a:len,d:d});len+=d+(k<parts.length-1?0.34:0);});
+  if(i===n-1&&!AT)want=Math.min(want,D-0.35-len);var st=Math.max(want,end+0.3);end=st+len;
+  var words=[];seg.forEach(function(sg){var ws=sg.p.split(/\\s+/).filter(Boolean),tot=0;ws.forEach(function(w){tot+=w.length+2;});var acc=0;ws.forEach(function(w){words.push({w:w,t:+(st+sg.a+sg.d*acc/tot).toFixed(3)});acc+=w.length+2;});});
+  out.push({t0:+st.toFixed(3),t1:+end.toFixed(3),words:words});});return out;}
+function capsLayer(host,plan,wide){var box=document.createElement('div'),cur=-1,spans=[];box.setAttribute('style','position:absolute;left:6%;right:6%;'+(wide?'bottom:7%;':'bottom:13%;')+'z-index:9999;display:flex;justify-content:center;pointer-events:none');
+ var inner=document.createElement('div');inner.setAttribute('style','max-width:100%;text-align:center;font:800 '+(wide?'60px':'66px')+'/1.18 Inter,"Helvetica Neue",Arial,sans-serif;letter-spacing:-0.01em;color:#fff;padding:18px 30px 22px;border-radius:28px;background:rgba(8,8,12,.62);box-shadow:0 18px 50px rgba(0,0,0,.28);opacity:0;text-wrap:balance');box.appendChild(inner);host.appendChild(box);
+ return function(t){var k=-1;for(var i=0;i<plan.length;i++){if(t>=plan[i].t0-0.08&&t<plan[i].t1+0.45){k=i;break;}}
+  if(k!==cur){cur=k;inner.innerHTML='';spans=[];if(k>=0)plan[k].words.forEach(function(x){var s=document.createElement('span');s.textContent=x.w+' ';s.style.display='inline-block';s.style.whiteSpace='pre';inner.appendChild(s);spans.push(s);});}
+  if(k<0){inner.style.opacity='0';return;}var L=plan[k],fin=Math.min(1,Math.max(0,(L.t1+0.45-t)/0.25)),fi=Math.min(1,Math.max(0,(t-L.t0+0.08)/0.16));inner.style.opacity=String(Math.min(fin,fi));inner.style.transform='translateY('+((1-fi)*18).toFixed(1)+'px)';
+  L.words.forEach(function(x,j){var s=spans[j],p=Math.min(1,Math.max(0,(t-x.t+0.04)/0.14)),now=t>=x.t-0.04&&(j===L.words.length-1||t<L.words[j+1].t-0.04);s.style.opacity=String(0.18+0.82*p);s.style.transform='translateY('+((1-p)*14).toFixed(1)+'px) scale('+(0.86+0.14*p).toFixed(3)+')';s.style.color=now?'#FFD84D':'#fff';});};}`;
 const SFX_FN = `var KIT={whoosh:{s:['mg-whoosh-5','mg-whoosh-8'],m:['mg-whoosh-1','mg-whoosh-6','mg-whoosh-4','mg-whoosh-7'],l:['mg-whoosh-3']},pop:['mg-pop-1','mg-pop-3','mg-pop-7','mg-pop-10','mg-pop-11'],ding:['mg-ding-4','mg-ding-6','mg-ding-8'],tick:['mg-tick-2','mg-tick-3','mg-click-1'],impact:['mg-impact-1','mg-impact-5','mg-impact-6'],riser:['mg-riser-1','mg-riser-13'],typing:['mg-typing-4','mg-typing-1']},VOL={whoosh:0.5,pop:0.45,ding:0.5,tick:0.32,impact:0.85,riser:0.3,typing:0.26},PRI={impact:5,whoosh:3,ding:2,pop:2,tick:1,typing:1,riser:0},ROT={};
 function take(cat,len){var L=cat==='whoosh'?KIT.whoosh[len||'m']:KIT[cat];ROT[cat+(len||'')]=((ROT[cat+(len||'')]||0)+1)%L.length;return L[ROT[cat+(len||'')]];}
 function cues(tl,P){P=P||{};var W=innerWidth||1920,H=innerHeight||1080,D=tl.duration(),raw=[],sets=[],moves=[],cuts=[];var num=function(x){return typeof x==='number'?x:(typeof x==='string'&&/^-?[\\d.]+(px)?$/.test(x)?parseFloat(x):null);};
@@ -228,7 +247,11 @@ function blockPage(block, vars, { standalone = true, data = null } = {}) {
 // sound effects: a soft hit each time something new appears (one per half second at most), a shimmer on the closing card
 ${SFX_FN}
 ${REMAP_FN}
-(function wait(){var t=window.__timelines&&window.__timelines[id];if(t){t.pause(0);var m=remap(t);try{window.__sfx=cues(t,${JSON.stringify(b.sfx || {})}).map(function(e){var o={t:+m.g(e.t).toFixed(3),k:e.k,v:e.v};if(e.len)o.len=+(m.g(e.t+e.len)-m.g(e.t)).toFixed(2);return o;});}catch(e){window.__sfx=[];}t.seek(0,false);window.__timeline=wrap(t,m);return;}if(++n<400)setTimeout(wait,25);})();})();</script>` : bind;
+${CAPS_FN}
+(function wait(){var t=window.__timelines&&window.__timelines[id];if(t){t.pause(0);var m=remap(t),V=(window.${MARK}||{}).voice,hasV=!!(V&&V.lines&&V.lines.length);
+// with a voice, the film runs a little slower when needed so every spoken line fits
+if(hasV){var need=1.8;V.lines.forEach(function(l){need+=estLen(l)+0.5;});m=stretch(m,need);}
+try{window.__sfx=cues(t,${JSON.stringify(b.sfx || {})}).map(function(e){var o={t:+m.g(e.t).toFixed(3),k:e.k,v:e.v};if(e.len)o.len=+(m.g(e.t+e.len)-m.g(e.t)).toFixed(2);return o;});}catch(e){window.__sfx=[];}t.seek(0,false);var W=wrap(t,m);if(hasV){var plan=window.__captions||capsPlan(V.show||V.lines,window.__sfx,m.D);window.__capPlan=plan;var sync=capsLayer(document.getElementById('stage')||document.body,plan,innerWidth>innerHeight),sk=W.seek;W.seek=function(x){sk.call(W,x);sync(W._t);return W;};}window.__timeline=W;return;}if(++n<400)setTimeout(wait,25);})();})();</script>` : bind;
   return html.replace(/<head>/i, `<head>${head}`).replace(/<body([^>]*)>/i, `<body$1><div id="stage" style="position:absolute;left:0;top:0;width:${b.meta.width}px;height:${b.meta.height}px;overflow:hidden">`)
     .replace(/<\/body>/i, `</div>${tail}</body>`);
 }
@@ -255,6 +278,7 @@ export function filmHtml({ film, W = 1920, H = 1080, voice = null }) {
 var SC=${JSON.stringify(scenes)},DOCS=${docsJson},D=0,XF=${XF},stage=document.getElementById('stage'),frames=[];
 ${SFX_FN}
 ${REMAP_FN}
+${CAPS_FN}
 SC.forEach(function(s,i){var f=document.createElement('iframe');f.setAttribute('scrolling','no');f.style.zIndex=String(i+1);stage.appendChild(f);frames.push(f);f.srcdoc=DOCS[i];});
 function child(i){try{var w=frames[i].contentWindow;return w&&w.__timelines&&w.__timelines[SC[i].id];}catch(e){return null;}}
 function apply(t){SC.forEach(function(s,i){var lt=t-s.start,o=0;if(lt>=0&&lt<=s.dur){o=1;if(i&&lt<XF)o=lt/XF;}
@@ -265,12 +289,12 @@ var T={_t:0,seek:function(t){this._t=+t||0;apply(this._t);return this;},time:fun
 var n=0;(function wait(){var ok=SC.every(function(s,i){return !!child(i);});
   if(ok){var docsReady=frames.map(function(f){var d=f.contentDocument;return Promise.race([Promise.all([d.fonts?d.fonts.ready:null].concat([].map.call(d.images,function(im){return im.complete?null:new Promise(function(r){im.onload=im.onerror=r;});}))),new Promise(function(r){setTimeout(r,8000);})]);});
     Promise.all(docsReady).then(function(){var sfx=[],at=0;
-      SC.forEach(function(s,i){var c=child(i);c.pause(0);s.m=remap(c,s.cap,i===SC.length-1?2.2:1.1);s.dur=s.m.D;s.start=i?at-XF:0;at=s.start+s.dur;
+      SC.forEach(function(s,i){var c=child(i);c.pause(0);s.m=remap(c,s.cap,i===SC.length-1?2.2:1.1);var VV=(window.${MARK}||{}).voice;if(VV&&VV.scenes&&VV.lines[i])s.m=stretch(s.m,estLen(VV.lines[i])+(i===SC.length-1?1.6:0.9));s.dur=s.m.D;s.start=i?at-XF:0;at=s.start+s.dur;
         try{cues(c,s.snd).forEach(function(e){if(e.t>s.cap)return;var tt=s.m.g(e.t)+s.start,o={t:+tt.toFixed(3),k:e.k,v:e.v};if(e.len)o.len=e.len;sfx.push(o);});}catch(e){}
         if(i)sfx.push({t:+Math.max(0,s.start-0.067).toFixed(3),k:'mg-whoosh-1',v:0.55});});
       // the ending lands: the first thing to appear in the last scene gets the impact, with a soft riser into it
       var L=SC[SC.length-1],hit=null;sfx.forEach(function(e){if(!hit&&e.t>=L.start+0.05&&/^mg-(pop|tick|ding|click)/.test(e.k))hit=e;});if(hit&&!sfx.some(function(e){return /impact/.test(e.k);})){hit.k='mg-impact-1';hit.v=0.85;if(hit.t>2.4)sfx.push({t:+(hit.t-2.0).toFixed(3),k:'mg-riser-13',v:0.3});}
-      D=at;sfx=sfx.filter(function(e){return e.t<D-0.2;}).sort(function(a,b){return a.t-b.t;});window.__sfx=sfx;apply(0);window.__timeline=T;});return;}
+      D=at;sfx=sfx.filter(function(e){return e.t<D-0.2;}).sort(function(a,b){return a.t-b.t;});window.__sfx=sfx;var V=(window.${MARK}||{}).voice;if(V&&V.lines&&V.lines.length){var plan=window.__captions||capsPlan(V.show||V.lines,sfx,D,V.scenes?SC.map(function(x,i){return x.start+(i?0.35:0.4);}):null);window.__capPlan=plan;var sync=capsLayer(stage,plan,true),sk=T.seek;T.seek=function(x){sk.call(T,x);sync(T._t);return T;};}apply(0);T.seek(0);window.__timeline=T;});return;}
   if(++n<600)setTimeout(wait,25);})();
 })();</script></body></html>`;
 }
@@ -292,7 +316,7 @@ function wideFilm(f, r) {
   } else {
     film.push({ block: 'weight-wave', vars: { text: clean(head, 34).toUpperCase() }, dur: 5 });
   }
-  const p = points(f).slice(0, 5);
+  const p = points(f).slice(0, 4);
   if (p.length >= 2) film.push({ block: 'mk-specs-list', vars: { rows: p.map((x) => { const m = x.split(' · '); return m.length > 1 ? { label: clean(m[0], 30), value: clean(m.slice(1).join(' · '), 30) } : { label: clean(x, 40), value: '' }; }) } });
   if (f.photos.length && (f.sub || f.heads[1])) film.push({ block: 'weight-wave', vars: { text: clean(f.heads[1] || f.sub, 34).toUpperCase() }, dur: 4.6 });
   film.push({ block: 'logo-outro', vars: { logo: f.logo || wordmark(f.name, '#ffffff'), tagline: clean(f.sub || head, 60), url: clean(contactLine(f), 40) } });
@@ -312,18 +336,36 @@ export function voiceScript(f, gender) {
   if (f.offer) lines.push(end(f.offer));
   // the phone number stays on screen: read aloud it takes longer than the ending lasts
   lines.push(end([f.name, f.cta].filter(Boolean).join('. ')));
-  return { voice: gender === 'male' ? 'am_michael' : 'af_heart', lines: lines.slice(0, 4).map(speakable) };
+  // what is said (numbers and prices in words) and what is shown on screen (as the owner wrote it)
+  const keep = lines.slice(0, 4);
+  return { voice: gender === 'male' ? 'am_michael' : 'af_heart', lines: keep.map(speakable), show: keep };
 }
 const wantsVoice = (brief) => [true, 'yes', 'female', 'male'].includes(brief?.voiceover);
 
 
+/** Landscape films say exactly what each scene shows, as each scene starts (one line per scene). */
+function filmVoice(film, f, gender) {
+  const end = (t) => { t = clean(String(t || '').replace(/[|]/g, ' '), 120); return !t ? '' : /[.!?]$/.test(t) ? t : `${t}.`; };
+  const cap = (t) => { t = clean(t, 120).toLowerCase(); return t.charAt(0).toUpperCase() + t.slice(1); };
+  const show = film.map((s) => {
+    const v = s.vars || {};
+    if (s.block.startsWith('carousel')) return [end(v.line1), end(v.line2)].filter(Boolean).join(' ');
+    if (s.block === 'mk-specs-list') return (v.rows || []).slice(0, 2).map((r) => end(r.value ? `${r.label}, ${r.value}` : r.label)).join(' ');
+    if (s.block === 'weight-wave') return end(cap(v.text));
+    if (s.block === 'logo-outro') return [end(v.tagline), end(f.cta)].filter(Boolean).join(' ');
+    return '';
+  });
+  return { voice: gender === 'male' ? 'am_michael' : 'af_heart', lines: show.map(speakable), show, scenes: true };
+}
+
+/** Pick a template that fits this business (a different one on Regenerate) and fill it. */
 export function premiumFilm({ plan = {}, brief = {}, assets = [], salt = '', previous = null }) {
   const aspect = plan.aspect_ratio || '9:16';
   if (!PREMIUM_ASPECTS.includes(aspect)) throw new Error('No premium template for this size yet');
   const f = factsOf(plan, brief, assets);
   const r = mulberry(hash(`${f.name}|${salt}`));
   const voice = wantsVoice(brief) ? voiceScript(f, brief.voiceGender || brief.voiceover) : null;
-  if (aspect === '16:9') { const film = wideFilm(f, r); return { html: filmHtml({ film, voice }), block: film.map((s) => s.block).join('+') }; }
+  if (aspect === '16:9') { const film = wideFilm(f, r); const fv = voice ? filmVoice(film, f, brief.voiceGender || brief.voiceover) : null; return { html: filmHtml({ film, voice: fv }), block: film.map((s) => s.block).join('+') }; }
   const prev = readPremium(previous)?.block;
   let options = PREMIUM_BLOCKS.filter((k) => BLOCKS[k].fits(f));
   if (options.length > 1 && prev) options = options.filter((k) => k !== prev);

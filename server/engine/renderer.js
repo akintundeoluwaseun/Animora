@@ -182,6 +182,7 @@ async function openPage(browser, htmlFile, { width, height }, opts, log) {
       sfx,
       music,
       finish: Number(window.__finish) || 0,
+      caps: Array.isArray(window.__capPlan) ? window.__capPlan : null,
       failedImages: [...document.images].filter((i) => !i.naturalWidth).map((i) => i.src).slice(0, 5),
     };
   }, opts.assetTimeoutMs);
