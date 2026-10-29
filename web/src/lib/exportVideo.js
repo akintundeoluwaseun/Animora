@@ -48,7 +48,7 @@ async function mixAudio(sfx, music, duration) {
   const dec = new Ctx(1, SR, SR);
   const load = async (url) => { try { const r = await fetch(url); return await dec.decodeAudioData(await r.arrayBuffer()); } catch { return null; } };
   const names = [...new Set((sfx || []).map((e) => e.k))];
-  const bank = Object.fromEntries(await Promise.all(names.map(async (k) => [k, await load(`/sfx/${k}.wav`)])));
+  const bank = Object.fromEntries(await Promise.all(names.map(async (k) => [k, await load(`/sfx/${/impact|thud/.test(k) ? 'pop-soft' : k}.wav`)])));
   for (const e of sfx || []) {
     const b = bank[e.k]; if (!b || e.muted || !(Number(e.v) > 0)) continue;   // switched off in the editor
     const s = b.getChannelData(0), start = Math.round(e.t * SR), v = (Number(e.v) || 1) * 0.6;

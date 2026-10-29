@@ -205,6 +205,7 @@ function wrap(tl,m){return {_t:0,seek:function(t){this._t=+t||0;var x=m.f(this._
 // replaces the estimate with the voice's exact timing (window.__captions) before recording.
 const CAPS_FN = `function estLen(text){var parts=String(text||'').split(/(?<=[.!?])\\s+/),L=0;parts.forEach(function(p,k){L+=Math.max(0.5,p.split(/\\s+/).filter(Boolean).length/2.55)+(k<parts.length-1?0.34:0);});return L;}
 // slow a scene down (never more than 1.6x) so a spoken line fits it; motion keeps moving instead of freezing
+function scaleM(m,k){var f=m.f,g=m.g;return {D:m.D*k,f:function(t){return f(t/k);},g:function(x){return g(x)*k;}};}
 function stretch(m,need){if(!(need>m.D))return m;var k=Math.min(1.6,need/m.D),f=m.f,g=m.g;return {D:m.D*k,f:function(t){return f(t/k);},g:function(x){return g(x)*k;}};}
 function capsPlan(lines,sfx,D,AT){var hits=(sfx||[]).map(function(e){return e.t;}).sort(function(a,b){return a-b;}),imp=null;(sfx||[]).forEach(function(e){if(imp==null&&/impact/.test(e.k))imp=e.t;});
  var n=lines.length,last=Math.max(1.5,Math.min(D-3.2,imp!=null?imp:D-3.2)),out=[],end=0;
@@ -258,11 +259,11 @@ export function premiumHtml({ block, vars, voice = null, audio = null }) { retur
  * scripts never clash; one master clock seeks every scene, cross-fading 0.4 s between them.
  */
 const XF = 0.4;
-export function filmHtml({ film, W = 1920, H = 1080, voice = null, audio = null }) {
+export function filmHtml({ film, W = 1920, H = 1080, voice = null, audio = null, target = 0 }) {
   // scene lengths are worked out in the page, after the dead air in each scene has been taken out
   const scenes = film.map((s) => ({ cap: Number(s.dur) || BLOCKS[s.block].meta.duration, id: s.block, snd: BLOCKS[s.block].sfx || {} }));
   const docs = film.map((s) => blockPage(s.block, s.vars, { standalone: false }));
-  const data = JSON.stringify({ film, ...(voice ? { voice } : {}), ...(audio ? { audio } : {}) }).replace(/</g, '\\u003c');
+  const data = JSON.stringify({ film, ...(voice ? { voice } : {}), ...(audio ? { audio } : {}), ...(target ? { target, W, H } : {}) }).replace(/</g, '\\u003c');
   const docsJson = JSON.stringify(docs).replace(/</g, '\\u003c').replace(/[\u2028\u2029]/g, '');
   return `<!doctype html><html><head><meta charset="utf-8"><title>Animora</title>
 <script>window.${MARK}=${data};${MUSIC_HOOK}window.__hyperframes=null;</script>
@@ -283,7 +284,9 @@ var T={_t:0,seek:function(t){this._t=+t||0;apply(this._t);return this;},time:fun
 var n=0;(function wait(){var ok=SC.every(function(s,i){return !!child(i);});
   if(ok){var docsReady=frames.map(function(f){var d=f.contentDocument;return Promise.race([Promise.all([d.fonts?d.fonts.ready:null].concat([].map.call(d.images,function(im){return im.complete?null:new Promise(function(r){im.onload=im.onerror=r;});}))),new Promise(function(r){setTimeout(r,8000);})]);});
     Promise.all(docsReady).then(function(){var sfx=[],allEv=[],at=0;
-      SC.forEach(function(s,i){var c=child(i);c.pause(0);s.m=remap(c,s.cap,i===SC.length-1?2.2:1.1);var VV=(window.${MARK}||{}).voice;if(VV&&VV.scenes&&VV.lines[i])s.m=stretch(s.m,estLen(VV.lines[i])+(i===SC.length-1?1.6:0.9));s.dur=s.m.D;s.start=i?at-XF:0;at=s.start+s.dur;
+      // the length the owner chose: scenes are slowed (at most 1.3x) or quickened (at most 0.85x) together to land on it
+      var TG=+((window.${MARK}||{}).target)||0,KF=1;if(TG){var tot=0;SC.forEach(function(s,i){tot+=remap(child(i),s.cap,i===SC.length-1?2.2:1.1).D;});tot-=XF*(SC.length-1);if(tot>0)KF=Math.max(0.85,Math.min(1.3,TG/tot));}
+      SC.forEach(function(s,i){var c=child(i);c.pause(0);s.m=remap(c,s.cap,i===SC.length-1?2.2:1.1);if(KF!==1)s.m=scaleM(s.m,KF);var VV=(window.${MARK}||{}).voice;if(VV&&VV.scenes&&VV.lines[i])s.m=stretch(s.m,estLen(VV.lines[i])+(i===SC.length-1?1.6:0.9));s.dur=s.m.D;s.start=i?at-XF:0;at=s.start+s.dur;
         try{var ev=AnimoraSound.events(c).filter(function(e){return e.t<=s.cap*1000;});if(i<SC.length-1)ev.forEach(function(e){e.final=false;});ev.forEach(function(e){e.P=s.snd;});allEv=allEv.concat(AnimoraSound.remapEvents(ev,s.m.g,Math.round(s.start*1000),'s'+i+':'));}catch(e){console.error(e);}
         if(i)allEv.push({kind:'scene',t:Math.round(s.start*1000),dur:Math.round(XF*1000),key:'scene',id:'scene@'+i+'#1',info:{area:1}});});
       // the ending lands: if the last scene has no closing reveal of its own, its first appearance becomes it
@@ -391,6 +394,32 @@ function defaultMusic(brief, r) {
   return pool.length ? { music: `/music/${pool[Math.floor(r() * pool.length)].file}`, musicOffset: 0, pack } : { pack };
 }
 
+// Tall films: designer templates played one after another until the film is as long as the owner asked for.
+// LEN: each template's length once its still moments are trimmed (measured); END: when its own closing card starts.
+// A template that isn't last is cut before its closing card, so only the final scene ends on the brand.
+const LEN = { 'notification-cascade': 12.7, 'message-thread-reveal': 20.7, 'notes-reveal': 21.6, 'ai-chat-reveal': 9.1, 'share-sheet-carousel': 7.2 };
+const END = { 'notification-cascade': 9.89, 'message-thread-reveal': 23.25, 'notes-reveal': 21.35, 'ai-chat-reveal': 15.8 };
+function tallFilm(f, r, T, prev) {
+  const fit = PREMIUM_BLOCKS.filter((k) => BLOCKS[k].fits(f) && LEN[k]);
+  if (!fit.length) return null;
+  const est = (k, last) => (last || !END[k] ? LEN[k] : LEN[k] * (END[k] / BLOCKS[k].meta.duration));
+  const prevFirst = (prev?.film?.[0]?.block) || prev?.block;
+  const seqs = [];
+  const grow = (seq) => { if (seq.length) seqs.push(seq); if (seq.length < 3) fit.forEach((k) => { if (!seq.includes(k)) grow([...seq, k]); }); };
+  grow([]);
+  let best = null;
+  for (const seq of seqs) {
+    if (!END[seq[seq.length - 1]]) continue;                 // the last scene must end on a brand card
+    const e = seq.reduce((n, k, i) => n + est(k, i === seq.length - 1), 0) - 0.4 * (seq.length - 1);
+    const reach = Math.min(Math.max(T / e, 0.85), 1.3) * e;   // what the page can stretch or quicken it to
+    const score = Math.abs(reach - T) / T + (seq.length - 1) * 0.06 + (seq[0] === prevFirst ? 0.2 : 0) + r() * 0.05;
+    if (!best || score < best.score) best = { seq, score, reach };
+  }
+  // too short even when slowed down: the Story engine makes it at the exact length instead
+  if (!best || best.reach < T * 0.8) throw new Error(`No premium templates long enough for ${T}s`);
+  return best.seq.map((k, i) => ({ block: k, dur: i === best.seq.length - 1 || !END[k] ? BLOCKS[k].meta.duration : END[k] }));
+}
+
 export function premiumFilm({ plan = {}, brief = {}, assets = [], salt = '', previous = null }) {
   const aspect = plan.aspect_ratio || '9:16';
   if (!PREMIUM_ASPECTS.includes(aspect)) throw new Error('No premium template for this size yet');
@@ -400,7 +429,19 @@ export function premiumFilm({ plan = {}, brief = {}, assets = [], salt = '', pre
   // keep the song the owner already has (Regenerate changes the pictures and moves, not the music they picked)
   const kept = readPremium(previous)?.audio, fresh = defaultMusic(brief, mulberry(hash(`${f.name}|music|${salt}`)));
   const audio = kept && (kept.music || kept.pack) ? { ...(fresh || {}), ...kept } : fresh;
-  if (aspect === '16:9') { const film = wideFilm(f, r); const fv = voice ? filmVoice(film, f, brief.voiceGender || brief.voiceover, brief.voiceId) : null; return { html: filmHtml({ film, voice: fv, audio }), block: film.map((s) => s.block).join('+') }; }
+  if (aspect === '16:9') {
+    const film = wideFilm(f, r), T = Number(plan.duration_seconds) || 0;
+    const est = 0.6 * film.reduce((n, s) => n + (Number(s.dur) || BLOCKS[s.block].meta.duration), 0);   // measured: still moments trimmed, ~60% remains
+    if (T && est * 1.3 < T * 0.8) throw new Error(`Landscape templates too short for ${T}s`);   // the Story engine makes it at the exact length
+    const fv = voice ? filmVoice(film, f, brief.voiceGender || brief.voiceover, brief.voiceId) : null;
+    return { html: filmHtml({ film, voice: fv, audio, target: T }), block: film.map((s) => s.block).join('+') };
+  }
+  const tall = tallFilm(f, r, Number(plan.duration_seconds) || 20, readPremium(previous));
+  if (tall) {
+    const film = tall.map((b) => ({ ...b, vars: BLOCKS[b.block].fill(f, r) }));
+    // the voice reads the business's own lines across the whole film (tall templates have no per-scene script)
+    return { html: filmHtml({ film, W: 1080, H: 1920, voice, audio, target: Number(plan.duration_seconds) || 0 }), block: film.map((s) => s.block).join('+') };
+  }
   const prev = readPremium(previous)?.block;
   let options = PREMIUM_BLOCKS.filter((k) => BLOCKS[k].fits(f));
   if (options.length > 1 && prev) options = options.filter((k) => k !== prev);
@@ -441,7 +482,7 @@ export async function premiumEdit({ html, instruction, useAi }) {
     if (k === 'rows') { if (sc.vars.rows?.[+j]) { sc.vars.rows[+j][part] = val; changed++; } } else { sc.vars[k] = val; changed++; }
   }
   if (!changed) return null;
-  const out = d.film ? filmHtml({ film: next, voice: d.voice, audio: d.audio }) : premiumHtml({ block: next[0].block, vars: next[0].vars, voice: d.voice, audio: d.audio });
+  const out = d.film ? filmHtml({ film: next, voice: d.voice, audio: d.audio, W: d.W || 1920, H: d.H || 1080, target: d.target || 0 }) : premiumHtml({ block: next[0].block, vars: next[0].vars, voice: d.voice, audio: d.audio });
   return { html: out, summary: clean(o.summary, 200) || 'Done! Check the video.' };
 }
 
@@ -466,11 +507,11 @@ export function premiumWithAudio(html, patch = {}, { brief = null, plan = {}, as
   if (patch.voiceOn === false) voice = null;
   if (patch.voiceOn === true && !voice) {
     const f = factsOf(plan, brief || {}, assets);
-    voice = d.film ? filmVoice(d.film, f, 'female', patch.voice) : voiceScript(f, 'female', patch.voice);
+    voice = d.film && (d.W || 1920) > (d.H || 1080) ? filmVoice(d.film, f, 'female', patch.voice) : voiceScript(f, 'female', patch.voice);
   }
   if (voice && isVoiceId(patch.voice)) voice.voice = patch.voice;
   if (voice && typeof patch.captions === 'boolean') voice.captions = patch.captions;
-  return d.film ? filmHtml({ film: d.film, voice, audio }) : premiumHtml({ block: d.block, vars: d.vars, voice, audio });
+  return d.film ? filmHtml({ film: d.film, voice, audio, W: d.W || 1920, H: d.H || 1080, target: d.target || 0 }) : premiumHtml({ block: d.block, vars: d.vars, voice, audio });
 }
 
 /** For tests: a tiny template made of your own HTML and GSAP code, run through the same page code as real templates. */

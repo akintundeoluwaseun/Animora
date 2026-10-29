@@ -30,5 +30,16 @@
   ],
   "regions": [
     "lhr1"
+  ],
+  "headers": [
+    {
+      "source": "/(premium|sfx|music|vendor|voices)/(.*)",
+      "headers": [
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        }
+      ]
+    }
   ]
 }

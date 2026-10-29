@@ -32,6 +32,8 @@ export function sounds() {
   if (bank) return bank;
   bank = {};
   if (existsSync(SFX_DIR)) for (const f of readdirSync(SFX_DIR)) if (f.endsWith('.wav')) { const w = readWav(path.join(SFX_DIR, f)); if (w) bank[f.slice(0, -4)] = w; }
+  // house rule: never a heavy impact; any old request for one gets a soft pop instead
+  for (const k of Object.keys(bank)) if (/impact|thud/.test(k) && bank['pop-soft']) bank[k] = bank['pop-soft'];
   return bank;
 }
 

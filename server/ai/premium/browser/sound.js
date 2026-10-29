@@ -146,6 +146,7 @@
   function score(s, q, recent, r, pack) {
     // interface packs (uisfx): a film uses one family; the others (and all of them when no pack is set) stay out
     if (s.key.indexOf('ui-') === 0 && (!pack || s.key.indexOf('ui-' + pack + '-') !== 0)) return -99;
+    if (s.role === 'impact' || /impact|thud/.test(s.key)) return -99;            // house rule: soft sounds only, never a heavy impact
     var sc = s.role === q.role ? 6 : q.alt.indexOf(s.role) >= 0 ? 3 - q.alt.indexOf(s.role) * 0.5 : -99;
     if (sc < 0) return sc;
     if (pack && s.key.indexOf('ui-' + pack + '-') === 0) sc += 2.8;              // the film's own pack leads the small moments

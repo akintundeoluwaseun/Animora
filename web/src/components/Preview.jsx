@@ -18,6 +18,8 @@ const BRIDGE = `<script>(function(){
     else if(m.cmd==='seek'){ tl.seek(m.t,false); state(); } });
   // drawn at the size it is shown (not full HD shrunk down): far less work for phones
   window.addEventListener('message', function(e){ var m=e.data||{}; if(m.__adflash&&m.cmd==='zoom'&&m.z>0) document.documentElement.style.zoom=m.z; });
+  // never a scrollbar: rounding can make the page a pixel taller than the frame, and a scrollbar shows as a dark strip
+  try { var ns=document.createElement('style'); ns.textContent='html,body{overflow:hidden!important;scrollbar-width:none}::-webkit-scrollbar{display:none}'; (document.head||document.documentElement).appendChild(ns); } catch(_){}
   try { var z0=parseFloat(window.name); if(z0>0) document.documentElement.style.zoom=z0; } catch(_){}
   window.addEventListener('error', function(e){ post('error',{message:String(e.message||'Script error')}); });
   window.addEventListener('load', function(){ var n=0; (function wait(){ tl=window.__timeline;
@@ -32,7 +34,9 @@ export function prepareHtml(html) {
   // Use our own copy of GSAP (fast, same build as the renderer, works when cdnjs is slow).
   let out = html.replace(/<script([^>]*?)src=["']https?:\/\/[^"']*gsap[^"']*\/([A-Za-z]+)(?:\.min)?\.js["']/gi,
     (m, attrs, name) => `<script${attrs}src="${origin}/vendor/gsap/${name}.min.js"`);
-  out = /<\/body>/i.test(out) ? out.replace(/<\/body>/i, `${BRIDGE}</body>`) : out + BRIDGE;
+  // multi-scene films carry each scene's page as a string (escaped tags), so swap the bare CDN address too
+  out = out.replace(/https?:\/\/cdn\.jsdelivr\.net\/npm\/gsap@[\d.]+\/dist\/([A-Za-z]+)(?:\.min)?\.js/g, (m, name) => `${origin}/vendor/gsap/${name}.min.js`);
+  out =/<\/body>/i.test(out) ? out.replace(/<\/body>/i, `${BRIDGE}</body>`) : out + BRIDGE;
   return out;
 }
 
@@ -55,7 +59,7 @@ function ctx() { if (!audio) { const C = window.AudioContext || window.webkitAud
 async function sound(k) {
   if (buffers[k] !== undefined) return buffers[k];
   buffers[k] = null;
-  try { const r = await fetch(`/sfx/${k}.wav`); buffers[k] = await ctx().decodeAudioData(await r.arrayBuffer()); } catch { buffers[k] = null; }
+  try { const r = await fetch(`/sfx/${/impact|thud/.test(k) ? 'pop-soft' : k}.wav`); buffers[k] = await ctx().decodeAudioData(await r.arrayBuffer()); } catch { buffers[k] = null; }
   return buffers[k];
 }
 // every effect goes through one master bus (glue compressor + make-up gain), like the downloaded MP4
@@ -103,6 +107,10 @@ export function LivePreview({ html, aspect = '9:16', autoPlay = true, maxWidth =
   const frameRef = useRef(null);
   const boxRef = useRef(null);
   const srcDoc = useMemo(() => prepareHtml(html), [html]);
+  // films made of several scenes play each scene in its own frame and must reach into them; a fully sandboxed
+  // frame gives every scene a different origin, so nothing would play. Our own template films (all text escaped) get
+  // the same origin, like the export frame already does.
+  const nested = useMemo(() => /f\.srcdoc=DOCS\[i\]/.test(html || ''), [html]);
   const scaleRef = useRef(scale);
   const wasPlaying = useRef(false);
   const onEndedRef = useRef(onEnded);
@@ -189,7 +197,7 @@ export function LivePreview({ html, aspect = '9:16', autoPlay = true, maxWidth =
       <PhoneFrame aspect={aspect} maxWidth={maxWidth} exact={exact}>
         <div ref={boxRef} className="absolute inset-0">
           {srcDoc && (
-            <iframe ref={frameRef} title="Video preview" sandbox="allow-scripts" srcDoc={srcDoc} name={String(scale)}
+            <iframe ref={frameRef} title="Video preview" sandbox={nested ? 'allow-scripts allow-same-origin' : 'allow-scripts'} srcDoc={srcDoc} name={String(scale)}
               style={{ width: Math.ceil(a.w * scale), height: Math.ceil(a.h * scale), border: 0, display: 'block', overflow: 'hidden' }} scrolling="no" />
           )}
           {!ready && !error && <div className="absolute inset-0 grid place-items-center bg-ink text-sm text-white/70">Loading preview…</div>}
@@ -203,9 +211,9 @@ export function LivePreview({ html, aspect = '9:16', autoPlay = true, maxWidth =
             ? <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><rect x="3" y="2" width="3.5" height="12" rx="1" /><rect x="9.5" y="2" width="3.5" height="12" rx="1" /></svg>
             : <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M4 2.5v11a.5.5 0 0 0 .77.42l8.5-5.5a.5.5 0 0 0 0-.84l-8.5-5.5A.5.5 0 0 0 4 2.5Z" /></svg>}
         </button>
-        <input type="range" className="range flex-1" min={0} max={d || 1} step={1 / 30} value={t} disabled={!ready}
+        <input type="range" className="range min-w-0 flex-1" min={0} max={d || 1} step={1 / 30} value={t} disabled={!ready}
           onChange={(e) => { send({ cmd: 'pause' }); send({ cmd: 'seek', t: Number(e.target.value) }); }} aria-label="Seek" />
-        <span className="w-24 text-right text-sm tabular-nums text-white/70">{clock(t)} / {clock(d)}</span>
+        <span className="shrink-0 whitespace-nowrap text-right text-xs tabular-nums text-white/70 sm:text-sm">{clock(t)} / {clock(d)}</span>
         {onSoundChange && (
           <button onClick={() => { unlock(); onSoundChange(!(soundOn && audioReady) ? true : false); }} className="press grid size-10 shrink-0 place-items-center rounded-full bg-white/10 text-white hover:bg-white/20"
             aria-label={soundOn && audioReady ? 'Turn sound effects off' : 'Turn sound effects on'} title={soundOn ? 'Sound effects on' : 'Sound effects off'}>
