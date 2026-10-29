@@ -14,6 +14,11 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SFX = os.path.join(ROOT, 'assets', 'sfx')
 
 # family -> (role, tags). Roles are what the selection engine asks for.
+# uisfx interface packs (ui-<pack>-<cue>): the cue decides the role, the pack becomes a tag ("pack:glass")
+UI_CUE = {'press': ('click', ['ui', 'button', 'tap']), 'select': ('tick', ['ui', 'subtle', 'word']), 'check': ('tick', ['ui', 'subtle', 'success']),
+          'purchase': ('cash', ['money', 'price']), 'reward': ('ding', ['success', 'bright']), 'complete': ('ding', ['success', 'notification']),
+          'typing': ('typing', ['text', 'keyboard']), 'open': ('pop', ['appear', 'soft', 'ui']), 'start': ('sting', ['branding', 'logo']),
+          'focus': ('blip', ['ui', 'subtle'])}
 FAMILY = [
     (r'^mg-whoosh|^whoosh|^swish|^swipe', 'whoosh', ['movement', 'air', 'directional']),
     (r'^mg-transition|^trans-', 'transition', ['scene', 'movement', 'air']),
@@ -46,6 +51,11 @@ def licence_table():
             m2 = re.search(r'The other effects \(([^)]+)\) were made from scratch by `scripts/make-sfx.py`', line)
             if m2:
                 for k in [x.strip() for x in m2.group(1).split(',')]: lic[k + '.wav'] = {'licence': 'Animora original (synthesised)', 'source': 'scripts/make-sfx.py'}
+    # uisfx packs: the whole family is CC0 (recorded once in CREDITS-SOUND.md)
+    credits = open(os.path.join(ROOT, 'assets', 'CREDITS-SOUND.md'), encoding='utf8').read() if os.path.exists(os.path.join(ROOT, 'assets', 'CREDITS-SOUND.md')) else ''
+    if 'github.com/romainsimon/uisfx' in credits:
+        for f in os.listdir(SFX):
+            if re.match(r'^ui-[a-z]+-[a-z-]+\.wav$', f): lic[f] = {'licence': 'CC0 1.0', 'source': 'uisfx (github.com/romainsimon/uisfx), ' + f[3:-4].replace('-', ' / ', 1)}
     p = os.path.join(SFX, 'CREDITS-motion-kit.md')
     if os.path.exists(p):
         for line in open(p, encoding='utf8'):
@@ -83,8 +93,11 @@ def main():
         if not f.endswith('.wav'): continue
         key = f[:-4]; x, err = read(os.path.join(SFX, f))
         role, tags = 'other', []
-        for pat, r, t in FAMILY:
-            if re.search(pat, key): role, tags = r, list(t); break
+        ui = re.match(r'^ui-([a-z]+)-([a-z-]+)$', key)
+        if ui and ui.group(2) in UI_CUE: role, tags = UI_CUE[ui.group(2)][0], list(UI_CUE[ui.group(2)][1]) + ['pack:' + ui.group(1)]
+        else:
+            for pat, r, t in FAMILY:
+                if re.search(pat, key): role, tags = r, list(t); break
         e = {'key': key, 'file': f'assets/sfx/{f}', 'role': role, 'tags': tags}
         if err: e.update({'ok': False, 'error': err}); out.append(e); continue
         m = measure(x); e.update(m)

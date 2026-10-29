@@ -59,7 +59,12 @@
       clean: { trans: ['trans-soft-1', 'trans-soft-2', 'swish-3'], hook: 'trans-soft-2', reveal: 'swish-3', pop: 'pop-soft', tick: 'tap-wood', price: 'coins', offer: 'sparkle', end: 'chime-soft', click: 'click-soft', swell: 'swell', sting: 'swell', photo: 'shutter', type: 'tap-wood', pin: 'pop-soft' },
     };
     const VOL = { trans: 0.9, hook: 1, reveal: 0.8, pop: 0.9, tick: 0.6, price: 0.9, offer: 0.8, end: 0.9, click: 0.8, swell: 0.7, sting: 0.8, photo: 0.7, type: 0.45, pin: 0.8 };
-    const pal = PAL[L0.id] || PAL.clean, turn = {};
+    // the small interface moments (pops, ticks, prices, the offer, the button, the close) come from one uisfx pack per look
+    // (CC0, github.com/romainsimon/uisfx), so each look sounds like itself. Whooshes, swells and the camera stay recorded.
+    const UIPACK = { editorial: 'zen', noir: 'cinematic', bold: 'rubber', fresh: 'dreamy', tech: 'scifi', clean: 'glass' };
+    const pk = UIPACK[L0.id] || 'glass', uis = (c) => `ui-${pk}-${c}`;
+    const pal = { ...(PAL[L0.id] || PAL.clean), pop: uis('press'), tick: [uis('select'), uis('check')], price: uis('purchase'), offer: uis('reward'),
+      end: uis('complete'), click: uis('press'), type: uis('typing'), pin: uis('focus'), ...(L0.id === 'tech' ? {} : { sting: uis('start') }) }, turn = {};
     const sound = (t, role, v) => {
       if (cfg.sound === 'none') return;
       let k = pal[role] || role;

@@ -143,9 +143,12 @@
     return null;
   }
 
-  function score(s, q, recent, r) {
+  function score(s, q, recent, r, pack) {
+    // interface packs (uisfx): a film uses one family; the others (and all of them when no pack is set) stay out
+    if (s.key.indexOf('ui-') === 0 && (!pack || s.key.indexOf('ui-' + pack + '-') !== 0)) return -99;
     var sc = s.role === q.role ? 6 : q.alt.indexOf(s.role) >= 0 ? 3 - q.alt.indexOf(s.role) * 0.5 : -99;
     if (sc < 0) return sc;
+    if (pack && s.key.indexOf('ui-' + pack + '-') === 0) sc += 2.8;              // the film's own pack leads the small moments
     var len = s.useful * 1000;
     sc -= Math.min(3, Math.abs(Math.log((len + 40) / (q.len + 40))) * 1.6);   // length fits the motion
     sc -= Math.abs((s.intensity || 0.5) - q.intensity) * 2.2;                  // as strong as the moment
@@ -179,7 +182,7 @@
       if (prev && !prev.muted && Math.abs(prev.at * 1000 - e.t) < 60 && prev.kind !== 'build-up') { if ((PRI[q.role] || 0) <= (PRI[prev.role] || 0)) return; out.pop(); }
       var cool = COOL[q.role] || 150;
       if (lastByRole[q.role] != null && e.t - lastByRole[q.role] < cool && !e.final) return;
-      var ranked = REG.map(function (s) { return [score(s, q, recent, r), s]; }).filter(function (x) { return x[0] > -50; }).sort(function (a, b) { return b[0] - a[0]; });
+      var ranked = REG.map(function (s) { return [score(s, q, recent, r, ov.pack), s]; }).filter(function (x) { return x[0] > -50; }).sort(function (a, b) { return b[0] - a[0]; });
       if (!ranked.length) return;
       var pick = ranked[0][1];
       if (ov.swap && ov.swap[e.id] && byKey[ov.swap[e.id]]) pick = byKey[ov.swap[e.id]];

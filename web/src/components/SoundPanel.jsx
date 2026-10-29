@@ -6,6 +6,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../lib.jsx';
 import { Alert, Spinner } from './ui.jsx';
 
+// uisfx sound packs (CC0): one family of small sounds per film
+const SOUND_STYLES = [['soft', 'Soft'], ['glass', 'Glass'], ['studio', 'Studio'], ['zen', 'Zen'], ['dreamy', 'Dreamy'], ['cinematic', 'Cinematic'], ['rubber', 'Playful'], ['scifi', 'Sci-fi']];
+
 const ROLE_COLOR = { whoosh: '#6C5CE7', transition: '#6C5CE7', zoom: '#6C5CE7', impact: '#E84393', riser: '#E84393', sting: '#E84393', pop: '#00B894', ding: '#00B894', shimmer: '#00B894', click: '#0984E3', tick: '#0984E3', blip: '#0984E3', typing: '#FDCB6E', glitch: '#D63031' };
 const fmt = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}.${String(Math.floor((t % 1) * 10))}`;
 
@@ -107,6 +110,13 @@ export default function SoundPanel({ project, onUpdate, info, time = 0, control 
           ))}
         </div>
         <button type="button" className={`${chip(false)} mt-2 w-full text-center`} disabled={!!busy} onClick={() => save('shuffle', { reshuffle: true })}>{busy === 'shuffle' ? 'Choosing…' : 'Pick different sounds'}</button>
+        <p className="mt-4 text-sm font-semibold">Sound style</p>
+        <p className="text-sm text-ink-mute">The family of small sounds: taps, ticks, prices and the closing chime.</p>
+        <div className="mt-2 grid grid-cols-4 gap-2">
+          {SOUND_STYLES.map(([v, l]) => (
+            <button key={v} type="button" className={chip(a.pack === v)} disabled={!!busy} onClick={() => save('pack', { pack: v })}>{busy === 'pack' && a.pack !== v ? '…' : l}</button>
+          ))}
+        </div>
       </section>
 
       <section>

@@ -88,3 +88,12 @@ Background beds for Story films, cut to 80-second excerpts. All **CC0 1.0 (publi
 | clean-2-everything-you-ever-dreamed.mp3 | Everything You Ever Dreamed (HoliznaCC0) | lofi |
 | clean-3-a-small-town-on-pluto.mp3 | A Small Town On Pluto (HoliznaCC0) | upbeat |
 | clean-4-beginning-5.mp3 | Beginning 5 (HoliznaCC0) | intro |
+
+## Interface sound packs (`sfx/ui-<pack>-<cue>.wav`)
+
+From **uisfx** by Yuki Capital (https://github.com/romainsimon/uisfx). The audio is dedicated to the public domain under
+**CC0 1.0** (`LICENSE-AUDIO` in that repository): free for commercial use, no credit required.
+Ten cues (press, select, check, purchase, reward, complete, typing, open, start, focus) from eight packs
+(zen, cinematic, rubber, dreamy, scifi, glass, soft, studio). Each was converted to 44.1 kHz mono WAV, given a 140 Hz
+high-pass (no heavy low "impact"), a short fade and a peak of -9 dBFS to sit with the other effects.
+A film uses one pack at a time, so its small moments sound like one family (editor: Sound & voice > Sound style).

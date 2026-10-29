@@ -357,12 +357,38 @@ function filmVoice(film, f, gender, voiceId) {
 // Music by default: "Music + sound effects" is the default answer, so a film gets a CC0 library song unless the owner chose
 // effects only, their own music or no sound. Only songs with a checked beat grid are picked, so the MP4 can start the song
 // where its beats meet the film's big moments (server/engine/sfx.js). The editor can change or remove it.
-const BEAT_SONGS = (() => { try { return Object.keys(JSON.parse(readFileSync(new URL('../../../assets/music/beats.json', import.meta.url), 'utf8'))); } catch { return []; } })();
+const BEAT_SONGS = (() => {
+  try {
+    const beats = JSON.parse(readFileSync(new URL('../../../assets/music/beats.json', import.meta.url), 'utf8'));
+    const lib = JSON.parse(readFileSync(new URL('../../../assets/music/library.json', import.meta.url), 'utf8')).tracks || {};
+    // library songs whose beat grid sits on the kick drum, with their mood
+    return Object.entries(lib).map(([id, t]) => ({ file: `${id}.mp3`, mood: t.mood || '' })).filter((t) => { const b = beats[t.file]; return b?.ok && b.kickErrorMs <= 75 && b.beats?.length >= 8; });
+  } catch { return []; }
+})();
+const MOODS_FOR = { scifi: ['synthwave', 'scifi', 'upbeat'], glass: ['chill', 'upbeat', 'lofi'], dreamy: ['chill', 'lofi'], soft: ['chill', 'lofi', 'upbeat'],
+  rubber: ['upbeat', 'funk'], zen: ['lofi', 'chill'], studio: ['lofi', 'chill', 'hiphop'], cinematic: ['calm', 'intro', 'synthwave'] };
+// The family of small interface sounds (taps, ticks, prices, the closing chime): one uisfx pack per film, chosen to suit the business.
+export const SOUND_PACKS = ['soft', 'glass', 'studio', 'zen', 'dreamy', 'cinematic', 'rubber', 'scifi'];
+const PACK_FOR = [
+  [/fintech|bank|pay|loan|insur|crypto|software|app\b|tech|saas|gadget|phone|laptop|repair|electronic/i, ['scifi', 'glass']],
+  [/luxury|jewel|real estate|property|hotel|car\b|cars\b|automobile|interior/i, ['glass', 'cinematic']],
+  [/beauty|salon|spa|hair|nail|skin|fashion|boutique|wellness|yoga|bridal|makeup/i, ['dreamy', 'soft']],
+  [/food|restaurant|cafe|coffee|bakery|cake|snack|drink|kids|toy|party|event|game/i, ['rubber', 'soft']],
+  [/school|tutor|book|church|ministry|consult|law|clinic|health|hospital|pharmac/i, ['zen', 'studio']],
+  [/film|music|studio|photo|media|creative|design|agency/i, ['studio', 'cinematic']],
+];
+function defaultPack(brief, r) {
+  const text = [brief?.category, brief?.name, brief?.goal].filter(Boolean).join(' ');
+  const hit = PACK_FOR.find(([re]) => re.test(text));
+  const pool = hit ? hit[1] : ['soft', 'glass', 'studio'];
+  return pool[Math.floor(r() * pool.length)];
+}
 function defaultMusic(brief, r) {
-  if (['sfx', 'none', 'own'].includes(brief?.sound) || brief?.soundStyle === 'none') return null;
-  const pool = BEAT_SONGS.filter((f) => /\.mp3$/.test(f));
-  if (!pool.length) return null;
-  return { music: `/music/${pool[Math.floor(r() * pool.length)]}`, musicOffset: 0 };
+  if (brief?.sound === 'none' || brief?.soundStyle === 'none') return null;
+  const pack = defaultPack(brief, r);
+  if (['sfx', 'own'].includes(brief?.sound)) return { pack };
+  const want = MOODS_FOR[pack] || ['upbeat', 'chill'], fit = BEAT_SONGS.filter((t) => want.includes(t.mood)), pool = fit.length ? fit : BEAT_SONGS;
+  return pool.length ? { music: `/music/${pool[Math.floor(r() * pool.length)].file}`, musicOffset: 0, pack } : { pack };
 }
 
 export function premiumFilm({ plan = {}, brief = {}, assets = [], salt = '', previous = null }) {
@@ -372,7 +398,8 @@ export function premiumFilm({ plan = {}, brief = {}, assets = [], salt = '', pre
   const r = mulberry(hash(`${f.name}|${salt}`));
   const voice = wantsVoice(brief) ? voiceScript(f, brief.voiceGender || brief.voiceover, brief.voiceId) : null;
   // keep the song the owner already has (Regenerate changes the pictures and moves, not the music they picked)
-  const audio = readPremium(previous)?.audio?.music ? { ...readPremium(previous).audio } : defaultMusic(brief, mulberry(hash(`${f.name}|music|${salt}`)));
+  const kept = readPremium(previous)?.audio, fresh = defaultMusic(brief, mulberry(hash(`${f.name}|music|${salt}`)));
+  const audio = kept && (kept.music || kept.pack) ? { ...(fresh || {}), ...kept } : fresh;
   if (aspect === '16:9') { const film = wideFilm(f, r); const fv = voice ? filmVoice(film, f, brief.voiceGender || brief.voiceover, brief.voiceId) : null; return { html: filmHtml({ film, voice: fv, audio }), block: film.map((s) => s.block).join('+') }; }
   const prev = readPremium(previous)?.block;
   let options = PREMIUM_BLOCKS.filter((k) => BLOCKS[k].fits(f));
@@ -434,6 +461,7 @@ export function premiumWithAudio(html, patch = {}, { brief = null, plan = {}, as
   if (patch.reshuffle) { audio.seed = `s${Date.now().toString(36)}`; delete audio.swap; }
   if ('music' in patch) { if (patch.music && /^\/music\/[\w-]+\.mp3$/.test(patch.music)) { audio.music = patch.music; audio.musicOffset = Math.max(0, Number(patch.musicOffset) || 0); } else { delete audio.music; delete audio.musicOffset; } }
   if (typeof patch.musicGain === 'number') audio.musicGain = Math.max(-20, Math.min(6, patch.musicGain));
+  if ('pack' in patch) { if (SOUND_PACKS.includes(patch.pack)) { audio.pack = patch.pack; delete audio.swap; } else delete audio.pack; }
   let voice = d.voice ? { ...d.voice } : null;
   if (patch.voiceOn === false) voice = null;
   if (patch.voiceOn === true && !voice) {
