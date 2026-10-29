@@ -416,7 +416,7 @@ function tallFilm(f, r, T, prev) {
     if (!best || score < best.score) best = { seq, score, reach };
   }
   // too short even when slowed down: the Story engine makes it at the exact length instead
-  if (!best || best.reach < T * 0.8) throw new Error(`No premium templates long enough for ${T}s`);
+  if (!best || best.reach < T * 0.93) throw new Error(`No premium templates long enough for ${T}s`);
   return best.seq.map((k, i) => ({ block: k, dur: i === best.seq.length - 1 || !END[k] ? BLOCKS[k].meta.duration : END[k] }));
 }
 
@@ -432,7 +432,7 @@ export function premiumFilm({ plan = {}, brief = {}, assets = [], salt = '', pre
   if (aspect === '16:9') {
     const film = wideFilm(f, r), T = Number(plan.duration_seconds) || 0;
     const est = 0.6 * film.reduce((n, s) => n + (Number(s.dur) || BLOCKS[s.block].meta.duration), 0);   // measured: still moments trimmed, ~60% remains
-    if (T && est * 1.3 < T * 0.8) throw new Error(`Landscape templates too short for ${T}s`);   // the Story engine makes it at the exact length
+    if (T && est * 1.3 < T * 0.93) throw new Error(`Landscape templates too short for ${T}s`);   // the Story engine makes it at the exact length
     const fv = voice ? filmVoice(film, f, brief.voiceGender || brief.voiceover, brief.voiceId) : null;
     return { html: filmHtml({ film, voice: fv, audio, target: T }), block: film.map((s) => s.block).join('+') };
   }
