@@ -114,7 +114,8 @@ function readable(colors, chosen) {
 // Rule-based plan (always works)
 // ---------------------------------------------------------------------------
 export function briefToPlanRules(brief, { assets = [], limits = { minSeconds: 15, maxSeconds: 300 }, palette = null } = {}) {
-  const b = cleanBrief(brief);
+  // cleanBrief drops empty lists (a skipped question), so every list is read with a safe default here
+  const b = { ...cleanBrief(brief) }; for (const k of ['features', 'products', 'headlines', 'ctas', 'goals', 'steps']) if (!Array.isArray(b[k])) b[k] = [];
   let D = Math.max(limits.minSeconds || 15, Math.min(limits.maxSeconds || 300, b.duration || 20));
   const images = assets.filter((a) => a.kind === 'image');
   const logo = images.find((a) => a.role === 'logo');

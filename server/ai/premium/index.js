@@ -354,20 +354,33 @@ function filmVoice(film, f, gender, voiceId) {
 }
 
 /** Pick a template that fits this business (a different one on Regenerate) and fill it. */
+// Music by default: "Music + sound effects" is the default answer, so a film gets a CC0 library song unless the owner chose
+// effects only, their own music or no sound. Only songs with a checked beat grid are picked, so the MP4 can start the song
+// where its beats meet the film's big moments (server/engine/sfx.js). The editor can change or remove it.
+const BEAT_SONGS = (() => { try { return Object.keys(JSON.parse(readFileSync(new URL('../../../assets/music/beats.json', import.meta.url), 'utf8'))); } catch { return []; } })();
+function defaultMusic(brief, r) {
+  if (['sfx', 'none', 'own'].includes(brief?.sound) || brief?.soundStyle === 'none') return null;
+  const pool = BEAT_SONGS.filter((f) => /\.mp3$/.test(f));
+  if (!pool.length) return null;
+  return { music: `/music/${pool[Math.floor(r() * pool.length)]}`, musicOffset: 0 };
+}
+
 export function premiumFilm({ plan = {}, brief = {}, assets = [], salt = '', previous = null }) {
   const aspect = plan.aspect_ratio || '9:16';
   if (!PREMIUM_ASPECTS.includes(aspect)) throw new Error('No premium template for this size yet');
   const f = factsOf(plan, brief, assets);
   const r = mulberry(hash(`${f.name}|${salt}`));
   const voice = wantsVoice(brief) ? voiceScript(f, brief.voiceGender || brief.voiceover, brief.voiceId) : null;
-  if (aspect === '16:9') { const film = wideFilm(f, r); const fv = voice ? filmVoice(film, f, brief.voiceGender || brief.voiceover, brief.voiceId) : null; return { html: filmHtml({ film, voice: fv }), block: film.map((s) => s.block).join('+') }; }
+  // keep the song the owner already has (Regenerate changes the pictures and moves, not the music they picked)
+  const audio = readPremium(previous)?.audio?.music ? { ...readPremium(previous).audio } : defaultMusic(brief, mulberry(hash(`${f.name}|music|${salt}`)));
+  if (aspect === '16:9') { const film = wideFilm(f, r); const fv = voice ? filmVoice(film, f, brief.voiceGender || brief.voiceover, brief.voiceId) : null; return { html: filmHtml({ film, voice: fv, audio }), block: film.map((s) => s.block).join('+') }; }
   const prev = readPremium(previous)?.block;
   let options = PREMIUM_BLOCKS.filter((k) => BLOCKS[k].fits(f));
   if (options.length > 1 && prev) options = options.filter((k) => k !== prev);
   if (!options.length) throw new Error('No premium template fits these details');
   const block = options[Math.floor(r() * options.length)];
   const vars = BLOCKS[block].fill(f, r);
-  return { html: premiumHtml({ block, vars, voice }), block, duration: BLOCKS[block].meta.duration };
+  return { html: premiumHtml({ block, vars, voice, audio }), block, duration: BLOCKS[block].meta.duration };
 }
 
 /**

@@ -50,7 +50,7 @@ async function mixAudio(sfx, music, duration) {
   const names = [...new Set((sfx || []).map((e) => e.k))];
   const bank = Object.fromEntries(await Promise.all(names.map(async (k) => [k, await load(`/sfx/${k}.wav`)])));
   for (const e of sfx || []) {
-    const b = bank[e.k]; if (!b) continue;
+    const b = bank[e.k]; if (!b || e.muted || !(Number(e.v) > 0)) continue;   // switched off in the editor
     const s = b.getChannelData(0), start = Math.round(e.t * SR), v = (Number(e.v) || 1) * 0.6;
     for (let i = 0; i < s.length && start + i < n; i++) if (start + i >= 0) mix[start + i] += s[i] * v;
   }
