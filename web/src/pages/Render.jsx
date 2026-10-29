@@ -4,7 +4,7 @@ import { publicMessage } from '../lib/errors.js';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { api, ASPECTS, clock, duration, naira, useAuth, usePolling } from '../lib.jsx';
-import { Alert, Button, Modal, PageLoader, ProjectTabs, Spinner } from '../components/ui.jsx';
+import { Alert, Burst, Button, Modal, PageLoader, ProjectTabs, Spinner } from '../components/ui.jsx';
 import { VideoPhone } from '../components/Preview.jsx';
 import { downloadVideo, fetchVideo } from '../lib/videoFile.js';
 
@@ -147,6 +147,9 @@ export default function Render() {
   }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const active = render && ['queued', 'rendering'].includes(render.status);
+  // celebrate once when the MP4 finishes while the person is watching (not when an old one is opened)
+  const wasActive = useRef(false), [justDone, setJustDone] = useState(false);
+  useEffect(() => { if (active) wasActive.current = true; else if (wasActive.current && render?.status === 'done') { wasActive.current = false; setJustDone(true); } }, [active, render?.status]);
   // the MP4 is only kept a few minutes: count down, then show "Make your MP4" again (free)
   const [now, setNow] = useState(Date.now());
   const expiresAt = render?.status === 'done' && render.expiresAt ? new Date(render.expiresAt).getTime() : 0;
@@ -221,7 +224,7 @@ export default function Render() {
                   <Button size="lg" className="mt-3 w-full sm:w-auto" onClick={() => { setRender(null); begin(); }} loading={busy}>Render video again</Button>
                 </div>
               )}
-              <p className="text-sm font-semibold text-money">{render.stale ? 'Your last MP4' : 'Your video is ready'}</p>
+              <p className="relative text-sm font-semibold text-money">{!render.stale && justDone && <Burst />}{render.stale ? 'Your last MP4' : 'Your video is ready'}</p>
               <h2 className="mt-1 text-3xl font-extrabold">Download and post it</h2>
               <p className="mt-2 text-ink-soft">{duration(render.durationSeconds)} · {ASPECTS[render.aspectRatio]?.w}×{ASPECTS[render.aspectRatio]?.h} MP4 · {(render.fileSize / 1e6).toFixed(1)} MB · plays on every phone.</p>
               <div className="mt-6 flex flex-wrap gap-3">

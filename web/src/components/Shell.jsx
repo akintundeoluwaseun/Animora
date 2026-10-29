@@ -81,8 +81,8 @@ function SiteBar({ onCreate }) {
         </nav>
         <div className="ml-auto flex items-center gap-2">
           <ThemeToggle />
-          {user && <Link to={lastLib()} className="rounded-lg px-3 py-2 text-[15px] font-medium text-ink-soft hover:text-ink">My work</Link>}
-          <button onClick={onCreate} className="press flex h-10 items-center gap-1.5 rounded-[10px] bg-ink px-4 text-[15px] font-semibold text-white hover:opacity-90"><Icon k="plus" size={17} />Create</button>
+          {user && <Link to={lastLib()} className="whitespace-nowrap rounded-lg px-2 py-2 text-[15px] font-medium text-ink-soft hover:text-ink sm:px-3">My work</Link>}
+          <button onClick={onCreate} className="press flex h-10 items-center gap-1.5 whitespace-nowrap rounded-[10px] bg-ink px-3.5 text-[15px] font-semibold text-white hover:opacity-90 sm:px-4"><Icon k="plus" size={17} />Create</button>
         </div>
       </div>
     </header>

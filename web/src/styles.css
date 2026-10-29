@@ -198,13 +198,13 @@ html[data-theme="dark"] .home-card-alt:hover { background: rgba(255, 255, 255, .
 .wiz-items button:disabled { cursor: default; }
 .wiz-main { min-width: 0; }
 .wiz-meta { margin-bottom: 1rem; }
-.wiz-track { height: 4px; border-radius: 4px; background: rgba(20,17,43,.07); overflow: hidden; }
+.wiz-track { height: 6px; border-radius: 6px; background: rgba(20,17,43,.07); overflow: hidden; }
 .wiz-track > div { height: 100%; border-radius: 4px; background: linear-gradient(90deg, #4f7dff, var(--color-danfo), #b06bff); transition: width .5s cubic-bezier(.2,.8,.2,1); }
-.wiz-meta p { margin-top: .6rem; font-size: .75rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--color-ink-mute); }
+.wiz-meta p { margin-top: .55rem; font-size: .85rem; font-weight: 600; color: var(--color-ink-mute); }
 .wiz-card { position: relative; background: #fff; border: 1px solid rgba(20,17,43,.08); border-radius: 28px; padding: 1.5rem 1.25rem 1.25rem; box-shadow: 0 1px 0 rgba(255,255,255,.9) inset, 0 30px 60px -40px rgba(20,17,43,.35); animation: wizIn .45s cubic-bezier(.2,.8,.2,1); }
 @media (min-width: 640px) { .wiz-card { padding: 2.5rem 2.75rem 2rem; } }
 @keyframes wizIn { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
-.wiz-q { font-size: clamp(1.5rem, 1.1rem + 1.6vw, 2.15rem); font-weight: 750; line-height: 1.12; letter-spacing: -.035em; color: var(--color-ink); max-width: 22ch; }
+.wiz-q { font-size: clamp(1.3rem, 1rem + 1.6vw, 2.15rem); font-weight: 750; line-height: 1.15; letter-spacing: -.035em; color: var(--color-ink); max-width: 22ch; }
 .wiz-hint { margin-top: .6rem; font-size: .975rem; line-height: 1.45; color: var(--color-ink-mute); max-width: 52ch; }
 .wiz-sub { margin: 1.6rem 0 .8rem; font-size: .72rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--color-ink-mute); }
 .wiz-field { max-width: 640px; }
@@ -302,3 +302,16 @@ html[data-theme="dark"] .project-tabs { border-color: rgba(255, 255, 255, .12); 
 /* segmented tabs keep each label on one line; on small phones they get a little tighter instead of wrapping */
 .segmented > button { white-space: nowrap; }
 @media (max-width: 420px) { .segmented > button { padding-left: .55rem; padding-right: .55rem; font-size: .84rem; } }
+
+/* every page fades in softly; the end state is always fully visible */
+@keyframes page-fade { from { opacity: 0; } to { opacity: 1; } }
+.page-fade { animation: page-fade .28s ease-out both; }
+@media (prefers-reduced-motion: reduce) { .page-fade { animation: none; } }
+
+/* library, first visit: a calm panel in the kind's colour with three numbered steps (they are a real sequence) */
+.first-run { background: linear-gradient(160deg, var(--color-video-soft) 0%, transparent 70%), var(--color-paper); box-shadow: inset 0 0 0 1px rgba(20, 17, 43, .08); }
+.first-run-flyer { background: linear-gradient(160deg, var(--color-flyer-soft) 0%, transparent 70%), var(--color-paper); }
+.first-run-step { position: relative; padding-left: 2.75rem; }
+.first-run-num { position: absolute; left: 0; top: 0; display: grid; place-items: center; width: 2rem; height: 2rem; border-radius: 999px; font-weight: 700; font-size: .9rem; background: var(--color-video); color: #fff; }
+.first-run-flyer .first-run-num { background: var(--color-flyer); }
+html[data-theme="dark"] .first-run { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .1); }

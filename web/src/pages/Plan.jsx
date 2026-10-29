@@ -581,7 +581,7 @@ export default function Plan() {
           )}
           <div className="wiz-meta">
             <div className="wiz-track" aria-hidden="true"><div style={{ width: `${Math.round((pos / Math.max(1, shownQs.length)) * 100)}%` }} /></div>
-            <p>{finished ? 'All done' : `${group} · ${pos + 1} of ${shownQs.length}`}</p>
+            <p>{finished ? 'All done, ready to make it' : `Question ${pos + 1} of ${shownQs.length}: ${String(group).toLowerCase()}`}</p>
           </div>
 
           {/* each question slides in from the side it comes from */}

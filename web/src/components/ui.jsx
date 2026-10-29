@@ -171,6 +171,25 @@ export function Nav() {
   );
 }
 
+// A short burst of colour when something the person waited for is ready (the MP4). It answers their wait, plays once,
+// and Motion skips it for people who ask their phone for less motion.
+const BURST = ['#5546FF', '#F2691B', '#2FCB93', '#FFC93C', '#B06BFF', '#4F7DFF'];
+export function Burst({ className = '' }) {
+  const bits = Array.from({ length: 22 }, (_, i) => {
+    const a = (i / 22) * Math.PI * 2 + (i % 3) * 0.2, d = 70 + (i * 37) % 70;
+    return { x: Math.cos(a) * d, y: Math.sin(a) * d * 0.75 - 20, r: (i * 53) % 180, c: BURST[i % BURST.length], w: i % 4 === 0 ? 10 : 7, round: i % 2 === 0 };
+  });
+  return (
+    <span aria-hidden="true" className={`pointer-events-none absolute left-6 top-2 ${className}`}>
+      {bits.map((b, i) => (
+        <motion.span key={i} className="absolute block" style={{ width: b.w, height: b.round ? b.w : b.w * 0.5, borderRadius: b.round ? 999 : 2, background: b.c }}
+          initial={{ x: 0, y: 0, opacity: 1, rotate: 0, scale: 0.6 }} animate={{ x: b.x, y: [0, b.y, b.y + 60], opacity: [1, 1, 0], rotate: b.r, scale: 1 }}
+          transition={{ duration: 1.3, ease: [0.2, 0.8, 0.3, 1], times: [0, 0.55, 1] }} />
+      ))}
+    </span>
+  );
+}
+
 // Chat / Edit / Video: move between a project's pages at any time, so the questions and the edits are never lost behind you.
 export function ProjectTabs({ project, current, className = '' }) {
   if (!project?.id || !project.plan) return null;
