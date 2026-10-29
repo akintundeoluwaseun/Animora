@@ -730,11 +730,11 @@ export default function Plan() {
 
             <div className="wiz-actions">
               {!finished && <button type="button" onClick={goBack} disabled={isFirst || building} className="wiz-back">← Back</button>}
-              <span className="flex-1" />
+              {!finished && <span className="flex-1" />}
               {!finished && q?.optional && !q.done && <button type="button" onClick={skip} className="wiz-skip">Skip</button>}
               {!finished && b.name && q && !['mode', 'paste', 'name'].includes(q.id) && !q.done && <button type="button" onClick={makeNow} disabled={building || reading} className="wiz-now">Make it now</button>}
               {false}
-              {!finished && needsContinue && <Button type="submit" size="lg" loading={reading} disabled={continueDisabled}>{continueLabel}</Button>}
+              {!finished && needsContinue && <Button type="submit" size="lg" className="wiz-go" loading={reading} disabled={continueDisabled}>{continueLabel}</Button>}
               {finished && (
                 <div className="flex w-full flex-col gap-2 sm:w-auto sm:items-end">
                   <Button type="button" size="lg" className="w-full sm:w-auto" loading={building} onClick={() => (project.plan && b.done ? navigate(`/p/${id}/studio${project.code ? '' : '?generate=1'}`) : build(b))}>

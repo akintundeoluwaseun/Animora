@@ -217,7 +217,13 @@ html[data-theme="dark"] .home-card-alt:hover { background: rgba(255, 255, 255, .
 .wiz-mic:hover { background: rgba(20,17,43,.06) !important; }
 .wiz-foot { margin-top: .55rem; font-size: .78rem; color: var(--color-ink-mute); }
 .wiz-drop { border: 1.5px dashed rgba(20,17,43,.2); background: #FAF9FE; border-radius: 20px; padding: 1.1rem; }
-.wiz-actions { display: flex; align-items: center; gap: .75rem; margin-top: 2rem; padding-top: 1.25rem; border-top: 1px solid rgba(20,17,43,.07); }
+.wiz-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; margin-top: 2rem; padding-top: 1.25rem; border-top: 1px solid rgba(20,17,43,.07); }
+.wiz-back, .wiz-skip, .wiz-now, .wiz-go { white-space: nowrap; }
+/* phones: Back, Skip and "Make it now" share one row; the main button gets its own full-width row under them */
+@media (max-width: 560px) {
+  .wiz-actions { gap: .5rem; }
+  .wiz-go { order: 5; flex: 1 1 100%; }
+}
 .wiz-back, .wiz-skip { font-size: .9rem; font-weight: 650; color: var(--color-ink-mute); padding: .5rem .7rem; border-radius: 10px; }
 .wiz-now { font-size: .9rem; font-weight: 700; color: var(--color-ink); padding: .5rem 1rem; border-radius: 999px; border: 1.5px solid rgba(20, 17, 43, .22); background: #fff; }
 .wiz-now:hover:not(:disabled) { border-color: var(--color-ink); }
@@ -292,3 +298,7 @@ html[data-theme="dark"] .dock-create { --tw-ring-color: #1A1A1F; }
 html[data-theme="dark"] .text-video { color: #A9A4FF; }
 html[data-theme="dark"] .text-flyer { color: #FF9A5E; }
 html[data-theme="dark"] .project-tabs { border-color: rgba(255, 255, 255, .12); }
+
+/* segmented tabs keep each label on one line; on small phones they get a little tighter instead of wrapping */
+.segmented > button { white-space: nowrap; }
+@media (max-width: 420px) { .segmented > button { padding-left: .55rem; padding-right: .55rem; font-size: .84rem; } }
