@@ -139,7 +139,7 @@ export function Nav() {
           {links.map(([to, l, k]) => <NavLink key={l} to={to} end={to === '/'} className={railLink(to)}><Icon k={k} />{l}</NavLink>)}
         </nav>
         <div className="mt-auto space-y-3 p-5 text-sm">
-          <DeveloperCard />
+          <BuiltBy />
           {inst.can && <button onClick={inst.install} className="flex w-full items-center gap-2 rounded-[10px] border border-white/12 px-3 py-2.5 font-semibold text-white/80 hover:text-white"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 21h14" /></svg>Install the app</button>}
           {status && status.ai === 'offline' && <p className="rounded-lg border border-white/10 p-3 text-xs leading-relaxed text-white/55">Practice mode: add a Gemini API key for the full AI director.</p>}
           {user && !user.testMode && (
@@ -257,75 +257,15 @@ export function PageLoader() {
   return <div className="grid min-h-[50vh] place-items-center text-ink-mute"><Spinner className="size-8" /></div>;
 }
 
-const WA_ICON = <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2Zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8s-.4-.1-.6.1-.7.8-.8 1-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.3-.4.7-1.3a.5.5 0 0 0 0-.5l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2 5.2 5.2 0 0 0 1.1 2.7 11.8 11.8 0 0 0 4.5 4c1.7.7 2.3.8 3.2.6a2.7 2.7 0 0 0 1.8-1.2 2.2 2.2 0 0 0 .2-1.3c-.1-.1-.3-.2-.5-.3Z"/></svg>;
-const GLOBE_ICON = <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18" /></svg>;
-const VERIFIED = <svg width="15" height="15" viewBox="0 0 24 24" aria-label="Verified developer" role="img"><path fill="#5546FF" d="m12 2 2.4 1.8 3-.2.9 2.9 2.5 1.7-1 2.8 1 2.8-2.5 1.7-.9 2.9-3-.2L12 22l-2.4-1.8-3 .2-.9-2.9-2.5-1.7 1-2.8-1-2.8 2.5-1.7.9-2.9 3 .2Z" /><path d="m8.5 12.2 2.3 2.3 4.7-4.9" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>;
-
-// The developer of Animora: a small signature card (menu) and a full card (home page).
-export function DeveloperMark({ size = 40 }) {
+// The developer's credit: a small pill that opens the portfolio in a new tab.
+export function BuiltBy({ className = '' }) {
   return (
-    <span className="dev-mark grid shrink-0 place-items-center rounded-[30%] font-extrabold text-white" style={{ width: size, height: size, fontSize: size * 0.38 }} aria-hidden="true">OJ</span>
-  );
-}
-
-// One classic, premium signature for the foot of the site (replaces the old double card).
-export function DeveloperSignature() {
-  return (
-    <div className="dev-sign">
-      <div className="dev-sign-inner flex flex-col gap-7 p-7 sm:flex-row sm:items-center sm:justify-between sm:gap-10 sm:p-9">
-        <div className="flex items-center gap-5">
-          <span className="dev-sign-mark grid shrink-0 place-items-center rounded-full" aria-hidden="true">OJ</span>
-          <div className="min-w-0">
-            <p className="dev-sign-eyebrow">Designed &amp; developed by</p>
-            <a href={DEVELOPER.website} target="_blank" rel="noopener" className="dev-sign-name mt-1.5 inline-flex items-center gap-2 hover:underline">{DEVELOPER.name.replace(/\.$/, '')}<span className="shrink-0">{VERIFIED}</span></a>
-            <p className="dev-sign-tag mt-1.5">Websites, software and apps for businesses. Animora is one of them.</p>
-          </div>
-        </div>
-        <div className="flex flex-col gap-2.5 sm:items-end">
-          <div className="flex flex-wrap gap-2.5">
-            <a href={DEVELOPER.whatsapp} target="_blank" rel="noopener" className="dev-sign-btn dev-sign-btn-gold press">{WA_ICON}Chat on WhatsApp</a>
-            <a href={DEVELOPER.website} target="_blank" rel="noopener" className="dev-sign-btn dev-sign-btn-line press">{GLOBE_ICON}Visit website</a>
-          </div>
-          <p className="dev-sign-phone tabular-nums">{DEVELOPER.handle}</p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-export function DeveloperCard({ wide = false }) {
-  if (wide) {
-    return (
-      <div className="dev-card flex flex-col gap-6 rounded-[22px] p-6 text-white sm:flex-row sm:items-center sm:justify-between sm:p-8">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-          <DeveloperMark size={60} />
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-white/50">The developer</p>
-            <a href={DEVELOPER.website} target="_blank" rel="noopener" className="mt-1 inline-flex items-center gap-1.5 text-2xl font-bold tracking-[-0.03em] hover:underline">{DEVELOPER.name}<span className="shrink-0">{VERIFIED}</span></a>
-            <p className="mt-1 text-white/65">Websites, software and apps for businesses. Animora is one of them.</p>
-          </div>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <a href={DEVELOPER.whatsapp} target="_blank" rel="noopener" className="press flex h-11 items-center gap-2 rounded-full bg-[#25D366] px-5 font-semibold text-[#06351B] hover:brightness-105">{WA_ICON}WhatsApp {DEVELOPER.handle}</a>
-          <a href={DEVELOPER.website} target="_blank" rel="noopener" className="press flex h-11 items-center gap-2 rounded-full border border-white/20 px-5 font-semibold text-white hover:bg-white/10">{GLOBE_ICON}Visit website</a>
-        </div>
-      </div>
-    );
-  }
-  return (
-    <div className="dev-card rounded-[14px] p-3.5 text-white">
-      <div className="flex items-center gap-3">
-        <DeveloperMark size={36} />
-        <div className="min-w-0">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-white/45">Developer</p>
-          <a href={DEVELOPER.website} target="_blank" rel="noopener" className="inline-flex items-center gap-1 text-[13.5px] font-semibold leading-tight hover:underline">{DEVELOPER.name}<span className="shrink-0">{VERIFIED}</span></a>
-        </div>
-      </div>
-      <div className="mt-3 grid grid-cols-2 gap-1.5">
-        <a href={DEVELOPER.whatsapp} target="_blank" rel="noopener" className="press flex h-9 items-center justify-center gap-1.5 rounded-[9px] bg-[#25D366] text-[13px] font-semibold text-[#06351B] hover:brightness-105" aria-label={`WhatsApp ${DEVELOPER.handle}`}>{WA_ICON}Chat</a>
-        <a href={DEVELOPER.website} target="_blank" rel="noopener" className="press flex h-9 items-center justify-center gap-1.5 rounded-[9px] bg-white/10 text-[13px] font-semibold text-white hover:bg-white/15">{GLOBE_ICON}Website</a>
-      </div>
-      <p className="mt-2 text-center text-[11px] tabular-nums text-white/45">{DEVELOPER.handle}</p>
-    </div>
+    <a href={DEVELOPER.website} target="_blank" rel="noopener noreferrer" className={`built-by press ${className}`}
+       aria-label="Built by Oluwaseun. Opens his portfolio in a new tab">
+      <span className="built-by-icon" aria-hidden="true">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round"><path d="M8 7l-5 5 5 5M16 7l5 5-5 5M13.5 5l-3 14" /></svg>
+      </span>
+      <span>Built by <strong>Oluwaseun</strong></span>
+    </a>
   );
 }

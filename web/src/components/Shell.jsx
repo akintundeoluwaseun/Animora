@@ -7,7 +7,7 @@ import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import ThemeToggle from './ThemeToggle.jsx';
 import { useAuth, api, naira } from '../lib.jsx';
 import { useInstall } from './InstallApp.jsx';
-import { Logo, Modal, PlanBadge, DeveloperCard, DeveloperSignature } from './ui.jsx';
+import { Logo, Modal, PlanBadge, BuiltBy } from './ui.jsx';
 import { creditsLeft } from './BuyCredits.jsx';
 
 export function modeFor(pathname, signedIn = false) {
@@ -105,7 +105,7 @@ function SiteFooter() {
           <Link to="/flyers" className="text-ink-soft hover:text-ink">My flyers</Link>
         </nav>
       </div>
-      <div className="mx-auto max-w-[1180px] px-6 pb-12 sm:px-10"><DeveloperSignature /></div>
+      <div className="mx-auto flex max-w-[1180px] justify-center border-t border-ink/8 px-6 pb-12 pt-6 sm:px-10"><BuiltBy /></div>
     </footer>
   );
 }
@@ -185,7 +185,8 @@ function Rail({ onCreate }) {
         {status?.ai === 'offline' && <p className="rounded-xl border border-ink/10 bg-white p-3 text-xs leading-relaxed text-ink-mute">Practice mode: add a Gemini key for the full AI director.</p>}
         {inst.can && <button onClick={inst.install} className="flex w-full items-center gap-2 rounded-[10px] border border-ink/12 bg-white px-3 py-2.5 text-sm font-semibold text-ink-soft hover:text-ink">Install the app</button>}
         <Account />
-        <Link to="/" className="block px-1 text-xs text-ink-mute hover:text-ink">About Animora · Built by the developer</Link>
+        <Link to="/" className="block px-1 text-xs text-ink-mute hover:text-ink">About Animora</Link>
+        <BuiltBy />
       </div>
     </aside>
   );
@@ -279,7 +280,7 @@ function MeSheet({ open, onClose }) {
       </div>
       {inst.can && <button onClick={() => { inst.install(); onClose(); }} className="press mt-3 flex w-full items-center justify-center gap-2 rounded-2xl border border-ink/12 py-3.5 text-[15px] font-semibold">Install the app on this phone</button>}
       <div className="mt-4"><Account /></div>
-      <div className="mt-4"><DeveloperCard /></div>
+      <div className="mt-4 flex justify-center"><BuiltBy /></div>
     </Modal>
   );
 }
