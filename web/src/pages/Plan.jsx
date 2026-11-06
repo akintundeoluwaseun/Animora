@@ -57,7 +57,7 @@ const GROUP_OF = { template: 'Look and feel', intensity: 'Look and feel', mode: 
 
 const MAX_PICS = 10;
 
-const CATEGORIES = ['Food & drinks', 'Fashion & clothing', 'Beauty & salon', 'Tech & software', 'Finance & payments', 'Health & fitness', 'Real estate', 'Events & parties', 'School & training', 'Shop & retail', 'Services'];
+const CATEGORIES = ['Birthday', 'Wedding', 'Church or ministry', 'Announcement', 'Personal story or tribute', 'Food & drinks', 'Fashion & clothing', 'Beauty & salon', 'Tech & software', 'Finance & payments', 'Health & fitness', 'Real estate', 'Events & parties', 'School & training', 'Shop & retail', 'Services'];
 const GOALS = ['Promote a sale or offer', 'Launch something new', 'Get more orders or bookings', 'Make people know my brand', 'Announce an event'];
 const CTAS = ['Order on WhatsApp', 'Call now', 'Visit our website', 'Visit our store', 'Download the app', 'Book now', 'DM us on Instagram'];
 const ASPECT_OPTS = [
@@ -90,7 +90,7 @@ export function lengthWarning(b, v) {
 const groupOf = (b) => {
   const c = `${b.category || ''} ${b.name || ''}`.toLowerCase();
   if (/tech|software|app|saas|website|digital/.test(c)) return 'tech';
-  if (/event|party|wedding|concert|church|conference|program/.test(c)) return 'event';
+  if (/event|party|wedding|birthday|anniversary|concert|church|ministry|conference|program|invitation|funeral|graduation/.test(c)) return 'event';
   if (/real estate|property|propert|house|land|apartment|rent/.test(c)) return 'property';
   if (/beauty|salon|hair|spa|health|fitness|gym|clinic|service|school|training|tutor|repair|clean/.test(c)) return 'service';
   if (/food|drink|restaurant|kitchen|cake|bakery|catering/.test(c)) return 'food';
@@ -112,13 +112,14 @@ const PRODUCT_HINT = {
 const lookAuto = (b) => b.lookAuto === 'auto';
 
 const QUESTIONS = [
-  { id: 'mode', type: 'single', options: [
+  { id: 'mode', type: 'single', show: () => false, options: [
     { v: 'steps', l: 'Ask me one question at a time' },
     { v: 'paste', l: "I'll paste everything at once", d: "Write or paste all your details. I'll only ask what's missing." },
   ], ask: () => "Hi! I'm your Animora director. Let's make your ad. Should I ask you questions one by one, or will you paste all your details at once?" },
-  { id: 'paste', type: 'long', show: (b) => b.mode === 'paste', ask: () => 'Paste or type everything about your business and the ad: name, what you sell, your message, prices, contact, where you\'ll post it, how long, anything special.', placeholder: 'e.g. My business is Oluwaseun Computers in Ado Ekiti. We sell and repair laptops. HP EliteBook ₦250,000, Dell ₦300,000. Call or WhatsApp 0807 691 1614. Landscape for YouTube, about 30 seconds, calm and premium.' },
-  { id: 'name', type: 'text', ask: () => "What's your business name?", placeholder: 'e.g. Kemi Cakes' },
-  { id: 'category', type: 'single', options: CATEGORIES, typed: true, ask: (b) => `Nice! What does ${b.name} do?`, placeholder: 'Or type it, e.g. "laptop repairs"' },
+  { id: 'paste', type: 'long', ask: () => "Hi! I'm your Animora director. What video do you want to make? Just tell me in your own words. A sentence is enough, and I'll work out the rest.", placeholder: 'e.g. A birthday video for my sister Tola turning 30, warm and fun, with her photos\n\nor: An ad for my laptop repair shop in Ado Ekiti, call 0807 691 1614',
+    examples: ['A birthday video for my mum turning 60', 'An ad for my cake business', 'A wedding invitation for 14 December', 'A church programme announcement', 'A tribute to my best friend', 'A promo for my new app'] },
+  { id: 'name', type: 'text', ask: () => "What's the video about? A name or title is enough.", placeholder: "e.g. Kemi Cakes, Tola's 30th Birthday, Our Wedding" },
+  { id: 'category', type: 'single', options: CATEGORIES, typed: true, ask: (b) => `Nice! What kind of video is "${b.name}"?`, placeholder: 'Or type it, e.g. "laptop repairs" or "birthday"' },
   { id: 'goal', type: 'multi', max: 6, show: (b) => groupOf(b) !== 'event', options: GOALS, typed: true, ask: () => "What's the goal of this ad?", placeholder: 'Or type your own goal' },
   { id: 'headline', type: 'multi', max: 8, suggest: 'headline', typed: true, ask: () => "What's the main message of your ad?", hint: 'Pick as many as you like, or type your own. More messages make a longer video.', placeholder: 'Add your own message' },
   { id: 'features', type: 'multi', max: 8, suggest: 'features', typed: true, optional: true, ask: (b) => `What makes ${b.name} stand out?`, hint: 'Pick as many as you like, or type your own.', placeholder: 'Add your own' },
@@ -173,8 +174,8 @@ const FLYER_LAYOUTS = [
   { v: 'auto', l: 'Let the AI decide', d: 'It picks what suits your business' },
 ];
 const FLYER_QUESTIONS = [
-  { id: 'mode', type: 'single', options: QUESTIONS[0].options, ask: QUESTIONS[0].ask },
-  { ...QUESTIONS.find((x) => x.id === 'paste'), ask: FLYER_TEXT.paste, placeholder: 'e.g. My business is Oluwaseun Computers in Ado Ekiti. We sell and repair laptops. HP EliteBook ₦250,000, Dell ₦300,000. Call or WhatsApp 0807 691 1614. Square flyer for WhatsApp, clean and premium.' },
+  { id: 'mode', type: 'single', show: () => false, options: QUESTIONS[0].options, ask: QUESTIONS[0].ask },
+  { ...QUESTIONS.find((x) => x.id === 'paste'), show: undefined, ask: FLYER_TEXT.paste, placeholder: 'e.g. My business is Oluwaseun Computers in Ado Ekiti. We sell and repair laptops. HP EliteBook ₦250,000, Dell ₦300,000. Call or WhatsApp 0807 691 1614. Square flyer for WhatsApp, clean and premium.' },
   { id: 'name', type: 'text', ask: () => "What's your business name?", placeholder: 'e.g. Kemi Cakes' },
   { id: 'category', type: 'single', options: CATEGORIES, typed: true, ask: (b) => `Nice! What does ${b.name} do?`, placeholder: 'Or type your own' },
   { id: 'flyerType', type: 'multi', max: 3, options: FLYER_TYPES, typed: true, ask: () => 'What kind of flyer is this?', hint: 'Pick one or more. A sale and a new opening can share one flyer.', placeholder: 'Or describe it in your own words' },
@@ -623,7 +624,7 @@ export default function Plan() {
 
                 {typedKind && (
                   <div className="wiz-field mt-6">
-                    <label className="wiz-label" htmlFor="wiz-in">{q.type === 'long' ? 'Your answer' : q.typed ? 'Or write your own' : 'Your answer'}</label>
+                    <label className="wiz-label" htmlFor="wiz-in">{q.id === 'paste' ? 'Your idea' : q.type === 'long' ? 'Your answer' : q.typed ? 'Or write your own' : 'Your answer'}</label>
                     <div className="wiz-box">
                       {q.type === 'long' ? (
                         <textarea id="wiz-in" value={text} onChange={(e) => setText(e.target.value)} rows={q.id === 'paste' ? 8 : 4} placeholder={q.placeholderFor?.(b) || q.placeholder} className="wiz-input resize-none" />
@@ -632,6 +633,11 @@ export default function Plan() {
                       )}
                       <MicButton onText={(t) => setText((x) => (x.trim() ? `${x.trim()} ${t}` : t))} onError={setError} className="wiz-mic" />
                     </div>
+                    {q.examples && !text && (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {q.examples.map((ex) => <button key={ex} type="button" className="chip-suggest" onClick={() => setText(ex)}>{ex}</button>)}
+                      </div>
+                    )}
                     <p className="wiz-foot">{q.type === 'long' ? 'Press Continue when you are done' : 'Press Enter to continue'} · or tap the mic and say it</p>
                   </div>
                 )}

@@ -69,7 +69,7 @@ function rulesCopy(brief, assets, avoid) {
     v: 2, kinds, offer, when, facts,
     layout, headline: str(brief.headline || brief.name, 60), highlight: '', subhead: str(brief.headlines?.[1] || '', 90),
     badge: /sale|offer|discount|%|off/i.test(brief.goal || '') ? 'Special offer' : '',
-    items, features: (brief.features || []).slice(0, 4).map((f) => str(f, 34)), cta: str(brief.cta || 'Order now', 30),
+    items, features: (brief.features || []).slice(0, 4).map((f) => str(f, 34)), cta: str(brief.cta || (!brief.kind || brief.kind === 'business' ? 'Order now' : 'You are invited'), 30),
     contact: str(brief.contact, 120), heroImg: photos[0]?.name || null,
   };
 }

@@ -25,6 +25,8 @@ const keep = (arr) => arr.filter((x) => !isVague(x));
 export function cleanBrief(b = {}) {
   const out = {
     name: str(b.name, 60), category: str(b.category, 60),
+    // what the video is for: a business ad, an event, a personal moment, an announcement
+    kind: ['business', 'event', 'personal', 'announcement', 'other'].includes(b.kind) ? b.kind : undefined,
     // goal: one or more; `goal` is them joined (used in prompts and titles), `goals` the list
     goals: list(Array.isArray(b.goals) ? b.goals : Array.isArray(b.goal) ? b.goal : b.goal ? [b.goal] : []).slice(0, 6),
     // main message: one or more (up to 8); `headline` is the first, `headlines` all of them
@@ -167,7 +169,7 @@ export function briefToPlanRules(brief, { assets = [], limits = { minSeconds: 15
     voiceover: b.voiceover ? { enabled: true, source: 'ai', voice_style: 'warm, friendly and confident', captions: true } : { enabled: false },
     cta: ctaLine,
     goal: b.goal || '',
-    special_instructions: [b.extra, b.pasteText && `The business owner's full description (follow it): ${b.pasteText}`].filter(Boolean).join('\n\n'),
+    special_instructions: [b.kind && b.kind !== 'business' ? `This is a ${b.kind} video, not a business advert. Do not add selling language, prices, "order now" or contact calls unless the person asked for them.` : '', b.extra, b.pasteText && `The business owner's full description (follow it): ${b.pasteText}`].filter(Boolean).join('\n\n'),
     sound: b.sound || 'all',
     sfx: b.sound !== 'none',
     music_url: b.sound === 'own' ? (assets.find((a) => a.kind === 'audio' && a.role === 'music') || {}).url || '' : '',
@@ -309,6 +311,16 @@ export function parseBriefRules(text) {
   if (/no (music|sound|audio)|without (music|sound)|silent/i.test(t)) out.sound = 'none';
   else if (/only (sound )?effects|no music/i.test(t)) out.sound = 'sfx';
   if (/voice[- ]?over|narrat/i.test(t)) out.voiceover = !/no (voice|narrat)/i.test(t);
+  // a few words are enough: work out a title and the kind of video even without the AI
+  const KINDS = [[/birthday|b-?day|anniversary/i, 'Birthday', 'personal'], [/wedding|engagement|bridal/i, 'Wedding', 'event'], [/church|ministry|sunday service|revival|crusade|mosque/i, 'Church event', 'event'],
+    [/tribute|in memory|memorial|funeral|rip\b/i, 'Tribute', 'personal'], [/graduat|convocation|school event|prize giving/i, 'Graduation', 'event'], [/announce|programme|program|invitation|invite|save the date/i, 'Announcement', 'announcement']];
+  for (const [re, cat, kind] of KINDS) if (re.test(t)) { out.category = out.category || cat; out.kind = out.kind || kind; break; }
+  if (!out.name) {
+    const first = t.split(/[\n.,;!?]/)[0].replace(/^\s*(?:please\s+)?(?:i\s+(?:want|need|would like)\s+(?:to\s+make\s+)?)?(?:make\s+(?:me\s+)?)?(?:an?\s+)?(?:(?:birthday|wedding|promo|promotional|short|nice|cool)\s+)?(?:video|ad|advert|advertisement|flyer|clip)?\s*(?:for|about|of|on)?\s*(?:my\s+|our\s+|the\s+)?/i, '').trim();
+    if (first.length >= 3) out.name = first.charAt(0).toUpperCase() + str(first, 40).slice(1);
+  }
+  if (!out.aspect) out.aspect = '9:16';
+  if (!out.duration) out.duration = 20;
   out.pasteText = str(t, 6000);   // the whole text also goes to the AI director (kept apart from the last question's answer)
   return out;
 }
@@ -318,18 +330,27 @@ export async function parseBrief(text, current = {}) {
   if (!config.useGemini) return cleanBrief({ ...rules, mode: 'paste' });
   try {
     const { text: out } = await geminiGenerate({
-      system: `You read a business owner's description of the video ad they want and fill in a form. Return JSON only with any of these keys, and ONLY for things the text clearly says (leave everything else out, never invent):
-{ "name": business name, "category": what the business does (2-4 words), "goals": ["..."] (why they want the ad),
-  "headlines": ["..."] (the main messages / slogans for the video, short), "features": ["..."] (selling points, 2-5 words each),
-  "products": ["Product ₦price", ...], "ctas": ["Order on WhatsApp", "Call now", ...] (what viewers should do), "contact": phone / website / address,
-  "aspect": "9:16" | "16:9" | "1:1", "duration": seconds, "voiceover": true/false, "sound": "all" | "sfx" | "none",
-  "extra": any other instructions about the look, scenes, pictures or style, in their words }`,
+      system: `You are a smart video director. A person describes ANY video they want: a business advert, a birthday, a wedding, a church or school event, an announcement, a tribute, a personal story, a promo, a music or lyric video. Read it and fill in a form so they do not have to answer questions. Return JSON only.
+Be smart: work out what they mean from a few words and make sensible choices yourself. Never invent facts (names, dates, places, prices, phone numbers, awards, claims). You MAY write short, warm, natural on-screen lines from what they told you.
+Keys:
+{ "kind": "business" | "event" | "personal" | "announcement" | "other",
+  "name": the title or subject in a few words (a business name, "Tola's 30th Birthday", "Sunday Service", "Our Wedding"), always give one,
+  "category": what it is (2-4 words, e.g. "Birthday", "Wedding", "Church event", "Laptop repairs"),
+  "goals": ["..."] (why they want it), "headlines": ["2-3 short on-screen messages, under 7 words each, written from their idea"],
+  "features": ["..."] (highlights or key points, 2-5 words each; leave out if there are none), "products": ["Item ₦price"] (only if they gave prices),
+  "ctas": ["..."] (the closing line or what viewers should do; for personal videos use something fitting like "Happy birthday!" or "Join us"; only business adverts get a sales call to action),
+  "contact": phone / website / address only if given, "when": date, time and place if given,
+  "aspect": "9:16" | "16:9" | "1:1" (9:16 unless they say otherwise), "duration": seconds (about 20 unless they say otherwise),
+  "voiceover": true/false, "sound": "all" | "sfx" | "none",
+  "extra": any instructions about look, mood, scenes or pictures, in their words }`,
       messages: [{ role: 'user', text: `Already known: ${JSON.stringify({ name: current.name, category: current.category })}\n\nTHEIR TEXT:\n${String(text).slice(0, 6000)}` }],
       json: true, temperature: 0.2, timeoutMs: 50000, maxOutputTokens: 8192, thinking: 'low',
     });
     const g = JSON.parse(out);
     // the AI wins where it found something; rules fill gaps (phone numbers, aspect words); keep the full text for the director
     const merged = { ...rules, ...Object.fromEntries(Object.entries(g).filter(([, v]) => v !== null && v !== '' && !(Array.isArray(v) && !v.length))) };
+    if (!merged.aspect) merged.aspect = '9:16';
+    if (!merged.duration) merged.duration = 20;
     delete merged.extra;   // the last question asks for anything extra; the full text goes to the director as pasteText
     return cleanBrief({ ...merged, mode: 'paste' });
   } catch (e) {
