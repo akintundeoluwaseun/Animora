@@ -18,7 +18,7 @@ const SPRING = { type: 'spring', stiffness: 520, damping: 30, mass: 0.6 };
 export function Button({ as: As = 'button', variant = 'primary', size = 'md', className = '', loading, children, ...rest }) {
   const v = {
     primary: 'bg-danfo text-white hover:bg-danfo-deep',
-    dark: 'bg-ink text-white hover:bg-[#2A2160]',
+    dark: 'bg-ink text-white hover:bg-[#3A2A1F]',
     ghost: 'bg-transparent text-ink hover:bg-ink/5',
     outline: 'bg-white text-ink border border-ink/15 hover:border-ink/35',
     glass: 'bg-white/8 text-white border border-white/15 hover:bg-white/14',
@@ -173,7 +173,7 @@ export function Nav() {
 
 // A short burst of colour when something the person waited for is ready (the MP4). It answers their wait, plays once,
 // and Motion skips it for people who ask their phone for less motion.
-const BURST = ['#5546FF', '#F2691B', '#2FCB93', '#FFC93C', '#B06BFF', '#4F7DFF'];
+const BURST = ['#F2542D', '#1F6F5C', '#2FCB93', '#FFC93C', '#B06BFF', '#4F7DFF'];
 export function Burst({ className = '' }) {
   const bits = Array.from({ length: 22 }, (_, i) => {
     const a = (i / 22) * Math.PI * 2 + (i % 3) * 0.2, d = 70 + (i * 37) % 70;

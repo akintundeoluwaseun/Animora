@@ -140,10 +140,10 @@ export default function Admin() {
       </section>
 
       <section className="mt-5 grid gap-3 md:grid-cols-2" aria-label="Last 30 days">
-        <Bars title="New people" series={data.daily.users} colour="#5546FF" />
+        <Bars title="New people" series={data.daily.users} colour="#F2542D" />
         <Bars title="MP4s finished" series={data.daily.renders} colour="#0E9F6E" />
-        <Bars title="Videos started" series={data.daily.videos} colour="#4F46E5" />
-        <Bars title="Flyers started" series={data.daily.flyers} colour="#F2691B" />
+        <Bars title="Videos started" series={data.daily.videos} colour="#F2542D" />
+        <Bars title="Flyers started" series={data.daily.flyers} colour="#1F6F5C" />
       </section>
 
       <section className="mt-5 grid gap-3 lg:grid-cols-3" aria-label="Details">
