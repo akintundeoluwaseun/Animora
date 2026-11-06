@@ -5,8 +5,8 @@ import { api, naira } from '../lib.jsx';
 import { Button } from '../components/ui.jsx';
 
 const STEPS = [
-  ['Answer a few questions', 'Your business name, what you sell, your message and your pictures. One question at a time.'],
-  ['The AI directs the shots', 'Every ad gets its own concept, moves and transitions. No two videos come out the same.'],
+  ['Describe your video', 'One box, your own words: a birthday, a wedding, an advert. Add photos if you like. Animora works out the rest.'],
+  ['The AI directs the shots', 'Every video gets its own concept, moves and transitions. No two come out the same.'],
   ['Download the MP4', 'Watch the preview, change anything in plain words, then download it for WhatsApp, TikTok or YouTube.'],
 ];
 
@@ -43,9 +43,9 @@ export default function Home() {
       <section className="home-hero">
         <div className="mx-auto grid max-w-[1180px] items-center gap-12 px-6 py-16 sm:px-10 lg:grid-cols-[minmax(0,1fr)_380px] lg:py-24">
           <div>
-            <h1 className="max-w-[14ch] text-[2.75rem] font-bold leading-[1] tracking-[-0.045em] sm:text-[4.25rem]">Motion-design video ads for your business.</h1>
+            <h1 className="max-w-[14ch] text-[2.75rem] font-bold leading-[1] tracking-[-0.045em] sm:text-[4.25rem]">Say it. Animora makes the video.</h1>
             <p className="mt-6 max-w-[46ch] text-lg leading-relaxed text-ink-soft">
-              Tell Animora about your business. Its AI director plans every shot, and you download a finished MP4 in a few minutes. Need something to post or print? It designs flyers too.
+              Birthdays, weddings, church events, announcements, tributes or your business advert. Describe it in your own words and the AI director plans every shot. Download a finished MP4 in minutes. Flyers too.
             </p>
             <div className="mt-9 grid max-w-[520px] gap-3 sm:grid-cols-2">
               <StartCard kind="video" />

@@ -69,20 +69,20 @@ function SiteBar({ onCreate }) {
     on(); window.addEventListener('scroll', on, { passive: true });
     return () => window.removeEventListener('scroll', on);
   }, []);
-  const link = ({ isActive }) => `rounded-lg px-3 py-2 text-[15px] font-medium transition-colors ${isActive ? 'text-ink' : 'text-ink-mute hover:text-ink'}`;
+  const link = ({ isActive }) => `glass-pill px-4 py-2 text-[15px] font-medium ${isActive ? 'glass-pill-on' : ''}`;
   return (
     <header className={`sticky top-0 z-40 transition-colors site-bar ${solid ? 'site-bar-solid' : ''}`}>
       <div className="mx-auto flex h-16 max-w-[1180px] items-center gap-2 px-6 sm:px-10">
-        <Logo />
-        <nav className="ml-8 hidden items-center gap-1 sm:flex" aria-label="Main">
+        <span className="glass-pill glass-brand"><Logo /></span>
+        <nav className="ml-4 hidden items-center gap-1 sm:flex" aria-label="Main">
           <NavLink to="/styles" className={link}>Styles</NavLink>
           <NavLink to="/pricing" className={link}>Pricing</NavLink>
           {!user && <NavLink to="/videos" className={link}>My work</NavLink>}
         </nav>
         <div className="ml-auto flex items-center gap-2">
           <ThemeToggle />
-          {user && <Link to={lastLib()} className="whitespace-nowrap rounded-lg px-2 py-2 text-[15px] font-medium text-ink-soft hover:text-ink sm:px-3">My work</Link>}
-          <button onClick={onCreate} className="press flex h-10 items-center gap-1.5 whitespace-nowrap rounded-[10px] bg-ink px-3.5 text-[15px] font-semibold text-white hover:opacity-90 sm:px-4"><Icon k="plus" size={17} />Create</button>
+          {user && <Link to={lastLib()} className="glass-pill whitespace-nowrap px-4 py-2 text-[15px] font-medium">My work</Link>}
+          <button onClick={onCreate} className="press flex h-10 items-center gap-1.5 whitespace-nowrap rounded-full bg-ink px-3.5 text-[15px] font-semibold text-white hover:opacity-90 sm:px-4"><Icon k="plus" size={17} />Create</button>
         </div>
       </div>
     </header>
@@ -114,7 +114,7 @@ function SiteFooter() {
 const RAIL_LINKS = [
   ['Explore', [['/styles', 'Styles', 'styles'], ['/pricing', 'Pricing', 'pricing']]],
 ];
-const railCls = ({ isActive }) => `group flex items-center gap-3 rounded-[10px] px-3 py-2.5 text-[14.5px] font-medium transition-colors ${isActive ? 'bg-ink text-white' : 'text-ink-soft hover:bg-ink/5 hover:text-ink'}`;
+const railCls = ({ isActive }) => `group flex items-center gap-3 rounded-full px-3 py-2.5 text-[14.5px] font-medium transition-colors ${isActive ? 'bg-ink text-white' : 'text-ink-soft hover:bg-ink/5 hover:text-ink'}`;
 
 function Account() {
   const { user, logout } = useAuth();
@@ -183,7 +183,7 @@ function Rail({ onCreate }) {
       </nav>
       <div className="mt-auto space-y-3 p-4">
         {status?.ai === 'offline' && <p className="rounded-xl border border-ink/10 bg-white p-3 text-xs leading-relaxed text-ink-mute">Practice mode: add a Gemini key for the full AI director.</p>}
-        {inst.can && <button onClick={inst.install} className="flex w-full items-center gap-2 rounded-[10px] border border-ink/12 bg-white px-3 py-2.5 text-sm font-semibold text-ink-soft hover:text-ink">Install the app</button>}
+        {inst.can && <button onClick={inst.install} className="flex w-full items-center gap-2 rounded-full border border-ink/12 bg-white px-3 py-2.5 text-sm font-semibold text-ink-soft hover:text-ink">Install the app</button>}
         <Account />
         <Link to="/" className="block px-1 text-xs text-ink-mute hover:text-ink">About Animora</Link>
         <BuiltBy />

@@ -116,7 +116,7 @@ const QUESTIONS = [
     { v: 'steps', l: 'Ask me one question at a time' },
     { v: 'paste', l: "I'll paste everything at once", d: "Write or paste all your details. I'll only ask what's missing." },
   ], ask: () => "Hi! I'm your Animora director. Let's make your ad. Should I ask you questions one by one, or will you paste all your details at once?" },
-  { id: 'paste', type: 'long', ask: () => "Hi! I'm your Animora director. What video do you want to make? Just tell me in your own words. A sentence is enough, and I'll work out the rest.", placeholder: 'e.g. A birthday video for my sister Tola turning 30, warm and fun, with her photos\n\nor: An ad for my laptop repair shop in Ado Ekiti, call 0807 691 1614',
+  { id: 'paste', type: 'long', ask: () => 'What video do you want to make?', hint: "Just say it in your own words. A sentence is enough and I'll work out the rest.", placeholder: 'e.g. A birthday video for my sister Tola turning 30, warm and fun, with her photos\n\nor: An ad for my laptop repair shop in Ado Ekiti, call 0807 691 1614',
     examples: ['A birthday video for my mum turning 60', 'An ad for my cake business', 'A wedding invitation for 14 December', 'A church programme announcement', 'A tribute to my best friend', 'A promo for my new app'] },
   { id: 'name', type: 'text', ask: () => "What's the video about? A name or title is enough.", placeholder: "e.g. Kemi Cakes, Tola's 30th Birthday, Our Wedding" },
   { id: 'category', type: 'single', options: CATEGORIES, typed: true, ask: (b) => `Nice! What kind of video is "${b.name}"?`, placeholder: 'Or type it, e.g. "laptop repairs" or "birthday"' },
@@ -592,7 +592,7 @@ export default function Plan() {
               <>
                 <h2 className="wiz-q">{q.ask(b)}</h2>
                 {q.type === 'multi' && <p className="wiz-hint">{q.hint || 'Pick one or more, or type your own.'}</p>}
-                {q.type === 'scenes' && <p className="wiz-hint">{q.hint}</p>}
+                {(q.type === 'scenes' || q.id === 'paste') && <p className="wiz-hint">{q.hint}</p>}
                 {(q.type === 'text' || q.type === 'long') && q.placeholder && q.type === 'text' && <p className="wiz-hint">Just type it in the box below.</p>}
                 {q.type === 'long' && q.optional && <p className="wiz-hint">You can skip this one.</p>}
 
