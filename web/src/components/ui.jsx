@@ -7,8 +7,8 @@ import { useInstall } from './InstallApp.jsx';
 
 export function Logo({ light = false }) {
   return (
-    <Link to="/" className="flex items-center gap-2 font-display text-[19px] font-bold tracking-[-0.04em]" aria-label="Animora home">
-      <img src="/animora-mark.png" width="28" height="28" alt="" className="size-7" />
+    <Link to="/" className="flex shrink-0 items-center gap-2.5 whitespace-nowrap font-display text-[20px] font-bold tracking-[-0.04em]" aria-label="Animora home">
+      <img src="/animora-mark.png" width="34" height="34" alt="" className="size-[34px] shrink-0" />
       <span className={light ? 'text-white' : 'text-ink'}>Animora</span>
     </Link>
   );

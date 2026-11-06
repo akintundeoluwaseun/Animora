@@ -73,15 +73,15 @@ function SiteBar({ onCreate }) {
   return (
     <header className={`sticky top-0 z-40 transition-colors site-bar ${solid ? 'site-bar-solid' : ''}`}>
       <div className="mx-auto flex h-16 max-w-[1180px] items-center gap-2 px-6 sm:px-10">
-        <span className="glass-pill glass-brand"><Logo /></span>
+        <Logo />
         <nav className="ml-4 hidden items-center gap-1 sm:flex" aria-label="Main">
           <NavLink to="/styles" className={link}>Styles</NavLink>
           <NavLink to="/pricing" className={link}>Pricing</NavLink>
-          {!user && <NavLink to="/videos" className={link}>My work</NavLink>}
+          {!user && <NavLink to="/videos" className={(s) => `${link(s)} hidden sm:inline-flex`}>My work</NavLink>}
         </nav>
         <div className="ml-auto flex items-center gap-2">
           <ThemeToggle />
-          {user && <Link to={lastLib()} className="glass-pill whitespace-nowrap px-4 py-2 text-[15px] font-medium">My work</Link>}
+          {user && <Link to={lastLib()} className="glass-pill !hidden whitespace-nowrap px-4 py-2 text-[15px] font-medium sm:!inline-flex">My work</Link>}
           <button onClick={onCreate} className="press flex h-10 items-center gap-1.5 whitespace-nowrap rounded-full bg-ink px-3.5 text-[15px] font-semibold text-white hover:opacity-90 sm:px-4"><Icon k="plus" size={17} />Create</button>
         </div>
       </div>
