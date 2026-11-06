@@ -149,11 +149,13 @@ const AFFINITY = [
   [/real estate|property|architect|design|agency|consult|school|education|law|finance|account|photograph|media|brand/i, ['swiss-editorial', 'cinematic-logo', 'type-reactor']],
   [/food|bake|cake|restaurant|cafe|kitchen|chop|grill|drink|juice|catering|pharmacy|clinic|shop|store|market|fresh/i, ['type-reactor', 'swiss-editorial', 'luxury-product']],
 ];
-function pickDirection({ brief, plan, salt, previous, aspect }) {
+// templates that carry the headline, the strengths and the contact (the others are brand stings: logo and name only)
+const CONTENT_TEMPLATES = ['type-reactor', 'luxury-product', 'hud-tech', 'sports-hype', 'swiss-editorial'];
+function pickDirection({ brief, plan, salt, previous, aspect, templatesOnly = false }) {
   const text = [brief.category, brief.name, plan?.business?.category, [].concat(brief.features || []).join(' ')].filter(Boolean).join(' ');
   const fits = new Set(AFFINITY.filter(([re]) => re.test(text)).flatMap(([, ids]) => ids));
   const prev = (String(previous || '').match(/animora-direction:([a-z-]+);/) || [])[1];
-  const options = [...(SIZES[aspect] ? [['mix', 4]] : []), ...(TPL_SIZES[aspect] ? TEMPLATE_IDS.map((id) => [id, fits.has(id) ? 3 : 0.3]) : [])].filter(([id]) => id !== prev);
+  const options = [...(SIZES[aspect] && !templatesOnly ? [['mix', 4]] : []), ...(TPL_SIZES[aspect] ? TEMPLATE_IDS.filter((id) => !templatesOnly || (brief.kind && brief.kind !== 'business' ? ['type-reactor', 'swiss-editorial'] : CONTENT_TEMPLATES).includes(id)).map((id) => [id, fits.has(id) ? 3 : 0.3]) : [])].filter(([id]) => id !== prev);
   const r = mulberry(hashStr(`${brief.name}|${text}|${salt}|dir`) % 2147483647 || 5)();
   let t = r * options.reduce((n, [, w]) => n + w, 0);
   for (const [id, w] of options) { t -= w; if (t <= 0) return id; }
@@ -161,6 +163,11 @@ function pickDirection({ brief, plan, salt, previous, aspect }) {
 }
 export function piecesFilm({ plan = {}, brief = {}, assets = [], style = null, themeColors = {}, salt = '', previous = null }) {
   const aspect = TPL_SIZES[plan.aspect_ratio] ? plan.aspect_ratio : '9:16';
+  // Normal-length videos start from a signature template chosen for the business (kinetic type, chrome, HUD, editorial ...).
+  // The long-form Story engine is for videos over ~35 s, where one template would run out of things to show.
+  const seconds = Number(plan.duration_seconds) || Number(brief.duration) || 20;
+  const autoTemplate = !salt && !isTemplateBrief(brief) && seconds <= 35 && !!TPL_SIZES[aspect] && process.env.ANIMORA_DIRECTOR !== 'story';
+  if (autoTemplate) brief = { ...brief, template: pickDirection({ brief, plan, salt: 'first', previous, aspect, templatesOnly: true }) };
   if (!(!salt && isTemplateBrief(brief)) && process.env.ANIMORA_DIRECTOR !== 'pieces') {
     const out = storyFilm({ plan, brief, assets, style, salt, previous });
     out.html = out.html.replace('</body>', `<!--animora-direction:story-${out.data.story.look.id};--></body>`);

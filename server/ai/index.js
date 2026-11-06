@@ -134,7 +134,7 @@ export async function generateCode({ plan, style, assets, brief = null, previous
   // ANIMORA_ENGINE=motion (or cinema) switches back to the older engines.
   const pieces = CODE_MODE !== 'html' && !['motion', 'cinema'].includes(process.env.ANIMORA_ENGINE) && (PIECES_ASPECTS.includes(planWithAssets.aspect_ratio || '9:16') || ['16:9', '1:1', '4:5'].includes(planWithAssets.aspect_ratio));
   // Premium first: a designer-made template filled with the owner's details (no AI call). ANIMORA_ENGINE=pieces skips it.
-  // The premium recipes script fake chats, notes and messages ("where did u get this??", "i kept settling for bad food"), which invents things the owner never said. Off unless ANIMORA_ENGINE=premium.
+  // Premium recipes (phone-UI scenes) are off unless ANIMORA_ENGINE=premium. They only show the owner's own words; the fake friend-chat template is never auto-picked.
   const premium = CODE_MODE !== 'html' && process.env.ANIMORA_ENGINE === 'premium' && PREMIUM_ASPECTS.includes(planWithAssets.aspect_ratio || '9:16');
   if (premium) {
     try {

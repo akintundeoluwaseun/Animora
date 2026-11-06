@@ -100,6 +100,12 @@ const PATCH = {
 
 // ---- one filler per template: business details -> that template's slots ----
 const FRIENDS = ['Tolu', 'Amaka', 'Chidi', 'Zainab', 'Bisi', 'Ifeoma', 'Kemi', 'Tunde'];
+/** The owner's own facts as the lines of a note, never repeating the headline. */
+function noteLines(f, head) {
+  const seen = new Set([clean(head, 60).toLowerCase()]);
+  return [...points(f), f.offer, f.sub, f.place && `find us in ${f.place}`, f.cta, f.phone || f.link].map((x) => clean(x, 40)).filter(Boolean)
+    .filter((x) => { const k = x.toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true; });
+}
 const BLOCKS = {
   'notification-cascade': {
     meta: mNotif, sfx: { appear: 'ding' }, html: notificationCascade, fits: () => true,
@@ -115,7 +121,7 @@ const BLOCKS = {
     },
   },
   'message-thread-reveal': {
-    meta: mThread, sfx: {}, html: messageThread, fits: (f) => f.photos.length >= 1,
+    meta: mThread, sfx: {}, html: messageThread, fits: () => !!process.env.ANIMORA_FAKE_CHATS,
     fill(f, r) {
       const t = thing(f), p = points(f), friend = FRIENDS[Math.floor(r() * FRIENDS.length)];
       const ec = (f.features.length ? f.features : p).slice(0, 3).map((x) => { const [a, b] = labelValue(x); return b ? `${a}|${b}` : `${a}|`; });
@@ -136,16 +142,17 @@ const BLOCKS = {
     },
   },
   'notes-reveal': {
-    meta: mNotes, sfx: { appear: 'tick' }, html: notesReveal, fits: (f) => f.features.length + f.products.length >= 2,
+    meta: mNotes, sfx: { appear: 'tick' }, html: notesReveal, fits: (f) => noteLines(f, f.heads[0] || f.sub || f.name).length >= 6,
     fill(f) {
-      const t = thing(f), p = points(f), head = f.heads[0] || f.sub || f.name;
+      const p = points(f), head = f.heads[0] || f.sub || f.name;
       const words = clean(head, 40).toUpperCase().split(' ');
+      const cand = noteLines(f, head);
+      const note = (i) => lower1(cand[i] || '') || '\u00a0';
       const checks = p.slice(0, 3).map(labelValue);
-      while (checks.length < 3) checks.push([['CALL', 'NOW'], ['VISIT', 'TODAY'], ['SAVE', 'MORE']][checks.length]);
+      while (checks.length < 3) checks.push([['CALL', 'NOW'], ['VISIT', 'US'], ['ASK', 'US']][checks.length]);
       return {
-        titleL1: 'Things nobody told me', titleL2: t === 'this' ? `about ${clean(f.category || 'this', 24).toLowerCase()}.` : `about ${t}.`,
-        noteLine1: t === 'this' ? 'i kept settling for less' : `i kept settling for bad ${t}`, noteLine2: 'paying too much', noteLine3: 'and getting too little.',
-        noteLine4: `then i found ${clean(f.name, 30)}`, noteLine5: lower1(p[0] || f.sub || head), noteLine6: `${lower1(p[1] || 'the difference is real')} —`, noteLine7: clean(head, 40),
+        titleL1: clean(f.name, 26), titleL2: f.category ? `${clean(f.category, 30).toLowerCase()}.` : '',
+        noteLine1: note(0), noteLine2: note(1), noteLine3: note(2), noteLine4: note(3), noteLine5: note(4), noteLine6: note(5), noteLine7: clean(head, 40),
         cardTop: words.length > 2 ? words.slice(0, Math.ceil(words.length / 2)).join(' ') : 'THE POWER', cardMid: words.length > 2 ? '' : 'OF',
         cardBottom: words.length > 2 ? words.slice(Math.ceil(words.length / 2)).join(' ') : clean(f.name, 20).toUpperCase(),
         check1Label: checks[0][0].toUpperCase(), check1Value: checks[0][1].toUpperCase(), check2Label: checks[1][0].toUpperCase(), check2Value: checks[1][1].toUpperCase(),
@@ -160,8 +167,8 @@ const BLOCKS = {
       const t = thing(f), p = points(f), city = cityOf(f), head = f.heads[0] || f.sub || f.name;
       const bullets = p.slice(0, 3); while (bullets.length < 3) bullets.push([f.cta, f.place && `In ${f.place}`, f.phone && `Call ${f.phone}`].filter(Boolean)[bullets.length] || clean(f.category || f.name, 40));
       return {
-        botName: 'Assistant', userMessage: t === 'this' ? `Who does the best ${clean(f.category || 'service', 30).toLowerCase()}${city ? ` in ${city}` : ''}?` : `Where can I get great ${t}${city ? ` in ${city}` : ''}?`,
-        answer1: clean(`Try ${f.name}. ${f.sub || head}`, 120), answer2: clean(f.offer ? `Right now: ${f.offer}.` : `People keep coming back.`, 60), answer3: 'What you get:',
+        botName: 'Assistant', userMessage: t === 'this' ? `Looking for ${clean(f.category || 'a service', 30).toLowerCase()}${city ? ` in ${city}` : ''}?` : `Where can I get ${t}${city ? ` in ${city}` : ''}?`,
+        answer1: clean(`Try ${f.name}. ${f.sub || head}`, 120), answer2: clean(f.offer ? `Right now: ${f.offer}.` : f.place ? `You'll find them in ${f.place}.` : f.cta ? `${f.cta}.` : '', 60), answer3: 'What you get:',
         bullet1: bullets[0], bullet2: bullets[1], bullet3: bullets[2],
         ecHeadline: halves(head).filter(Boolean).join('|'), ecSub: clean(f.sub || f.category || head, 80), ecCta: clean(f.cta, 24),
         ecFooter: clean(contactLine(f), 40).toUpperCase(), brandLogo: f.logo || wordmark(f.name, '#ffffff'),
