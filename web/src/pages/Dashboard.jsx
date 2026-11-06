@@ -319,7 +319,7 @@ export default function Dashboard({ kind = 'video' }) {   // /videos shows video
           <ol className="mt-6 grid gap-4 sm:grid-cols-3">
             {(kind === 'flyer'
               ? [['Tell me about your business', 'Name, what you sell, your offer. Skip anything you like.'], ['Pick a look', 'Or let Animora choose one that suits you.'], ['Download the picture', 'Ready for WhatsApp, Instagram or print.']]
-              : [['Tell me about your business', 'Name, what you sell, your message, a few pictures.'], ['Watch the preview', 'Change anything by typing it, like "make it red".'], ['Download the MP4', 'With music and sound, ready for WhatsApp, TikTok or Instagram.']]
+              : [['Say what you want', 'A birthday, an invite, a tribute or an ad. One sentence is enough, add photos if you like.'], ['Watch the preview', 'Change anything by typing it, like "make it red".'], ['Download the MP4', 'With music and sound, ready for WhatsApp, TikTok or Instagram.']]
             ).map(([t, d], i) => (
               <li key={t} className="first-run-step">
                 <span className="first-run-num" aria-hidden="true">{i + 1}</span>

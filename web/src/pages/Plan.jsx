@@ -39,7 +39,7 @@ const SCENE_OPTIONS = [
 // The questions are grouped so people always know where they are
 // signature templates (After Effects-style recipes, see server/ai/motion/browser/signature.js)
 const TEMPLATE_OPTS = [
-  { v: 'auto', l: 'Mix my own film', d: 'A new mix of scenes made for your business' },
+  { v: 'auto', l: 'Mix my own film', d: 'A new mix of scenes made for your video' },
   { v: 'type-reactor', l: 'Kinetic Typography', d: 'Big words slam in to the beat' },
   { v: 'luxury-product', l: 'Luxury Product', d: 'Rim light, slow orbit, gold type' },
   { v: 'hud-tech', l: 'Futuristic HUD', d: 'Wireframes, data panels, glowing emblem' },
@@ -131,7 +131,7 @@ const QUESTIONS = [
   { id: 'aspect', type: 'single', options: ASPECT_OPTS, ask: () => 'Where will you post it?' },
   { id: 'duration', type: 'single', options: [15, 20, 25, 30, 40, 45, 60], ask: () => 'How long should it be?', hint: 'Any length works. A longer video gets more scenes, not slower ones.' },
   { id: 'pictures', type: 'upload', optional: true, ask: (b) => (groupOf(b) === 'tech' ? `Add your logo and screenshots of your app, in the order people use it (up to ${MAX_PICS}). The video walks through them one by one.` : `Add your logo and product photos if you have them (up to ${MAX_PICS}). Both are optional. You can also paste a picture with Ctrl+V.`) },
-  { id: 'lookAuto', type: 'single', options: [{ v: 'auto', l: 'Yes, you choose', d: 'Look, colours and sound picked to fit your business' }, { v: 'own', l: "I'll choose myself" }], ask: () => 'Should I choose the look, colours and sound for you?' },
+  { id: 'lookAuto', type: 'single', options: [{ v: 'auto', l: 'Yes, you choose', d: 'Look, colours and sound picked to fit your video' }, { v: 'own', l: "I'll choose myself" }], ask: () => 'Should I choose the look, colours and sound for you?' },
   { id: 'colors', show: (b) => !lookAuto(b), type: 'colors', ask: () => 'Which colours should the video use?' },
   { id: 'style', show: (b) => !lookAuto(b), type: 'style', ask: () => 'Pick a look for your video, or let me choose one that fits.' },
   { id: 'voiceover', type: 'single', options: [{ v: 'female', l: "Yes, a woman's voice", d: 'A natural voice reads your words, with real pauses' }, { v: 'male', l: "Yes, a man's voice", d: 'A natural voice reads your words, with real pauses' }, { v: 'no', l: 'No voice, just sound effects' }], ask: () => 'Do you want a voice in your video?' },
@@ -171,7 +171,7 @@ const FLYER_LAYOUTS = [
   { v: 'photo', l: 'Photo first', d: 'Your picture fills the flyer, text sits on top' },
   { v: 'type', l: 'Big type first', d: 'Huge words, minimal and bold' },
   { v: 'price', l: 'Price first', d: 'A giant price or offer in the middle' },
-  { v: 'auto', l: 'Let the AI decide', d: 'It picks what suits your business' },
+  { v: 'auto', l: 'Let the AI decide', d: 'It picks what suits your video' },
 ];
 const FLYER_QUESTIONS = [
   { id: 'mode', type: 'single', show: () => false, options: QUESTIONS[0].options, ask: QUESTIONS[0].ask },
@@ -702,7 +702,7 @@ export default function Plan() {
                   <div className="mt-6">
                     <button type="button" className="auto-pick press" onClick={() => answer('auto')}>
                       <span className="auto-spark" aria-hidden="true">✦</span>
-                      <span><b>Let the AI choose for me</b><small>It plans the best scenes for your business. Recommended.</small></span>
+                      <span><b>Let the AI choose for me</b><small>It plans the best scenes for your video. Recommended.</small></span>
                     </button>
                     <p className="wiz-sub">Or pick the scenes you want</p>
                     <ScenePicker value={multi} onChange={setMulti} hasPhotos={pics.filter((p) => p.role !== 'logo').length >= 2} />

@@ -143,6 +143,23 @@ export function briefToPlanRules(brief, { assets = [], limits = { minSeconds: 15
   if (photos[1]) add('offer', [b.products[0] || b.headline || b.name], 1, [{ asset: photos[1].name, placement: 'background', fit: 'cover' }]);
   add('cta', [action, phone || site, otherActions.join(' · '), place].filter(Boolean), 1.2, logo ? [{ asset: logo.name, placement: 'corner', fit: 'contain' }] : []);
 
+  // Never show the same line twice: a thin brief used to repeat the name in every scene ("Visit here" x5).
+  {
+    const norm = (x) => String(x || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+    const last = scenes[scenes.length - 1];
+    const ctaKeys = new Set(last.on_screen_text.map(norm));
+    const seen = new Set();
+    for (const s of scenes.slice(0, -1)) {
+      s.on_screen_text = s.on_screen_text.filter((x) => { const k = norm(x); if (!k || seen.has(k)) return false; seen.add(k); return true; });
+    }
+    for (let i = scenes.length - 2; i >= 1; i--) if (!scenes[i].on_screen_text.length) scenes.splice(i, 1);   // keep the opening scene
+    if (!scenes[0].on_screen_text.length) scenes[0].on_screen_text = [action];
+    last.on_screen_text = last.on_screen_text.filter((x) => { const k = norm(x); return k && !(seen.has(k) && ctaKeys.size > 1); });
+    if (!last.on_screen_text.length) last.on_screen_text = [action];
+    // a closing line that is word-for-word the opening one is dropped from the opening scene instead
+    if (scenes.length > 1 && scenes[0].on_screen_text.length === 1 && norm(scenes[0].on_screen_text[0]) === norm(last.on_screen_text[0]) && (b.category || place)) scenes[0].on_screen_text = [b.category || place];
+  }
+
   // More answers = a longer video: every scene gets at least ~3.5 s, up to the plan's maximum length.
   const maxD = limits.maxSeconds || 300;
   D = Math.max(D, Math.min(maxD, Math.ceil((scenes.length * 3.5) / 5) * 5));
