@@ -235,7 +235,7 @@ export async function briefToPlan(brief, { assets = [], limits, palette, style =
   try {
     const images = assets.filter((a) => a.kind === 'image');
     const { text } = await geminiGenerate({
-      system: PLAN_SYSTEM, model: BRIEF_MODEL(), json: true, temperature: 0.7, timeoutMs: 60000,
+      system: PLAN_SYSTEM, model: BRIEF_MODEL(), json: true, temperature: 0.7, timeoutMs: 30000, thinking: 'low', maxOutputTokens: 4096,
       messages: [{ role: 'user', text: `ANSWERS:\n${JSON.stringify({ ...b, step: undefined, done: undefined })}\nVIDEO: ${rules.duration_seconds} seconds, ${rules.aspect_ratio}${style ? `, style "${style.name}"` : ''}\nIMAGES: ${images.length ? images.map((a) => `"${a.name}" (${a.role || 'photo'})`).join(', ') : 'none'}\nNarration: ${b.voiceover ? 'on' : 'off'}` }],
     });
     const g = JSON.parse(String(text).replace(/^```(?:json)?|```$/g, '').trim());
@@ -367,7 +367,8 @@ export async function parseBrief(text, current = {}) {
   const rules = parseBriefRules(text);
   if (!config.useGemini) return cleanBrief({ ...rules, mode: 'paste' });
   try {
-    const { text: out } = await geminiGenerate({
+    // never keep a person waiting: all Gemini attempts together get ~20 s, then the rules reader takes over
+    const { text: out } = await Promise.race([geminiGenerate({
       model: BRIEF_MODEL(),
       system: `You are a smart video director. A person describes ANY video they want: a business advert, a birthday, a wedding, a church or school event, an announcement, a tribute, a personal story, a promo, a music or lyric video. Read it and fill in a form so they do not have to answer questions. Return JSON only.
 Be smart: work out what they mean from a few words and make sensible choices yourself. Never invent facts (names, dates, places, prices, phone numbers, awards, claims). You MAY write short, warm, natural on-screen lines from what they told you.
@@ -383,8 +384,8 @@ Keys:
   "voiceover": true/false, "sound": "all" | "sfx" | "none",
   "extra": any instructions about look, mood, scenes or pictures, in their words }`,
       messages: [{ role: 'user', text: `Already known: ${JSON.stringify({ name: current.name, category: current.category })}\n\nTHEIR TEXT:\n${String(text).slice(0, 6000)}` }],
-      json: true, temperature: 0.2, timeoutMs: 50000, maxOutputTokens: 8192, thinking: 'low',
-    });
+      json: true, temperature: 0.2, timeoutMs: 18000, maxOutputTokens: 4096, thinking: 'low',
+    }), new Promise((_, rej) => setTimeout(() => rej(new Error('Gemini took too long to read the idea')), 20000))]);
     const g = JSON.parse(out);
     // the AI wins where it found something; rules fill gaps (phone numbers, aspect words); keep the full text for the director
     const merged = { ...rules, ...Object.fromEntries(Object.entries(g).filter(([, v]) => v !== null && v !== '' && !(Array.isArray(v) && !v.length))) };
