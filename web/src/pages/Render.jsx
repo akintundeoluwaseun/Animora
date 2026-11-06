@@ -108,6 +108,42 @@ async function shareVideo(render, title) {
   return false;
 }
 
+// Tell friends about Animora: the video (when the device can share files) with a short message and the link.
+const shareText = (title) => `I just made a cool motion-graphics video${title ? ` ("${title}")` : ''} with Animora in minutes. Try it yourself:`;
+async function shareApp(render, title) {
+  const url = window.location.origin;
+  const text = shareText(title);
+  try {
+    if (render?.videoUrl) {
+      const blob = await fetchVideo(render.videoUrl);
+      const file = new File([blob], `${title || 'animora-video'}.mp4`, { type: 'video/mp4' });
+      if (navigator.canShare?.({ files: [file] })) { await navigator.share({ files: [file], title: 'Made with Animora', text: `${text} ${url}` }); return 'shared'; }
+    }
+    if (navigator.share) { await navigator.share({ title: 'Animora', text, url }); return 'shared'; }
+  } catch (e) { if (e?.name === 'AbortError') return 'cancelled'; }
+  try { await navigator.clipboard.writeText(`${text} ${url}`); return 'copied'; } catch { return 'failed'; }
+}
+
+function ShareNudge({ render, title, pulse }) {
+  const [state, setState] = useState('');
+  const go = async () => { setState('busy'); const r = await shareApp(render, title); setState(r); if (r === 'copied') setTimeout(() => setState(''), 3500); };
+  return (
+    <div className={`mt-5 rounded-2xl border p-4 ${pulse ? 'border-danfo/50 bg-danfo/10' : 'border-ink/12 bg-lilac/50'}`}>
+      <div className="flex items-center gap-3">
+        <button type="button" onClick={go} aria-label="Share your video and Animora" className={`press relative flex size-14 shrink-0 items-center justify-center rounded-full bg-ink text-white ${pulse ? 'animate-pulse' : ''}`}>
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><path d="M8.6 10.5l6.8-4M8.6 13.5l6.8 4" /></svg>
+        </button>
+        <div className="min-w-0">
+          <p className="font-extrabold leading-tight text-ink">{pulse ? '👆 Tap here to share it' : 'Share your video'}</p>
+          <p className="mt-0.5 text-sm text-ink-soft">Show friends what you made with Animora. It sends your video and a link so they can try it too.</p>
+        </div>
+      </div>
+      {state === 'copied' && <p className="mt-2 text-sm font-semibold text-money" role="status">Link and message copied. Paste it anywhere.</p>}
+      {state === 'failed' && <p className="mt-2 text-sm text-alert" role="alert">Sharing isn't available here. Copy this page's address and send it instead.</p>}
+    </div>
+  );
+}
+
 export default function Render() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -232,8 +268,9 @@ export default function Render() {
                 {project.plan?.voiceover?.enabled && (script
                   ? <Button variant="outline" size="lg" onClick={downloadScript}>Download narration script</Button>
                   : <Button as={Link} to={`/p/${id}/studio`} variant="outline" size="lg">Open narration script</Button>)}
-                {canShare && <Button variant="outline" size="lg" onClick={async () => setCanShare(await shareVideo(render, project.title))}>Share to WhatsApp</Button>}
+                {canShare && <Button variant="outline" size="lg" onClick={async () => setCanShare(await shareVideo(render, project.title))}>Send video only</Button>}
               </div>
+              {!render.stale && <ShareNudge render={render} title={project.title} pulse={justDone} />}
               {left !== null && (
                 <p className={`mt-4 rounded-xl px-3.5 py-2.5 text-sm font-semibold ${left > 60 ? 'bg-lilac text-ink-soft' : 'bg-alert/10 text-alert'}`} role="status">
                   {left > 0 ? `Download it now: this MP4 is deleted in ${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}. You can make it again for free.` : 'This MP4 is being deleted. Make it again any time, for free.'}

@@ -445,7 +445,7 @@ export default function Plan() {
         bRef.current = { ...(r.project.brief || {}) };
         const next = save({ pasted: true });
         if (r.aiError) setError(`The AI couldn't read all of it (${r.aiError.slice(0, 90)}). I picked up what I could and will ask about the rest.`);
-        setToast(r.found?.length ? `Got it. I found your ${r.found.map((k) => FOUND_LABEL[k] || k).join(', ')}.` : "Got it. I'll ask about the rest."); setTimeout(() => setToast(''), 5000);
+        setToast(r.found?.length ? `Got it. I found your ${r.found.map((k) => (r.project?.brief?.kind && r.project.brief.kind !== 'business' && k === 'name' ? 'title' : k === 'category' && r.project?.brief?.kind !== 'business' ? 'kind of video' : FOUND_LABEL[k] || k)).join(', ')}.` : "Got it. I'll ask about the rest."); setTimeout(() => setToast(''), 5000);
         if (bRef.current.name) {
           setReading(false);
           // the logo and photos matter, so ask for them once (skippable), then make the video without any other question

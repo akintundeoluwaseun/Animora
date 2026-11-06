@@ -251,7 +251,7 @@ r.post('/:id/brief/parse', async (req, res) => {
   const merged = cleanBrief({ ...found, ...Object.fromEntries(Object.entries(current).filter(([, v]) => v !== undefined && v !== '')), pasteText: found.pasteText, mode: 'paste' });
   if (!merged.name) { const nm = text.match(/^\s*([A-Z][\w'&.-]*(?:\s+[A-Z][\w'&.-]*){0,3})\s+(?:is|are|sells|makes|offers|does|runs)\b/); if (nm) merged.name = nm[1].trim(); }
   const u = await one('UPDATE projects SET brief_json=$2, updated_at=now() WHERE id=$1 RETURNING *', [p.id, JSON.stringify(merged)]);
-  res.json({ project: shape(u, { assets: await projectAssets(p.id) }), found: ['name', 'category', 'goals', 'headlines', 'features', 'products', 'ctas', 'contact', 'aspect', 'duration', 'voiceover', 'sound'].filter((k) => found[k] !== undefined && found[k] !== '' && !(Array.isArray(found[k]) && !found[k].length)), aiError });
+  res.json({ project: shape(u, { assets: await projectAssets(p.id) }), found: ['name', 'category', 'goals', 'headlines', 'features', 'products', 'ctas', 'contact', 'payment', 'aspect', 'duration', 'voiceover', 'sound'].filter((k) => found[k] !== undefined && found[k] !== '' && !(Array.isArray(found[k]) && !found[k].length)), aiError });
 });
 
 r.post('/:id/suggest', async (req, res) => {

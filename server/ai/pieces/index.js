@@ -153,11 +153,14 @@ const AFFINITY = [
 // templates that carry the headline, the strengths and the contact (the others are brand stings: logo and name only)
 const CONTENT_TEMPLATES = ['type-reactor', 'luxury-product', 'hud-tech', 'sports-hype', 'swiss-editorial'];
 function pickDirection({ brief, plan, salt, previous, aspect, templatesOnly = false }) {
+  // giant scrolling type cannot show a long name ("COMMUNITY HEALTH INITIATIVE" shows as "IATIVE"), so long names skip that template
+  const longName = String(brief.name || plan?.business?.name || '').split(/\s+/).some((w) => w.length >= 10) || String(brief.name || '').length > 20;
   const text = [brief.category, brief.name, plan?.business?.category, [].concat(brief.features || []).join(' ')].filter(Boolean).join(' ');
   const fits = new Set(AFFINITY.filter(([re]) => re.test(text)).flatMap(([, ids]) => ids));
   const prev = (String(previous || '').match(/animora-direction:([a-z-]+);/) || [])[1];
   const distinct = new Set([...[].concat(brief.headlines || [], brief.headline || []), ...[].concat(brief.features || []), ...[].concat(brief.products || []), brief.category, brief.cta].map((x) => String(x || '').toLowerCase().trim()).filter(Boolean)).size;
-  const options = [...(SIZES[aspect] && !templatesOnly && distinct >= 5 ? [['mix', 4]] : []), ...(TPL_SIZES[aspect] ? TEMPLATE_IDS.filter((id) => !templatesOnly || (brief.kind && brief.kind !== 'business' ? ['type-reactor', 'swiss-editorial'] : CONTENT_TEMPLATES).includes(id)).map((id) => [id, fits.has(id) ? 3 : 0.3]) : [])].filter(([id]) => id !== prev);
+  const options = [...(SIZES[aspect] && !templatesOnly && distinct >= 5 ? [['mix', 4]] : []), ...(TPL_SIZES[aspect] ? TEMPLATE_IDS  .filter((id) => !(longName && id === 'type-reactor'))
+    .filter((id) => !templatesOnly || (brief.kind && brief.kind !== 'business' ? ['type-reactor', 'swiss-editorial'] : CONTENT_TEMPLATES).includes(id)).map((id) => [id, fits.has(id) ? 3 : 0.3]) : [])].filter(([id]) => id !== prev);
   const r = mulberry(hashStr(`${brief.name}|${text}|${salt}|dir`) % 2147483647 || 5)();
   let t = r * options.reduce((n, [, w]) => n + w, 0);
   for (const [id, w] of options) { t -= w; if (t <= 0) return id; }
