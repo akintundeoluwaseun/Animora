@@ -16,6 +16,7 @@ const runtime = () => (RUNTIME ||= ['pieces.js', 'atoms.js', 'pieces2.js', 'prem
 // What the video ends on when nobody wrote a closing line. Only business adverts say "Order now".
 function closingLine(brief = {}) {
   const c = `${brief.category || ''} ${brief.name || ''}`.toLowerCase();
+  if (brief.kind === 'cause') return 'Donate today';
   if (!brief.kind || brief.kind === 'business') return 'Order now';
   if (/birthday|anniversary/.test(c)) return 'Happy birthday';
   if (/wedding|engagement/.test(c)) return 'See you there';
@@ -55,7 +56,7 @@ export function factsOf(plan = {}, brief = {}, assets = []) {
   const features = [].concat(brief.features || []).map((f) => str(f, 34)).filter(Boolean).slice(0, 4);
   const products = [].concat(brief.products || []).map((p) => { const m = String(p).match(/^(.*?)[\s:–-]*((?:₦|N|NGN|\$)\s?[\d,.]+\s?[km]?)\s*$/i); return m ? { title: str(m[1], 34), price: m[2].replace(/^N(?=\d)/, '₦') } : { title: str(p, 34) }; });
   const priced = products.find((p) => p.price);
-  const contact = str(brief.contact, 120), phone = (contact.match(/(\+?\d[\d\s-]{7,}\d)/) || [])[1] || '';
+  const payment = str(brief.payment, 100), contact = payment ? '' : str(brief.contact, 120), phone = payment || (contact.match(/(\+?\d[\d\s-]{7,}\d)/) || [])[1] || '';
   // the address: given, or the part of the contact line that is not a phone number, a handle or a link
   const segs = contact.split(/\s*[·|•;]\s*|\s+-\s+/).map((x) => x.trim()).filter(Boolean);
   const placeSeg = segs.find((x) => !/https?:|www\.|\.com|@/i.test(x) && /\b(street|st|road|rd|way|avenue|ave|lagos|abuja|ibadan|lekki|ikeja|island|close|estate|plaza|mall|area|crescent|junction|opposite|beside|gra|phase|market|shop|suite|floor|off)\b/i.test(x))
@@ -155,7 +156,8 @@ function pickDirection({ brief, plan, salt, previous, aspect, templatesOnly = fa
   const text = [brief.category, brief.name, plan?.business?.category, [].concat(brief.features || []).join(' ')].filter(Boolean).join(' ');
   const fits = new Set(AFFINITY.filter(([re]) => re.test(text)).flatMap(([, ids]) => ids));
   const prev = (String(previous || '').match(/animora-direction:([a-z-]+);/) || [])[1];
-  const options = [...(SIZES[aspect] && !templatesOnly ? [['mix', 4]] : []), ...(TPL_SIZES[aspect] ? TEMPLATE_IDS.filter((id) => !templatesOnly || (brief.kind && brief.kind !== 'business' ? ['type-reactor', 'swiss-editorial'] : CONTENT_TEMPLATES).includes(id)).map((id) => [id, fits.has(id) ? 3 : 0.3]) : [])].filter(([id]) => id !== prev);
+  const distinct = new Set([...[].concat(brief.headlines || [], brief.headline || []), ...[].concat(brief.features || []), ...[].concat(brief.products || []), brief.category, brief.cta].map((x) => String(x || '').toLowerCase().trim()).filter(Boolean)).size;
+  const options = [...(SIZES[aspect] && !templatesOnly && distinct >= 5 ? [['mix', 4]] : []), ...(TPL_SIZES[aspect] ? TEMPLATE_IDS.filter((id) => !templatesOnly || (brief.kind && brief.kind !== 'business' ? ['type-reactor', 'swiss-editorial'] : CONTENT_TEMPLATES).includes(id)).map((id) => [id, fits.has(id) ? 3 : 0.3]) : [])].filter(([id]) => id !== prev);
   const r = mulberry(hashStr(`${brief.name}|${text}|${salt}|dir`) % 2147483647 || 5)();
   let t = r * options.reduce((n, [, w]) => n + w, 0);
   for (const [id, w] of options) { t -= w; if (t <= 0) return id; }

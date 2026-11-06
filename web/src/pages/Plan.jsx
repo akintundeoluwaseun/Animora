@@ -53,19 +53,20 @@ const INTENSITY_OPTS = [
   { v: 'auto', l: "The template's own feel" }, { v: 'elegant', l: 'Elegant', d: 'Smooth and calm' }, { v: 'aggressive', l: 'Aggressive', d: 'Fast, punchy cuts' },
   { v: 'mechanical', l: 'Mechanical', d: 'Precise, techy moves' }, { v: 'fluid', l: 'Fluid', d: 'Flowing, liquid moves' },
 ];
-const GROUP_OF = { template: 'Look and feel', intensity: 'Look and feel', mode: 'Start', paste: 'Start', flyerType: 'Your business', offer: 'Your message', when: 'Your message', layout: 'Look and feel', name: 'Your business', category: 'Your business', goal: 'Your business', headline: 'Your message', features: 'Your message', products: 'Your message', cta: 'Your message', contact: 'Your message', aspect: 'Format', duration: 'Format', pictures: 'Look and feel', colors: 'Look and feel', style: 'Look and feel', scenes: 'Look and feel', voiceover: 'Finish', sound: 'Finish', extra: 'Finish' };
+const GROUP_OF = { template: 'Look and feel', intensity: 'Look and feel', mode: 'Start', paste: 'Start', flyerType: 'Your business', offer: 'Your message', when: 'Your message', layout: 'Look and feel', name: 'Your business', category: 'Your business', goal: 'Your business', headline: 'Your message', payment: 'Your message', features: 'Your message', products: 'Your message', cta: 'Your message', contact: 'Your message', aspect: 'Format', duration: 'Format', pictures: 'Look and feel', colors: 'Look and feel', style: 'Look and feel', scenes: 'Look and feel', voiceover: 'Finish', sound: 'Finish', extra: 'Finish' };
 
 const MAX_PICS = 10;
 
-const CATEGORIES = ['Birthday', 'Wedding', 'Church or ministry', 'Announcement', 'Personal story or tribute', 'Food & drinks', 'Fashion & clothing', 'Beauty & salon', 'Tech & software', 'Finance & payments', 'Health & fitness', 'Real estate', 'Events & parties', 'School & training', 'Shop & retail', 'Services'];
+const CATEGORIES = ['Fundraiser or donation', 'Birthday', 'Wedding', 'Church or ministry', 'Announcement', 'Personal story or tribute', 'Food & drinks', 'Fashion & clothing', 'Beauty & salon', 'Tech & software', 'Finance & payments', 'Health & fitness', 'Real estate', 'Events & parties', 'School & training', 'Shop & retail', 'Services'];
 const GOALS = ['Promote a sale or offer', 'Launch something new', 'Get more orders or bookings', 'Make people know my brand', 'Announce an event'];
+const CAUSE_CTAS = ['Donate today', 'Give what you can', 'Share this video', 'Join us', 'Volunteer with us'];
 const CTAS = ['Order on WhatsApp', 'Call now', 'Visit our website', 'Visit our store', 'Download the app', 'Book now', 'DM us on Instagram'];
 const ASPECT_OPTS = [
   { v: '9:16', l: 'Portrait 9:16', d: 'WhatsApp Status · TikTok · Reels' },
   { v: '16:9', l: 'Landscape 16:9', d: 'YouTube · TV · websites' },
   { v: '1:1', l: 'Square 1:1', d: 'Instagram & Facebook feed' },
 ];
-const FOUND_LABEL = { name: 'business name', category: 'business type', goals: 'goal', headlines: 'message', features: 'selling points', products: 'products', ctas: 'call to action', contact: 'contact', aspect: 'format', duration: 'length', voiceover: 'voice-over choice', sound: 'sound choice' };
+const FOUND_LABEL = { payment: 'donation account', name: 'business name', category: 'business type', goals: 'goal', headlines: 'message', features: 'selling points', products: 'products', ctas: 'call to action', contact: 'contact', aspect: 'format', duration: 'length', voiceover: 'voice-over choice', sound: 'sound choice' };
 const EXTRA_CHIPS = ['Zoom into my logo at the start', 'Make the price really big', 'Keep it calm and premium', 'Make it loud and energetic', 'Show my photos more'];
 
 // How long the answers need: an opening, one shot per message, about two selling points or products per shot,
@@ -89,6 +90,7 @@ export function lengthWarning(b, v) {
 // Each kind of business gets its own path: the questions that matter for it, worded for it. The rest are skipped.
 const groupOf = (b) => {
   const c = `${b.category || ''} ${b.name || ''}`.toLowerCase();
+  if (b.kind === 'cause' || /donat|fundrais|charity|appeal|\bngo\b|foundation|relief/.test(c)) return 'cause';
   if (/tech|software|app|saas|website|digital/.test(c)) return 'tech';
   if (/event|party|wedding|birthday|anniversary|concert|church|ministry|conference|program|invitation|funeral|graduation/.test(c)) return 'event';
   if (/real estate|property|propert|house|land|apartment|rent/.test(c)) return 'property';
@@ -120,14 +122,15 @@ const QUESTIONS = [
     examples: ['A birthday video for my mum turning 60', 'An ad for my cake business', 'A wedding invitation for 14 December', 'A church programme announcement', 'A tribute to my best friend', 'A promo for my new app'] },
   { id: 'name', type: 'text', ask: () => "What's the video about? A name or title is enough.", placeholder: "e.g. Kemi Cakes, Tola's 30th Birthday, Our Wedding" },
   { id: 'category', type: 'single', options: CATEGORIES, typed: true, ask: (b) => `Nice! What kind of video is "${b.name}"?`, placeholder: 'Or type it, e.g. "laptop repairs" or "birthday"' },
-  { id: 'goal', type: 'multi', max: 6, show: (b) => groupOf(b) !== 'event', options: GOALS, typed: true, ask: () => "What's the goal of this ad?", placeholder: 'Or type your own goal' },
-  { id: 'headline', type: 'multi', max: 8, suggest: 'headline', typed: true, ask: () => "What's the main message of your ad?", hint: 'Pick as many as you like, or type your own. More messages make a longer video.', placeholder: 'Add your own message' },
-  { id: 'features', type: 'multi', max: 8, suggest: 'features', typed: true, optional: true, ask: (b) => `What makes ${b.name} stand out?`, hint: 'Pick as many as you like, or type your own.', placeholder: 'Add your own' },
+  { id: 'goal', type: 'multi', max: 6, show: (b) => !['event', 'cause'].includes(groupOf(b)), options: GOALS, typed: true, ask: () => "What's the goal of this ad?", placeholder: 'Or type your own goal' },
+  { id: 'headline', type: 'multi', max: 8, suggest: 'headline', typed: true, ask: (b) => (groupOf(b) === 'cause' ? 'What should people know about this cause?' : "What's the main message of your ad?"), hint: 'Pick as many as you like, or type your own. More messages make a longer video.', placeholder: 'Add your own message' },
+  { id: 'features', type: 'multi', max: 8, suggest: 'features', typed: true, optional: true, ask: (b) => (groupOf(b) === 'cause' ? 'What will the money do? A few points.' : `What makes ${b.name} stand out?`), hint: 'Pick as many as you like, or type your own.', placeholder: 'Add your own' },
   { id: 'steps', type: 'long', optional: true, show: (b) => groupOf(b) === 'tech', ask: (b) => `Walk me through ${b.name || 'your app'}: what does someone do, step by step? One step per line. Add your screenshots in the same order next.`, placeholder: 'Sign up in seconds\nAdd your tasks\nGet reminders\nShare with your team' },
   { id: 'when', type: 'text', optional: true, show: (b) => groupOf(b) === 'event', ask: () => 'When and where is it? Date, time and venue.', placeholder: 'Sat 14 Dec, 4pm · Civic Centre, Ado Ekiti' },
-  { id: 'products', type: 'long', optional: true, show: (b) => !['tech', 'event'].includes(groupOf(b)), ask: (b) => (PRODUCT_ASK[groupOf(b)] || PRODUCT_ASK.shop)(b), placeholder: 'Jollof rice ₦2,500\nFried rice ₦2,800\nSmall chops ₦1,500', placeholderFor: (b) => PRODUCT_HINT[groupOf(b)] },
-  { id: 'cta', type: 'multi', max: 5, options: CTAS, typed: true, ask: () => 'What should people do after watching?', placeholder: 'Or type your own, e.g. "Send us a DM"' },
-  { id: 'contact', type: 'text', optional: true, ask: () => 'Your phone number, website or address for the end of the video?', placeholder: '0803 123 4567 · www.yoursite.com · 12 Allen Ave, Ikeja' },
+  { id: 'products', type: 'long', optional: true, show: (b) => !['tech', 'event', 'cause'].includes(groupOf(b)), ask: (b) => (PRODUCT_ASK[groupOf(b)] || PRODUCT_ASK.shop)(b), placeholder: 'Jollof rice ₦2,500\nFried rice ₦2,800\nSmall chops ₦1,500', placeholderFor: (b) => PRODUCT_HINT[groupOf(b)] },
+  { id: 'cta', type: 'multi', max: 5, options: CTAS, optionsFor: (b) => (groupOf(b) === 'cause' ? CAUSE_CTAS : CTAS), typed: true, ask: () => 'What should people do after watching?', placeholder: 'Or type your own, e.g. "Send us a DM"' },
+  { id: 'payment', type: 'long', show: (b) => groupOf(b) === 'cause', ask: () => 'Where should donations go? Bank, account number and account name.', hint: 'This is shown on screen exactly as you type it, as an account to give to (not as a phone number).', placeholder: 'GTBank · 0123456789 · Community Health Initiative' },
+  { id: 'contact', type: 'text', optional: true, show: (b) => groupOf(b) !== 'cause', ask: () => 'Your phone number, website or address for the end of the video?', placeholder: '0803 123 4567 · www.yoursite.com · 12 Allen Ave, Ikeja' },
   { id: 'aspect', type: 'single', options: ASPECT_OPTS, ask: () => 'Where will you post it?' },
   { id: 'duration', type: 'single', options: [15, 20, 25, 30, 40, 45, 60], ask: () => 'How long should it be?', hint: 'Any length works. A longer video gets more scenes, not slower ones.' },
   { id: 'pictures', type: 'upload', optional: true, ask: (b) => (groupOf(b) === 'tech' ? `Add your logo and screenshots of your app, in the order people use it (up to ${MAX_PICS}). The video walks through them one by one.` : `Add your logo and product photos if you have them (up to ${MAX_PICS}). Both are optional. You can also paste a picture with Ctrl+V.`) },
@@ -519,7 +522,7 @@ export default function Plan() {
   const shownQs = visible.map((qq, i) => ({ qq, i })).filter(({ qq }) => !(qq.show && !qq.show(b)));
   const finished = step >= visible.length;
   const pos = finished ? shownQs.length : Math.max(0, shownQs.findIndex(({ i }) => i === step));
-  const opts = q?.suggest ? (suggestions[q.id] || []) : q?.options || [];
+  const opts = q?.suggest ? (suggestions[q.id] || []) : (q?.optionsFor ? q.optionsFor(b) : q?.options) || [];
   const group = q ? GROUP_OF[q.id] : 'Finish';
   const groups = [...new Set(shownQs.map(({ qq }) => GROUP_OF[qq.id] || 'Start'))];
   const isFirst = shownQs.length ? shownQs[0].i === step : true;

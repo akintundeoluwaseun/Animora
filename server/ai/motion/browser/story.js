@@ -1009,7 +1009,9 @@
         tl.fromTo(glow, { scale: 0.85, opacity: 0 }, { scale: 1.15, opacity: 1, duration: d, ease: 'none' }, t);
         const leftA = v === 'left' && !land;
         const mk = (port ? 200 : 160) * TU;
-        const contacts = [data.phone && [data.whatsapp ? 'chat' : 'phone', data.phone], data.link && ['globe', data.link], data.place && ['pin', data.place]].filter(Boolean);
+        const contacts = [data.phone && [data.whatsapp ? 'chat' : 'phone', data.phone], data.link && ['globe', data.link], data.place && ['pin', data.place]].filter(Boolean)
+          // a long line such as "Bank · account number · account name" is stacked, one part per row, so it never runs off the screen
+          .flatMap(([ic, text]) => (String(text).includes(' · ') && String(text).length > 24 ? String(text).split(' · ').map((x, k) => [k ? '' : ic, x]) : [[ic, text]]));
         // measure the stack first so it sits centred
         const nameW = land ? W * 0.7 : CW;
         const nb = textBlock(Lr, cfg.brand, { w: nameW, size: (port ? 96 : 88) * TU, min: 40 * TU, maxLines: 2, color: S.ink, upper: L0.upper, align: leftA ? 'left' : 'center', css: leftA ? `left:${M}px;top:0` : `left:${(W - nameW) / 2}px;top:0` });
@@ -1052,7 +1054,7 @@
         y += btnH + gap;
         contacts.forEach(([ic, text], i) => {
           const row = el('div', `position:absolute;${leftA ? `left:${M}px` : 'left:0;right:0;justify-content:center'};top:${y + i * 64 * TU}px;display:flex;align-items:center;gap:${16 * U}px;font-family:${ui};font-weight:600;font-size:${(port ? 38 : 34) * TU}px;color:${S.ink};white-space:nowrap;`, Lr);
-          row.innerHTML = icon(ic, 38 * TU, S.acc, 2) + `<span>${esc(text)}</span>`;
+          row.innerHTML = (ic ? icon(ic, 38 * TU, S.acc, 2) : '') + `<span>${esc(text)}</span>`;
           fadeUp(row, tb + 0.4 + i * 0.15);
         });
         if (data.note) {   // a small closing line, e.g. "This video was made with Animora"

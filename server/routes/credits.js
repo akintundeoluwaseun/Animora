@@ -139,4 +139,30 @@ r.post('/devices/link', requireAuth, async (req, res) => {
   res.json({ user: publicUser(await loadUser(to)), linked: true });
 });
 
+// How many devices share this account (so the page can offer "Unlink this device").
+r.get('/devices', requireAuth, async (req, res) => {
+  const key = req.get('x-animora-key');
+  if (!validKey(key)) return res.json({ count: 1, canUnlink: false });
+  const row = await one('SELECT count(*)::int AS n FROM device_keys WHERE user_id=$1', [req.user.id]);
+  const owner = await one('SELECT 1 AS x FROM users WHERE id=$1 AND device_key_hash IS NOT NULL', [req.user.id]);
+  const count = (row?.n || 0) + (owner ? 1 : 0);
+  res.json({ count, canUnlink: count > 1 });
+});
+
+// This device leaves the shared account and starts empty. The videos stay on the other devices.
+r.post('/devices/unlink', requireAuth, async (req, res) => {
+  const key = req.get('x-animora-key');
+  if (!validKey(key)) return res.status(400).json({ error: 'Please reload Animora and try again.' });
+  const h = keyHash(key);
+  const row = await one('SELECT count(*)::int AS n FROM device_keys WHERE user_id=$1', [req.user.id]);
+  const owner = await one('SELECT 1 AS x FROM users WHERE id=$1 AND device_key_hash IS NOT NULL', [req.user.id]);
+  if ((row?.n || 0) + (owner ? 1 : 0) < 2) return res.status(400).json({ error: 'This is the only device on this account, so there is nothing to unlink from.' });
+  await tx(async (t) => {
+    await t.q('DELETE FROM device_keys WHERE key_hash=$1', [h]);
+    await t.q('UPDATE users SET device_key_hash=NULL WHERE id=$1 AND device_key_hash=$2', [req.user.id, h]);
+  });
+  forgetDevice(key);
+  res.json({ unlinked: true });
+});
+
 export default r;

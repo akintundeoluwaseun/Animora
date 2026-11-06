@@ -67,6 +67,10 @@ function OtherDevice({ onLinked }) {
   const [msg, setMsg] = useState('');
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
+  const [info, setInfo] = useState({ count: 1, canUnlink: false });
+  const [sure, setSure] = useState(false);
+  useEffect(() => { if (open) api('/devices').then(setInfo).catch(() => {}); setSure(false); }, [open]);
+  const unlink = async () => { setBusy(true); setError(''); try { await api('/devices/unlink', { method: 'POST' }); window.location.assign('/videos'); } catch (e) { setError(e.message); setBusy(false); } };
   useEffect(() => { if (!code) return undefined; const t = setInterval(() => setLeft((s) => { if (s <= 1) { setCode(null); return 0; } return s - 1; }), 1000); return () => clearInterval(t); }, [code]);
   const make = async () => { setError(''); try { const r = await api('/devices/code', { method: 'POST' }); setCode(r.code); setLeft(r.minutes * 60); } catch (e) { setError(e.message); } };
   const link = async () => {
@@ -106,6 +110,15 @@ function OtherDevice({ onLinked }) {
         {msg && <p className="mt-3 text-sm font-semibold text-money" role="status">{msg}</p>}
         {error && <p className="mt-3 text-sm text-alert" role="alert">{publicMessage(error)}</p>}
         <button onClick={copyLink} className="mt-4 text-xs font-semibold text-ink-mute hover:text-ink">{copied ? 'Private link copied' : 'Or copy a private link instead'}</button>
+        {info.canUnlink && (
+          <div className="mt-5 rounded-[16px] border border-alert/30 p-4">
+            <p className="font-semibold text-ink">Linked to {info.count - 1} other device{info.count - 1 === 1 ? '' : 's'}</p>
+            <p className="mt-1 text-sm text-ink-soft">Unlink this device to stop seeing the shared videos here. It starts empty, and the videos stay on the other devices.</p>
+            {sure
+              ? <div className="mt-3 flex gap-2"><Button className="flex-1" onClick={unlink} loading={busy}>Yes, unlink this device</Button><button onClick={() => setSure(false)} className="px-3 text-sm font-semibold text-ink-soft">Cancel</button></div>
+              : <button onClick={() => setSure(true)} className="mt-3 text-sm font-bold text-alert hover:underline">Unlink this device</button>}
+          </div>
+        )}
       </Modal>
     </>
   );

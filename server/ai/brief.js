@@ -11,6 +11,19 @@ import { WANT_IDS } from './cinema/compose.js';
 import { MOTION_WANTS } from './motion/compose.js';
 import { TEMPLATE_IDS } from './pieces/index.js';
 
+// fundraisers, donations and appeals
+export const CAUSE_RE = /donat|fundrais|charity|appeal\b|\bngo\b|foundation|relief fund|crowdfund|help us (raise|build|support)|sponsor (a|our)|\bgive (to|today)|support (our|the) (cause|community|school|clinic|orphan)/i;
+const BANKS = 'access|gtb(?:ank)?|guaranty trust|zenith|uba|united bank|first ?bank|fidelity|fcmb|sterling|stanbic|wema|union|polaris|keystone|ecobank|opay|palm ?pay|kuda|moniepoint|providus|jaiz|taj|titan|globus|lotus|carbon|paga';
+/** "GTBank 0123456789 Community Health Initiative" from free text: bank + 10-digit account number + account name. */
+export function findPayment(text) {
+  const t = String(text || '');
+  const m = t.match(new RegExp(`(?:acc(?:ount)?(?:\\s*(?:no|num|number))?\\.?\\s*[:\\-]?\\s*)(\\d{10})\\b`, 'i')) || t.match(/\b(\d{10})\b(?=[^\n]{0,40}\b(?:bank|acct|account)\b)/i) || t.match(new RegExp(`\\b(?:${BANKS})\\b[^\\n\\d]{0,20}(\\d{10})\\b`, 'i'));
+  if (!m) return '';
+  const num = m[1];
+  const bank = (t.match(new RegExp(`\\b(${BANKS})(?:\\s*bank)?\\b`, 'i')) || [])[0] || '';
+  const nm = (t.match(/(?:account\s*name|acct\s*name|name)\s*[:\-]\s*([^\n,;.]{3,50})/i) || [])[1] || '';
+  return [bank.replace(/\s+/g, ' ').trim(), num, nm.trim()].filter(Boolean).join(' · ');
+}
 const PHONE_RE = /(\+?234[\s-]?|0)[789][01]\d[\s-]?\d{3}[\s-]?\d{4}/;
 const URL_RE = /\b((?:https?:\/\/)?(?:www\.)?[a-z0-9-]+\.(?:com|ng|com\.ng|space|app|io|co|org|net|store|shop)(?:\/\S*)?)\b/i;
 // cut at a whole word, never in the middle of one ("This flyer was mad", "fix your devi")
@@ -26,7 +39,9 @@ export function cleanBrief(b = {}) {
   const out = {
     name: str(b.name, 60), category: str(b.category, 60),
     // what the video is for: a business ad, an event, a personal moment, an announcement
-    kind: ['business', 'event', 'personal', 'announcement', 'other'].includes(b.kind) ? b.kind : undefined,
+    kind: ['business', 'event', 'personal', 'announcement', 'cause', 'other'].includes(b.kind) ? b.kind : (CAUSE_RE.test(`${b.category || ''} ${b.name || ''}`) ? 'cause' : undefined),
+    // fundraising: where gifts go (bank, account number, account name). Shown exactly as written, never treated as a phone number.
+    payment: str(b.payment, 120),
     // goal: one or more; `goal` is them joined (used in prompts and titles), `goals` the list
     goals: list(Array.isArray(b.goals) ? b.goals : Array.isArray(b.goal) ? b.goal : b.goal ? [b.goal] : []).slice(0, 6),
     // main message: one or more (up to 8); `headline` is the first, `headlines` all of them
@@ -122,10 +137,11 @@ export function briefToPlanRules(brief, { assets = [], limits = { minSeconds: 15
   const images = assets.filter((a) => a.kind === 'image');
   const logo = images.find((a) => a.role === 'logo');
   const photos = images.filter((a) => a.role !== 'logo');
-  const phone = (b.contact || '').match(PHONE_RE)?.[0] || '';
-  const site = (b.contact || '').match(URL_RE)?.[0] || '';
-  const place = str((b.contact || '').replace(phone, '').replace(site, '').replace(/^[\s,·|-]+|[\s,·|-]+$/g, ''), 60);
-  const action = b.cta || (phone ? 'Call or WhatsApp us' : site ? 'Visit our website' : 'Contact us today');
+  const pay = b.payment || '';
+  const phone = pay || (b.contact || '').match(PHONE_RE)?.[0] || '';
+  const site = pay ? '' : (b.contact || '').match(URL_RE)?.[0] || '';
+  const place = pay ? '' : str((b.contact || '').replace(phone, '').replace(site, '').replace(/^[\s,·|-]+|[\s,·|-]+$/g, ''), 60);
+  const action = b.cta || (pay || b.kind === 'cause' ? 'Donate today' : phone ? 'Call or WhatsApp us' : site ? 'Visit our website' : 'Contact us today');
   const otherActions = (b.ctas || []).slice(1);
   const ctaLine = [[action, ...otherActions].join(' or '), phone || site].filter(Boolean).join(' ');
 
@@ -186,7 +202,7 @@ export function briefToPlanRules(brief, { assets = [], limits = { minSeconds: 15
     voiceover: b.voiceover ? { enabled: true, source: 'ai', voice_style: 'warm, friendly and confident', captions: true } : { enabled: false },
     cta: ctaLine,
     goal: b.goal || '',
-    special_instructions: [b.kind && b.kind !== 'business' ? `This is a ${b.kind} video, not a business advert. Do not add selling language, prices, "order now" or contact calls unless the person asked for them.` : '', b.extra, b.pasteText && `The business owner's full description (follow it): ${b.pasteText}`].filter(Boolean).join('\n\n'),
+    special_instructions: [b.kind === 'cause' ? 'This is a fundraising video for a cause, not a business advert. Never invent statistics, quotes, ratings, stars, reviews or testimonials, and never present the organiser\'s own words as a customer review. Show the account details exactly as given, as an account to give to (never as a phone number to call). Speak about the cause and the people it helps.' : b.kind && b.kind !== 'business' ? `This is a ${b.kind} video, not a business advert. Do not add selling language, prices, "order now" or contact calls unless the person asked for them.` : '', b.extra, b.pasteText && `The business owner's full description (follow it): ${b.pasteText}`].filter(Boolean).join('\n\n'),
     sound: b.sound || 'all',
     sfx: b.sound !== 'none',
     music_url: b.sound === 'own' ? (assets.find((a) => a.kind === 'audio' && a.role === 'music') || {}).url || '' : '',
@@ -329,15 +345,16 @@ export function parseBriefRules(text) {
   else if (/only (sound )?effects|no music/i.test(t)) out.sound = 'sfx';
   if (/voice[- ]?over|narrat/i.test(t)) out.voiceover = !/no (voice|narrat)/i.test(t);
   // a few words are enough: work out a title and the kind of video even without the AI
-  const KINDS = [[/birthday|b-?day|anniversary/i, 'Birthday', 'personal'], [/wedding|engagement|bridal/i, 'Wedding', 'event'], [/church|ministry|sunday service|revival|crusade|mosque/i, 'Church event', 'event'],
+  const KINDS = [[CAUSE_RE, 'Fundraiser', 'cause'], [/birthday|b-?day|anniversary/i, 'Birthday', 'personal'], [/wedding|engagement|bridal/i, 'Wedding', 'event'], [/church|ministry|sunday service|revival|crusade|mosque/i, 'Church event', 'event'],
     [/tribute|in memory|memorial|funeral|rip\b/i, 'Tribute', 'personal'], [/graduat|convocation|school event|prize giving/i, 'Graduation', 'event'], [/announce|programme|program|invitation|invite|save the date/i, 'Announcement', 'announcement']];
   for (const [re, cat, kind] of KINDS) if (re.test(t)) { out.category = out.category || cat; out.kind = out.kind || kind; break; }
   if (!out.name) {
-    const first = t.split(/[\n.,;!?]/)[0].replace(/^\s*(?:please\s+)?(?:i\s+(?:want|need|would like)\s+(?:to\s+make\s+)?)?(?:make\s+(?:me\s+)?)?(?:an?\s+)?(?:(?:birthday|wedding|promo|promotional|short|nice|cool)\s+)?(?:video|ad|advert|advertisement|flyer|clip)?\s*(?:for|about|of|on)?\s*(?:my\s+|our\s+|the\s+)?/i, '').trim();
+    const first = t.split(/[\n.,;!?]/)[0].replace(/^\s*(?:please\s+)?(?:i\s+(?:want|need|would like)\s+(?:to\s+make\s+)?)?(?:make\s+(?:me\s+)?)?(?:an?\s+)?(?:(?:birthday|wedding|promo|promotional|short|nice|cool|donation|donations|fundraising|fundraiser|charity|appeal)\s+)?(?:video|ad|advert|advertisement|flyer|clip)?\s*(?:for|about|of|on)?\s*(?:my\s+|our\s+|the\s+)?/i, '').trim();
     if (first.length >= 3) out.name = first.charAt(0).toUpperCase() + str(first, 40).slice(1);
   }
   if (!out.aspect) out.aspect = '9:16';
   if (!out.duration) out.duration = 20;
+  const pay = findPayment(t); if (pay) { out.payment = pay; out.kind = out.kind || 'cause'; out.category = out.category || 'Fundraiser'; }
   out.pasteText = str(t, 6000);   // the whole text also goes to the AI director (kept apart from the last question's answer)
   return out;
 }
@@ -350,13 +367,13 @@ export async function parseBrief(text, current = {}) {
       system: `You are a smart video director. A person describes ANY video they want: a business advert, a birthday, a wedding, a church or school event, an announcement, a tribute, a personal story, a promo, a music or lyric video. Read it and fill in a form so they do not have to answer questions. Return JSON only.
 Be smart: work out what they mean from a few words and make sensible choices yourself. Never invent facts (names, dates, places, prices, phone numbers, awards, claims). You MAY write short, warm, natural on-screen lines from what they told you.
 Keys:
-{ "kind": "business" | "event" | "personal" | "announcement" | "other",
+{ "kind": "business" | "event" | "personal" | "announcement" | "cause" | "other"  (cause = a donation, fundraiser, charity or community appeal),
   "name": the title or subject in a few words (a business name, "Tola's 30th Birthday", "Sunday Service", "Our Wedding"), always give one,
   "category": what it is (2-4 words, e.g. "Birthday", "Wedding", "Church event", "Laptop repairs"),
   "goals": ["..."] (why they want it), "headlines": ["2-3 short on-screen messages, under 7 words each, written from their idea"],
   "features": ["..."] (highlights or key points, 2-5 words each; leave out if there are none), "products": ["Item ₦price"] (only if they gave prices),
-  "ctas": ["..."] (the closing line or what viewers should do; for personal videos use something fitting like "Happy birthday!" or "Join us"; only business adverts get a sales call to action),
-  "contact": phone / website / address only if given, "when": date, time and place if given,
+  "ctas": ["..."] (the closing line or what viewers should do; for personal videos use something fitting like "Happy birthday!" or "Join us"; a cause gets "Donate today" or "Give what you can"; only business adverts get a sales call to action),
+  "contact": phone / website / address only if given (never an account number), "payment": for a cause, the bank, account number and account name exactly as given ("GTBank · 0123456789 · Name"), "when": date, time and place if given,
   "aspect": "9:16" | "16:9" | "1:1" (9:16 unless they say otherwise), "duration": seconds (about 20 unless they say otherwise),
   "voiceover": true/false, "sound": "all" | "sfx" | "none",
   "extra": any instructions about look, mood, scenes or pictures, in their words }`,
