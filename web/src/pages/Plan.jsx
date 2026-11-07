@@ -448,8 +448,7 @@ export default function Plan() {
         setToast(r.found?.length ? `Got it. I found your ${r.found.map((k) => (r.project?.brief?.kind && r.project.brief.kind !== 'business' && k === 'name' ? 'title' : k === 'category' && r.project?.brief?.kind !== 'business' ? 'kind of video' : FOUND_LABEL[k] || k)).join(', ')}.` : "Got it. I'll ask about the rest."); setTimeout(() => setToast(''), 5000);
         if (bRef.current.name) {
           setReading(false);
-          // the logo and photos matter, so ask for them once (skippable), then make the video without any other question
-          if (!logo) { autoMake.current = true; setStep(Math.max(0, QS.findIndex((qq) => qq.id === 'pictures'))); return; }
+          // pictures were added on this same screen, so there is nothing else to ask: the AI decides the rest and builds
           return makeNow();
         }
         advance(next);
@@ -536,7 +535,7 @@ export default function Plan() {
     if (!v) return;
     answer(q.type === 'long' ? v.split('\n').map((x) => x.trim()).filter(Boolean).join(q.id === 'products' ? '\n' : ' ') : v);
   };
-  const continueDisabled = reading || (q?.type === 'multi' ? !multi.length && !text.trim() : q?.type === 'scenes' ? false : q?.type === 'upload' ? uploading : q?.done ? false : !text.trim());
+  const continueDisabled = reading || (q?.id === 'paste' && uploading) || (q?.type === 'multi' ? !multi.length && !text.trim() : q?.type === 'scenes' ? false : q?.type === 'upload' ? uploading : q?.done ? false : !text.trim());
   const continueLabel = q?.done ? (text.trim() ? `Make my ${what}` : "No, that's all") : q?.type === 'multi' ? (multi.length ? `Continue · ${multi.length + (text.trim() && !multi.includes(text.trim()) ? 1 : 0)}` : 'Continue')
     : q?.type === 'scenes' ? (multi.length ? `Use my ${multi.length} pick${multi.length === 1 ? '' : 's'}` : 'Continue') : q?.type === 'upload' ? (pics.length ? 'Continue' : 'Continue without pictures') : q?.id === 'paste' ? 'Read it and make my video' : 'Continue';
   const onContinue = (e) => {
@@ -647,8 +646,9 @@ export default function Plan() {
 
                 {reading && <div className="mt-5 flex items-center gap-3"><div className="bubble-ai typing px-4 py-3.5"><span /><span /><span /></div><span className="text-sm text-ink-mute">Reading your details…</span></div>}
 
-                {q.type === 'upload' && (
+                {(q.type === 'upload' || q.id === 'paste') && (
                   <div className="wiz-drop mt-6">
+                    {q.id === 'paste' && <p className="mb-3 text-sm font-semibold text-ink-soft">Pictures (optional). Up to {MAX_PICS}, shown in the order you add them.</p>}
                     <input ref={logoRef} type="file" accept="image/*" hidden onChange={(e) => upload([...e.target.files], 'logo')} />
                     <input ref={photoRef} type="file" accept="image/*" multiple hidden onChange={(e) => upload([...e.target.files], 'photo')} />
                     <div className="flex flex-wrap items-center gap-2">

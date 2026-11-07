@@ -12,7 +12,7 @@ import { inspectAnimation, snapshotFrames } from '../engine/renderer.js';
 import { probeBuffer, toMp3 } from '../media.js';
 import { voiceoverFormats, generateVoiceTrack, VOICES, hasOfflineVoice } from '../ai/voice.js';
 import { config } from '../config.js';
-import { cleanBrief, briefToPlanRules, suggest, autoStyleSlug, parseBrief, fillDemoBrief } from '../ai/brief.js';
+import { cleanBrief, briefToPlanRules, suggest, autoStyleSlug, parseBrief, parseBriefRules, fillDemoBrief } from '../ai/brief.js';
 import { makeFlyer, flyerFitNotice } from '../ai/flyer.js';
 import { adjustDesign, aspectOf, currentLook } from '../ai/adjust.js';
 import { isPremium, readPremium, premiumWithAudio, VOICE_LIBRARY, SOUND_REGISTRY } from '../ai/premium/index.js';
@@ -249,9 +249,19 @@ r.post('/:id/brief/parse', async (req, res) => {
   const { aiError, ...found } = await parseBrief(text, current, { flyer: p.kind === 'flyer' });
   // never overwrite answers the user already gave one by one
   const merged = cleanBrief({ ...found, ...Object.fromEntries(Object.entries(current).filter(([, v]) => v !== undefined && v !== '')), pasteText: found.pasteText, mode: 'paste' });
+  // The AI decides the rest, so the person never has to answer a form: a title from their own words if nothing else was found
+  if (!merged.name) {
+    const first = text.split(/[.!?\n]/)[0].replace(/^\s*(please\s+)?(i\s+(want|need|would like)\s+(to\s+(make|create)\s+)?|(make|create|build|do)\s+(me\s+)?)?(an?\s+|the\s+|my\s+)?(video|ad|advert|promo|slideshow|flyer)\s+(for|about|of|on)\s+/i, '').replace(/[“”"]/g, '').trim();
+    const words = first.split(/\s+/).filter(Boolean).slice(0, 5).join(' ');
+    if (words.length >= 3) merged.name = words.charAt(0).toUpperCase() + words.slice(1, 40);
+  }
   if (!merged.name) { const nm = text.match(/^\s*([A-Z][\w'&.-]*(?:\s+[A-Z][\w'&.-]*){0,3})\s+(?:is|are|sells|makes|offers|does|runs)\b/); if (nm) merged.name = nm[1].trim(); }
+  // pictures given: a slideshow needs time for each one (about 2 s each), unless they named a length
+  const assetsNow = await projectAssets(p.id);
+  const nPics = assetsNow.filter((x) => x.kind === 'image' && x.role !== 'logo').length;
+  if (nPics >= 3 && !parseBriefRules(text).duration && !current.duration) merged.duration = Math.min(45, Math.max(20, 6 + 2 * nPics));
   const u = await one('UPDATE projects SET brief_json=$2, updated_at=now() WHERE id=$1 RETURNING *', [p.id, JSON.stringify(merged)]);
-  res.json({ project: shape(u, { assets: await projectAssets(p.id) }), found: ['name', 'category', 'goals', 'headlines', 'features', 'products', 'ctas', 'contact', 'payment', 'aspect', 'duration', 'voiceover', 'sound'].filter((k) => found[k] !== undefined && found[k] !== '' && !(Array.isArray(found[k]) && !found[k].length)), aiError });
+  res.json({ project: shape(u, { assets: assetsNow }), found: ['name', 'category', 'goals', 'headlines', 'features', 'products', 'ctas', 'contact', 'payment', 'aspect', 'duration', 'voiceover', 'sound'].filter((k) => found[k] !== undefined && found[k] !== '' && !(Array.isArray(found[k]) && !found[k].length)), aiError });
 });
 
 r.post('/:id/suggest', async (req, res) => {
