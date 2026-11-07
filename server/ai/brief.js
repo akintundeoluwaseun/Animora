@@ -63,6 +63,8 @@ export function cleanBrief(b = {}) {
     scenes: (Array.isArray(b.scenes) ? b.scenes : []).map(String).filter((x) => WANT_IDS.includes(x) || x in MOTION_WANTS).slice(0, 8), sceneAuto: b.sceneAuto === undefined ? undefined : !!b.sceneAuto,
     // flyer-only answers
     flyerType: (Array.isArray(b.flyerType) ? list(b.flyerType) : b.flyerType ? [str(b.flyerType, 60)] : []).map((x) => str(x, 60)).filter(Boolean).slice(0, 3), offer: str(b.offer, 60), when: str(b.when, 120), layout: ['photo', 'type', 'price', 'auto'].includes(b.layout) ? b.layout : undefined,
+    // exact on-screen wording the owner gave (shown as written, in order, as picture captions first); slideshow = show every picture one after another
+    phrases: (Array.isArray(b.phrases) ? b.phrases : String(b.phrases || '').split(/\n/)).map((x) => str(x, 90)).filter(Boolean).slice(0, 12), slideshow: b.slideshow === true || b.slideshow === 'yes' ? true : undefined,
     steps: list(b.steps).slice(0, 8), lookAuto: ['auto', 'own'].includes(b.lookAuto) ? b.lookAuto : undefined,
     extra: str(b.extra, 3000), done: !!b.done, mode: ['steps', 'paste'].includes(b.mode) ? b.mode : undefined, pasted: b.pasted ? true : undefined, pasteText: str(b.pasteText, 6000),
     colorMode: ['style', 'logo', 'own'].includes(b.colorMode) ? b.colorMode : undefined, picturesDone: b.picturesDone ? true : undefined,
@@ -339,6 +341,8 @@ export function parseBriefRules(text) {
   const contact = [phone, site, addr].filter(Boolean).join(', ');
   if (contact) out.contact = contact;
   for (const [re, v] of ASPECT_WORDS) if (re.test(t)) { out.aspect = v; break; }
+  { const q = [...t.matchAll(/["“]([^"”\n]{3,90})["”]/g)].map((m) => m[1].trim()).filter((x) => x && !PHONE_RE.test(x)); if (q.length) out.phrases = q.slice(0, 12); }
+  if (/\b(slide ?show|slides? of (my )?(photos|pictures)|all (my |the )?(photos|pictures|images))\b/i.test(t)) out.slideshow = true;
   const sec = t.match(/(\d{1,3})\s*(?:s\b|secs?\b|seconds?\b)/i)?.[1] || (t.match(/(\d)\s*(?:min|minutes?)\b/i)?.[1] * 60);
   if (sec) out.duration = Number(sec);
   const name = t.match(/(?:business(?:\s+name)?\s*(?:is|:|-)|(?:company|brand|shop|store)\s+(?:name\s+)?(?:is|:)|(?:called|named))\s*["'“‘]?([A-Z0-9][\w&'’. -]{1,40}?)["'”’]?(?=[,.\n”"]|\s+(?:and|we|i|in|at|is)\b|$)/i)?.[1];
@@ -382,6 +386,7 @@ Keys:
   "contact": phone / website / address only if given (never an account number), "payment": for a cause, the bank, account number and account name exactly as given ("GTBank · 0123456789 · Name"), "when": date, time and place if given,
   "aspect": "9:16" | "16:9" | "1:1" (9:16 unless they say otherwise), "duration": seconds (about 20 unless they say otherwise),
   "voiceover": true/false, "sound": "all" | "sfx" | "none",
+  "phrases": ["only if they gave specific wording for the screen: each line EXACTLY as they wrote it, in the order they gave it; never reword, never add"], "slideshow": true if they want their pictures shown one after another,
   "extra": any instructions about look, mood, scenes or pictures, in their words }`,
       messages: [{ role: 'user', text: `Already known: ${JSON.stringify({ name: current.name, category: current.category })}\n\nTHEIR TEXT:\n${String(text).slice(0, 6000)}` }],
       json: true, temperature: 0.2, timeoutMs: 18000, maxOutputTokens: 4096, thinking: 'low',

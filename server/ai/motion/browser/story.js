@@ -239,7 +239,9 @@
       const box = el('div', `position:absolute;${o.css || 'inset:0'};overflow:hidden;${o.radius ? `border-radius:${o.radius}px;` : ''}background:#111;`, parent);
       // a picture that would lose more than half of itself to the crop is shown whole on a soft copy of itself instead
       const ri = ratioOf(src), bw = box.offsetWidth || W, bh = box.offsetHeight || H;
-      if (fit !== 'contain' && ri && !o.forceCover && Math.min(ri / (bw / bh), (bw / bh) / ri) < 0.5) fit = 'contain';
+      const sweep = !!o.sweep && ri && (ri / (bw / bh) > 1.25 || ri / (bw / bh) < 0.8) && Math.min(ri / (bw / bh), (bw / bh) / ri) >= 0.3;   // slideshow: fill the frame and pan across the picture instead of shrinking it
+      if (fit !== 'contain' && ri && !o.forceCover && !sweep && Math.min(ri / (bw / bh), (bw / bh) / ri) < 0.5) fit = 'contain';
+      if (sweep && fit === 'contain') fit = 'cover';
       if (fit === 'contain') {
         const back = el('div', `position:absolute;inset:-8%;background:url("${src}") center/cover;filter:blur(${40 * U}px) brightness(.55) saturate(1.15);`, box);
         const front = el('img', `position:absolute;left:8%;top:8%;width:84%;height:84%;object-fit:contain;filter:drop-shadow(0 ${30 * U}px ${50 * U}px rgba(0,0,0,.45));`, box);
@@ -252,6 +254,10 @@
       const img = el('img', `position:absolute;left:0;top:0;width:100%;height:100%;object-fit:cover;object-position:${o.pos || '50% 50%'};transform-origin:${o.origin || '50% 50%'};`, box);
       img.src = src;
       const dir = o.dir || (R() < 0.5 ? 1 : -1);
+      if (sweep) {
+        const wide = ri / (bw / bh) > 1;
+        tl.fromTo(img, { scale: 1.06, objectPosition: wide ? `${dir > 0 ? 8 : 92}% 50%` : `50% ${dir > 0 ? 6 : 94}%` }, { scale: 1.1, objectPosition: wide ? `${dir > 0 ? 92 : 8}% 50%` : `50% ${dir > 0 ? 94 : 6}%`, duration: Math.max(1, d), ease: 'none' }, t);
+      } else
       tl.fromTo(img, { scale: o.zoomFrom || 1.16, xPercent: -2.2 * dir }, { scale: o.zoomTo || 1.04, xPercent: 2.2 * dir, duration: Math.max(1, d), ease: 'none' }, t);
       // focus pull: the lens finds the picture as the scene opens
       const fbase = o.treat === 'duotone' ? 'grayscale(1) contrast(1.15) ' : '';
@@ -803,6 +809,45 @@
           reveal(cb, t + 0.9);
         }
         sound(t + 0.1, 'reveal'); sound(t + 1.2, 'click', 0.8);
+      },
+      // Slideshow: EVERY picture, one after another, each with its own camera move and its own way of arriving.
+      // Captions are the owner's own words when they gave them. Thin progress bars show how far through the show we are.
+      show(Lr, t, d, data, v, S) {
+        const shots = (data.shots || []).slice(0, 10), n = shots.length; if (!n) return;
+        const per = d / n, first = R() < 0.5 ? 0 : 3;
+        const ENTRY = ['zoom', 'wipe-r', 'push', 'circle', 'wipe-u', 'rot', 'wipe-d', 'fade'];
+        let prev = null;
+        shots.forEach((s, i) => {
+          const ts = t + i * per;
+          const sl = el('div', 'position:absolute;inset:0;overflow:hidden;', Lr);
+          sl.style.zIndex = String(i + 1);
+          const inn = i % 3 === 0;
+          photo(sl, s.photo, s.fit, ts - 0.3, per + 1.1, { pos: s.pos, dir: i % 2 ? 1 : -1, zoomFrom: inn ? 1.02 : 1.24, zoomTo: inn ? 1.22 : 1.05, focus: i === 0, wiggle: false, sweep: true });
+          const e = i === 0 ? ['zoom', 'fade'][first ? 1 : 0] : ENTRY[(i * 3 + first) % ENTRY.length];
+          const D = Math.min(0.9, per * 0.6);
+          if (e === 'zoom') tl.fromTo(sl, { scale: 1.35, opacity: 0 }, { scale: 1, opacity: 1, duration: D, ease: 'power3.out' }, ts);
+          else if (e === 'fade') tl.fromTo(sl, { opacity: 0 }, { opacity: 1, duration: D, ease: 'power2.out' }, ts);
+          else if (e === 'rot') tl.fromTo(sl, { rotate: 8, scale: 1.25, opacity: 0 }, { rotate: 0, scale: 1, opacity: 1, duration: D + 0.1, ease: 'expo.out' }, ts);
+          else if (e === 'push') { tl.fromTo(sl, { xPercent: 100 }, { xPercent: 0, duration: D, ease: 'expo.out' }, ts); if (prev) tl.to(prev, { xPercent: -18, duration: D, ease: 'expo.out' }, ts); }
+          else {
+            const from = { 'wipe-r': 'inset(0 100% 0 0)', 'wipe-u': 'inset(100% 0 0 0)', 'wipe-d': 'inset(0 0 100% 0)', circle: 'circle(0% at 50% 55%)' }[e], to = e === 'circle' ? 'circle(150% at 50% 55%)' : 'inset(0 0 0 0)';
+            tl.fromTo(sl, { clipPath: from }, { clipPath: to, duration: D + 0.1, ease: 'expo.inOut' }, ts);
+          }
+          if (s.caption) {
+            scrim(sl, 0.8);
+            const cb = textBlock(sl, s.caption, { w: land ? W * 0.6 : CW, size: (port ? 92 : 80) * TU, min: 34 * TU, maxLines: 3, color: '#FFFFFF', accent: L0.accentWord, accentCss: accOnPhoto, upper: L0.upper, css: `left:${M}px;bottom:${M + 44 * U}px` });
+            reveal(cb, ts + 0.45);
+          }
+          sound(ts + 0.05, 'photo');
+          prev = sl;
+        });
+        // progress: one thin bar per picture along the top, filling as its picture is on screen
+        const bw = (CW - (n - 1) * 8 * U) / n, bar = el('div', 'position:absolute;inset:0;z-index:99;pointer-events:none;', Lr);
+        shots.forEach((s, i) => {
+          const b = el('div', `position:absolute;left:${M + i * (bw + 8 * U)}px;top:${M * 0.55}px;width:${bw}px;height:${Math.max(4, 6 * U)}px;border-radius:9px;background:rgba(255,255,255,.28);overflow:hidden;`, bar);
+          const f = el('div', 'position:absolute;inset:0;background:#fff;transform-origin:left;', b);
+          tl.fromTo(f, { scaleX: 0 }, { scaleX: 1, duration: per, ease: 'none' }, t + i * per);
+        });
       },
       // chat takeover: the business answering in a chat, one message at a time with a typing indicator
       // App walkthrough: ONE phone stays on screen while a finger taps through the real screenshots, A to Z.

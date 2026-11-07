@@ -100,7 +100,8 @@ export function composeStory({ facts: f, duration, seed, look: lookId, aspect, o
   // the opening picture: the one that fills this frame best
   // an app with screenshots: the film walks through them in order (one phone scene each), so none is used as the opening picture
   const walk = f.appy && photos.filter((p) => !p.cut).length >= 2;
-  const p0 = walk ? null : photos.filter((p) => p.fit === 'cover' && !p.cut).sort((a, b) => (b.full >= 0.55) - (a.full >= 0.55))[0] || null;
+  const gal = !!f.gallery && !walk && photos.length >= 2;   // a slideshow: every picture, one after another
+  const p0 = walk || gal ? null : photos.filter((p) => p.fit === 'cover' && !p.cut).sort((a, b) => (b.full >= 0.55) - (a.full >= 0.55))[0] || null;
   let hookType = 'hook', hookV = 'type';
   if (p0) {
     // a picture that would lose most of itself full screen (a wide shot in a tall frame) opens as a split instead
@@ -141,17 +142,25 @@ export function composeStory({ facts: f, duration, seed, look: lookId, aspect, o
     add('walk', { title: f.name, shots: shots.map((p, i) => ({ photo: p.url, ratio: p.ratio || 0, tap: (f.taps || {})[p.url] || null, caption: (f.steps || [])[i] || feats[i] || (i === shots.length - 1 ? head : '') })) }, 10);
     if ((f.steps || []).length) used = Math.min(feats.length, shots.length);
   }
-  photoBeat(hookType === 'hook' && hookV === 'type' ? (f.sub && f.sub !== head ? f.sub : '') : '', f.category || '', 6);
-  if (feats.length >= 2) {
+  if (gal) {
+    // the owner's own words go on their pictures, in order (any left over become lines of their own); without them, the highlights do
+    const norm = (x) => String(x).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+    const ph = (f.phrases || []).filter((x) => norm(x) !== norm(head));   // the opening already says the headline
+    const shots = rest.splice(0, 10);
+    add('show', { shots: shots.map((p, i) => ({ photo: p.url, fit: p.fit, pos: p.pos, caption: ph.length ? (ph[i] || '') : (feats[i] || '') })) }, 10);
+    ph.slice(shots.length).forEach((x) => add('statement', { text: x, label: f.name }, 8));
+  }
+  if (!gal) photoBeat(hookType === 'hook' && hookV === 'type' ? (f.sub && f.sub !== head ? f.sub : '') : '', f.category || '', 6);
+  if (gal) { /* the slideshow carries the story */ } else if (feats.length >= 2) {
     if (f.whatsapp && r() < 0.6) add('chat', { items: feats, cta: f.cta }, 8);
     else { const v = feats.length <= 3 && r() < 0.45 ? 'seq' : 'list'; add('features', { items: feats, title: f.category || f.name, ...(aspect === '16:9' && rest[0] && !rest[0].cut ? { photo: rest[0].url, fit: rest[0].fit, pos: rest[0].pos } : {}) }, 8, v); }
     used = feats.length;
   } else if (feats.length === 1) add('statement', { text: feats[0] }, 5);
-  photoBeat(cap(used) || '', f.name, 5);
+  if (!gal) photoBeat(cap(used) || '', f.name, 5);
   const priced = f.products.filter((p) => p.price);
   if (priced.length) add('products', { items: priced.slice(0, 4), title: 'Prices' }, 8, priced.length === 1 ? 'hero' : 'list', { surface: L.dark ? 'alt' : 'base' });
   if (f.offer) add('offer', { offer: f.offer, label: 'Special offer' }, 9, 'center', { surface: 'accent' });
-  photoBeat('', '', 4, 'full');
+  if (!gal) photoBeat('', '', 4, 'full');
   if (f.when) add('info', { when: f.when, place: f.place }, 6);
   add('end', { cta: f.cta, phone: f.phone, whatsapp: f.whatsapp, place: f.place, link: f.link, note: f.note }, 10, L.center ? 'center' : pick(['center', 'left']));
   if (duration >= 20 && (L.id === 'noir' || r() < 0.4)) beats.unshift({ type: 'sting', data: {}, keep: 2 });
@@ -161,7 +170,7 @@ export function composeStory({ facts: f, duration, seed, look: lookId, aspect, o
   if (f.place && !f.when) ideas.push(() => ({ type: 'info', data: { place: f.place }, keep: 3 }));
   if (f.heads[1] && f.heads[1] !== head) ideas.push(() => ({ type: 'statement', data: { text: f.heads[1], label: f.name }, keep: 3 }));
   if (f.sub && f.sub !== head && hookV !== 'type') ideas.push(() => ({ type: 'statement', data: { text: f.sub, label: f.name }, keep: 3 }));
-  photos.forEach((p, i) => ideas.push(() => (p.cut ? { type: 'popout', data: { photo: p.url, caption: feats[(i + 1) % Math.max(1, feats.length)] || '', label: f.name }, keep: 2 } : { type: 'photo', data: { photo: p.url, fit: p.fit, pos: `${30 + Math.round(r() * 40)}% ${30 + Math.round(r() * 40)}%`, caption: feats[(i + 1) % Math.max(1, feats.length)] || '', label: f.name }, keep: 2, v: p.full < 0.55 ? 'frame' : pick(['frame', 'full']) })));
+  if (!gal) photos.forEach((p, i) => ideas.push(() => (p.cut ? { type: 'popout', data: { photo: p.url, caption: feats[(i + 1) % Math.max(1, feats.length)] || '', label: f.name }, keep: 2 } : { type: 'photo', data: { photo: p.url, fit: p.fit, pos: `${30 + Math.round(r() * 40)}% ${30 + Math.round(r() * 40)}%`, caption: feats[(i + 1) % Math.max(1, feats.length)] || '', label: f.name }, keep: 2, v: p.full < 0.55 ? 'frame' : pick(['frame', 'full']) })));
   feats.forEach((x) => ideas.push(() => ({ type: 'statement', data: { text: x, label: f.category || f.name }, keep: 2 })));
   priced.forEach((p) => ideas.push(() => ({ type: 'products', data: { items: [p], title: 'Prices' }, keep: 2, v: 'hero' })));
   if (f.offer) ideas.push(() => ({ type: 'offer', data: { offer: f.offer, label: 'Special offer' }, keep: 2, surface: 'accent' }));
@@ -169,7 +178,7 @@ export function composeStory({ facts: f, duration, seed, look: lookId, aspect, o
   ideas.push(() => ({ type: 'statement', data: { text: head, label: f.category || f.name }, keep: 2 }));
   if (!beats.some((b) => b.type === 'sting')) ideas.push(() => ({ type: 'sting', data: {}, keep: 2 }));
 
-  const base = (b) => (b.type === 'features' ? featDur(b.data.items.length, b.v) : b.type === 'chat' ? 1.6 + 1.05 * (b.data.items.length + (b.data.cta ? 1 : 0)) : b.type === 'products' ? prodDur(b.data.items.length) : b.type === 'walk' ? 3.8 + 3.3 * b.data.shots.length : BASE[b.type]);
+  const base = (b) => (b.type === 'features' ? featDur(b.data.items.length, b.v) : b.type === 'chat' ? 1.6 + 1.05 * (b.data.items.length + (b.data.cta ? 1 : 0)) : b.type === 'products' ? prodDur(b.data.items.length) : b.type === 'walk' ? 3.8 + 3.3 * b.data.shots.length : b.type === 'show' ? 0.8 + 2 * b.data.shots.length : BASE[b.type]);
   beats.forEach((b) => { b.dur = base(b); });
   const total = () => beats.reduce((n, b) => n + b.dur, 0) - overlap * (beats.length - 1);
   // too long: drop the least important beats, then tighten
@@ -209,7 +218,7 @@ export function composeStory({ facts: f, duration, seed, look: lookId, aspect, o
   // surfaces and transitions: never the same twice in a row
   let sIdx = Math.floor(r() * 2), lastT = null;
   beats.forEach((b, i) => {
-    if (!b.surface) { const photoFull = (b.type === 'photo' && b.v === 'full') || (b.type === 'hook' && b.v === 'full') || ['matte', 'cover', 'pip'].includes(b.type); b.surface = photoFull ? 'base' : L.surfaces[(sIdx++) % L.surfaces.length]; }
+    if (!b.surface) { const photoFull = (b.type === 'photo' && b.v === 'full') || (b.type === 'hook' && b.v === 'full') || ['matte', 'cover', 'pip', 'show'].includes(b.type); b.surface = photoFull ? 'base' : L.surfaces[(sIdx++) % L.surfaces.length]; }
     if (b.type === 'end') b.surface = L.dark ? 'base' : (r() < 0.5 ? 'base' : 'alt');
     if (i > 0 && beats[i - 1].surface === b.surface && b.surface === 'accent') b.surface = 'base';
     if (i) { const pool = L.trans.filter((x) => x !== lastT); b.trans = pool[Math.floor(r() * pool.length)]; lastT = b.trans; }

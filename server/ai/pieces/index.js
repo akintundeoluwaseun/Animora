@@ -69,7 +69,11 @@ export function factsOf(plan = {}, brief = {}, assets = []) {
   const cutouts = assets.filter((a) => (a.kind || 'image') === 'image' && a.role !== 'logo' && !/logo/i.test(a.name || '') && (a.transparent || a.has_alpha)).map((a) => a.url);
   const appy = /\b(app|apps|software|saas|platform|online store|e-?commerce|delivery app|mobile app|website|web ?site|game|gaming|fintech|payments?)\b/i.test([brief.category, brief.name, ...[].concat(brief.features || [])].join(' ')) && !/repair|fix|service centre|service center/i.test(brief.category || '');
   const steps = [].concat(brief.steps || []).map((x) => str(x, 40)).filter(Boolean).slice(0, 8);
-  return { link, note: str(brief.endNote, 60), taps, steps, cutouts, appy: appy || steps.length > 0, whatsapp, fits, ratios, name, mono: name.replace(/[^\p{L}\p{N} ]/gu, '').split(/\s+/).filter((w) => !/^(the|and|of)$/i.test(w)).slice(0, 2).map((w) => w[0]).join('').toUpperCase() || 'A', heads, features, products, priced, offer: str(brief.offer, 30), when: str(brief.when, 60), cta: str(brief.cta || [].concat(brief.ctas || [])[0] || closingLine(brief), 28), phone, place, photos, logo, category: str(brief.category, 40), sub: str(heads[1] || brief.goal || '', 90) };
+  const phrases = [].concat(brief.phrases || []).map((x) => str(x, 90)).filter(Boolean).slice(0, 12);
+  const usable = photos.filter((u) => !cutouts.includes(u));
+  // 3 or more ordinary pictures (2 if the owner asked for a slideshow) become a slideshow that shows every one of them
+  const gallery = !(appy || steps.length) && (usable.length >= 3 || (usable.length >= 2 && !!brief.slideshow));
+  return { gallery, phrases, link, note: str(brief.endNote, 60), taps, steps, cutouts, appy: appy || steps.length > 0, whatsapp, fits, ratios, name, mono: name.replace(/[^\p{L}\p{N} ]/gu, '').split(/\s+/).filter((w) => !/^(the|and|of)$/i.test(w)).slice(0, 2).map((w) => w[0]).join('').toUpperCase() || 'A', heads, features, products, priced, offer: str(brief.offer, 30), when: str(brief.when, 60), cta: str(brief.cta || [].concat(brief.ctas || [])[0] || closingLine(brief), 28), phone, place, photos, logo, category: str(brief.category, 40), sub: str(heads[1] || brief.goal || '', 90) };
 }
 const split2 = (t) => { const w = String(t).split(/\s+/); if (w.length < 3) return w.join(' '); const k = Math.ceil(w.length / 2); return w.slice(0, k).join(' ') + '|' + w.slice(k).join(' '); };
 
@@ -171,7 +175,8 @@ export function piecesFilm({ plan = {}, brief = {}, assets = [], style = null, t
   // Normal-length videos start from a signature template chosen for the business (kinetic type, chrome, HUD, editorial ...).
   // The long-form Story engine is for videos over ~35 s, where one template would run out of things to show.
   const seconds = Number(plan.duration_seconds) || Number(brief.duration) || 20;
-  const autoTemplate = !salt && !isTemplateBrief(brief) && seconds <= 35 && !!TPL_SIZES[aspect] && process.env.ANIMORA_DIRECTOR !== 'story';
+  const isGallery = factsOf(plan, brief, assets).gallery;
+  const autoTemplate = !salt && !isTemplateBrief(brief) && !isGallery && seconds <= 35 && !!TPL_SIZES[aspect] && process.env.ANIMORA_DIRECTOR !== 'story';
   if (autoTemplate) brief = { ...brief, template: pickDirection({ brief, plan, salt: 'first', previous, aspect, templatesOnly: true }) };
   if (!(!salt && isTemplateBrief(brief)) && process.env.ANIMORA_DIRECTOR !== 'pieces') {
     const out = storyFilm({ plan, brief, assets, style, salt, previous });
