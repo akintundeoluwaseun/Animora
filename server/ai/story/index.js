@@ -147,7 +147,9 @@ export function composeStory({ facts: f, duration, seed, look: lookId, aspect, o
     const norm = (x) => String(x).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
     const ph = (f.phrases || []).filter((x) => norm(x) !== norm(head));   // the opening already says the headline
     const shots = rest.splice(0, 10);
-    add('show', { shots: shots.map((p, i) => ({ photo: p.url, fit: p.fit, pos: p.pos, caption: ph.length ? (ph[i] || '') : (feats[i] || '') })) }, 10);
+    // four ways to show the pictures; the seed and the look decide (collage and the 3D styles need at least 3 pictures)
+    const styles = shots.length >= 3 ? (L.dark ? ['reel', 'strip', 'ring', 'ring', 'strip'] : ['reel', 'collage', 'collage', 'ring']) : ['reel'];
+    add('show', { shots: shots.map((p, i) => ({ photo: p.url, fit: p.fit, pos: p.pos, caption: ph.length ? (ph[i] || '') : (feats[i] || '') })) }, 10, process.env.ANIMORA_SLIDE && shots.length >= 3 ? process.env.ANIMORA_SLIDE : pick(styles));
     ph.slice(shots.length).forEach((x) => add('statement', { text: x, label: f.name }, 8));
   }
   if (!gal) photoBeat(hookType === 'hook' && hookV === 'type' ? (f.sub && f.sub !== head ? f.sub : '') : '', f.category || '', 6);

@@ -812,7 +812,91 @@
       },
       // Slideshow: EVERY picture, one after another, each with its own camera move and its own way of arriving.
       // Captions are the owner's own words when they gave them. Thin progress bars show how far through the show we are.
+      // pick the slideshow style this video was given (reel, collage, ring, strip)
       show(Lr, t, d, data, v, S) {
+        const fn = { collage: 'showCollage', ring: 'showRing', strip: 'showStrip' }[v] || 'showReel';
+        return BEATS[fn](Lr, t, d, data, v, S);
+      },
+      // shared by the three stage styles: the owner's caption for the current picture, swapped one by one
+      showCap(Lr, shots, t, per, S, light) {
+        shots.forEach((s, i) => {
+          if (!s.caption) return;
+          const cb = textBlock(Lr, s.caption, { w: CW, size: (port ? 84 : 72) * TU, min: 34 * TU, maxLines: 2, color: light ? '#FFFFFF' : S.ink, accent: L0.accentWord, accentCss: light ? accOnPhoto : acc(S), upper: L0.upper, css: `left:${M}px;bottom:${M + 36 * U}px;z-index:50` });
+          reveal(cb, t + i * per + 0.45);
+          if (i < shots.length - 1) tl.to(cb, { opacity: 0, y: -18 * U, duration: 0.3, ease: 'power2.in' }, t + (i + 1) * per - 0.32);
+        });
+      },
+      // Collage: photos are dealt onto a table like prints, and the camera travels from one to the next, then pulls back to show them all
+      showCollage(Lr, t, d, data, v, S) {
+        const shots = (data.shots || []).slice(0, 10), n = shots.length; if (!n) return;
+        const per = d / n, cw = port ? 0.76 * Math.min(W, H * 0.62) : land ? 0.5 * H : 0.56 * W, wd = el('div', 'position:absolute;left:0;top:0;width:0;height:0;transform-origin:0 0;', Lr);
+        decor(Lr, t, d, S.kind);
+        const spots = shots.map((s, i) => { const a = i * 2.39996 + 0.6, rad = cw * 0.78 * Math.sqrt(i + 0.35); return { x: Math.cos(a) * rad * (land ? 1.6 : 1), y: Math.sin(a) * rad * (port ? 1.15 : 1), rot: ((i * 37) % 15) - 7 }; });
+        const xs = spots.map((s) => s.x), ys = spots.map((s) => s.y), bx = Math.max(...xs) - Math.min(...xs) + cw * 1.5, by = Math.max(...ys) - Math.min(...ys) + cw * 1.5;
+        const all = { cx: (Math.max(...xs) + Math.min(...xs)) / 2, cy: (Math.max(...ys) + Math.min(...ys)) / 2, sc: Math.min(W / bx, (H * 0.8) / by, 1) };
+        const focus = (sp, sc) => ({ x: W / 2 - sc * sp.x, y: (port ? H * 0.42 : H * 0.46) - sc * sp.y, scale: sc });
+        tl.set(wd, focus(spots[0], 1.12), t - 0.01);
+        shots.forEach((s, i) => {
+          const ts = t + i * per, sp = spots[i], ri = Math.max(0.72, Math.min(1.4, ratioOf(s.photo) || 1)), ch = cw / ri, pad = cw * 0.045;
+          const card = el('div', `position:absolute;left:${sp.x - cw / 2 - pad}px;top:${sp.y - ch / 2 - pad}px;width:${cw + pad * 2}px;height:${ch + pad * 3.4}px;background:#FBFAF6;border-radius:${4 * U}px;box-shadow:0 ${8 * U}px ${30 * U}px rgba(0,0,0,.28);z-index:${i + 1};`, wd);
+          const im = el('img', `position:absolute;left:${pad}px;top:${pad}px;width:${cw}px;height:${ch}px;object-fit:cover;object-position:${s.pos || '50% 50%'};`, card); im.src = s.photo;
+          el('div', `position:absolute;left:${cw * 0.34}px;top:${-pad * 1.5}px;width:${cw * 0.3}px;height:${pad * 2.6}px;background:rgba(255,236,170,.78);transform:rotate(${-sp.rot * 0.8}deg);`, card);
+          const side = i % 2 ? 1 : -1;
+          tl.fromTo(card, { opacity: 0, x: side * W * 0.9, y: -H * 0.2, rotate: sp.rot + side * 40, scale: 1.3 }, { opacity: 1, x: 0, y: 0, rotate: sp.rot, scale: 1, duration: 0.85, ease: 'back.out(1.25)' }, ts - 0.1);
+          tl.to(wd, i === n - 1 ? { x: W / 2 - all.sc * all.cx, y: H * 0.46 - all.sc * all.cy, scale: all.sc, duration: 1.3, ease: 'power3.inOut' } : { ...focus(sp, 1.0 + (i % 2) * 0.08), duration: i === 0 ? 0.01 : 0.95, ease: 'power3.inOut' }, ts);
+          sound(ts, 'photo');
+        });
+        BEATS.showCap(Lr, shots, t, per, S, false);
+      },
+      // Ring: the pictures stand on a turntable that turns to the next one, over a soft blurred copy of the current picture
+      showRing(Lr, t, d, data, v, S) {
+        const shots = (data.shots || []).slice(0, 10), n = shots.length; if (!n) return;
+        const per = d / n, cw = (port ? 0.62 : land ? 0.4 : 0.46) * W, ch = cw * (port ? 1.3 : land ? 0.62 : 0.78), R = Math.max(cw * 0.95, (cw / 2) / Math.tan(Math.PI / Math.max(3, n)) * 1.12);
+        shots.forEach((s, i) => {
+          const bg = el('div', `position:absolute;inset:-6%;background:url("${s.photo}") center/cover;filter:blur(${46 * U}px) brightness(.5) saturate(1.3);`, Lr);
+          tl.fromTo(bg, { opacity: i ? 0 : 1 }, { opacity: 1, duration: 0.7, ease: 'power2.inOut' }, t + i * per);
+        });
+        const stage = el('div', `position:absolute;inset:0;perspective:${1500 * U}px;`, Lr);
+        const ring = el('div', `position:absolute;left:50%;top:${port ? 45 : 50}%;width:0;height:0;transform-style:preserve-3d;`, stage);
+        shots.forEach((s, i) => {
+          const c = el('div', `position:absolute;left:${-cw / 2}px;top:${-ch / 2}px;width:${cw}px;height:${ch}px;border-radius:${Math.max(10, L0.radius) * U}px;overflow:hidden;backface-visibility:hidden;box-shadow:0 ${30 * U}px ${70 * U}px rgba(0,0,0,.5);border:${Math.max(3, 5 * U)}px solid rgba(255,255,255,.9);transform:rotateY(${(360 / n) * i}deg) translateZ(${R}px);`, ring);
+          const im = el('img', `width:100%;height:100%;object-fit:cover;object-position:${s.pos || '50% 50%'};`, c); im.src = s.photo;
+        });
+        tl.set(ring, { z: -R, rotateX: -4 }, t - 0.01);
+        tl.fromTo(ring, { rotateY: 70, opacity: 0 }, { rotateY: 0, opacity: 1, duration: 0.9, ease: 'expo.out' }, t);
+        for (let i = 1; i < n; i++) tl.to(ring, { rotateY: -(360 / n) * i, duration: Math.min(1, per * 0.7), ease: 'power3.inOut' }, t + i * per - 0.2);
+        tl.to(ring, { rotateX: 4, duration: d, ease: 'sine.inOut' }, t);
+        shots.forEach((s, i) => sound(t + i * per, 'photo'));
+        BEATS.showCap(Lr, shots, t, per, S, true);
+      },
+      // Strip: a roll of film slides past; the frame in the middle grows, the others dim
+      showStrip(Lr, t, d, data, v, S) {
+        const shots = (data.shots || []).slice(0, 10), n = shots.length; if (!n) return;
+        const per = d / n, fw = (port ? 0.7 : land ? 0.34 : 0.56) * W, fh = fw * (port ? 1.25 : 0.72), gap = fw * 0.12;
+        const back = el('div', 'position:absolute;inset:0;background:radial-gradient(120% 90% at 50% 40%, #1b1b22 0%, #07070a 70%);', Lr);
+        const rot = port ? -7 : -4, hold = el('div', `position:absolute;left:0;top:${port ? 44 : 50}%;width:0;height:0;transform:rotate(${rot}deg);`, Lr);
+        const belt = el('div', 'position:absolute;left:0;top:0;', hold);
+        const bandH = fh + 150 * U;
+        el('div', `position:absolute;left:${-W}px;width:${(n + 2) * (fw + gap) + W * 2}px;top:${-bandH / 2}px;height:${bandH}px;background:#0b0b0e;border-top:${3 * U}px solid #2a2a31;border-bottom:${3 * U}px solid #2a2a31;`, belt);
+        const frames = shots.map((s, i) => {
+          const x = i * (fw + gap);
+          for (const yy of [-bandH / 2 + 28 * U, bandH / 2 - 56 * U]) for (let k = 0; k < 6; k++) el('div', `position:absolute;left:${x + k * (fw / 5.4)}px;top:${yy}px;width:${28 * U}px;height:${28 * U}px;border-radius:${6 * U}px;background:#d7d3c8;opacity:.8;`, belt);
+          const f = el('div', `position:absolute;left:${x}px;top:${-fh / 2}px;width:${fw}px;height:${fh}px;overflow:hidden;border-radius:${6 * U}px;transform-origin:50% 50%;`, belt);
+          const im = el('img', `width:100%;height:100%;object-fit:cover;object-position:${s.pos || '50% 50%'};`, f); im.src = s.photo;
+          return { f, x: x + fw / 2 };
+        });
+        tl.fromTo(hold, { opacity: 0, y: 80 * U }, { opacity: 1, y: 0, duration: 0.8, ease: 'expo.out' }, t);
+        const at = (cx) => W / 2 - cx;
+        tl.set(belt, { x: at(frames[0].x) + W * 0.6 }, t - 0.01);
+        frames.forEach((fr, i) => {
+          const ts = t + i * per;
+          tl.to(belt, { x: at(fr.x), duration: i === 0 ? 1.0 : Math.min(0.95, per * 0.65), ease: 'power3.inOut' }, i === 0 ? t : ts - 0.15);
+          frames.forEach((o, k) => tl.to(o.f, { scale: k === i ? 1.22 : 0.88, opacity: k === i ? 1 : 0.42, duration: 0.6, ease: 'power2.inOut' }, ts - 0.1));
+          sound(ts, 'photo');
+        });
+        BEATS.showCap(Lr, shots, t, per, S, true);
+      },
+      showReel(Lr, t, d, data, v, S) {
         const shots = (data.shots || []).slice(0, 10), n = shots.length; if (!n) return;
         const per = d / n, first = R() < 0.5 ? 0 : 3;
         const ENTRY = ['zoom', 'wipe-r', 'push', 'circle', 'wipe-u', 'rot', 'wipe-d', 'fade'];
@@ -840,6 +924,15 @@
           }
           sound(ts + 0.05, 'photo');
           prev = sl;
+        });
+        // film look: a little grain over everything, and a warm light leak sweeping across at each cut
+        const grain = el('div', `position:absolute;inset:-10%;z-index:90;pointer-events:none;opacity:.14;mix-blend-mode:overlay;background-image:url("data:image/svg+xml;utf8,${encodeURIComponent("<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(#n)'/></svg>")}");`, Lr);
+        for (let k = 0; k * 0.12 < d; k++) tl.set(grain, { x: ((k * 53) % 90) - 45, y: ((k * 31) % 90) - 45 }, t + k * 0.12);
+        shots.forEach((s, i) => {
+          if (!i) return;
+          const lk = el('div', `position:absolute;z-index:91;pointer-events:none;width:${W * 1.1}px;height:${H * 1.4}px;left:${-W * 0.1}px;top:${-H * 0.2}px;background:radial-gradient(closest-side, rgba(255,170,90,.75), rgba(255,90,60,.0));mix-blend-mode:screen;opacity:0;`, Lr);
+          tl.fromTo(lk, { x: -W * 0.9, opacity: 0 }, { x: W * 0.9, opacity: 0.7, duration: 1.1, ease: 'power1.inOut' }, t + i * per - 0.2);
+          tl.to(lk, { opacity: 0, duration: 0.4 }, t + i * per + 0.55);
         });
         // progress: one thin bar per picture along the top, filling as its picture is on screen
         const bw = (CW - (n - 1) * 8 * U) / n, bar = el('div', 'position:absolute;inset:0;z-index:99;pointer-events:none;', Lr);
