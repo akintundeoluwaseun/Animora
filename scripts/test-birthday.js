@@ -69,6 +69,8 @@ assert.ok(rendered.data.story.beats.some((beat) => /Happy 20th Birthday, Tony!/i
 
 assert.equal(cleanBrief({ ...brief, videoEngine: 'motion' }).videoEngine, 'motion', 'the selected video director must survive brief sanitization');
 assert.equal(cleanBrief({ ...brief, videoEngine: 'pieces' }).videoEngine, 'pieces', 'the Signature mix remains an explicit option');
+assert.equal(cleanBrief({ kind: 'personal', category: 'Birthday', name: 'Tony', milestoneSkipped: true }).milestoneSkipped, true, 'skipping an unknown age must persist when the form is reopened');
+assert.equal(cleanBrief({ kind: 'cause', category: 'Fundraiser or donation', name: 'Community Health Initiative', paymentSkipped: true }).paymentSkipped, true, 'skipping optional donation details must persist');
 const previousGemini = config.useGemini;
 const previousEngine = process.env.ANIMORA_ENGINE;
 config.useGemini = false;

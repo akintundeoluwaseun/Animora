@@ -5,9 +5,9 @@ import { api, naira } from '../lib.jsx';
 import { Button } from '../components/ui.jsx';
 
 const STEPS = [
-  ['Choose your way to plan', 'Answer guided questions one at a time, or describe a birthday, wedding, event or business video in your own words. Animora will ask for details it still needs.'],
+  ['Fill in a short video brief', 'Choose a business, church, announcement, birthday, event or cause. Animora asks only the details that fit your video.'],
   ['Build a story, not a text loop', 'The director uses your details and photos to plan an opening, distinct shots and transitions, and a clear finish.'],
-  ['Download the MP4', 'Watch the preview, change anything in plain words, then download it for WhatsApp, TikTok or YouTube.'],
+  ['Review, edit and download', 'Change a saved answer and remake the video, or keep editing the finished video in the studio. Download the MP4 for WhatsApp, TikTok or YouTube.'],
 ];
 
 // Two doors, each says exactly what it makes and goes straight there.
@@ -45,7 +45,7 @@ export default function Home() {
           <div>
             <h1 className="max-w-[14ch] text-[2.75rem] font-bold leading-[1] tracking-[-0.045em] sm:text-[4.25rem]">Say it. Animora makes the video.</h1>
             <p className="mt-6 max-w-[46ch] text-lg leading-relaxed text-ink-soft">
-              Birthdays, weddings, church events, announcements, tributes or your business advert. Describe it in your own words and the AI director plans every shot. Download a finished MP4 in minutes. Flyers too.
+              Birthdays, weddings, church events, announcements, tributes or business promos. Fill in a few details chosen for that type of video—no giant prompt needed. Change your answers and remake it any time. Flyers too.
             </p>
             <div className="mt-9 grid max-w-[520px] gap-3 sm:grid-cols-2">
               <StartCard kind="video" />

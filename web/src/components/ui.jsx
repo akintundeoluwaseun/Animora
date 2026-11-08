@@ -195,7 +195,7 @@ export function ProjectTabs({ project, current, className = '' }) {
   if (!project?.id || !project.plan) return null;
   const id = project.id, flyer = project.kind === 'flyer';
   const tabs = [
-    { key: 'chat', label: 'Chat', to: `/p/${id}/plan`, on: true, d: 'M4 5.5h16v11H10L5.5 20v-3.5H4z' },
+    { key: 'chat', label: 'Brief', to: `/p/${id}/plan`, on: true, d: 'M4 5.5h16v11H10L5.5 20v-3.5H4z' },
     { key: 'edit', label: 'Edit', to: `/p/${id}/studio`, on: true, d: 'M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4' },
     !flyer && { key: 'video', label: 'Video', to: `/p/${id}/render`, on: !!project.code, d: 'M4 5h16v14H4zM10 9l5 3-5 3z' },
   ].filter(Boolean);

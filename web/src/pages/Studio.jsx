@@ -364,6 +364,7 @@ export default function Studio() {
           <p className="text-sm text-ink-mute">{flyer ? 'Flyer' : duration(project.durationSeconds)} · {ASPECTS[project.aspectRatio]?.label}</p>
         </div>
         <div className="flex items-center gap-3">
+          {!flyer && <Button as={Link} to={`/p/${id}/plan`} variant="outline" size="sm">Edit video brief</Button>}
           {project.code && <span className="hidden lg:block">{flyer ? <FlyerDownload project={project} /> : canRender ? <Button onClick={() => navigate(`/p/${id}/render?new=1`)}>{project.status === 'rendered' ? 'Render video again' : 'Generate Video'}</Button> : <DownloadVideo project={project} />}</span>}
         </div>
       </div>

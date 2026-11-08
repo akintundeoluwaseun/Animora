@@ -1,6 +1,5 @@
-// Page 1: the guided question flow. One question at a time, like a chat with a director:
-// pick an option (or several), or type your own answer. Every answer is saved once, so nothing is asked twice.
-// Pictures can be uploaded or pasted (Ctrl+V) anywhere on the page, up to 10. Special instructions come last.
+// Page 1: a brief-first flow. Video questions adapt to the selected type; flyers keep their own guided form.
+// Answers save as they go, can be reopened from the completed summary, and photos can be uploaded or pasted (Ctrl+V).
 import { announceKind } from '../components/Shell.jsx';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -53,11 +52,23 @@ const INTENSITY_OPTS = [
   { v: 'auto', l: "The template's own feel" }, { v: 'elegant', l: 'Elegant', d: 'Smooth and calm' }, { v: 'aggressive', l: 'Aggressive', d: 'Fast, punchy cuts' },
   { v: 'mechanical', l: 'Mechanical', d: 'Precise, techy moves' }, { v: 'fluid', l: 'Fluid', d: 'Flowing, liquid moves' },
 ];
-const GROUP_OF = { template: 'Look and feel', intensity: 'Look and feel', videoEngine: 'Look and feel', mode: 'Start', paste: 'Start', flyerType: 'Your business', offer: 'Your message', when: 'Your message', layout: 'Look and feel', name: 'Your business', category: 'Your business', goal: 'Your business', headline: 'Your message', payment: 'Your message', features: 'Your message', products: 'Your message', cta: 'Your message', contact: 'Your message', relationship: 'About them', milestone: 'About them', personalMessage: 'Your message', memories: 'Your message', aspect: 'Format', duration: 'Format', pictures: 'Look and feel', colors: 'Look and feel', style: 'Look and feel', scenes: 'Look and feel', voiceover: 'Finish', sound: 'Finish', extra: 'Finish' };
+const GROUP_OF = { template: 'Look and feel', intensity: 'Look and feel', videoEngine: 'Look and feel', mode: 'Start', paste: 'Start', flyerType: 'Your business', offer: 'Your message', when: 'Event details', layout: 'Look and feel', name: 'Basics', category: 'Video type', goal: 'Your message', headline: 'Main message', payment: 'Donation details', features: 'Your message', products: 'Your message', cta: 'Next step', contact: 'Contact', relationship: 'Birthday details', milestone: 'Birthday details', personalMessage: 'Main message', memories: 'Birthday details', aspect: 'Format', duration: 'Format', pictures: 'Photos', colors: 'Look and feel', style: 'Look and feel', scenes: 'Look and feel', voiceover: 'Finish', sound: 'Finish', extra: 'Finish' };
 
 const MAX_PICS = 10;
 
 const CATEGORIES = ['Fundraiser or donation', 'Birthday', 'Wedding', 'Church or ministry', 'Announcement', 'Personal story or tribute', 'Food & drinks', 'Fashion & clothing', 'Beauty & salon', 'Tech & software', 'Finance & payments', 'Health & fitness', 'Real estate', 'Events & parties', 'School & training', 'Shop & retail', 'Services'];
+const VIDEO_TYPES = [
+  { v: 'Business / product / service', l: 'Business, product or service' },
+  { v: 'Food & drinks', l: 'Food or drinks' },
+  { v: 'Fashion & clothing', l: 'Fashion or clothing' },
+  { v: 'Beauty & salon', l: 'Beauty or salon' },
+  { v: 'Tech & software', l: 'Technology or app' },
+  { v: 'Church or ministry', l: 'Church or ministry' },
+  { v: 'Announcement', l: 'Announcement' },
+  { v: 'Event or wedding', l: 'Event or wedding' },
+  { v: 'Birthday', l: 'Birthday greeting' },
+  { v: 'Fundraiser or donation', l: 'Fundraiser or cause' },
+];
 const RELATIONSHIPS = ['Brother', 'Sister', 'Mum', 'Dad', 'Friend', 'Partner', 'Son', 'Daughter', 'Cousin', 'Someone special'];
 const GOALS = ['Promote a sale or offer', 'Launch something new', 'Get more orders or bookings', 'Make people know my brand', 'Announce an event'];
 const CAUSE_CTAS = ['Donate today', 'Give what you can', 'Share this video', 'Join us', 'Volunteer with us'];
@@ -89,7 +100,7 @@ export function lengthWarning(b, v) {
 
 // The questions, in order. `show` hides a question that doesn't apply; `optional` adds a Skip button.
 // Each kind of business gets its own path: the questions that matter for it, worded for it. The rest are skipped.
-const isBirthday = (b) => /birthday|b-?day/i.test(`${b.category || ''} ${b.name || ''}`);
+const isBirthday = (b) => /birthday|b-?day/i.test(String(b.category || '')) || (b.kind === 'personal' && /birthday|b-?day/i.test(String(b.name || '')));
 const groupOf = (b) => {
   const c = `${b.category || ''} ${b.name || ''}`.toLowerCase();
   if (b.kind === 'cause' || /donat|fundrais|charity|appeal|\bngo\b|foundation|relief/.test(c)) return 'cause';
@@ -101,6 +112,21 @@ const groupOf = (b) => {
   if (/food|drink|restaurant|kitchen|cake|bakery|catering/.test(c)) return 'food';
   return 'shop';
 };
+const videoTypeOf = (b = {}) => {
+  const c = String(b.category || '').toLowerCase();
+  if (/birthday|b-?day/.test(c)) return 'birthday';
+  if (/church|ministry/.test(c)) return 'church';
+  if (/announc/.test(c)) return 'announcement';
+  if (/event|wedding|party|conference|program|invitation|funeral|graduation/.test(c)) return 'event';
+  if (b.kind === 'cause' || /donat|fundrais|charity|appeal|\bngo\b|foundation|relief/.test(c)) return 'cause';
+  if (/tech|software|app|saas|website|digital/.test(c)) return 'tech';
+  if (/food|drink|restaurant|kitchen|cake|bakery|catering/.test(c)) return 'food';
+  if (/fashion|clothing|adire/.test(c)) return 'fashion';
+  if (/beauty|salon|hair|spa/.test(c)) return 'beauty';
+  if (/health|fitness|service|school|training|tutor|repair|clean/.test(c)) return 'service';
+  return 'business';
+};
+const kindForVideoType = (b) => ({ birthday: 'personal', cause: 'cause', church: 'event', announcement: 'announcement', event: 'event' }[videoTypeOf(b)] || 'business');
 const PRODUCT_ASK = {
   food: () => "What's on the menu? One item per line, with the price if you like.",
   shop: () => 'Which items should we show? One per line, with the price if you like.',
@@ -151,6 +177,37 @@ const QUESTIONS = [
   { id: 'voiceover', type: 'single', options: [{ v: 'female', l: "Yes, a woman's voice", d: 'A natural voice reads your words, with real pauses' }, { v: 'male', l: "Yes, a man's voice", d: 'A natural voice reads your words, with real pauses' }, { v: 'no', l: 'No voice, just sound effects' }], ask: () => 'Do you want a voice in your video?' },
   { id: 'sound', show: (b) => !lookAuto(b), type: 'sound', ask: () => 'What sound should the video have?' },
   { id: 'extra', type: 'long', optional: true, chips: EXTRA_CHIPS, ask: () => 'Last one: any other special instructions? Anything goes. You can paste pictures here too.', placeholder: 'e.g. "Start by zooming into the logo of the chatbot, then show the app screen"', done: true },
+];
+// Video briefs stay short. The selected type determines which essential details are asked;
+// framing, length, sound and the classic director use sensible defaults.
+const VIDEO_QUESTIONS = [
+  { id: 'category', type: 'single', options: VIDEO_TYPES, ask: () => 'What kind of video are we making?' },
+  { id: 'name', type: 'text', ask: (b) => ({
+    birthday: 'Who are we celebrating?', church: 'What is the church or ministry called?',
+    announcement: 'Who is making the announcement?', event: 'What is the event called?',
+    cause: 'What is the organization or cause called?',
+  }[videoTypeOf(b)] || 'What is your business or brand called?'), placeholder: 'e.g. Tony, Kemi Cakes, Living Faith Ado, Annual Youth Convention' },
+  { id: 'relationship', type: 'single', options: RELATIONSHIPS, typed: true, show: (b) => videoTypeOf(b) === 'birthday', ask: (b) => `Who are you to ${b.name || 'the birthday person'}?`, placeholder: 'Or type your relationship' },
+  { id: 'milestone', type: 'text', optional: true, show: (b) => videoTypeOf(b) === 'birthday', ask: () => 'What age or milestone are they celebrating?', placeholder: 'e.g. Turning 20' },
+  { id: 'personalMessage', type: 'long', show: (b) => videoTypeOf(b) === 'birthday', ask: (b) => `What would you like to say to ${b.name || 'them'}?`, hint: 'Animora will shape your words into several short, readable moments.', placeholder: 'e.g. Happy birthday, brother! I’m proud of you. May this new age bring you many blessings.' },
+  { id: 'headline', type: 'long', show: (b) => videoTypeOf(b) !== 'birthday', ask: (b) => ({
+    church: 'What should people know about the service or programme?',
+    announcement: 'What are you announcing? Write the key news clearly.',
+    event: 'What is the main event message, and why should people come?',
+    cause: 'What does the cause do, and who will it help?',
+    tech: 'What does your app or technology help people do?',
+  }[videoTypeOf(b)] || 'What is the main product, service or offer people should remember?'), hint: 'One clear message is enough. Include a price or key detail if it matters.', placeholder: 'e.g. Fresh cakes made to order, with free delivery this weekend' },
+  { id: 'when', type: 'text', optional: true, show: (b) => ['church', 'announcement', 'event'].includes(videoTypeOf(b)), ask: (b) => videoTypeOf(b) === 'church' ? 'When and where is the service or programme?' : 'When and where is it happening?', placeholder: 'e.g. Sunday 16 Nov, 10am · Living Faith Church, Ado Ekiti' },
+  { id: 'payment', type: 'long', optional: true, show: (b) => videoTypeOf(b) === 'cause', ask: () => 'Where should donations go? Add the bank, account number and account name.', hint: 'Shown on screen exactly as you enter it.', placeholder: 'GTBank · 0123456789 · Community Health Initiative' },
+  { id: 'cta', type: 'single', optional: true, typed: true, options: CTAS, optionsFor: (b) => videoTypeOf(b) === 'cause' ? CAUSE_CTAS : ['Join us', 'Register now', 'Share this video', ...CTAS], show: (b) => videoTypeOf(b) !== 'birthday', ask: () => 'What should viewers do next?', placeholder: 'e.g. Register today or join us this Sunday' },
+  { id: 'contact', type: 'text', optional: true, show: (b) => ['business', 'food', 'fashion', 'beauty', 'tech', 'service'].includes(videoTypeOf(b)), ask: () => 'What phone, WhatsApp number or website should appear?', placeholder: 'e.g. WhatsApp 0803 123 4567 · www.kemicakes.ng' },
+  { id: 'pictures', type: 'upload', optional: true, ask: (b) => ({
+    birthday: `Add photos of ${b.name || 'the birthday person'} if you have them (optional).`,
+    church: `Add your church logo or programme photos if you have them (optional, up to ${MAX_PICS}).`,
+    announcement: `Add a logo or relevant photos if you have them (optional, up to ${MAX_PICS}).`,
+    event: `Add event or wedding photos if you have them (optional, up to ${MAX_PICS}).`,
+    cause: `Add your organization logo or photos of the cause if you have them (optional, up to ${MAX_PICS}).`,
+  }[videoTypeOf(b)] || `Add your logo or product photos if you have them (optional, up to ${MAX_PICS}).`) },
 ];
 // Flyers: the same questions minus length, narration and sound, with flyer wording and print sizes.
 const FLYER_ASPECTS = [
@@ -342,6 +399,7 @@ export default function Plan() {
   const [loadingSug, setLoadingSug] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [building, setBuilding] = useState(false);
+  const [answersChanged, setAnswersChanged] = useState(false);
   const [reading, setReading] = useState(false);   // reading a pasted description
   const [error, setError] = useState('');
   const [toast, setToast] = useState('');
@@ -354,7 +412,7 @@ export default function Plan() {
 
   const pics = (project?.assets || []).filter((a) => a.kind === 'image');
   const logo = pics.find((a) => a.role === 'logo');
-  const QS = project?.kind === 'flyer' ? FLYER_QUESTIONS : QUESTIONS;
+  const QS = project?.kind === 'flyer' ? FLYER_QUESTIONS : VIDEO_QUESTIONS;
   const visible = QS;
   const what = project?.kind === 'flyer' ? 'flyer' : 'video';
   const q = visible[step];
@@ -382,7 +440,7 @@ export default function Plan() {
         bRef.current = brief; setB(brief);
         const { styles: st } = await api('/styles'); setStyles(st);
         const imgs = (r.project.assets || []).filter((a) => a.kind === 'image').length;
-        const LIST = r.project.kind === 'flyer' ? FLYER_QUESTIONS : QUESTIONS;
+        const LIST = r.project.kind === 'flyer' ? FLYER_QUESTIONS : VIDEO_QUESTIONS;
         const first = LIST.findIndex((qq) => { const v = valueOf(qq, brief, imgs); return v === undefined && !(qq.optional && brief[`${qq.id}Skipped`]); });
         setStep(brief.done && r.project.plan ? LIST.length : first < 0 ? LIST.length : first);
       } catch (e) { setError(e.message); }
@@ -418,7 +476,9 @@ export default function Plan() {
   const bRef = useRef(b);
   const saving = useRef(Promise.resolve());
   const save = (patch) => {
-    const next = { ...bRef.current, ...patch };
+    const current = bRef.current;
+    if (project?.code && Object.entries(patch).some(([k, v]) => JSON.stringify(current[k]) !== JSON.stringify(v))) setAnswersChanged(true);
+    const next = { ...current, ...patch };
     bRef.current = next; setB(next);
     saving.current = saving.current.then(() => api(`/projects/${id}/brief`, { method: 'PATCH', body: { brief: patch } })
       .then((r) => setProject((p) => ({ ...p, ...r.project, assets: r.project.assets || p.assets })))
@@ -462,11 +522,32 @@ export default function Plan() {
     }
     if (q.id === 'voiceover') patch = { voiceover: value === 'female' || value === 'male', voiceGender: value === 'male' ? 'male' : value === 'female' ? 'female' : undefined };
     else if (q.id === 'lookAuto') patch = value === 'auto' ? { lookAuto: 'auto', styleAuto: true, colorMode: bRef.current.colorMode || 'style', sound: bRef.current.sound || 'all' } : { lookAuto: 'own' };
-
+    else if (q.id === 'category') {
+      const changedType = String(value) !== String(bRef.current.category || '');
+      patch = {
+        category: value, kind: kindForVideoType({ category: value }), aspect: bRef.current.aspect || '9:16',
+        duration: bRef.current.duration || 20, videoEngine: bRef.current.videoEngine || 'motion',
+        lookAuto: bRef.current.lookAuto || 'auto', styleAuto: bRef.current.styleAuto ?? true, sound: bRef.current.sound || 'all',
+        ...(changedType ? {
+          headlines: undefined, headline: undefined, goals: undefined, goal: undefined, ctas: undefined, cta: undefined,
+          relationship: undefined, milestone: undefined, personalMessage: undefined, memories: undefined,
+          when: undefined, payment: undefined, contact: undefined, features: undefined, products: undefined, steps: undefined,
+          headlineSkipped: false, ctaSkipped: false, whenSkipped: false, paymentSkipped: false, contactSkipped: false,
+          relationshipSkipped: false, milestoneSkipped: false, personalMessageSkipped: false,
+        } : {}),
+      };
+    }
     else if (q.id === 'duration') patch = { duration: Number(value) };
-    else if (q.id === 'headline') patch = { headlines: value, headline: value[0] };
+    else if (q.id === 'headline') {
+      const headlines = (Array.isArray(value) ? value : String(value || '').split('\n')).map((x) => String(x).trim()).filter(Boolean).slice(0, 8);
+      patch = { headlines, headline: headlines[0] || '' };
+    }
     else if (q.id === 'goal') patch = { goals: value, goal: value.join(' + ') };
-    else if (q.id === 'cta') patch = { ctas: value, cta: value[0] };
+    else if (q.id === 'cta') {
+      const ctas = (Array.isArray(value) ? value : String(value || '').split('\n')).map((x) => String(x).trim()).filter(Boolean).slice(0, 5);
+      patch = { ctas, cta: ctas[0] || '' };
+    }
+    else if (q.id === 'relationship') patch = { relationship: String(value || '').trim().toLowerCase() };
     else if (q.id === 'memories') patch = { memories: String(value).split(/\n|;/).map((x) => x.trim()).filter(Boolean).slice(0, 8) };
     else if (q.id === 'scenes') patch = value === 'auto' ? { sceneAuto: true, scenes: [] } : { sceneAuto: false, scenes: value };
     else patch = { [q.id]: value };
@@ -494,6 +575,7 @@ export default function Plan() {
         form.append('name', role === 'logo' ? 'logo' : f.name.replace(/\.[^.]+$/, '').slice(0, 40));
         const { asset } = await api(`/projects/${id}/assets`, { method: 'POST', form });
         setProject((p) => ({ ...p, assets: [...(p.assets || []), asset] }));
+        if (project?.code) setAnswersChanged(true);
       }
       setToast(files.length > 1 ? 'Pictures added' : 'Picture added'); setTimeout(() => setToast(''), 2500);
     } catch (e) { setError(e.message); } finally { setUploading(false); [logoRef, photoRef].forEach((r) => { if (r.current) r.current.value = ''; }); }
@@ -501,6 +583,7 @@ export default function Plan() {
   const removePic = async (a) => {
     await api(`/projects/${id}/assets/${a.id}`, { method: 'DELETE' }).catch(() => {});
     setProject((p) => ({ ...p, assets: p.assets.filter((x) => x.id !== a.id) }));
+    if (project?.code) setAnswersChanged(true);
   };
 
   const build = async (brief) => {
@@ -508,6 +591,7 @@ export default function Plan() {
     try {
       const r = await api(`/projects/${id}/build`, { method: 'POST', body: { brief } });
       setProject((p) => ({ ...p, ...r.project }));
+      setAnswersChanged(false);
       navigate(`/p/${id}/studio?generate=1`);
     } catch (e) { setError(e.message); setBuilding(false); }
   };
@@ -733,8 +817,21 @@ export default function Plan() {
             {finished && (
               <div className="py-4">
                 <h2 className="wiz-q">{building ? (what === 'flyer' ? 'Designing your flyer…' : 'Planning your scenes…') : project.plan ? 'Your answers are saved.' : `Ready when you are.`}</h2>
-                <p className="wiz-hint">{building ? 'This takes a few seconds.' : project.plan ? `Change any answer on the left, or open your ${what}.` : `I have everything I need to make your ${what}.`}</p>
+                <p className="wiz-hint">{building ? 'This takes a few seconds.' : project.plan ? `Tap any answer below to change it, then remake your ${what} when you are ready.` : `I have the essentials for your ${what}. You can review and change these answers before making it.`}</p>
                 {building && <div className="mt-5 flex"><div className="bubble-ai typing px-4 py-3.5"><span /><span /><span /></div></div>}
+                {!building && <div className="mt-5 space-y-2">
+                  {shownQs.filter(({ qq }) => qq.id !== 'mode').map(({ qq, i }) => {
+                    const value = valueOf(qq, b, pics.length);
+                    const skipped = qq.optional && (b[`${qq.id}Skipped`] || value === undefined);
+                    const answerText = skipped ? 'Skipped · tap to add' : value === undefined ? 'Not answered · tap to add' : label(qq, value, b, styles);
+                    const title = ({ category: 'Video type', name: 'Name or title', relationship: 'Relationship', milestone: 'Age or milestone', personalMessage: 'Birthday message', headline: 'Main message', when: 'Date, time and place', payment: 'Donation details', cta: 'Next step', contact: 'Contact details', pictures: 'Photos', extra: 'Extra details' })[qq.id] || qq.ask(b);
+                    return <button key={qq.id} type="button" disabled={building} onClick={() => { setEditing(true); setBackMode(false); setStep(i); }} className="flex w-full items-start justify-between gap-3 rounded-xl bg-lilac px-3.5 py-3 text-left hover:bg-lilac/70 disabled:opacity-60">
+                      <span className="min-w-0"><span className="block text-xs font-semibold uppercase tracking-wide text-ink-mute">{title}</span><span className="mt-1 block line-clamp-2 break-words text-sm font-medium text-ink">{answerText}</span></span>
+                      <span className="shrink-0 pt-3 text-xs font-bold text-ink-soft">Edit</span>
+                    </button>;
+                  })}
+                  {answersChanged && project.code && <p className="rounded-xl border border-amber-300 bg-amber-50 px-3.5 py-3 text-sm text-ink">Your saved answers have changed. The current video stays as it is until you remake it.</p>}
+                </div>}
                 {what === 'video' && !project.code && lengthWarning(b, b.duration) && (
                   <div className="mt-5 rounded-[14px] border border-amber-300 bg-amber-50 p-4 text-[14px] leading-relaxed text-ink" role="alert">
                     <p>{lengthWarning(b, b.duration).text}</p>
@@ -750,14 +847,15 @@ export default function Plan() {
               {!finished && <button type="button" onClick={goBack} disabled={isFirst || building} className="wiz-back">← Back</button>}
               {!finished && <span className="flex-1" />}
               {!finished && q?.optional && !q.done && <button type="button" onClick={skip} className="wiz-skip">Skip</button>}
-              {!finished && b.name && q && !['mode', 'paste', 'name'].includes(q.id) && !q.done && (groupOf(b) !== 'birthday' || b.personalMessage) && <button type="button" onClick={makeNow} disabled={building || reading} className="wiz-now">Make it now</button>}
+              {!finished && project.kind === 'flyer' && b.name && q && !['mode', 'paste', 'name'].includes(q.id) && !q.done && <button type="button" onClick={makeNow} disabled={building || reading} className="wiz-now">Make it now</button>}
               {!finished && needsContinue && <Button type="submit" size="lg" className="wiz-go" loading={reading} disabled={continueDisabled}>{continueLabel}</Button>}
               {finished && (
                 <div className="flex w-full flex-col gap-2 sm:w-auto sm:items-end">
-                  <Button type="button" size="lg" className="w-full sm:w-auto" loading={building} onClick={() => (project.plan && b.done ? navigate(`/p/${id}/studio${project.code ? '' : '?generate=1'}`) : build(b))}>
-                    {project.plan && project.code ? `Open my ${what}` : `Make my ${what}`}
+                  <Button type="button" size="lg" className="w-full sm:w-auto" loading={building} onClick={() => (project.plan && project.code && b.done && !answersChanged ? navigate(`/p/${id}/studio`) : build(b))}>
+                    {project.plan && project.code ? (answersChanged ? `Remake ${what} with updated answers` : `Open my ${what}`) : `Make my ${what}`}
                   </Button>
-                  {project.plan && <button type="button" onClick={() => build(b)} disabled={building} className="text-sm font-semibold text-ink-mute hover:text-ink">Plan again from my answers</button>}
+                  {project.plan && project.code && !answersChanged && <button type="button" onClick={() => build(b)} disabled={building} className="text-sm font-semibold text-ink-mute hover:text-ink">Remake {what} from these answers</button>}
+                  {project.plan && project.code && answersChanged && <button type="button" onClick={() => navigate(`/p/${id}/studio`)} className="text-sm font-semibold text-ink-mute hover:text-ink">Keep current {what} for now</button>}
                 </div>
               )}
             </div>
