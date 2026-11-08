@@ -42,6 +42,8 @@ const keep = (arr) => arr.filter((x) => !isVague(x));
 export function cleanBrief(b = {}) {
   const out = {
     name: str(b.name, 60), category: str(b.category, 60),
+    relationship: str(b.relationship, 50), milestone: str(b.milestone, 60),
+    personalMessage: str(b.personalMessage, 1200), memories: list(b.memories).slice(0, 8),
     // what the video is for: a business ad, an event, a personal moment, an announcement
     kind: ['business', 'event', 'personal', 'announcement', 'cause', 'other'].includes(b.kind) ? b.kind : (CAUSE_RE.test(`${b.category || ''} ${b.name || ''}`) ? 'cause' : undefined),
     // fundraising: where gifts go (bank, account number, account name). Shown exactly as written, never treated as a phone number.
@@ -55,6 +57,7 @@ export function cleanBrief(b = {}) {
     ctas: list(Array.isArray(b.ctas) ? b.ctas : Array.isArray(b.cta) ? b.cta : b.cta ? [b.cta] : []).slice(0, 5),
     contact: str(b.contact, 120), aspect: ['9:16', '16:9', '1:1', '4:5', 'A4'].includes(b.aspect) ? b.aspect : undefined,
     duration: Number(b.duration) || undefined, styleId: b.styleId ? String(b.styleId) : undefined, styleAuto: !!b.styleAuto,
+    videoEngine: ['motion', 'pieces'].includes(b.videoEngine) ? b.videoEngine : undefined,
     colors: b.colors && typeof b.colors === 'object' ? Object.fromEntries(Object.entries(b.colors).filter(([k, v]) => ['primary', 'secondary', 'background', 'text'].includes(k) && /^#[0-9a-f]{6}$/i.test(v))) : undefined,
     voiceover: b.voiceover === undefined || b.voiceover === null ? undefined : [true, 'yes', 'female', 'male'].includes(b.voiceover),
     voiceGender: b.voiceover === 'male' || b.voiceGender === 'male' ? 'male' : b.voiceover === 'female' || b.voiceGender === 'female' ? 'female' : undefined,
@@ -82,8 +85,8 @@ export function cleanBrief(b = {}) {
   if (Array.isArray(out.flyerType) && !out.flyerType.length) delete out.flyerType;
   // vague answers ("anything", "just make a demo") are dropped; demo = invent sample content for this kind of business
   let vague = false;
-  for (const k of ['name', 'category', 'contact', 'extra', 'pasteText', 'offer', 'when', 'goal', 'headline', 'cta']) if (typeof out[k] === 'string' && isVague(out[k])) { out[k] = ''; vague = true; }
-  for (const k of ['goals', 'headlines', 'products', 'features', 'ctas', 'steps']) if (Array.isArray(out[k])) { const n = out[k].length; out[k] = keep(out[k]); if (out[k].length < n) vague = true; if (!out[k].length) delete out[k]; }
+  for (const k of ['name', 'category', 'contact', 'extra', 'pasteText', 'offer', 'when', 'goal', 'headline', 'cta', 'relationship', 'milestone', 'personalMessage']) if (typeof out[k] === 'string' && isVague(out[k])) { out[k] = ''; vague = true; }
+  for (const k of ['goals', 'headlines', 'products', 'features', 'ctas', 'steps', 'memories']) if (Array.isArray(out[k])) { const n = out[k].length; out[k] = keep(out[k]); if (out[k].length < n) vague = true; if (!out[k].length) delete out[k]; }
   if (out.headline === '' && out.headlines?.length) out.headline = out.headlines[0];
   if (out.cta === '' && out.ctas?.length) out.cta = str(out.ctas[0], 60);
   if (vague || b.demo) out.demo = true;
@@ -133,6 +136,71 @@ function readable(colors, chosen) {
   return { ...colors, text: lum(colors.background) > 0.4 ? '#111318' : '#F7F7FA' };
 }
 
+function birthdayAge(value) {
+  const n = Number(String(value || '').match(/\d{1,2}/)?.[0]);
+  if (!n) return str(value, 30);
+  const suffix = n % 100 >= 11 && n % 100 <= 13 ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' }[n % 10] || 'th');
+  return `${n}${suffix}`;
+}
+
+function shortPersonalLines(value, limit = 8) {
+  const words = String(value || '').replace(/\s+/g, ' ').trim().split(' ').filter(Boolean);
+  const lines = [];
+  for (let i = 0; i < words.length; i += 8) lines.push(words.slice(i, i + 8).join(' '));
+  return lines.map((x) => str(x, 90)).filter(Boolean).slice(0, limit);
+}
+
+function birthdayPlan(b, { assets, limits, palette }) {
+  const min = limits.minSeconds || 15, max = limits.maxSeconds || 300;
+  const photos = assets.filter((a) => a.kind === 'image' && a.role !== 'logo');
+  const name = b.name || 'Someone special';
+  const relationship = str(b.relationship, 40).replace(/^(my|our)\s+/i, '').toLowerCase();
+  const age = birthdayAge(b.milestone);
+  const greeting = `Happy${age ? ` ${age}` : ''} Birthday${name ? `, ${name}` : ''}!`;
+  const memories = (b.memories || []).flatMap((x) => shortPersonalLines(x, 2)).slice(0, 4);
+  const message = b.personalMessage
+    ? shortPersonalLines(b.personalMessage, 8)
+    : ['May your new age be filled with blessings.', 'Wishing you joy, good health and beautiful opportunities.', "I'm so happy to celebrate you."];
+  const closing = `Blessed new age, ${name}!`;
+  const lines = [
+    { purpose: 'hook', text: [greeting], weight: 1.25, photo: photos[0] },
+    { purpose: 'brand', text: [name, relationship ? `From your ${relationship}` : 'A day all about you'], weight: 1.05 },
+    ...memories.map((x, i) => ({ purpose: 'detail', text: [x], weight: 1, photo: photos[i + 1] })),
+    ...message.map((x) => ({ purpose: 'detail', text: [x], weight: 1 })),
+    { purpose: 'cta', text: [closing], weight: 1.2 },
+  ];
+  const needed = Math.ceil((lines.length * 3.5) / 5) * 5;
+  const D = Math.max(min, Math.min(max, Math.max(b.duration || 20, needed)));
+  const total = lines.reduce((sum, s) => sum + s.weight, 0);
+  let t = 0;
+  const scenes = lines.map((s, i) => {
+    const end = i === lines.length - 1 ? D : Math.round((t + (D * s.weight) / total) * 10) / 10;
+    const text = s.text.filter(Boolean);
+    const scene = { id: i + 1, start: t, end, purpose: s.purpose, on_screen_text: text, images: s.photo ? [{ asset: s.photo.name, placement: i === 0 ? 'background' : 'center' }] : [] };
+    if (b.voiceover) scene.voiceover = (i === 0 ? greeting : text.join('. ')).slice(0, 180);
+    t = end;
+    return scene;
+  });
+  return {
+    title: `${name}'s ${age ? `${age} ` : ''}Birthday`.slice(0, 110),
+    business: { name, category: 'Birthday celebration', location: '', phone: '', handle: '' },
+    aspect_ratio: b.aspect || '9:16', duration_seconds: D,
+    style: { colors: readable({ ...(palette || {}), ...(b.colors || {}) }, b.colors) },
+    assets: assets.filter((a) => a.kind === 'image').map((a) => ({ name: a.name, url: a.url, use: a.role === 'logo' ? 'logo' : 'personal photo' })),
+    scenes,
+    voiceover: b.voiceover ? { enabled: true, source: 'ai', voice_style: 'warm, sincere and celebratory', captions: true } : { enabled: false },
+    cta: closing, goal: 'Celebrate someone special',
+    special_instructions: [
+      'This is a personal birthday greeting, not a business advert. Do not add prices, sales language, contact details, or a call to action.',
+      `Recipient: ${name}${relationship ? `; the sender is their ${relationship}` : ''}${age ? `; celebrating ${age}` : ''}.`,
+      b.personalMessage ? `Use the sender's own message and preserve its meaning: ${b.personalMessage}` : 'Use the warm birthday wishes in the scene plan. Do not invent personal history or personality traits.',
+      memories.length ? `Use only these personal details: ${memories.join(' · ')}` : '', b.extra,
+    ].filter(Boolean).join('\n\n'),
+    sound: b.sound || 'all', sfx: b.sound !== 'none',
+    music_url: b.sound === 'own' ? (assets.find((a) => a.kind === 'audio' && a.role === 'music') || {}).url || '' : '',
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Rule-based plan (always works)
 // ---------------------------------------------------------------------------
@@ -141,6 +209,7 @@ export function briefToPlanRules(brief, { assets = [], limits = { minSeconds: 15
   const b = { ...cleanBrief(brief) }; for (const k of ['features', 'products', 'headlines', 'ctas', 'goals', 'steps']) if (!Array.isArray(b[k])) b[k] = [];
   let D = Math.max(limits.minSeconds || 15, Math.min(limits.maxSeconds || 300, b.duration || 20));
   const images = assets.filter((a) => a.kind === 'image');
+  if ((b.kind === 'personal' || /\bbirthday\b/i.test(b.category || '')) && /birthday|b-?day/i.test(`${b.category || ''} ${b.name || ''}`)) return birthdayPlan(b, { assets, limits, palette });
   const logo = images.find((a) => a.role === 'logo');
   const photos = images.filter((a) => a.role !== 'logo');
   const pay = b.payment || '';
@@ -356,7 +425,26 @@ export function parseBriefRules(text) {
   const KINDS = [[CAUSE_RE, 'Fundraiser', 'cause'], [/birthday|b-?day|anniversary/i, 'Birthday', 'personal'], [/wedding|engagement|bridal/i, 'Wedding', 'event'], [/church|ministry|sunday service|revival|crusade|mosque/i, 'Church event', 'event'],
     [/tribute|in memory|memorial|funeral|rip\b/i, 'Tribute', 'personal'], [/graduat|convocation|school event|prize giving/i, 'Graduation', 'event'], [/announce|programme|program|invitation|invite|save the date/i, 'Announcement', 'announcement']];
   for (const [re, cat, kind] of KINDS) if (re.test(t)) { out.category = out.category || cat; out.kind = out.kind || kind; break; }
-  if (!out.name) {
+  const birthday = /birthday|b-?day/i.test(`${out.category || ''} ${t}`);
+  if (birthday) {
+    const relation = t.match(/\b(?:my|our)\s+(brother|sister|mum|mom|mother|dad|father|friend|partner|husband|wife|son|daughter|cousin|uncle|aunt|grandma|grandmother|grandpa|grandfather)\b/i)
+      || t.match(/\bfor\s+(brother|sister|mum|mom|mother|dad|father|friend|partner|husband|wife|son|daughter|cousin|uncle|aunt|grandma|grandmother|grandpa|grandfather)\b/i);
+    if (relation) out.relationship = relation[1].toLowerCase();
+    const possessiveName = t.match(/\b([A-Z][\p{L}'’.-]*(?:\s+[A-Z][\p{L}'’.-]*){0,1})['’]s\s+(?:\d{1,2}(?:st|nd|rd|th)?\s+)?birthday\b/u);
+    const nameAfterRole = t.match(/\b(?:for|to)\s+(?:(?:my|our)\s+)?(?:(?:brother|sister|mum|mom|mother|dad|father|friend|partner|husband|wife|son|daughter|cousin|uncle|aunt|grandma|grandmother|grandpa|grandfather)\s*,?\s+)?(?!my\b|our\b|turning\b|turns\b|age\b|celebrating\b|brother\b|sister\b|mum\b|mom\b|mother\b|dad\b|father\b|friend\b|partner\b|husband\b|wife\b|son\b|daughter\b|cousin\b|uncle\b|aunt\b|grandma\b|grandmother\b|grandpa\b|grandfather\b)([A-Z][\p{L}'’.-]*(?:\s+[A-Z][\p{L}'’.-]*){0,1})(?=\s+(?:turning|turns|celebrating|who|is|will)\b|[,!?;.]|$)/iu);
+    if (possessiveName) out.name = possessiveName[1].trim();
+    else if (nameAfterRole) out.name = nameAfterRole[1].trim();
+    const age = t.match(/\b(?:turning|turns|turn|celebrating|celebrates|age|the big)\s+(?:the\s+)?(\d{1,2}(?:st|nd|rd|th)?|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty)\b/i)
+      || t.match(/\b(\d{1,2}(?:st|nd|rd|th))\s+birthday\b/i);
+    if (age) {
+      const raw = age[1].toLowerCase().replace(/(?:st|nd|rd|th)$/i, '');
+      const words = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16, seventeen: 17, eighteen: 18, nineteen: 19, twenty: 20, thirty: 30, forty: 40, fifty: 50, sixty: 60 };
+      out.milestone = String(words[raw] || raw);
+    }
+    const message = t.match(/\b(?:message(?:\s+for\s+(?:him|her|them))?|say|write|include(?:\s+the\s+words)?|tell\s+(?:him|her|them))\s*(?:is|:|-|,)?\s*["“]?([^"”\n]{8,1200})/i);
+    if (message) out.personalMessage = message[1].trim().replace(/["”]+$/, '');
+  }
+  if (!out.name && !birthday) {
     const first = t.split(/[\n.,;!?]/)[0].replace(/^\s*(?:please\s+)?(?:i\s+(?:want|need|would like)\s+(?:to\s+make\s+)?)?(?:make\s+(?:me\s+)?)?(?:an?\s+)?(?:(?:birthday|wedding|promo|promotional|short|nice|cool|donation|donations|fundraising|fundraiser|charity|appeal)\s+)?(?:video|ad|advert|advertisement|flyer|clip)?\s*(?:for|about|of|on)?\s*(?:my\s+|our\s+|the\s+)?/i, '').trim();
     if (first.length >= 3) out.name = first.charAt(0).toUpperCase() + str(first, 40).slice(1);
   }
@@ -374,14 +462,16 @@ export async function parseBrief(text, current = {}) {
     // never keep a person waiting: all Gemini attempts together get ~20 s, then the rules reader takes over
     const { text: out } = await Promise.race([geminiGenerate({
       model: BRIEF_MODEL(),
-      system: `You are a smart video director. A person describes ANY video they want: a business advert, a birthday, a wedding, a church or school event, an announcement, a tribute, a personal story, a promo, a music or lyric video. Read it and fill in a form so they do not have to answer questions. Return JSON only.
-Be smart: work out what they mean from a few words and make sensible choices yourself. Never invent facts (names, dates, places, prices, phone numbers, awards, claims). You MAY write short, warm, natural on-screen lines from what they told you.
+      system: `You are a smart video director. A person describes ANY video they want: a business advert, a birthday, a wedding, a church or school event, an announcement, a tribute, a personal story, a promo, a music or lyric video. Read it and fill in a form. Return JSON only.
+Never invent facts (names, dates, places, ages, relationships, memories, prices, phone numbers, awards, or personal messages). For birthdays, set name only when the recipient's real name is clear; leave it empty when the prompt says only "my brother", "my friend" or similar so the form can ask. Extract personal wording only when the user explicitly wrote it. You MAY make sensible visual choices, but don't pretend generic filler is a personal message.
 Keys:
 { "kind": "business" | "event" | "personal" | "announcement" | "cause" | "other"  (cause = a donation, fundraiser, charity or community appeal),
-  "name": the title or subject in a few words (a business name, "Tola's 30th Birthday", "Sunday Service", "Our Wedding"), always give one,
+  "name": the real recipient's name for a personal birthday (empty if not stated); otherwise a title or subject in a few words,
   "category": what it is (2-4 words, e.g. "Birthday", "Wedding", "Church event", "Laptop repairs"),
+  "relationship": the user's relationship to the birthday person, only if stated, "milestone": age or milestone, only if stated,
+  "personalMessage": exact wording the user explicitly supplied for the birthday person, otherwise empty, "memories": ["..."], only details explicitly supplied,
   "goals": ["..."] (why they want it), "headlines": ["2-3 short on-screen messages, under 7 words each, written from their idea"],
-  "features": ["..."] (highlights or key points, 2-5 words each; leave out if there are none), "products": ["Item ₦price"] (only if they gave prices),
+  "features": ["..."] (business highlights only; don't use for birthdays), "products": ["Item ₦price"] (only if they gave prices),
   "ctas": ["..."] (the closing line or what viewers should do; for personal videos use something fitting like "Happy birthday!" or "Join us"; a cause gets "Donate today" or "Give what you can"; only business adverts get a sales call to action),
   "contact": phone / website / address only if given (never an account number), "payment": for a cause, the bank, account number and account name exactly as given ("GTBank · 0123456789 · Name"), "when": date, time and place if given,
   "aspect": "9:16" | "16:9" | "1:1" (9:16 unless they say otherwise), "duration": seconds (about 20 unless they say otherwise),

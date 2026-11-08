@@ -138,9 +138,11 @@ export async function directMotion({ plan, brief = null, assets = [], themeColor
   // the chosen style is a whole look: stage, display type, background world, pacing
   const look = lookFor(style?.slug || style?.palette?.theme || '', { ...(style?.palette || {}), ...themeColors });
   const rules = composeMotion(plan, { brief: brief || {}, assets, salt, avoid, colors, look });
+  const personalBirthday = /birthday|b-?day/i.test(`${brief?.category || ''} ${plan.business?.category || ''} ${plan.title || ''}`)
+    && (brief?.kind === 'personal' || brief?.relationship || brief?.personalMessage || (brief?.memories || []).length);
   const logo = (assets || []).find((a) => (a.kind || 'image') === 'image' && (a.role === 'logo' || /logo/i.test(a.name || '')));
   let beats = null, font = rules.font, concept = '';
-  if (useAi) {
+  if (useAi && !personalBirthday) {
     try {
       const f = factsFrom(plan, brief || {}, assets);
       const facts = { brand: rules.brand, category: f.cat, messages: f.headlines, strengths: f.features, products: f.products, call_to_action: f.cta, contact: f.phone, address: f.address, goal: f.goal, offer: brief?.offer, when: brief?.when, extra: brief?.extra, pasted: brief?.pasteText ? String(brief.pasteText).slice(0, 2500) : undefined };
@@ -164,7 +166,7 @@ export async function directMotion({ plan, brief = null, assets = [], themeColor
   const sound = plan.sound || (plan.sfx === false ? 'none' : 'sfx');
   const music = sound === 'own' && plan.music_url ? { url: plan.music_url } : sound === 'piano' || sound === 'soft' ? { url: `/music/${sound}.mp3`, builtin: sound } : null;
   const data = { W, H, seed: seedOf(`${rules.brand}${salt}`), brand: rules.brand, logo: logo?.url || null, font: look.ui || font, look, accent: rules.accent, accent2: look.accent2, beats, sound: sound === 'none' ? 'none' : 'on', music };
-  return { html: motionHtml(data), data, concept, source: aiBeats ? 'gemini' : 'template' };
+  return { html: motionHtml(data), data, concept, source: aiBeats ? 'gemini' : 'template', aiSkipped: !!personalBirthday };
 }
 
 /** Plain-words edit of a Motion film: Gemini gets the storyboard and returns a new one. */

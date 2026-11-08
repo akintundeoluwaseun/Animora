@@ -56,6 +56,7 @@ export const LOOKS = {
 };
 export const LOOK_IDS = Object.keys(LOOKS);
 const AFFINITY = [
+  [/birthday|anniversary|celebrat/i, ['fresh', 'editorial', 'noir']],
   [/luxur|jewel|perfume|fragrance|watch|hotel|lounge|wine|spirit|champagne|real estate|propert|wedding|bridal|event plan|interior|fashion|couture|gold/i, ['noir', 'editorial']],
   [/caf[eé]|coffee|bakery|bake|cake|restaurant|kitchen|food|chef|catering|boutique|beauty|salon|spa|lash|nail|makeup|hair|skin|photograph|book|florist|flower|tailor/i, ['editorial', 'noir', 'fresh']],
   [/gym|fitness|sport|football|promo|sale|music|party|club|street|sneaker|fast food|burger|pizza|grill|suya|church|concert|show|barber|car wash|logistic|dispatch|delivery/i, ['bold', 'tech']],
@@ -94,6 +95,24 @@ export function composeStory({ facts: f, duration, seed, look: lookId, aspect, o
   const photos = f.photos.map((url) => ({ url, ratio: (f.ratios || {})[url] || 0, fit: f.fits[url] || 'cover', cut: cuts.has(url), pos: `${45 + Math.round(r() * 10)}% ${40 + Math.round(r() * 20)}%` }));
   const beats = [];
   const add = (type, data, keep, v, extra = {}) => beats.push({ type, data, keep, v, ...extra });
+  const ideas = [];
+  if (f.personalBirthday) {
+    const head = f.heads[0] || `Happy Birthday${f.name ? `, ${f.name}` : ''}!`;
+    add('hook', { headline: head, label: 'A birthday wish', sub: f.age ? `Celebrating ${f.age}` : 'Today is all about you', ...(photos[0] ? { photo: photos[0].url, fit: photos[0].fit, pos: photos[0].pos } : {}) }, 10, photos[0] ? (photos[0].fit === 'contain' ? 'split' : 'full') : 'type');
+    add('statement', { text: f.relationship ? `From your ${f.relationship}` : `Celebrating ${f.name}`, label: f.name }, 9);
+    if (f.gallery && photos.length >= 2) {
+      const shots = photos.slice(0, 10);
+      const styles = shots.length >= 3 ? (L.dark ? ['reel', 'strip', 'ring', 'ring', 'strip'] : ['reel', 'collage', 'collage', 'ring']) : ['reel'];
+      add('show', { shots: shots.map((p, i) => ({ photo: p.url, fit: p.fit, pos: p.pos, caption: f.features[i] || '' })) }, 9, process.env.ANIMORA_SLIDE && shots.length >= 3 ? process.env.ANIMORA_SLIDE : pick(styles));
+    } else {
+      photos.slice(1).forEach((p, i) => add('photo', { photo: p.url, fit: p.fit, pos: p.pos, caption: f.features[i] || '', label: f.name }, 7, p.fit === 'contain' ? 'frame' : pick(['full', 'frame'])));
+    }
+    const storyLines = [...f.features, ...f.personalLines].filter(Boolean).filter((x, i, a) => a.findIndex((y) => y.toLowerCase() === x.toLowerCase()) === i);
+    storyLines.forEach((text) => add('statement', { text, label: f.name }, 9));
+    add('end', { cta: f.cta, phone: '', whatsapp: false, place: '', link: '', note: '' }, 10, L.center ? 'center' : pick(['center', 'left']));
+    storyLines.forEach((text) => ideas.push(() => ({ type: 'statement', data: { text, label: f.name }, keep: 3 })));
+    if (!storyLines.length) ideas.push(() => ({ type: 'statement', data: { text: 'Wishing you a wonderful year ahead.', label: f.name }, keep: 4 }));
+  } else {
   const keyWord = (t) => String(t).split(/\s+/).map((w) => w.replace(/[^\p{L}\p{N}&'-]/gu, '')).filter(Boolean).sort((x, y) => y.length - x.length)[0] || f.name;
   // the opening: a photo when there is a good one (full, split, magazine cover or photo-in-type), otherwise type (plain or stacked blocks)
   photos.forEach((p) => { p.full = keptAt(p.ratio, rb); });
@@ -168,7 +187,6 @@ export function composeStory({ facts: f, duration, seed, look: lookId, aspect, o
   if (duration >= 20 && (L.id === 'noir' || r() < 0.4)) beats.unshift({ type: 'sting', data: {}, keep: 2 });
 
   // material for long films, best first; when it runs out the list starts again with new crops and layouts
-  const ideas = [];
   if (f.place && !f.when) ideas.push(() => ({ type: 'info', data: { place: f.place }, keep: 3 }));
   if (f.heads[1] && f.heads[1] !== head) ideas.push(() => ({ type: 'statement', data: { text: f.heads[1], label: f.name }, keep: 3 }));
   if (f.sub && f.sub !== head && hookV !== 'type') ideas.push(() => ({ type: 'statement', data: { text: f.sub, label: f.name }, keep: 3 }));
@@ -179,6 +197,7 @@ export function composeStory({ facts: f, duration, seed, look: lookId, aspect, o
   if (f.cta) ideas.push(() => ({ type: 'statement', data: { text: f.cta, label: f.name }, keep: 2 }));
   ideas.push(() => ({ type: 'statement', data: { text: head, label: f.category || f.name }, keep: 2 }));
   if (!beats.some((b) => b.type === 'sting')) ideas.push(() => ({ type: 'sting', data: {}, keep: 2 }));
+  }
 
   const base = (b) => (b.type === 'features' ? featDur(b.data.items.length, b.v) : b.type === 'chat' ? 1.6 + 1.05 * (b.data.items.length + (b.data.cta ? 1 : 0)) : b.type === 'products' ? prodDur(b.data.items.length) : b.type === 'walk' ? 3.8 + 3.3 * b.data.shots.length : b.type === 'show' ? 0.8 + 2 * b.data.shots.length : BASE[b.type]);
   beats.forEach((b) => { b.dur = base(b); });
@@ -195,7 +214,7 @@ export function composeStory({ facts: f, duration, seed, look: lookId, aspect, o
   const MAXB = 7, MAXE = 8;
   const room = () => duration - total() - beats.slice(0, -1).reduce((n, b) => n + Math.max(0, MAXB - b.dur) * 0.35, 0);
   let k = 0;
-  while (room() > 3 && ideas.length && k < ideas.length * 2 && beats.length < 24) {
+  while (!f.personalBirthday && room() > 3 && ideas.length && k < ideas.length * 2 && beats.length < 24) {
     const sting = ideas[k % ideas.length]().type === 'sting';
     const b = ideas[k % ideas.length](); k++;
     if (sting && (k > ideas.length || beats.some((x) => x.type === 'sting'))) continue;

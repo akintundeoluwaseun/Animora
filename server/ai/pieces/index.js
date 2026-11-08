@@ -43,6 +43,15 @@ const hashStr = (t) => { let h = 2166136261; for (const c of String(t)) { h ^= c
 const mulberry = (a) => () => { a |= 0; a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
 const lum = (h) => { const n = parseInt(String(h || '#777777').slice(1), 16); const c = [n >> 16, (n >> 8) & 255, n & 255].map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }); return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; };
 const HEX = /^#[0-9a-f]{6}$/i;
+const ordinal = (value) => { const n = Number(String(value || '').match(/\d{1,2}/)?.[0]); return n ? `${n}${n % 100 >= 11 && n % 100 <= 13 ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' }[n % 10] || 'th')}` : ''; };
+const personalLines = (text, fallback) => {
+  if (!text) return fallback;
+  const words = String(text).replace(/\s+/g, ' ').trim().split(' ').filter(Boolean), out = [];
+  for (let i = 0; i < words.length; i += 8) out.push(str(words.slice(i, i + 8).join(' '), 90));
+  return out.slice(0, 8);
+};
+const isPersonalBirthday = (brief = {}) => brief.kind === 'personal' || /\bbirthday\b/i.test(brief.category || '');
+const isBirthdayBrief = (brief = {}) => /birthday|b-?day/i.test(`${brief.category || ''} ${brief.name || ''}`);
 
 // the facts a video may use, taken from the owner's answers (never invented)
 export function factsOf(plan = {}, brief = {}, assets = []) {
@@ -51,20 +60,24 @@ export function factsOf(plan = {}, brief = {}, assets = []) {
   const fitOf = (m) => { const w = Number(m.width) || 0, h = Number(m.height) || 0; if (!w || !h) return 'cover'; const ratio = w / h; return Math.min(w, h) < 600 || ratio > 2.1 || ratio < 0.48 ? 'contain' : 'cover'; };
   const fits = {}, ratios = {}, taps = {}; for (const a of assets) if (a.url) { fits[a.url] = fitOf(a); if (Number(a.width) && Number(a.height)) ratios[a.url] = Math.round((a.width / a.height) * 1000) / 1000; const m = String(a.focus || '').match(/^([\d.]+),([\d.]+)$/); if (m) taps[a.url] = { x: Math.min(0.95, Math.max(0.05, +m[1])), y: Math.min(0.95, Math.max(0.05, +m[2])) }; }
   const logo = assets.find((a) => (a.kind || 'image') === 'image' && (a.role === 'logo' || /logo/i.test(a.name || '')))?.url || null;
-  const name = str(brief.name || plan.business?.name || 'Your business', 40);
-  const heads = [].concat(brief.headlines || [], brief.headline || []).map((h) => str(h, 60)).filter(Boolean);
-  const features = [].concat(brief.features || []).map((f) => str(f, 34)).filter(Boolean).slice(0, 4);
-  const products = [].concat(brief.products || []).map((p) => { const m = String(p).match(/^(.*?)[\s:–-]*((?:₦|N|NGN|\$)\s?[\d,.]+\s?[km]?)\s*$/i); return m ? { title: str(m[1], 34), price: m[2].replace(/^N(?=\d)/, '₦') } : { title: str(p, 34) }; });
+  const birthday = isPersonalBirthday(brief) && isBirthdayBrief(brief);
+  const name = str(brief.name || plan.business?.name || (birthday ? 'Someone special' : 'Your business'), 40);
+  const age = birthday ? ordinal(brief.milestone) : '';
+  const relationship = birthday ? str(brief.relationship, 40).replace(/^(my|our)\s+/i, '').toLowerCase() : '';
+  const heads = birthday ? [`Happy${age ? ` ${age}` : ''} Birthday${name && name !== 'Someone special' ? `, ${name}` : ''}!`] : [].concat(brief.headlines || [], brief.headline || []).map((h) => str(h, 60)).filter(Boolean);
+  const features = [].concat(birthday ? brief.memories || [] : brief.features || []).map((f) => str(f, 34)).filter(Boolean).slice(0, 4);
+  const personalCopy = birthday ? personalLines(brief.personalMessage, ['May your new age bring you many blessings.', 'Wishing you joy and wonderful things in the year ahead.', "I'm so happy to celebrate you."]) : [];
+  const products = birthday ? [] : [].concat(brief.products || []).map((p) => { const m = String(p).match(/^(.*?)[\s:–-]*((?:₦|N|NGN|\$)\s?[\d,.]+\s?[km]?)\s*$/i); return m ? { title: str(m[1], 34), price: m[2].replace(/^N(?=\d)/, '₦') } : { title: str(p, 34) }; });
   const priced = products.find((p) => p.price);
-  const payment = str(brief.payment, 100), contact = payment ? '' : str(brief.contact, 120), phone = payment || (contact.match(/(\+?\d[\d\s-]{7,}\d)/) || [])[1] || '';
+  const payment = birthday ? '' : str(brief.payment, 100), contact = payment || birthday ? '' : str(brief.contact, 120), phone = payment || birthday ? '' : (contact.match(/(\+?\d[\d\s-]{7,}\d)/) || [])[1] || '';
   // the address: given, or the part of the contact line that is not a phone number, a handle or a link
   const segs = contact.split(/\s*[·|•;]\s*|\s+-\s+/).map((x) => x.trim()).filter(Boolean);
   const placeSeg = segs.find((x) => !/https?:|www\.|\.com|@/i.test(x) && /\b(street|st|road|rd|way|avenue|ave|lagos|abuja|ibadan|lekki|ikeja|island|close|estate|plaza|mall|area|crescent|junction|opposite|beside|gra|phase|market|shop|suite|floor|off)\b/i.test(x))
     || segs.find((x) => !/\d{6,}|\d[\d\s-]{7,}\d|@|https?:|www\.|\.com|whats\s?app|instagram|ig:|email/i.test(x) && /\p{L}{3,}/u.test(x));
   const linkSeg = segs.find((x) => /https?:\/\/|www\.|\b[a-z0-9-]+(\.[a-z0-9-]+)*\.(com|app|ng|net|org|io|co|shop|store|site|online)\b/i.test(x) && !/@/.test(x));
-  const link = str(String(linkSeg || '').replace(/^https?:\/\//i, '').replace(/\/$/, ''), 40);
-  const place = str(brief.address || (placeSeg && placeSeg !== linkSeg ? placeSeg : '') || '', 60);
-  const whatsapp = /whats\s?app|wa\.me/i.test(String(brief.contact || '') + ' ' + String(brief.cta || ''));
+  const link = birthday ? '' : str(String(linkSeg || '').replace(/^https?:\/\//i, '').replace(/\/$/, ''), 40);
+  const place = birthday ? '' : str(brief.address || (placeSeg && placeSeg !== linkSeg ? placeSeg : '') || '', 60);
+  const whatsapp = !birthday && /whats\s?app|wa\.me/i.test(String(brief.contact || '') + ' ' + String(brief.cta || ''));
   // pictures with a see-through background (product cut-outs) can step out of a frame
   const cutouts = assets.filter((a) => (a.kind || 'image') === 'image' && a.role !== 'logo' && !/logo/i.test(a.name || '') && (a.transparent || a.has_alpha)).map((a) => a.url);
   const appy = /\b(app|apps|software|saas|platform|online store|e-?commerce|delivery app|mobile app|website|web ?site|game|gaming|fintech|payments?)\b/i.test([brief.category, brief.name, ...[].concat(brief.features || [])].join(' ')) && !/repair|fix|service centre|service center/i.test(brief.category || '');
@@ -73,7 +86,7 @@ export function factsOf(plan = {}, brief = {}, assets = []) {
   const usable = photos.filter((u) => !cutouts.includes(u));
   // 3 or more ordinary pictures (2 if the owner asked for a slideshow) become a slideshow that shows every one of them
   const gallery = !(appy || steps.length) && (usable.length >= 3 || (usable.length >= 2 && !!brief.slideshow));
-  return { gallery, phrases, link, note: str(brief.endNote, 60), taps, steps, cutouts, appy: appy || steps.length > 0, whatsapp, fits, ratios, name, mono: name.replace(/[^\p{L}\p{N} ]/gu, '').split(/\s+/).filter((w) => !/^(the|and|of)$/i.test(w)).slice(0, 2).map((w) => w[0]).join('').toUpperCase() || 'A', heads, features, products, priced, offer: str(brief.offer, 30), when: str(brief.when, 60), cta: str(brief.cta || [].concat(brief.ctas || [])[0] || closingLine(brief), 28), phone, place, photos, logo, category: str(brief.category, 40), sub: str(heads[1] || brief.goal || '', 90) };
+  return { gallery, phrases, link, note: str(brief.endNote, 60), taps, steps, cutouts, appy: !birthday && (appy || steps.length > 0), whatsapp, fits, ratios, name, mono: name.replace(/[^\p{L}\p{N} ]/gu, '').split(/\s+/).filter((w) => !/^(the|and|of)$/i.test(w)).slice(0, 2).map((w) => w[0]).join('').toUpperCase() || 'A', heads, features, personalBirthday: birthday, age, relationship, personalLines: personalCopy, products, priced, offer: birthday ? '' : str(brief.offer, 30), when: birthday ? '' : str(brief.when, 60), cta: str(birthday ? (brief.closingMessage || `Blessed new age, ${name}!`) : (brief.cta || [].concat(brief.ctas || [])[0] || closingLine(brief)), 60), phone, place, photos, logo, category: birthday ? 'Birthday celebration' : str(brief.category, 40), sub: birthday ? (relationship ? `From your ${relationship}` : 'A day all about you') : str(heads[1] || brief.goal || '', 90) };
 }
 const split2 = (t) => { const w = String(t).split(/\s+/); if (w.length < 3) return w.join(' '); const k = Math.ceil(w.length / 2); return w.slice(0, k).join(' ') + '|' + w.slice(k).join(' '); };
 
@@ -176,9 +189,9 @@ export function piecesFilm({ plan = {}, brief = {}, assets = [], style = null, t
   // The long-form Story engine is for videos over ~35 s, where one template would run out of things to show.
   const seconds = Number(plan.duration_seconds) || Number(brief.duration) || 20;
   const isGallery = factsOf(plan, brief, assets).gallery;
-  const autoTemplate = !salt && !isTemplateBrief(brief) && !isGallery && seconds <= 35 && !!TPL_SIZES[aspect] && process.env.ANIMORA_DIRECTOR !== 'story';
+  const autoTemplate = !isBirthdayBrief(brief) && !salt && !isTemplateBrief(brief) && !isGallery && seconds <= 35 && !!TPL_SIZES[aspect] && process.env.ANIMORA_DIRECTOR !== 'story';
   if (autoTemplate) brief = { ...brief, template: pickDirection({ brief, plan, salt: 'first', previous, aspect, templatesOnly: true }) };
-  if (!(!salt && isTemplateBrief(brief)) && process.env.ANIMORA_DIRECTOR !== 'pieces') {
+  if ((isBirthdayBrief(brief) && isPersonalBirthday(brief)) || (!(!salt && isTemplateBrief(brief)) && process.env.ANIMORA_DIRECTOR !== 'pieces')) {
     const out = storyFilm({ plan, brief, assets, style, salt, previous });
     out.html = out.html.replace('</body>', `<!--animora-direction:story-${out.data.story.look.id};--></body>`);
     return out;

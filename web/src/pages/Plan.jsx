@@ -53,11 +53,12 @@ const INTENSITY_OPTS = [
   { v: 'auto', l: "The template's own feel" }, { v: 'elegant', l: 'Elegant', d: 'Smooth and calm' }, { v: 'aggressive', l: 'Aggressive', d: 'Fast, punchy cuts' },
   { v: 'mechanical', l: 'Mechanical', d: 'Precise, techy moves' }, { v: 'fluid', l: 'Fluid', d: 'Flowing, liquid moves' },
 ];
-const GROUP_OF = { template: 'Look and feel', intensity: 'Look and feel', mode: 'Start', paste: 'Start', flyerType: 'Your business', offer: 'Your message', when: 'Your message', layout: 'Look and feel', name: 'Your business', category: 'Your business', goal: 'Your business', headline: 'Your message', payment: 'Your message', features: 'Your message', products: 'Your message', cta: 'Your message', contact: 'Your message', aspect: 'Format', duration: 'Format', pictures: 'Look and feel', colors: 'Look and feel', style: 'Look and feel', scenes: 'Look and feel', voiceover: 'Finish', sound: 'Finish', extra: 'Finish' };
+const GROUP_OF = { template: 'Look and feel', intensity: 'Look and feel', videoEngine: 'Look and feel', mode: 'Start', paste: 'Start', flyerType: 'Your business', offer: 'Your message', when: 'Your message', layout: 'Look and feel', name: 'Your business', category: 'Your business', goal: 'Your business', headline: 'Your message', payment: 'Your message', features: 'Your message', products: 'Your message', cta: 'Your message', contact: 'Your message', relationship: 'About them', milestone: 'About them', personalMessage: 'Your message', memories: 'Your message', aspect: 'Format', duration: 'Format', pictures: 'Look and feel', colors: 'Look and feel', style: 'Look and feel', scenes: 'Look and feel', voiceover: 'Finish', sound: 'Finish', extra: 'Finish' };
 
 const MAX_PICS = 10;
 
 const CATEGORIES = ['Fundraiser or donation', 'Birthday', 'Wedding', 'Church or ministry', 'Announcement', 'Personal story or tribute', 'Food & drinks', 'Fashion & clothing', 'Beauty & salon', 'Tech & software', 'Finance & payments', 'Health & fitness', 'Real estate', 'Events & parties', 'School & training', 'Shop & retail', 'Services'];
+const RELATIONSHIPS = ['Brother', 'Sister', 'Mum', 'Dad', 'Friend', 'Partner', 'Son', 'Daughter', 'Cousin', 'Someone special'];
 const GOALS = ['Promote a sale or offer', 'Launch something new', 'Get more orders or bookings', 'Make people know my brand', 'Announce an event'];
 const CAUSE_CTAS = ['Donate today', 'Give what you can', 'Share this video', 'Join us', 'Volunteer with us'];
 const CTAS = ['Order on WhatsApp', 'Call now', 'Visit our website', 'Visit our store', 'Download the app', 'Book now', 'DM us on Instagram'];
@@ -66,7 +67,7 @@ const ASPECT_OPTS = [
   { v: '16:9', l: 'Landscape 16:9', d: 'YouTube · TV · websites' },
   { v: '1:1', l: 'Square 1:1', d: 'Instagram & Facebook feed' },
 ];
-const FOUND_LABEL = { payment: 'donation account', name: 'business name', category: 'business type', goals: 'goal', headlines: 'message', features: 'selling points', products: 'products', ctas: 'call to action', contact: 'contact', aspect: 'format', duration: 'length', voiceover: 'voice-over choice', sound: 'sound choice' };
+const FOUND_LABEL = { payment: 'donation account', name: 'name', category: 'kind of video', goals: 'goal', headlines: 'message', features: 'selling points', products: 'products', ctas: 'call to action', contact: 'contact', aspect: 'format', duration: 'length', voiceover: 'voice-over choice', sound: 'sound choice', relationship: 'relationship', milestone: 'birthday age', personalMessage: 'birthday message', memories: 'personal details', videoEngine: 'video direction' };
 const EXTRA_CHIPS = ['Zoom into my logo at the start', 'Make the price really big', 'Keep it calm and premium', 'Make it loud and energetic', 'Show my photos more'];
 
 // How long the answers need: an opening, one shot per message, about two selling points or products per shot,
@@ -88,9 +89,11 @@ export function lengthWarning(b, v) {
 
 // The questions, in order. `show` hides a question that doesn't apply; `optional` adds a Skip button.
 // Each kind of business gets its own path: the questions that matter for it, worded for it. The rest are skipped.
+const isBirthday = (b) => /birthday|b-?day/i.test(`${b.category || ''} ${b.name || ''}`);
 const groupOf = (b) => {
   const c = `${b.category || ''} ${b.name || ''}`.toLowerCase();
   if (b.kind === 'cause' || /donat|fundrais|charity|appeal|\bngo\b|foundation|relief/.test(c)) return 'cause';
+  if (/birthday|b-?day/.test(c)) return 'birthday';
   if (/tech|software|app|saas|website|digital/.test(c)) return 'tech';
   if (/event|party|wedding|birthday|anniversary|concert|church|ministry|conference|program|invitation|funeral|graduation/.test(c)) return 'event';
   if (/real estate|property|propert|house|land|apartment|rent/.test(c)) return 'property';
@@ -114,26 +117,34 @@ const PRODUCT_HINT = {
 const lookAuto = (b) => b.lookAuto === 'auto';
 
 const QUESTIONS = [
-  { id: 'mode', type: 'single', show: () => false, options: [
+  { id: 'mode', type: 'single', options: [
     { v: 'steps', l: 'Ask me one question at a time' },
     { v: 'paste', l: "I'll paste everything at once", d: "Write or paste all your details. I'll only ask what's missing." },
-  ], ask: () => "Hi! I'm your Animora director. Let's make your ad. Should I ask you questions one by one, or will you paste all your details at once?" },
-  { id: 'paste', type: 'long', ask: () => 'What video do you want to make?', hint: "Just say it in your own words. A sentence is enough and I'll work out the rest.", placeholder: 'e.g. A birthday video for my sister Tola turning 30, warm and fun, with her photos\n\nor: An ad for my laptop repair shop in Ado Ekiti, call 0807 691 1614',
+  ], ask: () => "Hi! I'm your Animora director. Let's make your video. Should I ask you questions one by one, or will you paste all your details at once?" },
+  { id: 'paste', type: 'long', show: (b) => b.mode === 'paste', ask: () => 'What video do you want to make?', hint: "Tell me your idea in your own words. I'll pick up what I can, then ask about the missing details before making the video.", placeholder: 'e.g. A birthday video for my brother Tony turning 20, warm and fun, with his photos\n\nor: An ad for my laptop repair shop in Ado Ekiti, call 0807 691 1614',
     examples: ['A birthday video for my mum turning 60', 'An ad for my cake business', 'A wedding invitation for 14 December', 'A church programme announcement', 'A tribute to my best friend', 'A promo for my new app'] },
-  { id: 'name', type: 'text', ask: () => "What's the video about? A name or title is enough.", placeholder: "e.g. Kemi Cakes, Tola's 30th Birthday, Our Wedding" },
-  { id: 'category', type: 'single', options: CATEGORIES, typed: true, ask: (b) => `Nice! What kind of video is "${b.name}"?`, placeholder: 'Or type it, e.g. "laptop repairs" or "birthday"' },
-  { id: 'goal', type: 'multi', max: 6, show: (b) => !['event', 'cause'].includes(groupOf(b)), options: GOALS, typed: true, ask: () => "What's the goal of this ad?", placeholder: 'Or type your own goal' },
-  { id: 'headline', type: 'multi', max: 8, suggest: 'headline', typed: true, ask: (b) => (groupOf(b) === 'cause' ? 'What should people know about this cause?' : "What's the main message of your ad?"), hint: 'Pick as many as you like, or type your own. More messages make a longer video.', placeholder: 'Add your own message' },
-  { id: 'features', type: 'multi', max: 8, suggest: 'features', typed: true, optional: true, ask: (b) => (groupOf(b) === 'cause' ? 'What will the money do? A few points.' : `What makes ${b.name} stand out?`), hint: 'Pick as many as you like, or type your own.', placeholder: 'Add your own' },
+  { id: 'name', type: 'text', ask: (b) => groupOf(b) === 'birthday' ? 'Who are we celebrating? Their name will make the greeting feel personal.' : "What's the video about? A name or title is enough.", placeholder: "e.g. Tony, Kemi Cakes, Tola's 30th Birthday, Our Wedding" },
+  { id: 'category', type: 'single', options: CATEGORIES, typed: true, ask: (b) => `What kind of video is "${b.name}"?`, placeholder: 'Or type it, e.g. "laptop repairs" or "birthday"' },
+  { id: 'relationship', type: 'single', options: RELATIONSHIPS, typed: true, show: (b) => groupOf(b) === 'birthday', ask: (b) => `Who are you to ${b.name || 'the birthday person'}?`, placeholder: 'Or type your relationship' },
+  { id: 'milestone', type: 'text', optional: true, show: (b) => groupOf(b) === 'birthday', ask: () => 'What age or milestone are they celebrating?', placeholder: 'e.g. Turning 20' },
+  { id: 'personalMessage', type: 'long', optional: true, show: (b) => groupOf(b) === 'birthday', ask: (b) => `What would you like to say to ${b.name || 'them'}?`, hint: 'Write it the way you would say it. Animora will shape it into several short, readable moments.', placeholder: 'e.g. Happy birthday, brother! I’m so proud of you. May this new age bring you many blessings. I’m so happy for you.' },
+  { id: 'memories', type: 'long', optional: true, show: (b) => groupOf(b) === 'birthday', ask: (b) => `What do you love about ${b.name || 'them'}, or what is one favourite memory?`, hint: 'Add a few short details, one per line. Skip this if you want to keep it simple.', placeholder: 'Always makes us laugh\nKind to everyone\nThat unforgettable family trip' },
+  { id: 'goal', type: 'multi', max: 6, show: (b) => !['event', 'cause', 'birthday'].includes(groupOf(b)), options: GOALS, typed: true, ask: () => "What's the goal of this ad?", placeholder: 'Or type your own goal' },
+  { id: 'headline', type: 'multi', max: 8, suggest: 'headline', typed: true, show: (b) => groupOf(b) !== 'birthday', ask: (b) => (groupOf(b) === 'cause' ? 'What should people know about this cause?' : "What's the main message of your ad?"), hint: 'Pick as many as you like, or type your own. More messages make a longer video.', placeholder: 'Add your own message' },
+  { id: 'features', type: 'multi', max: 8, suggest: 'features', typed: true, optional: true, show: (b) => groupOf(b) !== 'birthday', ask: (b) => (groupOf(b) === 'cause' ? 'What will the money do? A few points.' : `What makes ${b.name} stand out?`), hint: 'Pick as many as you like, or type your own.', placeholder: 'Add your own' },
   { id: 'steps', type: 'long', optional: true, show: (b) => groupOf(b) === 'tech', ask: (b) => `Walk me through ${b.name || 'your app'}: what does someone do, step by step? One step per line. Add your screenshots in the same order next.`, placeholder: 'Sign up in seconds\nAdd your tasks\nGet reminders\nShare with your team' },
   { id: 'when', type: 'text', optional: true, show: (b) => groupOf(b) === 'event', ask: () => 'When and where is it? Date, time and venue.', placeholder: 'Sat 14 Dec, 4pm · Civic Centre, Ado Ekiti' },
-  { id: 'products', type: 'long', optional: true, show: (b) => !['tech', 'event', 'cause'].includes(groupOf(b)), ask: (b) => (PRODUCT_ASK[groupOf(b)] || PRODUCT_ASK.shop)(b), placeholder: 'Jollof rice ₦2,500\nFried rice ₦2,800\nSmall chops ₦1,500', placeholderFor: (b) => PRODUCT_HINT[groupOf(b)] },
-  { id: 'cta', type: 'multi', max: 5, options: CTAS, optionsFor: (b) => (groupOf(b) === 'cause' ? CAUSE_CTAS : CTAS), typed: true, ask: () => 'What should people do after watching?', placeholder: 'Or type your own, e.g. "Send us a DM"' },
+  { id: 'products', type: 'long', optional: true, show: (b) => !['tech', 'event', 'cause', 'birthday'].includes(groupOf(b)), ask: (b) => (PRODUCT_ASK[groupOf(b)] || PRODUCT_ASK.shop)(b), placeholder: 'Jollof rice ₦2,500\nFried rice ₦2,800\nSmall chops ₦1,500', placeholderFor: (b) => PRODUCT_HINT[groupOf(b)] },
+  { id: 'cta', type: 'multi', max: 5, options: CTAS, optionsFor: (b) => (groupOf(b) === 'cause' ? CAUSE_CTAS : CTAS), typed: true, show: (b) => groupOf(b) !== 'birthday', ask: () => 'What should people do after watching?', placeholder: 'Or type your own, e.g. "Send us a DM"' },
   { id: 'payment', type: 'long', show: (b) => groupOf(b) === 'cause', ask: () => 'Where should donations go? Bank, account number and account name.', hint: 'This is shown on screen exactly as you type it, as an account to give to (not as a phone number).', placeholder: 'GTBank · 0123456789 · Community Health Initiative' },
-  { id: 'contact', type: 'text', optional: true, show: (b) => groupOf(b) !== 'cause', ask: () => 'Your phone number, website or address for the end of the video?', placeholder: '0803 123 4567 · www.yoursite.com · 12 Allen Ave, Ikeja' },
+  { id: 'contact', type: 'text', optional: true, show: (b) => !['cause', 'birthday'].includes(groupOf(b)), ask: () => 'Your phone number, website or address for the end of the video?', placeholder: '0803 123 4567 · www.yoursite.com · 12 Allen Ave, Ikeja' },
   { id: 'aspect', type: 'single', options: ASPECT_OPTS, ask: () => 'Where will you post it?' },
   { id: 'duration', type: 'single', options: [15, 20, 25, 30, 40, 45, 60], ask: () => 'How long should it be?', hint: 'Any length works. A longer video gets more scenes, not slower ones.' },
   { id: 'pictures', type: 'upload', optional: true, ask: (b) => (groupOf(b) === 'tech' ? `Add your logo and screenshots of your app, in the order people use it (up to ${MAX_PICS}). The video walks through them one by one.` : `Add your pictures, in the order you want them (up to ${MAX_PICS}). With 3 or more, the video becomes a slideshow that shows every one. Add your logo too if you have one. You can also paste with Ctrl+V.`) },
+  { id: 'videoEngine', type: 'single', options: [
+    { v: 'motion', l: 'Classic story film (recommended)', d: 'Varied shots and transitions; the director follows your details.' },
+    { v: 'pieces', l: 'Signature visual mix', d: 'A bold template-led treatment with kinetic type and graphic effects.' },
+  ], ask: () => 'How should Animora direct this video?' },
   { id: 'lookAuto', type: 'single', options: [{ v: 'auto', l: 'Yes, you choose', d: 'Look, colours and sound picked to fit your video' }, { v: 'own', l: "I'll choose myself" }], ask: () => 'Should I choose the look, colours and sound for you?' },
   { id: 'colors', show: (b) => !lookAuto(b), type: 'colors', ask: () => 'Which colours should the video use?' },
   { id: 'style', show: (b) => !lookAuto(b), type: 'style', ask: () => 'Pick a look for your video, or let me choose one that fits.' },
@@ -197,7 +208,7 @@ const FLYER_QUESTIONS = [
 ];
 
 // Only the business name is needed. Every other question can be skipped, and Animora chooses well for whatever is skipped.
-const SKIPPABLE = new Set(['category', 'goal', 'headline', 'cta', 'aspect', 'duration', 'colors', 'style', 'template', 'intensity', 'scenes', 'voiceover', 'sound', 'flyerType', 'layout', 'offer', 'when', 'features', 'products', 'contact', 'pictures', 'extra']);
+const SKIPPABLE = new Set(['category', 'goal', 'headline', 'cta', 'aspect', 'duration', 'colors', 'style', 'template', 'intensity', 'scenes', 'voiceover', 'sound', 'flyerType', 'layout', 'offer', 'when', 'features', 'products', 'contact', 'pictures', 'extra', 'relationship', 'milestone', 'personalMessage', 'memories']);
 for (const qq of [...QUESTIONS, ...FLYER_QUESTIONS]) if (SKIPPABLE.has(qq.id)) qq.optional = true;
 
 
@@ -378,7 +389,7 @@ export default function Plan() {
     })();
   }, [id]);
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }); }, [step, uploading, suggestions, building]);
-  useEffect(() => { setText(''); const cur = q?.id === 'headline' ? (b.headlines || (b.headline ? [b.headline] : [])) : q?.id === 'goal' ? (b.goals || (b.goal ? [b.goal] : [])) : q?.id === 'cta' ? (b.ctas || (b.cta ? [b.cta] : [])) : b[q?.id]; setMulti(Array.isArray(cur) ? cur : []); }, [step]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { const cur = q?.id === 'headline' ? (b.headlines || (b.headline ? [b.headline] : [])) : q?.id === 'goal' ? (b.goals || (b.goal ? [b.goal] : [])) : q?.id === 'cta' ? (b.ctas || (b.cta ? [b.cta] : [])) : b[q?.id]; setText(Array.isArray(cur) ? cur.join('\n') : String(cur || '')); setMulti(Array.isArray(cur) ? cur : []); }, [step]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // AI suggestions for the open questions
   useEffect(() => {
@@ -405,7 +416,6 @@ export default function Plan() {
   // Saving is instant on screen; the server copy is updated in the background, one request at a time
   // (so answers never wait on the network, and quick taps can't overwrite each other).
   const bRef = useRef(b);
-  const autoMake = useRef(false);
   const saving = useRef(Promise.resolve());
   const save = (patch) => {
     const next = { ...bRef.current, ...patch };
@@ -446,11 +456,6 @@ export default function Plan() {
         const next = save({ pasted: true });
         if (r.aiError) setError(`The AI couldn't read all of it (${r.aiError.slice(0, 90)}). I picked up what I could and will ask about the rest.`);
         setToast(r.found?.length ? `Got it. I found your ${r.found.map((k) => (r.project?.brief?.kind && r.project.brief.kind !== 'business' && k === 'name' ? 'title' : k === 'category' && r.project?.brief?.kind !== 'business' ? 'kind of video' : FOUND_LABEL[k] || k)).join(', ')}.` : "Got it. I'll ask about the rest."); setTimeout(() => setToast(''), 5000);
-        if (bRef.current.name) {
-          setReading(false);
-          // pictures were added on this same screen, so there is nothing else to ask: the AI decides the rest and builds
-          return makeNow();
-        }
         advance(next);
       } catch (e) { setError(e.message); } finally { setReading(false); }
       return;
@@ -462,20 +467,13 @@ export default function Plan() {
     else if (q.id === 'headline') patch = { headlines: value, headline: value[0] };
     else if (q.id === 'goal') patch = { goals: value, goal: value.join(' + ') };
     else if (q.id === 'cta') patch = { ctas: value, cta: value[0] };
+    else if (q.id === 'memories') patch = { memories: String(value).split(/\n|;/).map((x) => x.trim()).filter(Boolean).slice(0, 8) };
     else if (q.id === 'scenes') patch = value === 'auto' ? { sceneAuto: true, scenes: [] } : { sceneAuto: false, scenes: value };
     else patch = { [q.id]: value };
     const next = save({ ...patch, ...extra, [`${q.id}Skipped`]: false });
-    if (autoMake.current && q.id === 'pictures') { autoMake.current = false; return makeNow(); }
     advance(next);
   };
-  // "Make it now": skip every question that is left and build with what is known
-  const makeNow = async () => {
-    if (building || reading || !bRef.current.name) return;
-    const patch = { done: true, extraSkipped: true, picturesDone: true };
-    for (const qq of QS) if (qq.optional && valueOf(qq, bRef.current, pics.length) === undefined) patch[`${qq.id}Skipped`] = true;
-    const next = save(patch); setBuilding(true); await saved(); build(next);
-  };
-  const skip = () => { const next = save({ [`${q.id}Skipped`]: true, ...(q.id === 'pictures' ? { picturesDone: true } : {}) }); if (autoMake.current && q.id === 'pictures') { autoMake.current = false; return makeNow(); } advance(next); };
+  const skip = () => { const next = save({ [`${q.id}Skipped`]: true, ...(q.id === 'pictures' ? { picturesDone: true } : {}) }); advance(next); };
 
   const upload = async (files, role) => {
     setError('');
@@ -514,6 +512,16 @@ export default function Plan() {
     } catch (e) { setError(e.message); setBuilding(false); }
   };
 
+  const makeNow = async () => {
+    const current = bRef.current;
+    if (building || reading || !current.name) return;
+    if (groupOf(current) === 'birthday' && !current.personalMessage) return;
+    const next = save({ done: true, videoEngine: current.videoEngine || 'motion' });
+    setBuilding(true);
+    await saved();
+    build(next);
+  };
+
   // finishing the last question builds the video
   const finish = async (value) => { const next = save({ extra: value || '', extraSkipped: !value, done: true }); setBuilding(true); await saved(); build(next); };
 
@@ -521,7 +529,8 @@ export default function Plan() {
   const shownQs = visible.map((qq, i) => ({ qq, i })).filter(({ qq }) => !(qq.show && !qq.show(b)));
   const finished = step >= visible.length;
   const pos = finished ? shownQs.length : Math.max(0, shownQs.findIndex(({ i }) => i === step));
-  const opts = q?.suggest ? (suggestions[q.id] || []) : (q?.optionsFor ? q.optionsFor(b) : q?.options) || [];
+  const useSuggestions = q?.suggest && !(q.id === 'features' && groupOf(b) === 'birthday');
+  const opts = useSuggestions ? (suggestions[q.id] || []) : (q?.optionsFor ? q.optionsFor(b) : q?.options) || [];
   const group = q ? GROUP_OF[q.id] : 'Finish';
   const groups = [...new Set(shownQs.map(({ qq }) => GROUP_OF[qq.id] || 'Start'))];
   const isFirst = shownQs.length ? shownQs[0].i === step : true;
@@ -533,11 +542,11 @@ export default function Plan() {
     if (q.type === 'multi') { const all = [...multi, ...(v && !multi.includes(v) ? [v] : [])]; if (!all.length) return; return answer(all); }
     if (q.done) return finish(v);
     if (!v) return;
-    answer(q.type === 'long' ? v.split('\n').map((x) => x.trim()).filter(Boolean).join(q.id === 'products' ? '\n' : ' ') : v);
+    answer(q.type === 'long' ? v.split('\n').map((x) => x.trim()).filter(Boolean).join(['products', 'memories'].includes(q.id) ? '\n' : ' ') : v);
   };
   const continueDisabled = reading || (q?.id === 'paste' && uploading) || (q?.type === 'multi' ? !multi.length && !text.trim() : q?.type === 'scenes' ? false : q?.type === 'upload' ? uploading : q?.done ? false : !text.trim());
   const continueLabel = q?.done ? (text.trim() ? `Make my ${what}` : "No, that's all") : q?.type === 'multi' ? (multi.length ? `Continue · ${multi.length + (text.trim() && !multi.includes(text.trim()) ? 1 : 0)}` : 'Continue')
-    : q?.type === 'scenes' ? (multi.length ? `Use my ${multi.length} pick${multi.length === 1 ? '' : 's'}` : 'Continue') : q?.type === 'upload' ? (pics.length ? 'Continue' : 'Continue without pictures') : q?.id === 'paste' ? 'Read it and make my video' : 'Continue';
+    : q?.type === 'scenes' ? (multi.length ? `Use my ${multi.length} pick${multi.length === 1 ? '' : 's'}` : 'Continue') : q?.type === 'upload' ? (pics.length ? 'Continue' : 'Continue without pictures') : q?.id === 'paste' ? 'Read it, then continue' : 'Continue';
   const onContinue = (e) => {
     if (q.type === 'scenes') { e?.preventDefault(); return multi.length ? answer(multi) : answer('auto'); }
     if (q.type === 'upload') { e?.preventDefault(); return pics.length ? answer(pics.length, { picturesDone: true }) : skip(); }
@@ -578,7 +587,7 @@ export default function Plan() {
               <span className="wiz-kind-icon" aria-hidden="true">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">{what === 'flyer' ? <path d="M5 3h14v18H5zM8 15l3-3 2 2 3-3M9 7.5h.01" /> : <path d="M4 5h16v14H4zM10 9l5 3-5 3z" />}</svg>
               </span>
-              <span className="min-w-0 flex-1 leading-tight"><b>{what === 'flyer' ? 'New flyer' : 'New video ad'}</b><small>{what === 'flyer' ? 'A still design to post or print' : 'A motion ad you download as an MP4'}</small></span>
+                <span className="min-w-0 flex-1 leading-tight"><b>{what === 'flyer' ? 'New flyer' : isBirthday(b) ? 'Birthday video' : 'New video'}</b><small>{what === 'flyer' ? 'A still design to post or print' : 'A motion video you download as an MP4'}</small></span>
               <button type="button" onClick={switchKind} disabled={switching} className="wiz-kind-switch">{switching ? 'Switching…' : what === 'flyer' ? 'Make a video instead' : 'Make a flyer instead'}</button>
             </div>
           )}
@@ -741,8 +750,7 @@ export default function Plan() {
               {!finished && <button type="button" onClick={goBack} disabled={isFirst || building} className="wiz-back">← Back</button>}
               {!finished && <span className="flex-1" />}
               {!finished && q?.optional && !q.done && <button type="button" onClick={skip} className="wiz-skip">Skip</button>}
-              {!finished && b.name && q && !['mode', 'paste', 'name'].includes(q.id) && !q.done && <button type="button" onClick={makeNow} disabled={building || reading} className="wiz-now">Make it now</button>}
-              {false}
+              {!finished && b.name && q && !['mode', 'paste', 'name'].includes(q.id) && !q.done && (groupOf(b) !== 'birthday' || b.personalMessage) && <button type="button" onClick={makeNow} disabled={building || reading} className="wiz-now">Make it now</button>}
               {!finished && needsContinue && <Button type="submit" size="lg" className="wiz-go" loading={reading} disabled={continueDisabled}>{continueLabel}</Button>}
               {finished && (
                 <div className="flex w-full flex-col gap-2 sm:w-auto sm:items-end">
@@ -761,7 +769,10 @@ export default function Plan() {
           <div className="surface p-5">
             <h2 className="font-bold">Your {what} so far</h2>
             <dl className="mt-3 space-y-2.5 text-sm">
-              {b.name && <div><dt className="text-ink-mute">Business</dt><dd className="font-semibold">{b.name}{b.category ? ` · ${b.category}` : ''}</dd></div>}
+              {b.name && <div><dt className="text-ink-mute">{isBirthday(b) ? 'Celebrating' : 'About'}</dt><dd className="font-semibold">{b.name}{b.category ? ` · ${b.category}` : ''}</dd></div>}
+              {b.relationship && <div><dt className="text-ink-mute">Your relationship</dt><dd className="font-semibold">{b.relationship}</dd></div>}
+              {b.milestone && <div><dt className="text-ink-mute">Milestone</dt><dd className="font-semibold">{b.milestone}</dd></div>}
+              {b.personalMessage && <div><dt className="text-ink-mute">Your message</dt><dd className="font-semibold">{b.personalMessage}</dd></div>}
               {b.headline && <div><dt className="text-ink-mute">Message</dt><dd className="font-semibold">{(b.headlines || [b.headline]).join(', ')}</dd></div>}
               {b.aspect && <div><dt className="text-ink-mute">Format</dt><dd className="font-semibold">{ASPECT_OPTS.find((o) => o.v === b.aspect)?.l} {b.duration ? `· ${duration(b.duration)}` : ''}</dd></div>}
               {b.scenes?.length > 0 && <div><dt className="text-ink-mute">Scenes</dt><dd className="font-semibold">{b.scenes.map((id) => SCENE_OPTIONS.find((o) => o.id === id)?.t || id).join(', ')}</dd></div>}

@@ -206,6 +206,66 @@ export function composeMotion(plan, { brief = {}, assets = [], salt = '', avoid 
   B.cta = () => ({ type: 'button', bg: base, lead: pick([heads[3] || '', 'Ready?', 'Don\'t wait.', 'Your turn.']) || 'Ready?', accent: [0], label: cta, done: doneWord, glyph: ctaGlyph, sub: phone || handle || site || '' });
   B.end = () => ({ type: 'end', bg: pick(['brand', 'brand', base === 'light' ? 'dark' : 'light', base]), tagline: tagline || '', accent: tagline ? accentOf(tagline) : [], contact: handle || site || phone || '', contactGlyph: handle ? 'search' : site ? 'globe' : 'phone' });
 
+  // A personal birthday is a greeting, not an advert. Keep each supplied thought as its own animated beat.
+  const personalBirthday = /birthday|b-?day/i.test(`${brief.category || ''} ${plan.business?.category || ''} ${plan.title || ''}`)
+    && (brief.kind === 'personal' || brief.relationship || brief.personalMessage || (brief.memories || []).length);
+  if (personalBirthday) {
+    const storyScenes = plan.scenes || [];
+    const sceneText = (scene) => [].concat(scene?.on_screen_text || []).map((x) => cleanText(x, 90, { keepCase: true })).filter(Boolean);
+    const opening = sceneText(storyScenes.find((scene) => scene.purpose === 'hook') || storyScenes[0])[0] || `Happy Birthday, ${f.brand}!`;
+    const brandScene = storyScenes.find((scene) => scene.purpose === 'brand');
+    const relationship = sceneText(brandScene)[1] || (brief.relationship ? `From your ${String(brief.relationship).replace(/^(my|our)\s+/i, '')}` : 'A day all about you');
+    const details = storyScenes.filter((scene) => scene.purpose === 'detail').flatMap(sceneText);
+    const endingScene = storyScenes.find((scene) => scene.purpose === 'cta') || storyScenes.at(-1);
+    const closing = sceneText(endingScene)[0] || `Blessed new age, ${f.brand}!`;
+    const intro = B.brand(); intro.tagline = relationship;
+    const photoBeat = photos.length ? B.photos() : null;
+    if (photoBeat) photoBeat.lines = [f.brand];
+    const detailBeats = [...new Set(details.map((line) => line.trim()).filter(Boolean))].map((line, i) => {
+      if (words(line).length >= 4 && i % 2 === 1) {
+        const hot = accentOf(line)[0];
+        return { type: 'highlight', bg: i % 3 === 1 ? 'light' : base, text: line, hot: hot > 0 ? [hot - 1, hot] : [hot] };
+      }
+      const lines = balance(line, 22);
+      return { type: 'words', mode: i % 2 === 0 ? 'glow' : undefined, bg: i % 3 === 0 ? 'dark' : base, lines, accent: accentOf(lines[lines.length - 1], lines.length > 1 ? words(lines[0]).length : 0) };
+    });
+    const beats = [
+      { type: 'words', mode: 'slam', bg: 'dark', lines: balance(opening, 22), accent: accentOf(opening) },
+      intro,
+      ...(photoBeat ? [photoBeat] : []),
+      ...detailBeats,
+      { type: 'end', bg: 'brand', tagline: closing, accent: accentOf(closing), contact: '' },
+    ];
+    const requested = Math.max(10, Number(plan.duration_seconds) || duration);
+    const durs = beats.map((beat) => BEAT_MIN[beat.type] + extraFor(beat));
+    let room = requested - durs.reduce((sum, value) => sum + value, 0);
+    if (room < 0) {
+      const factor = requested / (requested - room);
+      for (let i = 0; i < durs.length; i++) durs[i] *= factor;
+      room = 0;
+    }
+    for (let pass = 0; pass < 6 && room > 0.01; pass++) {
+      const grow = beats.map((beat, i) => Math.max(0, BEAT_MAX[beat.type] - durs[i]));
+      const totalGrow = grow.reduce((sum, value) => sum + value, 0);
+      if (!totalGrow) break;
+      for (let i = 0; i < durs.length; i++) durs[i] += Math.min(grow[i], (room * grow[i]) / totalGrow);
+      room = requested - durs.reduce((sum, value) => sum + value, 0);
+    }
+    if (room > 0.01) durs[durs.length - 1] += room;
+    const outs = ['push', 'whip', 'zoom', 'rise', 'drop'];
+    let lastOut = '';
+    const finalBeats = beats.map((beat, i) => {
+      let out = 'push';
+      if (i < beats.length - 1) {
+        const choices = outs.filter((candidate) => candidate !== lastOut);
+        out = choices[Math.floor(rnd() * choices.length)];
+      }
+      lastOut = out;
+      return { ...beat, dur: Math.round(durs[i] * 100) / 100, out };
+    });
+    return { beats: finalBeats, font, accent: accentFor(colors, text), theme, brand: f.brand };
+  }
+
   // ---- the owner's own scene picks come first (after the hook) ----
   const wanted = [];
   for (const id of [].concat(brief?.scenes || [])) {

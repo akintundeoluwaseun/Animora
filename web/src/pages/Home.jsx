@@ -5,8 +5,8 @@ import { api, naira } from '../lib.jsx';
 import { Button } from '../components/ui.jsx';
 
 const STEPS = [
-  ['Describe your video', 'One box, your own words: a birthday, a wedding, an advert. Add photos if you like. Animora works out the rest.'],
-  ['The AI directs the shots', 'Every video gets its own concept, moves and transitions. No two come out the same.'],
+  ['Choose your way to plan', 'Answer guided questions one at a time, or describe a birthday, wedding, event or business video in your own words. Animora will ask for details it still needs.'],
+  ['Build a story, not a text loop', 'The director uses your details and photos to plan an opening, distinct shots and transitions, and a clear finish.'],
   ['Download the MP4', 'Watch the preview, change anything in plain words, then download it for WhatsApp, TikTok or YouTube.'],
 ];
 
@@ -20,7 +20,7 @@ function StartCard({ kind }) {
       </span>
       <span className="min-w-0 flex-1 leading-tight">
         <b className="block text-[17px] font-semibold tracking-[-0.02em]">{flyer ? 'Make a flyer' : 'Make a video'}</b>
-        <span className={`mt-0.5 block text-[13px] ${flyer ? 'text-ink-mute' : 'text-white/75'}`}>{flyer ? 'A still design to post or print' : 'Motion ad, downloads as MP4'}</span>
+        <span className={`mt-0.5 block text-[13px] ${flyer ? 'text-ink-mute' : 'text-white/75'}`}>{flyer ? 'A still design to post or print' : 'Animated video, downloads as MP4'}</span>
       </span>
       <span aria-hidden="true" className={`text-lg transition-transform group-hover:translate-x-0.5 ${flyer ? 'text-ink-mute' : 'text-white/70'}`}>→</span>
     </Link>

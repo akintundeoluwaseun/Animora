@@ -247,21 +247,32 @@ r.post('/:id/brief/parse', async (req, res) => {
   if (text.length < 10) return res.status(400).json({ error: 'Paste a few sentences about your business and the ad you want.' });
   const current = p.brief_json || {};
   const { aiError, ...found } = await parseBrief(text, current, { flyer: p.kind === 'flyer' });
+  const rules = parseBriefRules(text);
   // never overwrite answers the user already gave one by one
   const merged = cleanBrief({ ...found, ...Object.fromEntries(Object.entries(current).filter(([, v]) => v !== undefined && v !== '')), pasteText: found.pasteText, mode: 'paste' });
+  const birthdayInput = (found.kind === 'personal' || rules.kind === 'personal') && /birthday|b-?day/i.test(`${text} ${found.category || ''} ${rules.category || ''}`);
+  if (birthdayInput) {
+    merged.kind = 'personal';
+    merged.category = found.category || rules.category || 'Birthday';
+    merged.name = rules.name || (current.kind === 'personal' && /birthday|b-?day/i.test(current.category || '') ? current.name : '');
+    merged.relationship = found.relationship || rules.relationship || current.relationship || '';
+    merged.milestone = found.milestone || rules.milestone || current.milestone || '';
+    merged.personalMessage = found.personalMessage || rules.personalMessage || current.personalMessage || '';
+    merged.memories = found.memories?.length ? found.memories : current.memories || [];
+  }
   // The AI decides the rest, so the person never has to answer a form: a title from their own words if nothing else was found
-  if (!merged.name) {
+  if (!merged.name && merged.kind !== 'personal') {
     const first = text.split(/[.!?\n]/)[0].replace(/^\s*(please\s+)?(i\s+(want|need|would like)\s+(to\s+(make|create)\s+)?|(make|create|build|do)\s+(me\s+)?)?(an?\s+|the\s+|my\s+)?(video|ad|advert|promo|slideshow|flyer)\s+(for|about|of|on)\s+/i, '').replace(/[“”"]/g, '').trim();
     const words = first.split(/\s+/).filter(Boolean).slice(0, 5).join(' ');
     if (words.length >= 3) merged.name = words.charAt(0).toUpperCase() + words.slice(1, 40);
   }
-  if (!merged.name) { const nm = text.match(/^\s*([A-Z][\w'&.-]*(?:\s+[A-Z][\w'&.-]*){0,3})\s+(?:is|are|sells|makes|offers|does|runs)\b/); if (nm) merged.name = nm[1].trim(); }
+  if (!merged.name && merged.kind !== 'personal') { const nm = text.match(/^\s*([A-Z][\w'&.-]*(?:\s+[A-Z][\w'&.-]*){0,3})\s+(?:is|are|sells|makes|offers|does|runs)\b/); if (nm) merged.name = nm[1].trim(); }
   // pictures given: a slideshow needs time for each one (about 2 s each), unless they named a length
   const assetsNow = await projectAssets(p.id);
   const nPics = assetsNow.filter((x) => x.kind === 'image' && x.role !== 'logo').length;
-  if (nPics >= 3 && !parseBriefRules(text).duration && !current.duration) merged.duration = Math.min(45, Math.max(20, 6 + 2 * nPics));
+  if (nPics >= 3 && !rules.duration && !current.duration) merged.duration = Math.min(45, Math.max(20, 6 + 2 * nPics));
   const u = await one('UPDATE projects SET brief_json=$2, updated_at=now() WHERE id=$1 RETURNING *', [p.id, JSON.stringify(merged)]);
-  res.json({ project: shape(u, { assets: assetsNow }), found: ['name', 'category', 'goals', 'headlines', 'features', 'products', 'ctas', 'contact', 'payment', 'aspect', 'duration', 'voiceover', 'sound'].filter((k) => found[k] !== undefined && found[k] !== '' && !(Array.isArray(found[k]) && !found[k].length)), aiError });
+  res.json({ project: shape(u, { assets: assetsNow }), found: ['name', 'category', 'relationship', 'milestone', 'personalMessage', 'memories', 'goals', 'headlines', 'features', 'products', 'ctas', 'contact', 'payment', 'aspect', 'duration', 'voiceover', 'sound'].filter((k) => found[k] !== undefined && found[k] !== '' && !(Array.isArray(found[k]) && !found[k].length)), aiError });
 });
 
 r.post('/:id/suggest', async (req, res) => {

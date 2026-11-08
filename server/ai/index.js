@@ -124,18 +124,18 @@ export function aiReason(e) {
 /** Plan -> HTML. Returns { html, source, problems, notice? } */
 export async function generateCode({ plan, style, assets, brief = null, previous = null, onStatus }) {
   const themeKey = themeKeyFor(style);
-  const motionFirst = CODE_MODE !== 'html' && process.env.ANIMORA_ENGINE !== 'cinema' && MOTION_ASPECTS.includes(plan.aspect_ratio || '9:16');
+  const engine = String(brief?.videoEngine || process.env.ANIMORA_ENGINE || 'motion').toLowerCase();
+  const motionFirst = CODE_MODE !== 'html' && engine !== 'cinema' && MOTION_ASPECTS.includes(plan.aspect_ratio || '9:16');
   // The Motion director sees the pictures itself, so it skips the separate "describe the pictures" call (one AI round trip saved).
   if (config.useGemini && !motionFirst) { onStatus?.('Looking at your pictures'); assets = await describeAssets(assets, loadImage); }
   let planWithAssets = enrichPlan(plan, assets);
-  // Every video size is made by the Motion engine (Apple-style product films): the AI directs, or the rule-based composer without a key
-  const motion = CODE_MODE !== 'html' && process.env.ANIMORA_ENGINE !== 'cinema' && MOTION_ASPECTS.includes(planWithAssets.aspect_ratio || '9:16');
-  // Vertical videos are spelled from the premium motion library: a different mix of pieces for every business and every Regenerate.
-  // ANIMORA_ENGINE=motion (or cinema) switches back to the older engines.
-  const pieces = CODE_MODE !== 'html' && !['motion', 'cinema'].includes(process.env.ANIMORA_ENGINE) && (PIECES_ASPECTS.includes(planWithAssets.aspect_ratio || '9:16') || ['16:9', '1:1', '4:5'].includes(planWithAssets.aspect_ratio));
+  // The classic Motion director is the default: it composes a beginning, distinct shots and a finish from the user's brief.
+  // Choosing "Signature visual mix" in the form opts that video into the newer template-led Pieces engine.
+  const motion = CODE_MODE !== 'html' && engine !== 'cinema' && MOTION_ASPECTS.includes(planWithAssets.aspect_ratio || '9:16');
+  const pieces = CODE_MODE !== 'html' && !['motion', 'cinema'].includes(engine) && (PIECES_ASPECTS.includes(planWithAssets.aspect_ratio || '9:16') || ['16:9', '1:1', '4:5'].includes(planWithAssets.aspect_ratio));
   // Premium first: a designer-made template filled with the owner's details (no AI call). ANIMORA_ENGINE=pieces skips it.
   // Premium recipes (phone-UI scenes) are off unless ANIMORA_ENGINE=premium. They only show the owner's own words; the fake friend-chat template is never auto-picked.
-  const premium = CODE_MODE !== 'html' && process.env.ANIMORA_ENGINE === 'premium' && PREMIUM_ASPECTS.includes(planWithAssets.aspect_ratio || '9:16');
+  const premium = CODE_MODE !== 'html' && engine === 'premium' && PREMIUM_ASPECTS.includes(planWithAssets.aspect_ratio || '9:16');
   if (premium) {
     try {
       onStatus?.('Building your film');
@@ -159,7 +159,7 @@ export async function generateCode({ plan, style, assets, brief = null, previous
         images: config.useGemini ? await imageParts(assets) : [], useAi: !!config.useGemini,
         salt: previous ? String(Date.now()) : '', avoid: (prev?.beats || prev?.scenes || []).map((x) => x.type), style,
       });
-      return { html: r.html, source: config.useGemini && r.source === 'gemini' ? 'gemini' : 'template', problems: [], ...(config.useGemini && r.source !== 'gemini' ? { notice: "The AI director couldn't finish, so this version was arranged automatically. Press Regenerate to try the AI again." } : {}) };
+      return { html: r.html, source: config.useGemini && r.source === 'gemini' ? 'gemini' : 'template', problems: [], ...(config.useGemini && r.source !== 'gemini' && !r.aiSkipped ? { notice: "The AI director couldn't finish, so this version was arranged automatically. Press Regenerate to try the AI again." } : {}) };
     } catch (e) { console.warn('[motion] failed, trying Cinema:', e.message); }
     // the older engines below use picture descriptions
     if (config.useGemini) { onStatus?.('Looking at your pictures'); assets = await describeAssets(assets, loadImage); planWithAssets = enrichPlan(plan, assets); }
