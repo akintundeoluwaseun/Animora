@@ -108,7 +108,7 @@ Return JSON only:
 Rules: never invent prices, phone numbers or addresses. Only use picture NAMES from the list, and only where the words match what the picture shows.
 Short words beat long sentences. Pick the layout that suits what the flyer is for and the pictures you have.`,
       messages: [{ role: 'user', text: user }],
-      temperature: 0.85, maxOutputTokens: 4096, json: true, timeoutMs: 60000, thinking: 'low',
+      temperature: 0.85, maxOutputTokens: 4096, json: true, timeoutMs: 20000, thinking: 'low',
     });
     const o = JSON.parse(String(text).replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, ''));
     const names = new Set(photos.map((a) => a.name));

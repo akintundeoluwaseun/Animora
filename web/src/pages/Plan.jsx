@@ -244,28 +244,20 @@ const FLYER_LAYOUTS = [
   { v: 'price', l: 'Price first', d: 'A giant price or offer in the middle' },
   { v: 'auto', l: 'Let the AI decide', d: 'It picks what suits your video' },
 ];
+const flyerTypesOf = (b = {}) => [].concat(b.flyerType || []).map(String);
 const FLYER_QUESTIONS = [
-  { id: 'mode', type: 'single', show: () => false, options: QUESTIONS[0].options, ask: QUESTIONS[0].ask },
-  { ...QUESTIONS.find((x) => x.id === 'paste'), show: undefined, ask: FLYER_TEXT.paste, placeholder: 'e.g. My business is Oluwaseun Computers in Ado Ekiti. We sell and repair laptops. HP EliteBook ₦250,000, Dell ₦300,000. Call or WhatsApp 0807 691 1614. Square flyer for WhatsApp, clean and premium.' },
-  { id: 'name', type: 'text', ask: () => "What's your business name?", placeholder: 'e.g. Kemi Cakes' },
-  { id: 'category', type: 'single', options: CATEGORIES, typed: true, ask: (b) => `Nice! What does ${b.name} do?`, placeholder: 'Or type your own' },
-  { id: 'flyerType', type: 'multi', max: 3, options: FLYER_TYPES, typed: true, ask: () => 'What kind of flyer is this?', hint: 'Pick one or more. A sale and a new opening can share one flyer.', placeholder: 'Or describe it in your own words' },
-  { id: 'headline', type: 'multi', max: 3, suggest: 'headline', typed: true, ask: () => 'What is the big title? The words people read first.', hint: 'Short wins. One to three lines work best on a flyer.' },
-  { id: 'offer', type: 'text', optional: true, show: (b) => { const t = [].concat(b.flyerType || []); return !t.length || !t.every((x) => x === 'hiring' || x === 'brand'); }, ask: () => 'Is there one big thing to show huge: a price, a discount or a date?', placeholder: 'e.g. 30% OFF or ₦5,000 or 24 Dec' },
-  { id: 'products', type: 'long', optional: true, ask: () => 'Any items, services or prices to list? One per line.', placeholder: 'Jollof rice ₦2,500\nFried rice ₦3,000' },
-  { id: 'when', type: 'text', optional: true, show: (b) => !b.flyerType || [].concat(b.flyerType).some((x) => x === 'event' || x === 'launch' || /event|party|show|launch|open/i.test(x)), ask: () => 'When and where? Date, time and venue.', placeholder: 'e.g. Sat 14 Dec, 4pm, Ado Ekiti Town Hall' },
-  { id: 'cta', type: 'multi', max: 3, options: CTAS, typed: true, ask: FLYER_TEXT.cta, placeholder: 'Or type your own' },
-  { id: 'contact', type: 'text', optional: true, ask: FLYER_TEXT.contact, placeholder: 'e.g. 0803 123 4567 · @yourhandle' },
-  { id: 'aspect', type: 'single', options: FLYER_ASPECTS, ask: FLYER_TEXT.aspect },
-  { id: 'pictures', type: 'upload', optional: true, ask: FLYER_TEXT.pictures },
-  { id: 'layout', type: 'single', options: FLYER_LAYOUTS, ask: () => 'How should the flyer be laid out?' },
-  { id: 'colors', type: 'colors', ask: FLYER_TEXT.colors },
-  { id: 'style', type: 'style', ask: FLYER_TEXT.style },
-  { id: 'extra', type: 'long', optional: true, chips: ['Make the price really big', 'Keep it calm and premium', 'Make it loud and colourful', 'Use my photo as the background'], ask: FLYER_TEXT.extra, placeholder: 'e.g. "Put the prices in big circles" or "Make it look like a Christmas sale"' },
+  { id: 'flyerType', type: 'single', options: FLYER_TYPES, ask: () => 'What kind of flyer are you making?' },
+  { id: 'name', type: 'text', ask: (b) => flyerTypesOf(b).includes('event') ? 'What is the event called?' : 'What is your business or organization called?', placeholder: 'e.g. Kemi Cakes, Living Faith Ado, Annual Youth Convention' },
+  { id: 'headline', type: 'long', ask: (b) => flyerTypesOf(b).includes('menu') ? 'What is the main heading for the menu or price list?' : 'What is the main message people should notice first?', hint: 'A short headline is enough. Add the price or important details below if needed.', placeholder: 'e.g. Fresh cakes made to order · 30% off this weekend' },
+  { id: 'offer', type: 'text', optional: true, show: (b) => flyerTypesOf(b).some((x) => ['sale', 'launch'].includes(x)), ask: () => 'What price, discount or offer should stand out?', placeholder: 'e.g. 30% OFF · ₦5,000 · Opening week offer' },
+  { id: 'products', type: 'long', optional: true, show: (b) => flyerTypesOf(b).some((x) => ['menu', 'service'].includes(x)), ask: () => 'Any items, prices or services to list? One per line.', placeholder: 'Jollof rice ₦2,500\nFried rice ₦3,000' },
+  { id: 'when', type: 'text', optional: true, show: (b) => flyerTypesOf(b).includes('event'), ask: () => 'When and where? Date, time and venue.', placeholder: 'e.g. Sat 14 Dec, 4pm · Ado Ekiti Town Hall' },
+  { id: 'contact', type: 'text', optional: true, ask: () => 'What phone number, website or social handle should appear?', placeholder: 'e.g. 0803 123 4567 · @yourhandle' },
+  { id: 'pictures', type: 'upload', optional: true, ask: () => `Add your logo or relevant photos if you have them (optional, up to ${MAX_PICS}).` },
 ];
 
-// Only the business name is needed. Every other question can be skipped, and Animora chooses well for whatever is skipped.
-const SKIPPABLE = new Set(['category', 'goal', 'headline', 'cta', 'aspect', 'duration', 'colors', 'style', 'template', 'intensity', 'scenes', 'voiceover', 'sound', 'flyerType', 'layout', 'offer', 'when', 'features', 'products', 'contact', 'pictures', 'extra', 'relationship', 'milestone', 'personalMessage', 'memories']);
+// Only the type, name and main message are essential; optional details and photos can be skipped.
+const SKIPPABLE = new Set(['goal', 'cta', 'aspect', 'duration', 'colors', 'style', 'template', 'intensity', 'scenes', 'voiceover', 'sound', 'layout', 'offer', 'when', 'features', 'products', 'contact', 'pictures', 'extra', 'relationship', 'milestone', 'memories']);
 for (const qq of [...QUESTIONS, ...FLYER_QUESTIONS]) if (SKIPPABLE.has(qq.id)) qq.optional = true;
 
 
@@ -522,6 +514,14 @@ export default function Plan() {
     }
     if (q.id === 'voiceover') patch = { voiceover: value === 'female' || value === 'male', voiceGender: value === 'male' ? 'male' : value === 'female' ? 'female' : undefined };
     else if (q.id === 'lookAuto') patch = value === 'auto' ? { lookAuto: 'auto', styleAuto: true, colorMode: bRef.current.colorMode || 'style', sound: bRef.current.sound || 'all' } : { lookAuto: 'own' };
+    else if (q.id === 'flyerType') {
+      const selected = String(Array.isArray(value) ? value[0] || '' : value || '');
+      const changedType = selected !== (flyerTypesOf(bRef.current)[0] || '');
+      patch = {
+        flyerType: [selected], aspect: bRef.current.aspect || '4:5',
+        ...(changedType ? { headline: '', headlines: [], offer: '', products: [], when: '', cta: '', ctas: [], offerSkipped: false, productsSkipped: false, whenSkipped: false } : {}),
+      };
+    }
     else if (q.id === 'category') {
       const changedType = String(value) !== String(bRef.current.category || '');
       patch = {
@@ -696,7 +696,7 @@ export default function Plan() {
                     {loadingSug && !opts.length && <span className="flex items-center gap-2 text-sm text-ink-mute"><Spinner className="size-4" />Writing some ideas…</span>}
                     {opts.filter((o) => q.id !== 'duration' || (o >= limits.minSeconds && o <= limits.maxSeconds)).map((o) => {
                       const v = o.v ?? o, l = o.l ?? (q.id === 'duration' ? `${o} seconds` : o);
-                      const on = q.type === 'multi' ? multi.includes(v) : b[q.id] === v;
+                      const on = q.type === 'multi' ? multi.includes(v) : Array.isArray(b[q.id]) ? b[q.id].includes(v) : b[q.id] === v;
                       const best = false;
                       return <Chip key={v} active={on} sub={o.d || (best ? 'Fits your details best' : undefined)} multi={q.type === 'multi'} onClick={() => {
                         if (q.id === 'duration') { const w = lengthWarning(b, v); if (w) { setLenWarn({ v, ...w }); return undefined; } setLenWarn(null); }

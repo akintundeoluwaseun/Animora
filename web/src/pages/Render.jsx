@@ -92,10 +92,14 @@ function Progress({ render, onCancel }) {
 // Fetch the whole MP4. Videos made online come back in 4 MB ranges, so ask for each part in turn.
 function DownloadButton({ render, title }) {
   const [pct, setPct] = useState(null);
+  const [error, setError] = useState('');
   return (
-    <Button size="lg" loading={pct != null} onClick={async () => { setPct(0); try { await downloadVideo(render, title, setPct); } finally { setPct(null); } }}>
-      {pct != null ? `Saving ${Math.round(pct * 100)}%` : 'Download MP4'}
-    </Button>
+    <>
+      <Button size="lg" loading={pct != null} onClick={async () => { setPct(0); setError(''); try { await downloadVideo(render, title, setPct); } catch (e) { setError(e.message || 'The MP4 download failed. Please try again.'); } finally { setPct(null); } }}>
+        {pct != null ? `Saving ${Math.round(pct * 100)}%` : 'Download MP4'}
+      </Button>
+      {error && <div className="basis-full"><Alert>{error}</Alert></div>}
+    </>
   );
 }
 
@@ -192,7 +196,7 @@ export default function Render() {
   useEffect(() => {
     if (params.get('download') !== '1' || autoDl.current || render?.status !== 'done' || !render.videoUrl) return;
     autoDl.current = true;
-    downloadVideo(render, project?.title || 'video', () => {}).catch(() => {});
+    downloadVideo(render, project?.title || 'video', () => {}).catch((e) => setError(e.message || 'The MP4 download failed. Please try again.'));
   }, [render?.status]); // eslint-disable-line react-hooks/exhaustive-deps
   const autoStart = useRef(false);
   useEffect(() => { if (autoStart.current && check && !render && !busy) { autoStart.current = false; start(); } });   // "Generate Video" in the editor starts straight away
