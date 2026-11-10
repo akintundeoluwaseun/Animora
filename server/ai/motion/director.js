@@ -6,6 +6,7 @@ import { fixPrices, factsFrom } from '../cinema/compose.js';
 import { composeMotion, accentFor, BEAT_MIN, BEAT_MAX, MOTION_WANTS, FONTS } from './compose.js';
 import { motionHtml, readMotion } from './page.js';
 import { lookFor } from './looks.js';
+import { isPersonalBirthdayBrief } from '../personal.js';
 
 const MODEL = process.env.GEMINI_DIRECTOR_MODEL || process.env.GEMINI_CHAT_MODEL || 'gemini-flash-latest';
 // Speed: the director answers in seconds with light thinking; if it is slow (busy model, retries), the instant
@@ -138,9 +139,8 @@ export async function directMotion({ plan, brief = null, assets = [], themeColor
   // the chosen style is a whole look: stage, display type, background world, pacing
   const look = lookFor(style?.slug || style?.palette?.theme || '', { ...(style?.palette || {}), ...themeColors });
   const rules = composeMotion(plan, { brief: brief || {}, assets, salt, avoid, colors, look });
-  const personalBirthday = /birthday|b-?day/i.test(`${brief?.category || ''} ${plan.business?.category || ''} ${plan.title || ''}`)
-    && (brief?.kind === 'personal' || brief?.relationship || brief?.personalMessage || (brief?.memories || []).length);
-  const logo = (assets || []).find((a) => (a.kind || 'image') === 'image' && (a.role === 'logo' || /logo/i.test(a.name || '')));
+  const personalBirthday = isPersonalBirthdayBrief(brief || {}, plan);
+  const logo = personalBirthday ? null : (assets || []).find((a) => (a.kind || 'image') === 'image' && (a.role === 'logo' || /logo/i.test(a.name || '')));
   let beats = null, font = rules.font, concept = '';
   if (useAi && !personalBirthday) {
     try {

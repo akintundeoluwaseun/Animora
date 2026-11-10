@@ -16,6 +16,7 @@ import { directCinema, cinemaEdit, isCinema, readCinema, CINEMA_ASPECTS } from '
 import { directMotion, motionEdit, motionOfflineEdit, isMotion, readMotion, MOTION_ASPECTS } from './motion/index.js';
 import { piecesFilm, piecesEdit, isPieces, PIECES_ASPECTS, isTemplateBrief } from './pieces/index.js';
 import { premiumFilm, premiumEdit, isPremium, PREMIUM_ASPECTS } from './premium/index.js';
+import { birthdayPhotoAssets, isPersonalBirthdayBrief } from './personal.js';
 
 // 'director' (default): Gemini directs the shots, our motion engine animates them (fast, always renders).
 // 'html': Gemini writes the whole HTML/GSAP file itself (slower, experimental).
@@ -123,6 +124,7 @@ export function aiReason(e) {
 
 /** Plan -> HTML. Returns { html, source, problems, notice? } */
 export async function generateCode({ plan, style, assets, brief = null, previous = null, onStatus }) {
+  if (isPersonalBirthdayBrief(brief || {}, plan || {})) assets = birthdayPhotoAssets(assets || [], brief || {});
   const themeKey = themeKeyFor(style);
   const engine = String(brief?.videoEngine || process.env.ANIMORA_ENGINE || 'motion').toLowerCase();
   const motionFirst = CODE_MODE !== 'html' && engine !== 'cinema' && MOTION_ASPECTS.includes(plan.aspect_ratio || '9:16');

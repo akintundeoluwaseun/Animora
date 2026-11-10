@@ -12,7 +12,8 @@ import { inspectAnimation, snapshotFrames } from '../engine/renderer.js';
 import { probeBuffer, toMp3 } from '../media.js';
 import { voiceoverFormats, generateVoiceTrack, VOICES, hasOfflineVoice } from '../ai/voice.js';
 import { config } from '../config.js';
-import { cleanBrief, briefToPlanRules, suggest, autoStyleSlug, parseBrief, parseBriefRules, fillDemoBrief } from '../ai/brief.js';
+import { cleanBrief, briefToPlanRules, suggest, autoStyleSlug, parseBrief, parseBriefRules, fillDemoBrief, repairLegacyBirthdayBrief } from '../ai/brief.js';
+import { needsBirthdayPlanRepair } from '../ai/personal.js';
 import { makeFlyer, flyerFitNotice } from '../ai/flyer.js';
 import { adjustDesign, aspectOf, currentLook } from '../ai/adjust.js';
 import { isPremium, readPremium, premiumWithAudio, VOICE_LIBRARY, SOUND_REGISTRY } from '../ai/premium/index.js';
@@ -359,7 +360,7 @@ r.post('/:id/generate', async (req, res) => {
 
 async function runGenerate(p, user) {
   const setMsg = (m) => q('UPDATE projects SET gen_message=$2 WHERE id=$1', [p.id, String(m).slice(0, 120)]).catch(() => {});
-  const name = p.brief_json?.name || p.title;
+  let name = p.brief_json?.name || p.title;
   try {
     let out;
     if (p.kind === 'flyer') {
@@ -369,7 +370,27 @@ async function runGenerate(p, user) {
       setMsg('Designing your flyer');
       out = { html: await makeFlyer({ brief: p.brief_json || {}, plan: p.plan_json, style, assets, previous: p.code_html || null, useAI: config.useGemini }), source: config.useGemini ? 'gemini' : 'template' };
       out.notice = flyerFitNotice(out.html);
-    } else out = await generateCode({ plan: p.plan_json, style: await loadStyle(p.style_id), assets: await projectAssets(p.id), brief: p.brief_json || null, previous: p.code_html || null, onStatus: setMsg });
+    } else {
+      let brief = cleanBrief(p.brief_json || {});
+      let plan = p.plan_json;
+      const repaired = repairLegacyBirthdayBrief(brief, plan);
+      if (repaired) {
+        const shouldRebuildPlan = needsBirthdayPlanRepair(brief, plan, repaired);
+        brief = repaired;
+        if (shouldRebuildPlan) {
+          brief.aspect = p.brief_json?.aspect || plan.aspect_ratio || brief.aspect || '9:16';
+          brief.duration = Number(p.brief_json?.duration) || Number(plan.duration_seconds) || Number(brief.duration) || 20;
+          const style = await loadStyle(p.style_id);
+          const palette = style?.palette ? { primary: style.palette.primary, secondary: style.palette.secondary, background: style.palette.background, text: style.palette.text } : null;
+          plan = briefToPlanRules(brief, { assets: await projectAssets(p.id), limits: limitsFor(user), palette });
+          normalizePlan(plan);
+          await q(`UPDATE projects SET brief_json=$2, plan_json=$3, aspect_ratio=$4, duration_seconds=$5, title=$6, updated_at=now() WHERE id=$1`,
+            [p.id, JSON.stringify(brief), JSON.stringify(plan), plan.aspect_ratio, Math.round(plan.duration_seconds), (plan.title || p.title).slice(0, 120)]);
+        }
+        name = brief.name || plan.title || 'Birthday video';
+      }
+      out = await generateCode({ plan, style: await loadStyle(p.style_id), assets: await projectAssets(p.id), brief, previous: p.code_html || null, onStatus: setMsg });
+    }
     const versions = [...(p.code_versions || []), ...(p.code_html ? [p.code_html] : [])].slice(-MAX_VERSIONS);
     const u = await one(`UPDATE projects SET code_html=$2, code_versions=$3, status='ready', ai_source=$4, edit_history='[]'::jsonb, updated_at=now(),
       gen_state='done', gen_message=$5, gen_error=NULL WHERE id=$1 RETURNING *`, [p.id, out.html, JSON.stringify(versions), out.source, out.notice || '']);

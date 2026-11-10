@@ -9,6 +9,7 @@ import { GSAP_CDN } from '../../engine/prompts.js';
 import { lookFor, fontsUrl } from '../motion/looks.js';
 import { geminiGenerate } from '../../engine/gemini.js';
 import { composeStory, pickLook, lookFor as storyLook, fontLink as storyFonts, fontFamilies as storyFams, LOOK_IDS, LOOKS as STORY_LOOKS, pickTrack, trackMusic, snapToBeats, musicLibrary } from '../story/index.js';
+import { birthdayPhotoAssets, isPersonalBirthdayBrief } from '../personal.js';
 
 const dir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'motion', 'browser');
 let RUNTIME = null;
@@ -50,17 +51,17 @@ const personalLines = (text, fallback) => {
   for (let i = 0; i < words.length; i += 8) out.push(str(words.slice(i, i + 8).join(' '), 90));
   return out.slice(0, 8);
 };
-const isPersonalBirthday = (brief = {}) => brief.kind === 'personal' || /\bbirthday\b/i.test(brief.category || '');
-const isBirthdayBrief = (brief = {}) => /birthday|b-?day/i.test(`${brief.category || ''} ${brief.name || ''}`);
+const isBirthdayBrief = (brief = {}, plan = {}) => isPersonalBirthdayBrief(brief, plan);
 
 // the facts a video may use, taken from the owner's answers (never invented)
 export function factsOf(plan = {}, brief = {}, assets = []) {
-  const photos = assets.filter((a) => (a.kind || 'image') === 'image' && a.role !== 'logo' && !/logo/i.test(a.name || '')).map((a) => a.url);
+  const birthday = isBirthdayBrief(brief, plan);
+  const photoAssets = birthday ? birthdayPhotoAssets(assets, brief) : assets.filter((a) => (a.kind || 'image') === 'image' && a.role !== 'logo' && !/logo/i.test(a.name || ''));
+  const photos = photoAssets.map((a) => a.url);
   // What each picture can honestly do: small, very wide/tall or flat pictures are shown whole on a dimmed copy of themselves, never cropped into a circle or blown up.
   const fitOf = (m) => { const w = Number(m.width) || 0, h = Number(m.height) || 0; if (!w || !h) return 'cover'; const ratio = w / h; return Math.min(w, h) < 600 || ratio > 2.1 || ratio < 0.48 ? 'contain' : 'cover'; };
   const fits = {}, ratios = {}, taps = {}; for (const a of assets) if (a.url) { fits[a.url] = fitOf(a); if (Number(a.width) && Number(a.height)) ratios[a.url] = Math.round((a.width / a.height) * 1000) / 1000; const m = String(a.focus || '').match(/^([\d.]+),([\d.]+)$/); if (m) taps[a.url] = { x: Math.min(0.95, Math.max(0.05, +m[1])), y: Math.min(0.95, Math.max(0.05, +m[2])) }; }
-  const logo = assets.find((a) => (a.kind || 'image') === 'image' && (a.role === 'logo' || /logo/i.test(a.name || '')))?.url || null;
-  const birthday = isPersonalBirthday(brief) && isBirthdayBrief(brief);
+  const logo = birthday ? null : assets.find((a) => (a.kind || 'image') === 'image' && (a.role === 'logo' || /logo/i.test(a.name || '')))?.url || null;
   const name = str(brief.name || plan.business?.name || (birthday ? 'Someone special' : 'Your business'), 40);
   const age = birthday ? ordinal(brief.milestone) : '';
   const relationship = birthday ? str(brief.relationship, 40).replace(/^(my|our)\s+/i, '').toLowerCase() : '';
@@ -79,7 +80,7 @@ export function factsOf(plan = {}, brief = {}, assets = []) {
   const place = birthday ? '' : str(brief.address || (placeSeg && placeSeg !== linkSeg ? placeSeg : '') || '', 60);
   const whatsapp = !birthday && /whats\s?app|wa\.me/i.test(String(brief.contact || '') + ' ' + String(brief.cta || ''));
   // pictures with a see-through background (product cut-outs) can step out of a frame
-  const cutouts = assets.filter((a) => (a.kind || 'image') === 'image' && a.role !== 'logo' && !/logo/i.test(a.name || '') && (a.transparent || a.has_alpha)).map((a) => a.url);
+  const cutouts = photoAssets.filter((a) => a.transparent || a.has_alpha).map((a) => a.url);
   const appy = /\b(app|apps|software|saas|platform|online store|e-?commerce|delivery app|mobile app|website|web ?site|game|gaming|fintech|payments?)\b/i.test([brief.category, brief.name, ...[].concat(brief.features || [])].join(' ')) && !/repair|fix|service centre|service center/i.test(brief.category || '');
   const steps = [].concat(brief.steps || []).map((x) => str(x, 40)).filter(Boolean).slice(0, 8);
   const phrases = [].concat(brief.phrases || []).map((x) => str(x, 90)).filter(Boolean).slice(0, 12);
@@ -188,10 +189,11 @@ export function piecesFilm({ plan = {}, brief = {}, assets = [], style = null, t
   // Normal-length videos start from a signature template chosen for the business (kinetic type, chrome, HUD, editorial ...).
   // The long-form Story engine is for videos over ~35 s, where one template would run out of things to show.
   const seconds = Number(plan.duration_seconds) || Number(brief.duration) || 20;
+  const birthday = isBirthdayBrief(brief, plan);
   const isGallery = factsOf(plan, brief, assets).gallery;
-  const autoTemplate = !isBirthdayBrief(brief) && !salt && !isTemplateBrief(brief) && !isGallery && seconds <= 35 && !!TPL_SIZES[aspect] && process.env.ANIMORA_DIRECTOR !== 'story';
+  const autoTemplate = !birthday && !salt && !isTemplateBrief(brief) && !isGallery && seconds <= 35 && !!TPL_SIZES[aspect] && process.env.ANIMORA_DIRECTOR !== 'story';
   if (autoTemplate) brief = { ...brief, template: pickDirection({ brief, plan, salt: 'first', previous, aspect, templatesOnly: true }) };
-  if ((isBirthdayBrief(brief) && isPersonalBirthday(brief)) || (!(!salt && isTemplateBrief(brief)) && process.env.ANIMORA_DIRECTOR !== 'pieces')) {
+  if (birthday || (!(!salt && isTemplateBrief(brief)) && process.env.ANIMORA_DIRECTOR !== 'pieces')) {
     const out = storyFilm({ plan, brief, assets, style, salt, previous });
     out.html = out.html.replace('</body>', `<!--animora-direction:story-${out.data.story.look.id};--></body>`);
     return out;

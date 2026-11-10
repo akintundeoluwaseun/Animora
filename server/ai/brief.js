@@ -6,6 +6,7 @@
 
 import { config } from '../config.js';
 import { geminiGenerate } from '../engine/gemini.js';
+import { birthdayPhotoAssets, isPersonalBirthdayBrief } from './personal.js';
 
 // Reading someone's idea and writing the video plan are the steps where a small model sounds dumb and repeats itself,
 // so they use the full Flash model (the lighter one stays for quick chat). Override with GEMINI_BRIEF_MODEL.
@@ -68,6 +69,7 @@ export function cleanBrief(b = {}) {
     flyerType: (Array.isArray(b.flyerType) ? list(b.flyerType) : b.flyerType ? [str(b.flyerType, 60)] : []).map((x) => str(x, 60)).filter(Boolean).slice(0, 3), offer: str(b.offer, 60), when: str(b.when, 120), layout: ['photo', 'type', 'price', 'auto'].includes(b.layout) ? b.layout : undefined,
     // exact on-screen wording the owner gave (shown as written, in order, as picture captions first); slideshow = show every picture one after another
     phrases: (Array.isArray(b.phrases) ? b.phrases : String(b.phrases || '').split(/\n/)).map((x) => str(x, 90)).filter(Boolean).slice(0, 12), slideshow: b.slideshow === true || b.slideshow === 'yes' ? true : undefined,
+    personalPhotoIds: (Array.isArray(b.personalPhotoIds) ? b.personalPhotoIds : []).map((x) => str(x, 80)).filter(Boolean).slice(0, 10),
     steps: list(b.steps).slice(0, 8), lookAuto: ['auto', 'own'].includes(b.lookAuto) ? b.lookAuto : undefined,
     extra: str(b.extra, 3000), done: !!b.done, mode: ['steps', 'paste'].includes(b.mode) ? b.mode : undefined, pasted: b.pasted ? true : undefined, pasteText: str(b.pasteText, 6000),
     colorMode: ['style', 'logo', 'own'].includes(b.colorMode) ? b.colorMode : undefined, picturesDone: b.picturesDone ? true : undefined,
@@ -152,7 +154,7 @@ function shortPersonalLines(value, limit = 8) {
 
 function birthdayPlan(b, { assets, limits, palette }) {
   const min = limits.minSeconds || 15, max = limits.maxSeconds || 300;
-  const photos = assets.filter((a) => a.kind === 'image' && a.role !== 'logo');
+  const photos = birthdayPhotoAssets(assets, b);
   const name = b.name || 'Someone special';
   const relationship = str(b.relationship, 40).replace(/^(my|our)\s+/i, '').toLowerCase();
   const age = birthdayAge(b.milestone);
@@ -186,7 +188,7 @@ function birthdayPlan(b, { assets, limits, palette }) {
     business: { name, category: 'Birthday celebration', location: '', phone: '', handle: '' },
     aspect_ratio: b.aspect || '9:16', duration_seconds: D,
     style: { colors: readable({ ...(palette || {}), ...(b.colors || {}) }, b.colors) },
-    assets: assets.filter((a) => a.kind === 'image').map((a) => ({ name: a.name, url: a.url, use: a.role === 'logo' ? 'logo' : 'personal photo' })),
+    assets: photos.map((a) => ({ name: a.name, url: a.url, use: 'personal photo' })),
     scenes,
     voiceover: b.voiceover ? { enabled: true, source: 'ai', voice_style: 'warm, sincere and celebratory', captions: true } : { enabled: false },
     cta: closing, goal: 'Celebrate someone special',
@@ -209,7 +211,7 @@ export function briefToPlanRules(brief, { assets = [], limits = { minSeconds: 15
   const b = { ...cleanBrief(brief) }; for (const k of ['features', 'products', 'headlines', 'ctas', 'goals', 'steps']) if (!Array.isArray(b[k])) b[k] = [];
   let D = Math.max(limits.minSeconds || 15, Math.min(limits.maxSeconds || 300, b.duration || 20));
   const images = assets.filter((a) => a.kind === 'image');
-  if ((b.kind === 'personal' || /\bbirthday\b/i.test(b.category || '')) && /birthday|b-?day/i.test(`${b.category || ''} ${b.name || ''}`)) return birthdayPlan(b, { assets, limits, palette });
+  if (isPersonalBirthdayBrief(b)) return birthdayPlan(b, { assets, limits, palette });
   const logo = images.find((a) => a.role === 'logo');
   const photos = images.filter((a) => a.role !== 'logo');
   const pay = b.payment || '';
@@ -453,6 +455,29 @@ export function parseBriefRules(text) {
   const pay = findPayment(t); if (pay) { out.payment = pay; out.kind = out.kind || 'cause'; out.category = out.category || 'Fundraiser'; }
   out.pasteText = str(t, 6000);   // the whole text also goes to the AI director (kept apart from the last question's answer)
   return out;
+}
+
+/** Convert an older wrongly-classified birthday project into a safe, personal brief before regeneration. */
+export function repairLegacyBirthdayBrief(brief = {}, plan = {}) {
+  if (!isPersonalBirthdayBrief(brief, plan)) return null;
+  const sceneText = (plan.scenes || []).flatMap((scene) => [].concat(scene?.on_screen_text || [], scene?.voiceover || []));
+  const raw = [brief.pasteText, brief.headline, ...[].concat(brief.headlines || []), brief.extra, plan.title, ...sceneText].filter(Boolean).join('\n');
+  const found = parseBriefRules(raw);
+  const savedCategoryIsBirthday = /^(?:personal\s+)?birthday(?:\s+(?:greeting|video|film))?$/i.test(String(brief.category || '').trim());
+  const invalidName = /^(?:(?:my|our|the)\s+)?(?:brother|sister|mum|mom|mother|dad|father|friend|partner|husband|wife|son|daughter|cousin|uncle|aunt|grandma|grandmother|grandpa|grandfather|birthday|video|business|brand|product|service)$/i;
+  const savedName = String(brief.name || '').trim();
+  const name = found.name || ((brief.kind === 'personal' || savedCategoryIsBirthday) && savedName && !invalidName.test(savedName) ? savedName : '');
+  return cleanBrief({
+    ...brief,
+    kind: 'personal', category: 'Birthday', name,
+    relationship: brief.relationship || found.relationship || '',
+    milestone: brief.milestone || found.milestone || '',
+    personalMessage: found.personalMessage || brief.personalMessage || '',
+    memories: Array.isArray(brief.memories) ? brief.memories : [],
+    personalPhotoIds: brief.personalPhotoIds || [],
+    headlines: [], headline: '', goals: [], goal: '', features: [], products: [],
+    ctas: [], cta: '', contact: '', payment: '', offer: '', when: '', extra: '',
+  });
 }
 
 export async function parseBrief(text, current = {}) {

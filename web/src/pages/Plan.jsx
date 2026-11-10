@@ -402,8 +402,11 @@ export default function Plan() {
   const photoRef = useRef(null);
   const musicRef = useRef(null);
 
-  const pics = (project?.assets || []).filter((a) => a.kind === 'image');
-  const logo = pics.find((a) => a.role === 'logo');
+  const allPics = (project?.assets || []).filter((a) => a.kind === 'image');
+  const birthdayForm = project?.kind !== 'flyer' && videoTypeOf(b) === 'birthday';
+  const personalPhotoIds = new Set((b.personalPhotoIds || []).map(String));
+  const pics = birthdayForm ? allPics.filter((a) => a.role !== 'logo' && personalPhotoIds.has(String(a.id))) : allPics;
+  const logo = birthdayForm ? null : pics.find((a) => a.role === 'logo');
   const QS = project?.kind === 'flyer' ? FLYER_QUESTIONS : VIDEO_QUESTIONS;
   const visible = QS;
   const what = project?.kind === 'flyer' ? 'flyer' : 'video';
@@ -431,7 +434,10 @@ export default function Plan() {
         const brief = r.project.brief || {};
         bRef.current = brief; setB(brief);
         const { styles: st } = await api('/styles'); setStyles(st);
-        const imgs = (r.project.assets || []).filter((a) => a.kind === 'image').length;
+        const allImages = (r.project.assets || []).filter((a) => a.kind === 'image');
+        const imgs = videoTypeOf(brief) === 'birthday'
+          ? allImages.filter((a) => a.role !== 'logo' && (brief.personalPhotoIds || []).map(String).includes(String(a.id))).length
+          : allImages.length;
         const LIST = r.project.kind === 'flyer' ? FLYER_QUESTIONS : VIDEO_QUESTIONS;
         const first = LIST.findIndex((qq) => { const v = valueOf(qq, brief, imgs); return v === undefined && !(qq.optional && brief[`${qq.id}Skipped`]); });
         setStep(brief.done && r.project.plan ? LIST.length : first < 0 ? LIST.length : first);
@@ -457,7 +463,7 @@ export default function Plan() {
       const files = [...(e.clipboardData?.files || [])].filter((f) => f.type.startsWith('image/'));
       if (!files.length) return;
       e.preventDefault();
-      upload(files.map((f, i) => new File([f], f.name && f.name !== 'image.png' ? f.name : `pasted picture ${Date.now() % 10000}${i ? `-${i}` : ''}.png`, { type: f.type })), q?.id === 'pictures' ? (!logo ? null : 'photo') : null);
+      upload(files.map((f, i) => new File([f], f.name && f.name !== 'image.png' ? f.name : `pasted picture ${Date.now() % 10000}${i ? `-${i}` : ''}.png`, { type: f.type })), birthdayForm ? 'photo' : q?.id === 'pictures' && logo ? 'photo' : null);
     };
     window.addEventListener('paste', onPaste);
     return () => window.removeEventListener('paste', onPaste);
@@ -534,6 +540,7 @@ export default function Plan() {
           when: undefined, payment: undefined, contact: undefined, features: undefined, products: undefined, steps: undefined,
           headlineSkipped: false, ctaSkipped: false, whenSkipped: false, paymentSkipped: false, contactSkipped: false,
           relationshipSkipped: false, milestoneSkipped: false, personalMessageSkipped: false,
+          personalPhotoIds: [],
         } : {}),
       };
     }
@@ -558,7 +565,7 @@ export default function Plan() {
 
   const upload = async (files, role) => {
     setError('');
-    const room = MAX_PICS - pics.length;
+    const room = MAX_PICS - allPics.length;
     if (room <= 0) { setError(`You can add up to ${MAX_PICS} pictures. Remove one to add another.`); return; }
     if (files.length > room) setError(`Only ${room} more picture${room === 1 ? '' : 's'} can be added (up to ${MAX_PICS}).`);
     setUploading(true);
@@ -575,14 +582,22 @@ export default function Plan() {
         form.append('name', role === 'logo' ? 'logo' : f.name.replace(/\.[^.]+$/, '').slice(0, 40));
         const { asset } = await api(`/projects/${id}/assets`, { method: 'POST', form });
         setProject((p) => ({ ...p, assets: [...(p.assets || []), asset] }));
+        if (asset.kind === 'image' && videoTypeOf(bRef.current) === 'birthday' && role !== 'logo') {
+          save({ personalPhotoIds: [...new Set([...(bRef.current.personalPhotoIds || []).map(String), String(asset.id)])].slice(0, MAX_PICS) });
+        }
         if (project?.code) setAnswersChanged(true);
       }
+      await saved();
       setToast(files.length > 1 ? 'Pictures added' : 'Picture added'); setTimeout(() => setToast(''), 2500);
     } catch (e) { setError(e.message); } finally { setUploading(false); [logoRef, photoRef].forEach((r) => { if (r.current) r.current.value = ''; }); }
   };
   const removePic = async (a) => {
     await api(`/projects/${id}/assets/${a.id}`, { method: 'DELETE' }).catch(() => {});
     setProject((p) => ({ ...p, assets: p.assets.filter((x) => x.id !== a.id) }));
+    if (videoTypeOf(bRef.current) === 'birthday') {
+      save({ personalPhotoIds: (bRef.current.personalPhotoIds || []).filter((id) => String(id) !== String(a.id)) });
+      await saved();
+    }
     if (project?.code) setAnswersChanged(true);
   };
 
@@ -744,17 +759,26 @@ export default function Plan() {
                     {q.id === 'paste' && <p className="mb-3 text-sm font-semibold text-ink-soft">Pictures (optional). Up to {MAX_PICS}, shown in the order you add them.</p>}
                     <input ref={logoRef} type="file" accept="image/*" hidden onChange={(e) => upload([...e.target.files], 'logo')} />
                     <input ref={photoRef} type="file" accept="image/*" multiple hidden onChange={(e) => upload([...e.target.files], 'photo')} />
+                    {birthdayForm && <p className="mb-3 text-sm text-ink-mute">Only photos marked “Use in birthday” are included. Existing logos and business photos are left out unless you select them.</p>}
                     <div className="flex flex-wrap items-center gap-2">
-                      <Button size="sm" type="button" variant="dark" onClick={() => logoRef.current?.click()} disabled={uploading || !!logo || pics.length >= MAX_PICS}>{logo ? 'Logo added' : 'Add logo'}</Button>
-                      <Button size="sm" type="button" variant="outline" onClick={() => photoRef.current?.click()} disabled={uploading || pics.length >= MAX_PICS}>Add photos</Button>
-                      <span className="text-sm text-ink-mute">{pics.length}/{MAX_PICS} · or paste with Ctrl+V</span>
+                      {!birthdayForm && <Button size="sm" type="button" variant="dark" onClick={() => logoRef.current?.click()} disabled={uploading || !!logo || allPics.length >= MAX_PICS}>{logo ? 'Logo added' : 'Add logo'}</Button>}
+                      <Button size="sm" type="button" variant="outline" onClick={() => photoRef.current?.click()} disabled={uploading || allPics.length >= MAX_PICS}>Add photos</Button>
+                      <span className="text-sm text-ink-mute">{birthdayForm ? `${pics.length} selected · ${allPics.length}/${MAX_PICS} uploaded` : `${allPics.length}/${MAX_PICS}`} · or paste with Ctrl+V</span>
                     </div>
-                    {pics.length > 0 && (
+                    {allPics.length > 0 && (
                       <ul className="mt-4 grid grid-cols-4 gap-3 sm:grid-cols-5">
-                        {pics.map((a) => (
+                        {allPics.map((a) => (
                           <li key={a.id} className="relative">
                             <img src={a.url} alt={a.name} className={`aspect-square w-full rounded-xl bg-white ring-1 ring-ink/10 ${a.role === 'logo' ? 'object-contain p-1' : 'object-cover'}`} />
                             <span className="mt-1 block truncate text-[11px] text-ink-soft">{a.role === 'logo' ? '⭐ logo' : a.name}</span>
+                            {birthdayForm && a.role !== 'logo' && <button type="button" aria-pressed={personalPhotoIds.has(String(a.id))} onClick={() => {
+                              const current = new Set((bRef.current.personalPhotoIds || []).map(String));
+                              if (current.has(String(a.id))) current.delete(String(a.id)); else current.add(String(a.id));
+                              save({ personalPhotoIds: [...current].slice(0, MAX_PICS) });
+                            }} className={`mt-1 w-full rounded-md px-1.5 py-1 text-[10px] font-semibold ${personalPhotoIds.has(String(a.id)) ? 'bg-green-100 text-green-800' : 'bg-lilac text-ink-soft'}`}>
+                              {personalPhotoIds.has(String(a.id)) ? 'Selected for birthday' : 'Use in birthday'}
+                            </button>}
+                            {birthdayForm && a.role === 'logo' && <span className="mt-1 block text-[10px] text-ink-mute">Logo · not selected</span>}
                             <button type="button" onClick={() => removePic(a)} className="absolute right-1 top-1 grid size-6 place-items-center rounded-full bg-ink/80 text-xs text-white" aria-label={`Remove ${a.name}`}>✕</button>
                           </li>
                         ))}

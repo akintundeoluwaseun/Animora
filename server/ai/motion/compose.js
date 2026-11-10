@@ -3,6 +3,7 @@
 // where to find it, a real call to action, and a logo end card. What the owner never said is never invented:
 // no ratings, no customer counts, no delivery times unless they gave them.
 import { factsFrom, cleanText, fixPrices, glyphFor } from '../cinema/compose.js';
+import { isPersonalBirthdayBrief } from '../personal.js';
 
 const hash = (s) => { let h = 2166136261; for (const c of String(s)) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); } return (h >>> 0) % 2147483646 + 1; };
 const OK = /^#[0-9a-f]{6}$/i;
@@ -207,8 +208,7 @@ export function composeMotion(plan, { brief = {}, assets = [], salt = '', avoid 
   B.end = () => ({ type: 'end', bg: pick(['brand', 'brand', base === 'light' ? 'dark' : 'light', base]), tagline: tagline || '', accent: tagline ? accentOf(tagline) : [], contact: handle || site || phone || '', contactGlyph: handle ? 'search' : site ? 'globe' : 'phone' });
 
   // A personal birthday is a greeting, not an advert. Keep each supplied thought as its own animated beat.
-  const personalBirthday = /birthday|b-?day/i.test(`${brief.category || ''} ${plan.business?.category || ''} ${plan.title || ''}`)
-    && (brief.kind === 'personal' || brief.relationship || brief.personalMessage || (brief.memories || []).length);
+  const personalBirthday = isPersonalBirthdayBrief(brief, plan);
   if (personalBirthday) {
     const storyScenes = plan.scenes || [];
     const sceneText = (scene) => [].concat(scene?.on_screen_text || []).map((x) => cleanText(x, 90, { keepCase: true })).filter(Boolean);

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { config } from '../server/config.js';
-import { cleanBrief, parseBriefRules, briefToPlanRules } from '../server/ai/brief.js';
+import { cleanBrief, parseBriefRules, briefToPlanRules, repairLegacyBirthdayBrief } from '../server/ai/brief.js';
+import { birthdayPhotoAssets, isPersonalBirthdayBrief, needsBirthdayPlanRepair } from '../server/ai/personal.js';
 import { factsOf, piecesFilm } from '../server/ai/pieces/index.js';
 import { composeStory } from '../server/ai/story/index.js';
 import { composeMotion } from '../server/ai/motion/compose.js';
@@ -24,6 +25,62 @@ assert.equal(missingName.milestone, '20');
 const possessive = parseBriefRules("Make a video for Tony's 20th birthday");
 assert.equal(possessive.name, 'Tony');
 assert.equal(possessive.milestone, '20');
+
+const legacyBrief = cleanBrief({
+  kind: 'business', category: 'Business / product / service', name: 'Kemi Cakes',
+  headline: 'Birthday video for my brother Tony turning twenty',
+  pasteText: 'Make a warm birthday video for my brother Tony turning twenty. Say: Happy birthday, brother! I am proud of you. May this new age bring you many blessings.',
+  contact: '0803 123 4567', cta: 'Contact us today', products: ['Birthday cake ₦50,000'], features: ['Fresh cakes'],
+  personalPhotoIds: ['birthday-photo'],
+});
+const legacyPlan = {
+  title: 'Birthday video for my brother Tony', duration_seconds: 20, aspect_ratio: '9:16', cta: 'Contact us today',
+  business: { name: 'Kemi Cakes', category: 'Food & drinks', phone: '0803 123 4567', location: 'Ado Ekiti' },
+  scenes: [
+    { purpose: 'hook', on_screen_text: ['Birthday video for my brother Tony'] },
+    { purpose: 'detail', on_screen_text: ['Fresh cakes'] },
+    { purpose: 'cta', on_screen_text: ['Contact us today'] },
+  ],
+};
+const legacyAssets = [
+  { id: 'old-logo', name: 'Kemi Cakes logo', kind: 'image', role: 'logo', url: 'https://example.test/logo.png' },
+  { id: 'old-product', name: 'Cake product', kind: 'image', role: 'photo', url: 'https://example.test/cake.png' },
+  { id: 'birthday-photo', name: 'Tony', kind: 'image', role: 'photo', url: 'https://example.test/tony.png' },
+];
+assert.equal(isPersonalBirthdayBrief(legacyBrief, legacyPlan), true, 'a clear family birthday request must override an old business classification');
+const repairedBrief = repairLegacyBirthdayBrief(legacyBrief, legacyPlan);
+assert.equal(needsBirthdayPlanRepair(legacyBrief, legacyPlan, repairedBrief), true, 'a business plan saved under a birthday title must be rebuilt');
+assert.equal(repairedBrief.kind, 'personal');
+assert.equal(repairedBrief.category, 'Birthday');
+assert.equal(repairedBrief.name, 'Tony');
+assert.equal(repairedBrief.relationship, 'brother');
+assert.equal(repairedBrief.milestone, '20');
+assert.match(repairedBrief.personalMessage, /Happy birthday, brother!/);
+assert.equal(repairedBrief.contact, undefined);
+assert.equal(repairedBrief.cta, undefined);
+assert.equal(repairedBrief.products, undefined);
+assert.deepEqual(birthdayPhotoAssets(legacyAssets, repairedBrief).map((asset) => asset.id), ['birthday-photo']);
+const repairedPlan = briefToPlanRules(repairedBrief, { assets: legacyAssets, limits: { minSeconds: 15, maxSeconds: 60 } });
+assert.equal(needsBirthdayPlanRepair(repairedBrief, repairedPlan, repairedBrief), false, 'a clean birthday storyboard must not be rebuilt unnecessarily');
+assert.equal(repairedPlan.business.name, 'Tony');
+assert.equal(repairedPlan.business.phone, '');
+assert.equal(repairedPlan.business.location, '');
+assert.doesNotMatch(repairedPlan.cta, /contact us|order|call|visit|book/i);
+assert.deepEqual(repairedPlan.assets.map((asset) => asset.name), ['Tony'], 'the repaired birthday plan may use only explicitly selected personal photos');
+const legacyFacts = factsOf(repairedPlan, repairedBrief, legacyAssets);
+assert.equal(legacyFacts.personalBirthday, true);
+assert.equal(legacyFacts.logo, null);
+assert.deepEqual(legacyFacts.photos, ['https://example.test/tony.png']);
+assert.equal(legacyFacts.phone, '');
+const safeLegacyAssets = birthdayPhotoAssets(legacyAssets, repairedBrief);
+const safeLegacyMotion = await directMotion({ plan: repairedPlan, brief: repairedBrief, assets: safeLegacyAssets, useAi: true });
+assert.equal(safeLegacyMotion.aiSkipped, true, 'a repaired old birthday must never be sent to the generic commercial director');
+assert.equal(safeLegacyMotion.data.logo, null);
+const safeLegacyText = safeLegacyMotion.data.beats.flatMap((beat) => [
+  ...(beat.lines || []), beat.text, beat.tagline, ...(beat.items || []).map((item) => typeof item === 'string' ? item : item.body || item.t || ''),
+]).filter(Boolean).join(' ');
+assert.match(safeLegacyText, /Happy 20th Birthday, Tony!/);
+assert.doesNotMatch(safeLegacyText, /Contact us|Kemi Cakes|Fresh cakes/i, 'no stale business contact or product content may survive repair');
 
 const brief = {
   ...written,
