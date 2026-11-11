@@ -14,16 +14,7 @@ import { birthdayPhotoAssets, isPersonalBirthdayBrief } from '../personal.js';
 const dir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'motion', 'browser');
 let RUNTIME = null;
 const runtime = () => (RUNTIME ||= ['pieces.js', 'atoms.js', 'pieces2.js', 'premium.js', 'signature.js', 'story.js'].map((f) => readFileSync(path.join(dir, f), 'utf8')).join('\n;\n'));
-// What the video ends on when nobody wrote a closing line. Only business adverts say "Order now".
-function closingLine(brief = {}) {
-  const c = `${brief.category || ''} ${brief.name || ''}`.toLowerCase();
-  if (brief.kind === 'cause') return 'Donate today';
-  if (!brief.kind || brief.kind === 'business') return 'Order now';
-  if (/birthday|anniversary/.test(c)) return 'Happy birthday';
-  if (/wedding|engagement/.test(c)) return 'See you there';
-  if (brief.kind === 'event' || brief.kind === 'announcement') return 'You are invited';
-  return 'Thank you';
-}
+import { closingLine, fitCtas } from '../closing.js';
 
 export const PIECES_ASPECTS = ['9:16'];   // the library is laid out for vertical video; other sizes use the Motion engine
 const SIZES = { '9:16': [1080, 1920], '4:5': [1080, 1350] };
@@ -87,7 +78,7 @@ export function factsOf(plan = {}, brief = {}, assets = []) {
   const usable = photos.filter((u) => !cutouts.includes(u));
   // 3 or more ordinary pictures (2 if the owner asked for a slideshow) become a slideshow that shows every one of them
   const gallery = !(appy || steps.length) && (usable.length >= 3 || (usable.length >= 2 && !!brief.slideshow));
-  return { gallery, phrases, link, note: str(brief.endNote, 60), taps, steps, cutouts, appy: !birthday && (appy || steps.length > 0), whatsapp, fits, ratios, name, mono: name.replace(/[^\p{L}\p{N} ]/gu, '').split(/\s+/).filter((w) => !/^(the|and|of)$/i.test(w)).slice(0, 2).map((w) => w[0]).join('').toUpperCase() || 'A', heads, features, personalBirthday: birthday, age, relationship, personalLines: personalCopy, products, priced, offer: birthday ? '' : str(brief.offer, 30), when: birthday ? '' : str(brief.when, 60), cta: str(birthday ? (brief.closingMessage || `Blessed new age, ${name}!`) : (brief.cta || [].concat(brief.ctas || [])[0] || closingLine(brief)), 60), phone, place, photos, logo, category: birthday ? 'Birthday celebration' : str(brief.category, 40), sub: birthday ? (relationship ? `From your ${relationship}` : 'A day all about you') : str(heads[1] || brief.goal || '', 90) };
+  return { gallery, phrases, link, note: str(brief.endNote, 60), taps, steps, cutouts, appy: !birthday && (appy || steps.length > 0), whatsapp, fits, ratios, name, mono: name.replace(/[^\p{L}\p{N} ]/gu, '').split(/\s+/).filter((w) => !/^(the|and|of)$/i.test(w)).slice(0, 2).map((w) => w[0]).join('').toUpperCase() || 'A', heads, features, personalBirthday: birthday, age, relationship, personalLines: personalCopy, products, priced, offer: birthday ? '' : str(brief.offer, 30), when: birthday ? '' : str(brief.when, 60), cta: str(birthday ? (brief.closingMessage || `Blessed new age, ${name}!`) : (fitCtas(brief)[0] || closingLine(brief)), 60), phone, place, photos, logo, category: birthday ? 'Birthday celebration' : str(brief.category, 40), sub: birthday ? (relationship ? `From your ${relationship}` : 'A day all about you') : str(heads[1] || brief.goal || '', 90) };
 }
 const split2 = (t) => { const w = String(t).split(/\s+/); if (w.length < 3) return w.join(' '); const k = Math.ceil(w.length / 2); return w.slice(0, k).join(' ') + '|' + w.slice(k).join(' '); };
 

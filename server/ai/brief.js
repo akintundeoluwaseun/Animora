@@ -7,6 +7,7 @@
 import { config } from '../config.js';
 import { geminiGenerate } from '../engine/gemini.js';
 import { birthdayPhotoAssets, isPersonalBirthdayBrief } from './personal.js';
+import { videoGroup, closingLine, fitCtas } from './closing.js';
 
 // Reading someone's idea and writing the video plan are the steps where a small model sounds dumb and repeats itself,
 // so they use the full Flash model (the lighter one stays for quick chat). Override with GEMINI_BRIEF_MODEL.
@@ -82,7 +83,8 @@ export function cleanBrief(b = {}) {
   // optional questions the user skipped (so they are not asked again)
   for (const k of ['steps', 'lookAuto', 'features', 'products', 'contact', 'pictures', 'extra', 'scenes', 'category', 'goal', 'headline', 'cta', 'aspect', 'duration', 'colors', 'style', 'template', 'intensity', 'voiceover', 'sound', 'flyerType', 'layout', 'offer', 'when', 'payment', 'relationship', 'milestone', 'personalMessage', 'memories']) if (b[`${k}Skipped`] !== undefined) out[`${k}Skipped`] = !!b[`${k}Skipped`];
   if (out.headlines.length) out.headline = out.headlines[0]; else delete out.headlines;
-  if (out.ctas.length) out.cta = str(out.ctas[0], 60); else delete out.ctas;
+  { const fit = fitCtas(out); out.ctas = out.ctas.filter((x) => fit.includes(x)); }   // no shop lines on a wedding, tribute or event
+  if (out.ctas.length) out.cta = str(out.ctas[0], 60); else { delete out.ctas; if (out.cta) delete out.cta; }
   if (out.goals.length) out.goal = str(out.goals.join(' + '), 200); else delete out.goals;
   if (Array.isArray(out.flyerType) && !out.flyerType.length) delete out.flyerType;
   // vague answers ("anything", "just make a demo") are dropped; demo = invent sample content for this kind of business
@@ -218,7 +220,7 @@ export function briefToPlanRules(brief, { assets = [], limits = { minSeconds: 15
   const phone = pay || (b.contact || '').match(PHONE_RE)?.[0] || '';
   const site = pay ? '' : (b.contact || '').match(URL_RE)?.[0] || '';
   const place = pay ? '' : str((b.contact || '').replace(phone, '').replace(site, '').replace(/^[\s,·|-]+|[\s,·|-]+$/g, ''), 60);
-  const action = b.cta || (pay || b.kind === 'cause' ? 'Donate today' : phone ? 'Call or WhatsApp us' : site ? 'Visit our website' : 'Contact us today');
+  const action = b.cta || (pay || b.kind === 'cause' ? 'Donate today' : videoGroup(b) === 'social' ? closingLine(b) : phone ? 'Call or WhatsApp us' : site ? 'Visit our website' : 'Contact us today');
   const otherActions = (b.ctas || []).slice(1);
   const ctaLine = [[action, ...otherActions].join(' or '), phone || site].filter(Boolean).join(' ');
 
