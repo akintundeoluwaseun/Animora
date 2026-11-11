@@ -338,3 +338,7 @@ html[data-theme="dark"] .home-hero { background: radial-gradient(55% 60% at 8% 1
 
 html[data-theme="dark"] .chip-suggest { background: rgba(255,255,255,.07); border-color: rgba(255,255,255,.16); color: #ECEBFA; }
 html[data-theme="dark"] .chip-suggest:hover { border-color: rgba(255,255,255,.5); }
+
+/* notices: readable in both themes (the amber notice used to show pale text on a pale box in dark mode) */
+html[data-theme="dark"] .bg-amber-50 { background-color: rgba(245, 158, 11, .16); border-color: rgba(245, 158, 11, .5); color: #FDE9B8; }
+html:not([data-theme="dark"]) .bg-amber-50 { color: #422006; }

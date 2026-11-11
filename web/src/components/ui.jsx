@@ -1,6 +1,7 @@
 import { publicMessage } from '../lib/errors.js';
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth, api, DEVELOPER } from '../lib.jsx';
 import { useInstall } from './InstallApp.jsx';
@@ -79,19 +80,22 @@ export function Modal({ open, onClose, children, label, wide }) {
     document.body.style.overflow = 'hidden';
     return () => { window.removeEventListener('keydown', onKey); document.body.style.overflow = ''; };
   }, [open, onClose]);
-  return (
+  // drawn on the page itself (not inside a page section) so the bottom menu and Create button can never sit on top of it
+  if (typeof document === 'undefined') return null;
+  return createPortal(
     <AnimatePresence>
       {open && (
-        <motion.div key="modal" className="fixed inset-0 z-50 flex items-end justify-center bg-ink/55 p-0 backdrop-blur-sm sm:items-center sm:p-6" onClick={onClose}
+        <motion.div key="modal" className="fixed inset-0 z-[80] flex items-end justify-center bg-ink/55 p-0 backdrop-blur-sm sm:items-center sm:p-6" onClick={onClose}
           initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
           <motion.div role="dialog" aria-modal="true" aria-label={label} onClick={(e) => e.stopPropagation()}
             initial={{ opacity: 0, y: 40, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 24, scale: 0.98 }} transition={{ type: 'spring', stiffness: 380, damping: 32 }}
-            className={`max-h-[92vh] w-full overflow-auto rounded-t-4xl bg-white p-6 text-ink shadow-2xl sm:rounded-4xl sm:p-8 ${wide === 'xl' ? 'sm:max-w-6xl' : wide ? 'sm:max-w-3xl' : 'sm:max-w-md'}`}>
+            className={`max-h-[92vh] w-full overflow-auto rounded-t-4xl bg-white p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] text-ink shadow-2xl sm:rounded-4xl sm:p-8 ${wide === 'xl' ? 'sm:max-w-6xl' : wide ? 'sm:max-w-3xl' : 'sm:max-w-md'}`}>
             {children}
           </motion.div>
         </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body,
   );
 }
 
