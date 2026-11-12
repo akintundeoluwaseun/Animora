@@ -282,7 +282,7 @@
       if (cfg.logo) {
         const img = el('img', 'position:absolute;inset:0;width:100%;height:100%;object-fit:contain;', box); img.src = cfg.logo;
         tl.fromTo(img, { opacity: 0, scale: 0.86 }, { opacity: 1, scale: 1, duration: 1.1, ease: EASE }, t);
-      } else {
+      } else if (cfg.monogram === true) {
         const c = color || ink, r = 47;
         box.innerHTML = `<svg viewBox="0 0 100 100" width="${size}" height="${size}" style="position:absolute;inset:0;overflow:visible"><circle cx="50" cy="50" r="${r}" fill="none" stroke="${c}" stroke-width="${Math.max(1.2, 2.2 / Math.max(0.6, size / 200))}" stroke-dasharray="${2 * Math.PI * r}" stroke-dashoffset="${2 * Math.PI * r}" transform="rotate(-90 50 50)"/></svg>`;
         const m = el('div', `position:absolute;inset:0;display:grid;place-items:center;font-family:${disp};font-weight:${DW};font-size:${size * (String(cfg.mono || '').length > 1 ? 0.36 : 0.46)}px;letter-spacing:-.02em;color:${c};`, box, esc(cfg.mono || 'A'));

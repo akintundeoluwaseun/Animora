@@ -130,6 +130,16 @@ export function cleanBrief(b = {}) {
   for (const k of ['goals', 'headlines', 'products', 'features', 'ctas', 'steps', 'memories']) if (Array.isArray(out[k])) { const n = out[k].length; out[k] = keep(out[k]); if (out[k].length < n) vague = true; if (!out[k].length) delete out[k]; }
   if (out.headline === '' && out.headlines?.length) out.headline = out.headlines[0];
   if (out.cta === '' && out.ctas?.length) out.cta = str(out.ctas[0], 60);
+  // "Brother turning 20" typed as the name: that is the relationship and the age, not a name
+  if (out.name && (out.kind === 'personal' || /birthday|b-?day/i.test(out.category || ''))) {
+    const REL = 'brother|sister|mum|mom|mother|dad|father|friend|partner|husband|wife|son|daughter|cousin|uncle|aunt|grandma|grandmother|grandpa|grandfather|boss|pastor|baby';
+    const m = out.name.match(new RegExp(`^(?:(?:my|our|the)\\s+)?(${REL})(?:\\s+(?:is\\s+)?(?:turning|turns|celebrating|at|age[d]?)\\s+(\\d{1,3})(?:st|nd|rd|th)?)?(?:['’]s)?(?:\\s+birthday)?$`, 'i'));
+    if (m) {
+      out.relationship = out.relationship || m[1].toLowerCase();
+      if (m[2] && !out.milestone) out.milestone = m[2];
+      out.name = m[1].charAt(0).toUpperCase() + m[1].slice(1).toLowerCase();   // "Happy 20th Birthday, Brother!"
+    }
+  }
   if (vague || b.demo) out.demo = true;
   for (const k of Object.keys(out)) if (out[k] === undefined || out[k] === '') delete out[k];
   return out;

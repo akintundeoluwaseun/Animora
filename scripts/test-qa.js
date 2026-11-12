@@ -62,3 +62,19 @@ console.log('All creative QA checks passed');
   }
   console.log('pasted-prompt checks passed');
 }
+
+// ---- "Brother turning 20" typed as a name, and no invented monogram logo
+{
+  const { cleanBrief } = await import('../server/ai/brief.js');
+  const { factsOf } = await import('../server/ai/pieces/index.js');
+  const fs = await import('node:fs');
+  const bad = (c, m) => { if (!c) { console.error('FAIL', m); process.exit(1); } };
+  const b = cleanBrief({ kind: 'personal', category: 'Birthday', name: 'Brother turning 20' });
+  const f = factsOf({}, b, []);
+  bad(b.relationship === 'brother' && b.milestone === '20', 'relationship and age split out');
+  bad(f.heads[0] === 'Happy 20th Birthday, Brother!', 'greeting: ' + f.heads[0]);
+  for (const file of ['server/ai/motion/browser/motion.js', 'server/ai/runtime/motion.js', 'server/ai/motion/browser/story.js']) {
+    bad(/monogram !== true|monogram === true/.test(fs.readFileSync(file, 'utf8')), file + ' still draws a monogram without a logo');
+  }
+  console.log('name and logo checks passed');
+}

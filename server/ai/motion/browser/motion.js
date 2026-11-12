@@ -100,6 +100,8 @@
     if (D.logo) {
       ic.style.background = '#FFFFFF';
       el('img', '', ic, null, { width: '74%', height: '74%', objectFit: 'contain' }).src = D.logo;
+    } else if (D.monogram !== true) {
+      ic.style.display = 'none';   // no logo uploaded: never invent one from the initials
     } else {
       ic.style.background = onBrand ? '#FFFFFF' : `linear-gradient(155deg, ${mix(ACC, '#FFFFFF', 0.18)} 0%, ${ACC} 52%, ${mix(ACC, '#000000', 0.25)} 100%)`;
       const ini = initials(D.brand);

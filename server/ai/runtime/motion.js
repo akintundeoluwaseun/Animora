@@ -233,6 +233,8 @@
         if (L.light === true && !darkBg) m.classList.add('ink');
       }
       m.innerHTML = '<img src="' + esc(L.url) + '" crossorigin="anonymous" alt=""' + (boxed && (!L.ratio || Math.abs(L.ratio - ratio) > 0.06) ? ' style="object-fit:contain"' : '') + '>';
+    } else if (DATA.monogram !== true) {
+      m.style.display = 'none';   // no logo uploaded: never invent one
     } else {
       m.classList.add('mono'); m.style.fontSize = N(size * 0.52) + 'px';
       m.innerHTML = '<span>' + esc((String(DATA.brand || 'A').trim()[0] || 'A').toUpperCase()) + '</span>';
