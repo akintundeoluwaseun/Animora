@@ -342,3 +342,7 @@ html[data-theme="dark"] .chip-suggest:hover { border-color: rgba(255,255,255,.5)
 /* notices: readable in both themes (the amber notice used to show pale text on a pale box in dark mode) */
 html[data-theme="dark"] .bg-amber-50 { background-color: rgba(245, 158, 11, .16); border-color: rgba(245, 158, 11, .5); color: #FDE9B8; }
 html:not([data-theme="dark"]) .bg-amber-50 { color: #422006; }
+html[data-theme="dark"] .create-card[data-k="video"] { background: #25244A; border-color: #3F3D80; }
+html[data-theme="dark"] .create-card[data-k="flyer"] { background: #38241A; border-color: #7A4A2F; }
+html[data-theme="dark"] .create-card[data-k="video"]:hover { border-color: #7F73FF; }
+html[data-theme="dark"] .create-card[data-k="flyer"]:hover { border-color: #F26B1D; }

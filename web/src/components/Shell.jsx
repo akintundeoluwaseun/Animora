@@ -36,7 +36,7 @@ function CreateSheet({ open, onClose }) {
   const navigate = useNavigate();
   const go = (kind) => { onClose(); navigate(newPath(kind)); };
   const items = [
-    ['video', 'Video ad', 'Motion graphics as an MP4 for WhatsApp, TikTok and YouTube', 'videos'],
+    ['video', 'Video', 'Motion graphics as an MP4 for any occasion: birthdays, events, announcements or business', 'videos'],
     ['flyer', 'Flyer', 'A still design: a picture to post or a PDF to print', 'flyers'],
   ];
   return (
@@ -44,7 +44,7 @@ function CreateSheet({ open, onClose }) {
       <h2 className="text-2xl font-bold tracking-[-0.03em]">What are we making?</h2>
       <div className="mt-5 grid gap-3 sm:grid-cols-2">
         {items.map(([k, t, d, icon]) => (
-          <button key={k} onClick={() => go(k)} className={`press group rounded-2xl border-2 p-5 text-left ${k === 'flyer' ? 'border-[#FFD9BF] bg-[#FFF8F3] hover:border-flyer' : 'border-[#D9D6FF] bg-[#F6F5FF] hover:border-video'}`}>
+          <button key={k} data-k={k} onClick={() => go(k)} className={`create-card press group rounded-2xl border-2 p-5 text-left ${k === 'flyer' ? 'border-[#FFD9BF] bg-[#FFF8F3] hover:border-flyer' : 'border-[#D9D6FF] bg-[#F6F5FF] hover:border-video'}`}>
             <span className={`grid size-11 place-items-center rounded-xl text-white ${k === 'flyer' ? 'bg-flyer' : 'bg-video'}`}><Icon k={icon} /></span>
             <span className="mt-4 block text-lg font-semibold tracking-[-0.02em]">{t}</span>
             <span className="mt-1 block text-sm leading-snug text-ink-mute">{d}</span>

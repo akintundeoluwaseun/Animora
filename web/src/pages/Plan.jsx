@@ -144,8 +144,8 @@ const lookAuto = (b) => b.lookAuto === 'auto';
 
 const QUESTIONS = [
   { id: 'mode', type: 'single', options: [
+    { v: 'paste', l: 'Write my full idea in one go (recommended)', d: "Type or paste everything: the occasion, names, wording, places, phone, style. I'll only ask what's missing." },
     { v: 'steps', l: 'Ask me one question at a time' },
-    { v: 'paste', l: "I'll paste everything at once", d: "Write or paste all your details. I'll only ask what's missing." },
   ], ask: () => "Hi! I'm your Animora director. Let's make your video. Should I ask you questions one by one, or will you paste all your details at once?" },
   { id: 'paste', type: 'long', show: (b) => b.mode === 'paste', ask: () => 'What video do you want to make?', hint: "Tell me your idea in your own words. I'll pick up what I can, then ask about the missing details before making the video.", placeholder: 'e.g. A birthday video for my brother Tony turning 20, warm and fun, with his photos\n\nor: An ad for my laptop repair shop in Ado Ekiti, call 0807 691 1614',
     examples: ['A birthday video for my mum turning 60', 'An ad for my cake business', 'A wedding invitation for 14 December', 'A church programme announcement', 'A tribute to my best friend', 'A promo for my new app'] },
@@ -181,6 +181,7 @@ const QUESTIONS = [
 // Video briefs stay short. The selected type determines which essential details are asked;
 // framing, length, sound and the classic director use sensible defaults.
 const VIDEO_QUESTIONS = [
+  QUESTIONS.find((x) => x.id === 'mode'), QUESTIONS.find((x) => x.id === 'paste'),
   { id: 'category', type: 'single', options: VIDEO_TYPES, ask: () => 'What kind of video are we making?' },
   { id: 'name', type: 'text', ask: (b) => ({
     birthday: 'Who are we celebrating?', church: 'What is the church or ministry called?',
@@ -264,7 +265,7 @@ for (const qq of [...QUESTIONS, ...FLYER_QUESTIONS]) if (SKIPPABLE.has(qq.id)) q
 const label = (q, v, b, styles) => {
   if (q.id === 'lookAuto') return v === 'auto' ? 'Animora chooses the look and sound' : "I'll choose myself";
   if (v == null || v === '' || (Array.isArray(v) && !v.length)) return 'Skipped';
-  if (q.id === 'mode') return v === 'paste' ? "I'll paste everything at once" : 'One question at a time';
+  if (q.id === 'mode') return v === 'paste' ? 'I will write my full idea in one go' : 'One question at a time';
   if (q.id === 'paste') return 'My details (pasted)';
   if (q.id === 'aspect') return ASPECT_OPTS.find((o) => o.v === v)?.l || v;
   if (q.id === 'duration') return `${v} seconds`;
@@ -737,9 +738,9 @@ export default function Plan() {
                     <label className="wiz-label" htmlFor="wiz-in">{q.id === 'paste' ? 'Your idea' : q.type === 'long' ? 'Your answer' : q.typed ? 'Or write your own' : 'Your answer'}</label>
                     <div className="wiz-box">
                       {q.type === 'long' ? (
-                        <textarea id="wiz-in" value={text} onChange={(e) => setText(e.target.value)} rows={q.id === 'paste' ? 8 : 4} placeholder={q.placeholderFor?.(b) || q.placeholder} className="wiz-input resize-none" />
+                        <textarea id="wiz-in" value={text} onChange={(e) => setText(e.target.value)} rows={q.id === 'paste' ? 12 : 5} placeholder={q.placeholderFor?.(b) || q.placeholder} className="wiz-input resize-none" />
                       ) : (
-                        <input id="wiz-in" value={text} onChange={(e) => setText(e.target.value)} autoFocus placeholder={q.placeholder || (q.typed ? 'Type your own answer…' : 'Type your answer…')} className="wiz-input" />
+                        <textarea id="wiz-in" value={text} rows={2} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) onContinue(e); }} autoFocus placeholder={q.placeholder || (q.typed ? 'Type your own answer…' : 'Type your answer…')} className="wiz-input resize-none" />
                       )}
                       <MicButton onText={(t) => setText((x) => (x.trim() ? `${x.trim()} ${t}` : t))} onError={setError} className="wiz-mic" />
                     </div>
@@ -748,7 +749,7 @@ export default function Plan() {
                         {q.examples.map((ex) => <button key={ex} type="button" className="chip-suggest" onClick={() => setText(ex)}>{ex}</button>)}
                       </div>
                     )}
-                    <p className="wiz-foot">{q.type === 'long' ? 'Press Continue when you are done' : 'Press Enter to continue'} · or tap the mic and say it</p>
+                    <p className="wiz-foot">{q.type === 'long' ? 'Press Continue when you are done' : 'Press Enter to continue (Shift+Enter for a new line)'} · or tap the mic and say it</p>
                   </div>
                 )}
 
