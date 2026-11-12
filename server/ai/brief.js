@@ -41,9 +41,21 @@ export const isVague = (s) => VAGUE.test(String(s || '').trim());
 const keep = (arr) => arr.filter((x) => !isVague(x));
 
 /** Keep only known fields, trimmed. */
+
+// A name that is really an instruction ("Design a high-quality, professional Christian fellowship flyer") becomes a short title ("Christian Fellowship").
+const ASK_WORDS = /^(please\s+)?(can you |could you |i want (you )?to |i need (you )?to |i want |i need )?(design|make|create|generate|build|produce|write|prepare|do)\b/i;
+const FILLER = /\b(a|an|the|me|my|our|some|high[- ]?quality|professional|beautiful|nice|good|great|amazing|stunning|modern|simple|best|cool|awesome|attractive|catchy|premium|classy|elegant|flyer|flier|poster|video|ad|advert|advertisement|for|about|of|please)\b/gi;
+function titleFromName(raw) {
+  const t = str(raw, 120);
+  if (!t) return '';
+  if (!ASK_WORDS.test(t) && t.length <= 60) return str(t, 60);
+  if (!ASK_WORDS.test(t)) return str(t, 60);
+  const core = t.replace(ASK_WORDS, ' ').replace(FILLER, ' ').replace(/[,;:]+/g, ' ').replace(/\s+/g, ' ').trim();
+  return str(core.replace(/\b\p{L}/gu, (c) => c.toUpperCase()), 60);
+}
 export function cleanBrief(b = {}) {
   const out = {
-    name: str(b.name, 60), category: str(b.category, 60),
+    name: titleFromName(b.name), category: str(b.category, 60),
     relationship: str(b.relationship, 50), milestone: str(b.milestone, 60),
     personalMessage: str(b.personalMessage, 1200), memories: list(b.memories).slice(0, 8),
     // what the video is for: a business ad, an event, a personal moment, an announcement
@@ -89,6 +101,12 @@ export function cleanBrief(b = {}) {
   if (Array.isArray(out.flyerType) && !out.flyerType.length) delete out.flyerType;
   // vague answers ("anything", "just make a demo") are dropped; demo = invent sample content for this kind of business
   let vague = false;
+  // "none", "n/a", "skip" typed into a box are answers meaning nothing: never print them on a video or flyer
+  { const NONE = /^(none|n\/?a|nil|nothing|no|skip|skipped|-+|\.+|null|undefined)\.?$/i;
+    for (const [k, v] of Object.entries(out)) {
+      if (typeof v === 'string' && NONE.test(v.trim()) && !['mode', 'kind', 'aspect', 'voiceover', 'sound'].includes(k)) delete out[k];
+      else if (Array.isArray(v) && v.every((x) => typeof x === 'string')) out[k] = v.filter((x) => !NONE.test(x.trim()));
+    } }
   for (const k of ['name', 'category', 'contact', 'extra', 'pasteText', 'offer', 'when', 'goal', 'headline', 'cta', 'relationship', 'milestone', 'personalMessage']) if (typeof out[k] === 'string' && isVague(out[k])) { out[k] = ''; vague = true; }
   for (const k of ['goals', 'headlines', 'products', 'features', 'ctas', 'steps', 'memories']) if (Array.isArray(out[k])) { const n = out[k].length; out[k] = keep(out[k]); if (out[k].length < n) vague = true; if (!out[k].length) delete out[k]; }
   if (out.headline === '' && out.headlines?.length) out.headline = out.headlines[0];
@@ -391,12 +409,22 @@ export async function suggest(kind, brief) {
 }
 
 /** Pick a starter style that fits the business when the user lets AdFlash choose. */
+// Several good looks per kind of business, chosen by the name, so two flyers or videos never come out the same.
+const LOOK_POOLS = {
+  food: ['naija-bold', 'fresh-market', 'retro-pop'], fashion: ['street-hype', 'afro-vibes', 'mono-editorial'], beauty: ['beauty-bloom', 'gold-luxe', 'studio-white'],
+  tech: ['midnight-glow', 'tech-pulse', 'neon-nights'], finance: ['fintech-blue', 'clean-pro', 'graphite-pro'], health: ['health-pulse', 'fresh-market', 'ocean-breeze'],
+  realestate: ['prime-estate', 'graphite-pro', 'gold-luxe'], events: ['owambe-party', 'glory-light', 'gold-luxe', 'afro-vibes'], education: ['clean-pro', 'kiddies-fun', 'ocean-breeze'],
+  faith: ['glory-light', 'gold-luxe', 'prime-estate', 'ocean-breeze'], party: ['owambe-party', 'neon-nights', 'retro-pop', 'afro-vibes'], kids: ['kiddies-fun', 'retro-pop', 'ocean-breeze'], sports: ['sports-blitz', 'street-hype', 'neon-nights'],
+  default: ['studio-white', 'clean-pro', 'mono-editorial', 'ocean-breeze', 'midnight-glow', 'afro-vibes'],
+};
 export function autoStyleSlug(brief) {
   const b = cleanBrief(brief);
-  return {
-    food: 'naija-bold', fashion: 'street-hype', beauty: 'beauty-bloom', tech: 'midnight-glow', finance: 'fintech-blue', health: 'health-pulse',
-    realestate: 'prime-estate', events: 'owambe-party', education: 'clean-pro', default: 'studio-white',
-  }[catKey(b.category)];
+  const t = `${b.category || ''} ${b.name || ''}`;
+  const key = /church|ministry|fellowship|worship|christian|mosque|islam|prayer|gospel|crusade|revival|assembly/i.test(t) ? 'faith'
+    : /birthday|party|celebrat|wedding|anniversary|owambe/i.test(t) ? 'party' : /kid|children|nursery|toddler|baby/i.test(t) ? 'kids' : /sport|football|gym|fitness|training/i.test(t) ? 'sports' : catKey(b.category);
+  const pool = LOOK_POOLS[key] || LOOK_POOLS.default;
+  let h = 7; for (const ch of `${b.name || ''}|${b.category || ''}`) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  return pool[h % pool.length];
 }
 
 // ---------------------------------------------------------------------------

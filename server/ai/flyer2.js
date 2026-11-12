@@ -9,7 +9,7 @@
 // thumbnails and downloads keep working unchanged.
 import { fontsUrl } from './motion/looks.js';
 
-export const FLYER2_LAYOUTS = ['poster', 'price', 'event', 'menu', 'photo', 'diagonal', 'collage', 'services', 'hiring'];
+export const FLYER2_LAYOUTS = ['poster', 'price', 'event', 'menu', 'photo', 'diagonal', 'collage', 'services', 'hiring', 'invite', 'blocks'];
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
 const hex = (h) => { const n = parseInt(String(h || '#000000').replace('#', ''), 16); return [n >> 16, (n >> 8) & 255, n & 255]; };
 const toHex = (c) => '#' + c.map((v) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')).join('');
@@ -62,8 +62,11 @@ export function chooseFlyerLayout({ kinds = [], pref = '', photos = 0, items = 0
   if (items >= 3 && priced >= 2) add('menu', 4);
   if (features + items >= 4) add('services', 3);
   add('poster', 3);
+  // no photos: still give every flyer a real choice of composition
+  if (!photos) { if (when || has(/event|party|wedding|church|invit|concert|service/)) add('invite', 5); add('blocks', 4); }
+  if (photos >= 1) add('blocks', 1);
   if (offer || priced) add('price', 2);
-  let s = seed; const rnd = () => ((s = (s * 16807) % 2147483647) / 2147483647);
+  let s = (Math.imul(seed | 0, 2654435761) >>> 0) % 2147483647 || 1; const rnd = () => ((s = (s * 16807) % 2147483647) / 2147483647); rnd(); rnd();   // scrambled, so nearby seeds do not give the same pick
   // gentle weights: the business's signals still lead, but another good layout can win, so flyers stop looking alike
   if (photos >= 1) { add('photo', 2); add('diagonal', 2); }
   if (photos >= 2) add('collage', 2);
@@ -114,6 +117,7 @@ function decoHtml(deco, { W, H, A, A2, dark, brand, display, n, seed }) {
 
 // ---------------------------------------------------------------------------
 export function flyerHtml2(data) {
+  data = { ...data, features: (data.features || []).map((f) => String(f).trim()).filter((f, i, a) => f && a.findIndex((u) => u.toLowerCase() === f.toLowerCase()) === i) };   // never the same point twice
   const { W, H, brand, logo } = data;
   const look = data.look || { theme: 'dark', display: 'Inter', dw: 800, ui: 'Inter', text: 'plain', deco: 'none' };
   const c = data.colors || {};
@@ -224,6 +228,19 @@ export function flyerHtml2(data) {
       <section class="hr-head"><span class="kicker">${esc(data.badge || 'Join our team')}</span><h1 class="fit giant">We're <em>hiring</em></h1>${sub || `<p class="sub">${esc(data.headline || '')}</p>`}</section>
       <ul class="roles">${roles.map((r) => `<li>${ic('briefcase', Math.round(38 * U), ACC)}<span>${esc(r)}</span></li>`).join('')}</ul>
       <footer class="foot">${cta()}${contactList()}</footer></div>`;
+  } else if (L === 'invite') {
+    const bits = [when?.weekday && when?.day ? `${when.weekday} ${when.day} ${String(when.month || '').slice(0, 3)}` : [when?.day, when?.month].filter(Boolean).join(' '), when?.time].filter(Boolean);
+    body = `<div class="pf invite"><div class="iv-frame"></div>
+      <div class="iv-top">${mark(88)}<span class="bn">${esc(brand)}</span></div>
+      <section class="iv-main"><span class="kicker">${esc(data.badge || (when ? 'You are invited' : String((data.kinds || [])[0] || '')))}</span>${h1('giant')}<i class="iv-orn"></i>${sub}
+      ${bits.length || when?.place ? `<div class="iv-when">${bits.length ? `<b>${esc(bits.join('  ·  '))}</b>` : ''}${when?.place ? `<span>${ic('pin', Math.round(34 * U), ACC)}${esc(when.place)}</span>` : ''}</div>` : ''}</section>
+      ${(data.features || []).length ? `<ul class="iv-list">${(data.features || []).filter((f, i, a) => a.findIndex((u) => u.toLowerCase() === f.toLowerCase()) === i).slice(0, 4).map((f) => `<li>${esc(f)}</li>`).join('')}</ul>` : ''}
+      <footer class="foot center">${cta()}${contactList('small')}</footer></div>`;
+  } else if (L === 'blocks') {
+    const rows = [...(data.features || []), ...items.map((x) => (x.price ? `${x.title} · ${x.price}` : x.title))].filter(Boolean).filter((r, i, all) => all.findIndex((u) => String(u).trim().toLowerCase() === String(r).trim().toLowerCase()) === i).slice(0, 4);
+    body = `<div class="pf blocks"><section class="bk-top">${brandRow(true)}<div class="bk-h">${h1('giant')}</div>${sub}</section>
+      <section class="bk-body">${rows.length ? `<ol class="bk-rows">${rows.map((r, i) => `<li><b>${String(i + 1).padStart(2, '0')}</b><span>${esc(r)}</span></li>`).join('')}</ol>` : ''}
+      <footer class="foot">${cta(dark ? '' : 'dark')}${contactList()}</footer></section></div>`;
   }
 
   // treatment CSS for the display type
@@ -283,6 +300,21 @@ ${treat}
 .ghost { position:absolute; right:${n(40)}; top:${tall ? '44%' : '40%'}; font-family:${display}; font-weight:800; font-size:${n(tall ? 520 : 420)}; line-height:1; color:${dark ? 'rgba(255,255,255,.05)' : 'rgba(17,17,20,.05)'}; z-index:0; }
 .cols { display:grid; grid-template-columns:1fr 1fr; gap:${n(22)} ${n(40)}; position:relative; z-index:2; max-width:${hero ? '60%' : tall ? '100%' : '66%'}; }
 .col { display:flex; flex-direction:column; gap:${n(6)}; font-size:${n(32)}; font-weight:600; } .col b { font-family:${display}; font-size:${n(30)}; color:${ACC}; } .col.wide { grid-column:span 2; color:${mute}; }
+/* invite */
+.pf.invite { align-items:center; text-align:center; padding:${n(96)} ${n(96)} ${n(84)}; gap:${n(30)}; }
+.iv-frame { position:absolute; inset:${n(34)}; border:${n(3)} solid ${rgba(A, 0.7)}; border-radius:${n(26)}; pointer-events:none; } .iv-frame::after { content:''; position:absolute; inset:${n(12)}; border:${n(1.5)} solid ${rgba(A, 0.35)}; border-radius:${n(18)}; }
+.iv-top { display:flex; align-items:center; gap:${n(18)}; } .iv-main { display:flex; flex-direction:column; align-items:center; gap:${n(26)}; margin:auto 0; width:100%; }
+.iv-main h1 { text-align:center; max-height:${Math.round(H * 0.34)}px; font-size:${n(tall ? 180 : 150)}; } .iv-main .sub { text-align:center; margin:0 auto; }
+.iv-orn { width:${n(150)}; height:${n(10)}; background:linear-gradient(90deg, transparent, ${A}, transparent); border-radius:99px; display:block; }
+.iv-when { display:flex; flex-direction:column; gap:${n(8)}; align-items:center; font-size:${n(38)}; } .iv-when b { font-family:${display}; font-size:${n(52)}; color:${ACC}; letter-spacing:.02em; } .iv-when span { display:flex; align-items:center; gap:${n(10)}; font-weight:600; color:${mute}; }
+.iv-list { list-style:none; display:flex; flex-wrap:wrap; justify-content:center; gap:${n(14)} ${n(18)}; } .iv-list li { font-weight:700; font-size:${n(30)}; padding:${n(10)} ${n(24)}; border-radius:999px; border:${n(2)} solid ${rgba(A, 0.55)}; }
+/* blocks */
+.pf.blocks { padding:0; gap:0; }
+.bk-top { background:linear-gradient(160deg, ${mix(A, '#FFFFFF', 0.12)}, ${A} 55%, ${mix(A, '#000000', 0.28)}); color:${onA}; padding:${n(70)} ${n(68)} ${n(64)}; display:flex; flex-direction:column; gap:${n(26)}; flex:0 0 ${tall ? '54%' : '56%'}; border-bottom-left-radius:${n(70)}; position:relative; overflow:hidden; }
+.bk-top .bn { color:${onA}; } .bk-top .sub { color:${onA}; opacity:.85; } .bk-h { margin:auto 0; } .bk-top h1 { max-height:${Math.round(H * 0.3)}px; } .bk-top h1 em { color:${onA2 === '#111111' ? '#111' : A2}; }
+.bk-top::after { content:''; position:absolute; right:${n(-120)}; bottom:${n(-120)}; width:${n(420)}; height:${n(420)}; border-radius:50%; background:rgba(255,255,255,.14); }
+.bk-body { flex:1; display:flex; flex-direction:column; gap:${n(26)}; padding:${n(46)} ${n(68)} ${n(60)}; }
+.bk-rows { list-style:none; display:grid; grid-template-columns:1fr 1fr; gap:${n(18)} ${n(34)}; } .bk-rows li { display:flex; gap:${n(16)}; align-items:baseline; font-weight:700; font-size:${n(32)}; padding-bottom:${n(12)}; border-bottom:${n(2)} solid ${line}; } .bk-rows b { font-family:${display}; color:${ACC}; font-size:${n(30)}; }
 /* price */
 .pf.price { color:${onA}; }
 .price-bg { position:absolute; inset:0; background:radial-gradient(120% 90% at 50% 40%, ${mix(A, '#FFFFFF', 0.22)} 0%, ${A} 50%, ${mix(A, '#000000', 0.3)} 100%); }
