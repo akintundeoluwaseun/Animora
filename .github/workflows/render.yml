@@ -73,9 +73,15 @@ jobs:
             ~/kokoro
             ~/.cache/pip
           key: kokoro-v1-${{ runner.os }}
+      # The voice package needs Python 3.9-3.12; the runner's own Python moved on and the install failed, so pin one it supports
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
       - name: Get the voice engine
+        # a voice problem must never stop videos that have no voice-over
+        continue-on-error: true
         run: |
-          pip install --quiet --user --break-system-packages kokoro-onnx==0.6.1 soundfile > /dev/null 2>&1 || pip install --quiet --user kokoro-onnx==0.6.1 soundfile
+          python -m pip install --quiet kokoro-onnx==0.6.1 soundfile
           mkdir -p ~/kokoro
           [ -s ~/kokoro/kokoro-v1.0.int8.onnx ] || curl -sSL -o ~/kokoro/kokoro-v1.0.int8.onnx https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/kokoro-v1.0.int8.onnx
           [ -s ~/kokoro/voices-v1.0.bin ] || curl -sSL -o ~/kokoro/voices-v1.0.bin https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/voices-v1.0.bin
