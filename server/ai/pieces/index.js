@@ -66,7 +66,7 @@ export function factsOf(plan = {}, brief = {}, assets = []) {
   const priced = products.find((p) => p.price);
   const payment = birthday ? '' : str(brief.payment, 100), contact = payment || birthday ? '' : str(brief.contact, 120), phone = payment || birthday ? '' : (contact.match(/(\+?\d[\d\s-]{7,}\d)/) || [])[1] || '';
   // the address: given, or the part of the contact line that is not a phone number, a handle or a link
-  const segs = contact.split(/\s*[·|•;]\s*|\s+-\s+/).map((x) => x.trim()).filter(Boolean);
+  const segs = contact.split(/\s*[·|•;]\s*|\s+-\s+/).map((x) => (phone ? x.replace(phone, '') : x).replace(/^[\s,]+|[\s,]+$/g, '').trim()).filter(Boolean);
   const placeSeg = segs.find((x) => !/https?:|www\.|\.com|@/i.test(x) && /\b(street|st|road|rd|way|avenue|ave|lagos|abuja|ibadan|lekki|ikeja|island|close|estate|plaza|mall|area|crescent|junction|opposite|beside|gra|phase|market|shop|suite|floor|off)\b/i.test(x))
     || segs.find((x) => !/\d{6,}|\d[\d\s-]{7,}\d|@|https?:|www\.|\.com|whats\s?app|instagram|ig:|email/i.test(x) && /\p{L}{3,}/u.test(x));
   const linkSeg = segs.find((x) => /https?:\/\/|www\.|\b[a-z0-9-]+(\.[a-z0-9-]+)*\.(com|app|ng|net|org|io|co|shop|store|site|online)\b/i.test(x) && !/@/.test(x));

@@ -36,3 +36,29 @@ console.log('All creative QA checks passed');
   assertOk(videoGroup(cleanBrief({ category: 'Funeral home', kind: 'business', name: 'Peace Funeral Home' })) === 'business', 'a funeral home is a business');
   console.log('generality checks passed');
 }
+
+// ---- a pasted prompt: the instruction never becomes the title, and nothing is shown twice
+{
+  const { cleanBrief, parseBriefRules } = await import('../server/ai/brief.js');
+  const { factsOf } = await import('../server/ai/pieces/index.js');
+  const { composeStory } = await import('../server/ai/story/index.js');
+  const bad = (c, m) => { if (!c) { console.error('FAIL', m); process.exit(1); } };
+  const cases = [
+    ['Create a 20 second promo video for Kemi Cakes. We sell cupcakes and wedding cakes in Lekki. Call 08031234567.', 'Kemi Cakes', 'business'],
+    ['Make a video announcing that Greenfield School resumes on Monday 5 January 2027. Keep it professional.', 'Greenfield School', 'announcement'],
+    ['Please design a short tribute video for the late Chief Adeyemi, burial on Friday 21 November at St Paul Church, Ibadan.', 'Late Chief Adeyemi', 'personal'],
+    ['Write me a video ad for my church programme "Night of Glory" this Sunday 6pm at Grace Chapel.', 'Night of Glory', 'event'],
+  ];
+  for (const [p, name, kind] of cases) {
+    const b = cleanBrief({ ...parseBriefRules(p), pasteText: p });
+    bad(b.name === name, `name for "${p.slice(0, 30)}" was "${b.name}"`);
+    bad(b.kind === kind, `kind for ${name} was ${b.kind}`);
+    const f = factsOf({}, b, [{ id: '1', kind: 'image', url: '/x/1.jpg', name: '1.jpg', width: 1200, height: 1600 }]);
+    const beats = composeStory({ facts: f, duration: 30, seed: 5, look: 'editorial', aspect: '9:16' });
+    const texts = beats.flatMap((x) => [x.data.headline, x.data.text, x.data.cta].filter(Boolean)).map((x) => x.toLowerCase());
+    bad(new Set(texts).size === texts.length, `${name}: text repeated on screen: ${texts.join(' | ')}`);
+    bad(!/generate|create a|make a|design a|write me|\bvideo\b/i.test(JSON.stringify(beats)), `${name}: instruction words on screen`);
+    bad(!beats.some((x) => /^(business|announcement)$/i.test(x.data.label || '')), `${name}: generic label on screen`);
+  }
+  console.log('pasted-prompt checks passed');
+}

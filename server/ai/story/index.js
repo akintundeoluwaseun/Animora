@@ -135,8 +135,9 @@ export function composeStory({ facts: f, duration, seed, look: lookId, aspect, o
     else if (fillsFrame && (L.id === 'noir' || L.id === 'clean' || L.id === 'fresh') && roll < 0.35) hookType = 'matte';
   } else if (['bold', 'fresh', 'tech'].includes(L.id) && r() < 0.55) hookType = 'stack';
   const feats = f.features.slice(0, 4);
+  const lab = /^(?:business|announcement|event|church event|church|burial or memorial|fundraiser|birthday|wedding|graduation|personal|other|general|service|product)$/i.test(String(f.category || '').trim()) ? '' : (f.category || '');   // a generic word is not a label
   const word = f.name.length <= 12 ? f.name : keyWord(head);
-  const hookData = { headline: head, label: f.category || f.name, sub: f.sub && f.sub !== head ? f.sub : '', ...(p0 && hookV !== 'type' ? { photo: p0.url, fit: p0.fit, pos: p0.pos } : {}) };
+  const hookData = { headline: head, label: lab, sub: f.sub && f.sub !== head ? f.sub : '', ...(p0 && hookV !== 'type' ? { photo: p0.url, fit: p0.fit, pos: p0.pos } : {}) };
   if (hookType === 'cover') hookData.lines = feats.slice(0, 3);
   if (hookType === 'matte') hookData.word = word;
   add(hookType, hookData, 10, hookType === 'hook' ? hookV : undefined);
@@ -175,10 +176,10 @@ export function composeStory({ facts: f, duration, seed, look: lookId, aspect, o
     add('show', { shots: shots.map((p, i) => ({ photo: p.url, fit: p.fit, pos: p.pos, caption: ph.length ? (ph[i] || '') : (feats[i] || '') })) }, 10, process.env.ANIMORA_SLIDE && shots.length >= 3 ? process.env.ANIMORA_SLIDE : pick(styles));
     ph.slice(shots.length).forEach((x) => add('statement', { text: x, label: f.name }, 8));
   }
-  if (!gal) photoBeat(hookType === 'hook' && hookV === 'type' ? (f.sub && f.sub !== head ? f.sub : '') : '', f.category || '', 6);
+  if (!gal) photoBeat(hookType === 'hook' && hookV === 'type' ? (f.sub && f.sub !== head ? f.sub : '') : '', lab, 6);
   if (gal) { /* the slideshow carries the story */ } else if (feats.length >= 2) {
     if (f.whatsapp && r() < 0.6) add('chat', { items: feats, cta: f.cta }, 8);
-    else { const v = feats.length <= 3 && r() < 0.45 ? 'seq' : 'list'; add('features', { items: feats, title: f.category || f.name, ...(aspect === '16:9' && rest[0] && !rest[0].cut ? { photo: rest[0].url, fit: rest[0].fit, pos: rest[0].pos } : {}) }, 8, v); }
+    else { const v = feats.length <= 3 && r() < 0.45 ? 'seq' : 'list'; add('features', { items: feats, title: lab || f.name, ...(aspect === '16:9' && rest[0] && !rest[0].cut ? { photo: rest[0].url, fit: rest[0].fit, pos: rest[0].pos } : {}) }, 8, v); }
     used = feats.length;
   } else if (feats.length === 1) add('statement', { text: feats[0] }, 5);
   if (!gal) photoBeat(cap(used) || '', f.name, 5);
@@ -194,12 +195,12 @@ export function composeStory({ facts: f, duration, seed, look: lookId, aspect, o
   if (f.place && !f.when) ideas.push(() => ({ type: 'info', data: { place: f.place }, keep: 3 }));
   if (f.heads[1] && f.heads[1] !== head) ideas.push(() => ({ type: 'statement', data: { text: f.heads[1], label: f.name }, keep: 3 }));
   if (f.sub && f.sub !== head && hookV !== 'type') ideas.push(() => ({ type: 'statement', data: { text: f.sub, label: f.name }, keep: 3 }));
-  if (!gal) photos.forEach((p, i) => ideas.push(() => (p.cut ? { type: 'popout', data: { photo: p.url, caption: feats[(i + 1) % Math.max(1, feats.length)] || '', label: f.name }, keep: 2 } : { type: 'photo', data: { photo: p.url, fit: p.fit, pos: `${30 + Math.round(r() * 40)}% ${30 + Math.round(r() * 40)}%`, caption: feats[(i + 1) % Math.max(1, feats.length)] || '', label: f.name }, keep: 2, v: p.full < 0.55 ? 'frame' : pick(['frame', 'full']) })));
-  feats.forEach((x) => ideas.push(() => ({ type: 'statement', data: { text: x, label: f.category || f.name }, keep: 2 })));
+  if (!gal) photos.forEach((p, i) => ideas.push(() => (p.cut ? { type: 'popout', data: { photo: p.url, caption: "", label: f.name }, keep: 2 } : { type: 'photo', data: { photo: p.url, fit: p.fit, pos: `${30 + Math.round(r() * 40)}% ${30 + Math.round(r() * 40)}%`, caption: "", label: f.name }, keep: 2, v: p.full < 0.55 ? 'frame' : pick(['frame', 'full']) })));
+  feats.forEach((x) => ideas.push(() => ({ type: 'statement', data: { text: x, label: lab || f.name }, keep: 2 })));
   priced.forEach((p) => ideas.push(() => ({ type: 'products', data: { items: [p], title: 'Prices' }, keep: 2, v: 'hero' })));
   if (f.offer) ideas.push(() => ({ type: 'offer', data: { offer: f.offer, label: 'Special offer' }, keep: 2, surface: 'accent' }));
   if (f.cta) ideas.push(() => ({ type: 'statement', data: { text: f.cta, label: f.name }, keep: 2 }));
-  ideas.push(() => ({ type: 'statement', data: { text: head, label: f.category || f.name }, keep: 2 }));
+  ideas.push(() => ({ type: 'statement', data: { text: head, label: lab || f.name }, keep: 2 }));
   if (!beats.some((b) => b.type === 'sting')) ideas.push(() => ({ type: 'sting', data: {}, keep: 2 }));
   }
 
@@ -218,11 +219,19 @@ export function composeStory({ facts: f, duration, seed, look: lookId, aspect, o
   const MAXB = 7, MAXE = 8;
   const room = () => duration - total() - beats.slice(0, -1).reduce((n, b) => n + Math.max(0, MAXB - b.dur) * 0.35, 0);
   let k = 0;
+  // never put the same words on screen twice: padding may only use text that is not already there
+  const normT = (x) => String(x || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+  const seen = new Set();
+  const noteSeen = (b) => { const d = b.data || {}; [d.headline, d.text, d.sub, d.cta, d.caption, d.offer, ...(d.items || []).map((i) => (typeof i === 'string' ? i : i?.title))].forEach((x) => { if (x) seen.add(normT(x)); }); };
+  beats.forEach(noteSeen);
+  seen.add(normT(f.name));
   while (!f.personalBirthday && room() > 3 && ideas.length && k < ideas.length * 2 && beats.length < 24) {
     const sting = ideas[k % ideas.length]().type === 'sting';
     const b = ideas[k % ideas.length](); k++;
     if (sting && (k > ideas.length || beats.some((x) => x.type === 'sting'))) continue;
     if (k > ideas.length && b.type === 'info') continue;
+    if (b.type === 'statement' && seen.has(normT(b.data.text))) continue;
+    if (b.type === 'statement') seen.add(normT(b.data.text));
     b.dur = base(b);
     if (sting) { beats.unshift(b); continue; }
     const slots = [];

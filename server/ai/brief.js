@@ -46,6 +46,24 @@ const keep = (arr) => arr.filter((x) => !isVague(x));
 // A name that is really an instruction ("Design a high-quality, professional Christian fellowship flyer") becomes a short title ("Christian Fellowship").
 const ASK_WORDS = /^(please\s+)?(can you |could you |i want (you )?to |i need (you )?to |i want |i need )?(design|make|create|generate|build|produce|write|prepare|do)\b/i;
 const FILLER = /\b(a|an|the|me|my|our|some|high[- ]?quality|professional|beautiful|nice|good|great|amazing|stunning|modern|simple|best|cool|awesome|attractive|catchy|premium|classy|elegant|flyer|flier|poster|video|ad|advert|advertisement|for|about|of|please)\b/gi;
+
+// The title of a video from a pasted prompt: a quoted title, "the late <name>", or the first proper name. Never the instruction.
+const NOT_NAMES = /^(?:generate|create|make|design|write|build|produce|please|can|could|i|we|our|my|the|a|an|this|that|it|its|call|whatsapp|dm|visit|order|book|keep|use|add|include|show|let|also|and|but|then|for|with|on|at|in|to|from|monday|tuesday|wednesday|thursday|friday|saturday|sunday|january|february|march|april|may|june|july|august|september|october|november|december|today|tomorrow|tonight|video|ad|advert|flyer|status|whatsapp|instagram|tiktok|youtube|facebook|reels?|nigeria|lagos|ibadan|abuja|ado|ekiti|ikeja|lekki|yaba|ogun|oyo|god|lord|jesus|christ|hello|hi|dear|thanks|thank|make|emotional|fun|funny|professional|colourful|colorful|vertical|landscape|square|portrait|seconds?|secs?|minutes?)$/i;
+export function subjectFromPrompt(text) {
+  const t = String(text || '');
+  const late = t.match(/\b(?:the\s+)?late\s+((?:(?:Chief|Mr|Mrs|Miss|Dr|Pastor|Elder|Prof|Alhaji|Alhaja|Engr|Mama|Papa|Pa|Ma|Sir|Lady|Evangelist|Deaconess|Deacon|Rev|Hon|Barr)\.?\s+)?[A-Z][\p{L}'’.-]+(?:\s+[A-Z][\p{L}'’.-]+){0,3})/u);
+  if (late) return `Late ${late[1].trim()}`;
+  const quoted = [...t.matchAll(/["“‘]([^"”’\n]{3,50})["”’]/g)].map((m) => m[1].trim()).find((q) => !/\d{7,}/.test(q) && q.split(/\s+/).length <= 7 && /^[A-Z0-9]/.test(q));
+  if (quoted) return quoted;
+  const re = /(?<![\p{L}\d'’])([A-Z][\p{L}&'’.-]*(?:\s+(?:of|and|&|the|for)\s+[A-Z][\p{L}&'’.-]*|\s+[A-Z][\p{L}&'’.-]*){0,4})/gu;
+  for (const m of t.matchAll(re)) {
+    const words = m[1].trim().split(/\s+/);
+    while (words.length && NOT_NAMES.test(words[0].replace(/[.,]$/, ''))) words.shift();
+    while (words.length && NOT_NAMES.test(words[words.length - 1].replace(/[.,]$/, ''))) words.pop();
+    if (words.length && !NOT_NAMES.test(words.join(' ')) && words.join(' ').length >= 3) return words.join(' ').replace(/[.,]$/, '');
+  }
+  return '';
+}
 export function titleFromName(raw) {
   const t = str(raw, 120);
   if (!t) return '';
@@ -454,13 +472,31 @@ export function parseBriefRules(text) {
   if (name) out.name = name.trim();
   const priced = t.split(/\n|;|\.\s+(?=[A-Z])/).map((l) => l.trim()).filter((l) => /(₦|N\s?\d|naira|\d+k\b)/i.test(l) && l.length < 70);
   if (priced.length) out.products = priced.slice(0, 8);
+  // what is sold or offered, and where / when, straight from the sentence ("We sell cupcakes and wedding cakes in Lekki")
+  {
+    const offers = t.match(/\b(?:we|i)\s+(?:sell|offer|make|provide|bake|cook|deliver|do|specialis[ez]e in|specialize in)\s+([^.\n;]{3,120})/i)?.[1] || t.match(/\bspeciali[sz]e[sd]?\s+in\s+([^.\n;]{3,120})/i)?.[1];
+    if (offers) {
+      const head = offers.split(/\s+(?:in|at|around|across|within|near)\s+(?=[A-Z])/)[0];
+      const items = head.split(/\s*(?:,|&|\band\b)\s*/i).map((x) => x.trim().replace(/^(?:all|many|different|various|some|the)\s+/i, '')).filter((x) => x.length >= 3 && x.length <= 34 && !/^(?:more|others?|etc)$/i.test(x));
+      if (items.length) out.features = items.slice(0, 5).map((x) => x.charAt(0).toUpperCase() + x.slice(1));
+      const place = offers.match(/\b(?:in|at|around|across|within|near)\s+([A-Z][\p{L}' -]{2,30})/u)?.[1];
+      if (place && !/\d/.test(place)) out.contact = [out.contact, place.trim()].filter(Boolean).join(', ');
+    }
+    const when = t.match(/\b((?:(?:this|next|on)\s+)?(?:mon|tues|wednes|thurs|fri|satur|sun)day\b[^.\n]{0,70}|tomorrow[^.\n]{0,50}|tonight[^.\n]{0,50}|\d{1,2}(?:st|nd|rd|th)?\s+(?:of\s+)?(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?(?:\s+\d{4})?[^.\n]{0,60})/i)?.[1];
+    if (when && !/birthday|b-?day/i.test(t)) out.when = when.trim().replace(/[,;:\s]+$/, '').replace(/^on\s+/i, '');
+  }
   if (/no (music|sound|audio)|without (music|sound)|silent/i.test(t)) out.sound = 'none';
   else if (/only (sound )?effects|no music/i.test(t)) out.sound = 'sfx';
   if (/voice[- ]?over|narrat/i.test(t)) out.voiceover = !/no (voice|narrat)/i.test(t);
   // a few words are enough: work out a title and the kind of video even without the AI
-  const KINDS = [[CAUSE_RE, 'Fundraiser', 'cause'], [MEMORIAL, 'Burial or memorial', 'personal'], [/birthday|b-?day|anniversary/i, 'Birthday', 'personal'], [/wedding|engagement|bridal/i, 'Wedding', 'event'], [/church|ministry|sunday service|revival|crusade|mosque/i, 'Church event', 'event'],
-    [/graduat|convocation|school event|prize giving/i, 'Graduation', 'event'], [/announce|programme|program|invitation|invite|save the date/i, 'Announcement', 'announcement']];
+  const KINDS = [[CAUSE_RE, 'Fundraiser', 'cause'], [MEMORIAL, 'Burial or memorial', 'personal'], [/birthday|b-?day|anniversary/i, 'Birthday', 'personal'], [/church|ministry|sunday service|revival|crusade|mosque/i, 'Church event', 'event'],
+    [/\bwe (?:sell|offer|make|provide|do|bake|cook|deliver)\b|\bour (?:shop|store|business|products?|services?|menu|brand)\b|\bpromo\b|\bpromotional\b|\badverts?\b|\bad for\b|\bdiscount|\bbakery|\brestaurant|\bsalon\b|\bboutique/i, 'Business', 'business'], [/wedding|engagement|bridal/i, 'Wedding', 'event'],
+    [/graduat|convocation|school event|prize giving/i, 'Graduation', 'event'], [/announc|resum|notice|programme|program|invitation|invite|save the date/i, 'Announcement', 'announcement']];
   for (const [re, cat, kind] of KINDS) if (re.test(t)) { out.category = out.category || cat; out.kind = out.kind || kind; break; }
+  if (out.kind === 'announcement') {
+    const said = t.match(/\bannounc\w*\s+(?:that\s+|about\s+|the\s+)?([^.\n]{8,110})/i)?.[1];
+    if (said) { const h = said.trim().replace(/\s+(?:keep|make|and make|please)\b.*$/i, '').replace(/[,;:\s]+$/, ''); out.headline = h.charAt(0).toUpperCase() + h.slice(1); }
+  }
   const birthday = /birthday|b-?day/i.test(`${out.category || ''} ${t}`);
   if (birthday) {
     const relation = t.match(/\b(?:my|our)\s+(brother|sister|mum|mom|mother|dad|father|friend|partner|husband|wife|son|daughter|cousin|uncle|aunt|grandma|grandmother|grandpa|grandfather)\b/i)
@@ -480,6 +516,7 @@ export function parseBriefRules(text) {
     const message = t.match(/\b(?:message(?:\s+for\s+(?:him|her|them))?|say|write|include(?:\s+the\s+words)?|tell\s+(?:him|her|them))\s*(?:is|:|-|,)?\s*["“]?([^"”\n]{8,1200})/i);
     if (message) out.personalMessage = message[1].trim().replace(/["”]+$/, '');
   }
+  if (!out.name && !birthday) { const subj = subjectFromPrompt(t); if (subj) out.name = str(subj, 60); }
   if (!out.name && !birthday) {
     const first = t.split(/[\n.,;!?]/)[0].replace(/^\s*(?:please\s+)?(?:i\s+(?:want|need|would like)\s+(?:to\s+make\s+)?)?(?:make\s+(?:me\s+)?)?(?:an?\s+)?(?:(?:birthday|wedding|promo|promotional|short|nice|cool|donation|donations|fundraising|fundraiser|charity|appeal)\s+)?(?:video|ad|advert|advertisement|flyer|clip)?\s*(?:for|about|of|on)?\s*(?:my\s+|our\s+|the\s+)?/i, '').trim();
     if (first.length >= 3) out.name = first.charAt(0).toUpperCase() + str(first, 40).slice(1);
