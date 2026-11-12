@@ -424,7 +424,9 @@ export function autoStyleSlug(brief) {
   const t = `${b.category || ''} ${b.name || ''}`;
   const key = MEMORIAL.test(t) ? 'memorial' : /church|ministry|fellowship|worship|christian|mosque|islam|prayer|gospel|crusade|revival|assembly/i.test(t) ? 'faith'
     : /birthday|party|celebrat|wedding|anniversary|owambe/i.test(t) ? 'party' : /kid|children|nursery|toddler|baby/i.test(t) ? 'kids' : /sport|football|gym|fitness|training/i.test(t) ? 'sports' : catKey(b.category);
-  const pool = LOOK_POOLS[key] || LOOK_POOLS.default;
+  let pool = LOOK_POOLS[key] || LOOK_POOLS.default;
+  // the kente ribbon along the top and bottom is only for videos that ask for an African or cultural look
+  if (!/afric|ankara|aso.?oke|kente|afro|adire|naija|cultur|traditional|owambe/i.test(`${t} ${b.styleNote || ''} ${b.extra || ''}`)) pool = pool.filter((x) => x !== 'afro-vibes');
   let h = 7; for (const ch of `${b.name || ''}|${b.category || ''}`) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
   return pool[h % pool.length];
 }
