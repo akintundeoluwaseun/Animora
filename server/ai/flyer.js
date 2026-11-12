@@ -7,6 +7,7 @@ import { CANVAS } from '../engine/renderer.js';
 import { geminiGenerate } from '../engine/gemini.js';
 import { flyerHtml2, chooseFlyerLayout, FLYER2_LAYOUTS } from './flyer2.js';
 import { lookFor } from './motion/looks.js';
+import { titleFromName } from './brief.js';
 
 export const FLYER_LAYOUTS = ['hero', 'grid', 'split', 'type'];
 const PHONE_RE = /(\+?234[\s-]?|0)[789][01]\d[\s-]?\d{3}[\s-]?\d{4}/;
@@ -335,6 +336,7 @@ ${script}
 
 /** Answers + pictures -> flyer HTML. */
 export async function makeFlyer({ brief, plan, style, assets, previous = null, useAI = true }) {
+  brief = { ...(brief || {}), name: titleFromName(brief?.name) || brief?.name };   // an instruction typed as the name becomes a real title
   const themeKey = style?.palette?.theme || 'bold';
   const theme = THEMES[themeKey] || THEMES.bold;
   const { width: W, height: H } = CANVAS[plan?.aspect_ratio] || CANVAS['4:5'];

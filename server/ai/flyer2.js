@@ -31,7 +31,7 @@ const G = {
   briefcase: 'M4 8h16v11H4zM9 8V5h6v3M4 13h16',
 };
 const ic = (k, size, color, sw = 2.2) => `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${color || 'currentColor'}" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${G[k] || G.check}"/></svg>`;
-const GLYPH_WORDS = [[/deliver|ship|dispatch|logistic/i, 'truck'], [/fast|quick|instant|same.?day|express/i, 'bolt'], [/love|care|gentle|family|kid|baby/i, 'heart'], [/best|quality|premium|top|award|star/i, 'star'], [/hour|time|open|24|daily|day/i, 'clock'],
+const GLYPH_WORDS = [[/\b(deliver\w*|dispatch\w*|shipping|shipped|logistic\w*)\b/i, 'truck'], [/bible|study|scripture|prayer|word\b|teach|lesson|class|learn|school|book/i, 'book'], [/worship|fellowship|communit|church|welcome|friend|together|youth|choir|praise/i, 'heart'], [/fast|quick|instant|same.?day|express/i, 'bolt'], [/love|care|gentle|family|kid|baby/i, 'heart'], [/best|quality|premium|top|award|star/i, 'star'], [/hour|time|open|24|daily|day/i, 'clock'],
   [/where|address|location|visit|near/i, 'pin'], [/chat|whatsapp|message|support/i, 'chat'], [/secure|safe|trust|warrant|guarant/i, 'shield'], [/gift|free|bonus|offer/i, 'gift'], [/fresh|organic|natural|farm|plant/i, 'leaf'], [/drink|coffee|tea|juice|cafe/i, 'cup'],
   [/home|house|room|estate|rent/i, 'home'], [/class|learn|school|course|train|tutor/i, 'book'], [/hair|cut|barb|salon|tailor|sew/i, 'scissors'], [/job|work|career|hire|role/i, 'briefcase'], [/shop|buy|order|store|sale/i, 'bag']];
 const glyphFor = (t, i) => (GLYPH_WORDS.find(([re]) => re.test(t)) || [0, ['sparkle', 'star', 'check', 'heart', 'bolt', 'gift'][i % 6]])[1];
@@ -151,8 +151,9 @@ export function flyerHtml2(data) {
   const h1 = (cls = '') => `<h1 class="fit ${cls}">${headline}</h1>`;
 
   const initials = String(brand || '?').replace(/[^\p{L}\p{N} ]/gu, '').trim().split(/\s+/).filter((x) => !/^(the|and|of)$/i.test(x)).slice(0, 2).map((x) => x[0]).join('').toUpperCase() || '?';
-  const mark = (size = 104, onBrand = false) => logo
+  const mark = (size = 104, onBrand = false, force = false) => logo
     ? `<span class="mk ${logo.transparent ? 'clear' : 'boxed'}" style="height:${n(size)};${logo.transparent ? '' : `width:${n(size)};`}"><img src="${esc(logo.url)}" crossorigin="anonymous" alt=""></span>`
+    : !force ? ''   // no logo uploaded: show the business name only, never an invented badge
     : `<span class="mk mono ${onBrand ? 'on' : ''}" style="width:${n(size)};height:${n(size)};font-size:${n(size * (initials.length > 1 ? 0.4 : 0.52))}">${esc(initials)}</span>`;
   const brandRow = (onBrand = false) => `<header class="brandrow">${mark(96, onBrand)}<span class="bn">${esc(brand)}</span></header>`;
   const cta = (cls = '') => `<div class="cta ${cls}"><span>${esc(data.cta || 'Order now')}</span>${ic('arrow', n(40).replace('px', ''), 'currentColor', 2.6)}</div>`;
@@ -191,7 +192,7 @@ export function flyerHtml2(data) {
       <section class="ev">${day ? `<div class="date"><b>${esc(day)}</b><span>${esc(mon)}</span>${when?.weekday ? `<i>${esc(when.weekday)}</i>` : ''}</div>` : ''}<div class="ev-t">${h1()}${sub}</div></section>
       ${hero ? `<div class="ev-photo"><img src="${esc(hero)}" crossorigin="anonymous" alt=""></div>` : ''}
       <ul class="ev-info">${when?.time ? `<li>${ic('clock', Math.round(40 * U), ACC)}<span>${esc(when.time)}</span></li>` : ''}${when?.place ? `<li>${ic('pin', Math.round(40 * U), ACC)}<span>${esc(when.place)}</span></li>` : ''}${(data.features || []).slice(0, 3).map((f, i) => `<li>${ic(glyphFor(f, i), Math.round(40 * U), ACC)}<span>${esc(f)}</span></li>`).join('')}</ul>
-      <footer class="ticket"><div class="t-l"><span class="lbl">${esc(offer ? (/%|off|save|sale|discount/i.test(offer) ? 'Special' : (/\d/.test(offer) ? 'From' : 'Offer')) : 'Entry')}</span><b>${esc(offer || 'Free')}</b></div><div class="t-r">${cta()}${contactList('small')}</div></footer></div>`;
+      ${offer ? `<footer class="ticket"><div class="t-l"><span class="lbl">${esc(offer ? (/%|off|save|sale|discount/i.test(offer) ? 'Special' : (/\d/.test(offer) ? 'From' : 'Offer')) : 'Entry')}</span><b>${esc(offer || 'Free')}</b></div><div class="t-r">${cta()}${contactList('small')}</div></footer>` : `<footer class="foot">${cta()}${contactList('small')}</footer>`}</footer></div>`;
   } else if (L === 'menu') {
     const list = items.slice(0, tall ? 8 : 6);
     body = `<div class="pf menu">
@@ -205,7 +206,7 @@ export function flyerHtml2(data) {
       <section class="ph-copy">${h1('onphoto')}${sub}${feats(3, 'glass')}</section>
       <footer class="foot onphoto">${cta()}${contactList()}</footer></div>`;
   } else if (L === 'diagonal') {
-    body = `<div class="pf diag"><div class="dg-top">${hero ? `<img src="${esc(hero)}" crossorigin="anonymous" alt="">` : `<div class="dg-art">${mark(240, true)}</div>`}</div>
+    body = `<div class="pf diag"><div class="dg-top">${hero ? `<img src="${esc(hero)}" crossorigin="anonymous" alt="">` : `<div class="dg-art">${mark(240, true, true)}</div>`}</div>
       <div class="dg-top-row">${brandRow(true)}</div>
       ${data.badge || offer ? `<div class="seal"><span>${esc(data.badge || offer)}</span></div>` : ''}
       <section class="dg-copy">${h1()}${sub}${feats(4)}</section>

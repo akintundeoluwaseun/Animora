@@ -45,7 +45,7 @@ const keep = (arr) => arr.filter((x) => !isVague(x));
 // A name that is really an instruction ("Design a high-quality, professional Christian fellowship flyer") becomes a short title ("Christian Fellowship").
 const ASK_WORDS = /^(please\s+)?(can you |could you |i want (you )?to |i need (you )?to |i want |i need )?(design|make|create|generate|build|produce|write|prepare|do)\b/i;
 const FILLER = /\b(a|an|the|me|my|our|some|high[- ]?quality|professional|beautiful|nice|good|great|amazing|stunning|modern|simple|best|cool|awesome|attractive|catchy|premium|classy|elegant|flyer|flier|poster|video|ad|advert|advertisement|for|about|of|please)\b/gi;
-function titleFromName(raw) {
+export function titleFromName(raw) {
   const t = str(raw, 120);
   if (!t) return '';
   if (!ASK_WORDS.test(t) && t.length <= 60) return str(t, 60);
