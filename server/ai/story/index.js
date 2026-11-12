@@ -55,7 +55,9 @@ export const LOOKS = {
   },
 };
 export const LOOK_IDS = Object.keys(LOOKS);
+const MEMORIAL_RE = /burial|funeral|obituar|memorial|in memory|tribute|condolence|rest in peace|\brip\b|celebration of life|homegoing/i;
 const AFFINITY = [
+  [/church|ministry|worship|fellowship|thanksgiving|mosque|prayer/i, ['editorial', 'noir', 'clean']],
   [/birthday|anniversary|celebrat/i, ['fresh', 'editorial', 'noir']],
   [/luxur|jewel|perfume|fragrance|watch|hotel|lounge|wine|spirit|champagne|real estate|propert|wedding|bridal|event plan|interior|fashion|couture|gold/i, ['noir', 'editorial']],
   [/caf[eé]|coffee|bakery|bake|cake|restaurant|kitchen|food|chef|catering|boutique|beauty|salon|spa|lash|nail|makeup|hair|skin|photograph|book|florist|flower|tailor/i, ['editorial', 'noir', 'fresh']],
@@ -68,11 +70,13 @@ const AFFINITY = [
 // ---------------------------------------------------------------- choose the look
 export function pickLook({ facts, style, brief, salt, previous }) {
   const text = [facts.category, facts.name, ...(facts.features || [])].join(' ');
-  const fits = new Set(AFFINITY.filter(([re]) => re.test(text)).flatMap(([, ids]) => ids));
+  // a burial or tribute is always calm: only the quiet looks, never the loud ones
+  const fits = new Set(MEMORIAL_RE.test(text) ? ['noir', 'editorial'] : AFFINITY.filter(([re]) => re.test(text)).flatMap(([, ids]) => ids));
+  const quiet = MEMORIAL_RE.test(text);
   const prev = (String(previous || '').match(/animora-direction:story-([a-z]+);/) || [])[1];
   // a style the owner picked sets the mood (dark or light); a style chosen for them only nudges
   const mood = style && !brief?.styleAuto ? (style?.palette?.theme === 'light' || /light|white|fresh|clean|bloom|studio/i.test(style.slug || '') ? 'light' : /dark|night|neon|midnight|noir|luxe|glow/i.test(style.slug || '') ? 'dark' : null) : null;
-  const w = LOOK_IDS.filter((id) => id !== prev).map((id) => [id, (fits.has(id) ? (prev ? 3 : 9) : 1) * (mood ? (LOOKS[id].dark === (mood === 'dark') ? 2 : 0.35) : 1)]);
+  const w = LOOK_IDS.filter((id) => id !== prev).map((id) => [id, (fits.has(id) ? (prev ? 3 : 9) : quiet ? 0 : 1) * (mood ? (LOOKS[id].dark === (mood === 'dark') ? 2 : 0.35) : 1)]);
   const r = mulberry(hashStr(`${facts.name}|${text}|${salt}|look`) % 2147483647 || 3)();
   let t = r * w.reduce((n, [, x]) => n + x, 0);
   for (const [id, x] of w) { t -= x; if (t <= 0) return id; }

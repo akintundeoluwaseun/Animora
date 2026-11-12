@@ -67,6 +67,7 @@ const VIDEO_TYPES = [
   { v: 'Announcement', l: 'Announcement' },
   { v: 'Event or wedding', l: 'Event or wedding' },
   { v: 'Birthday', l: 'Birthday greeting' },
+  { v: 'Burial or memorial', l: 'Burial, funeral or tribute' },
   { v: 'Fundraiser or donation', l: 'Fundraiser or cause' },
 ];
 const RELATIONSHIPS = ['Brother', 'Sister', 'Mum', 'Dad', 'Friend', 'Partner', 'Son', 'Daughter', 'Cousin', 'Someone special'];
@@ -115,6 +116,7 @@ const groupOf = (b) => {
 const videoTypeOf = (b = {}) => {
   const c = String(b.category || '').toLowerCase();
   if (/birthday|b-?day/.test(c)) return 'birthday';
+  if (/burial|funeral|memorial|tribute|obituar|in memory|condolence|rest in peace|\brip\b|celebration of life|homegoing/.test(c)) return 'memorial';
   if (/church|ministry/.test(c)) return 'church';
   if (/announc/.test(c)) return 'announcement';
   if (/event|wedding|party|conference|program|invitation|funeral|graduation/.test(c)) return 'event';
@@ -126,7 +128,7 @@ const videoTypeOf = (b = {}) => {
   if (/health|fitness|service|school|training|tutor|repair|clean/.test(c)) return 'service';
   return 'business';
 };
-const kindForVideoType = (b) => ({ birthday: 'personal', cause: 'cause', church: 'event', announcement: 'announcement', event: 'event' }[videoTypeOf(b)] || 'business');
+const kindForVideoType = (b) => ({ birthday: 'personal', memorial: 'personal', cause: 'cause', church: 'event', announcement: 'announcement', event: 'event' }[videoTypeOf(b)] || 'business');
 const PRODUCT_ASK = {
   food: () => "What's on the menu? One item per line, with the price if you like.",
   shop: () => 'Which items should we show? One per line, with the price if you like.',
@@ -184,7 +186,7 @@ const VIDEO_QUESTIONS = [
   QUESTIONS.find((x) => x.id === 'mode'), QUESTIONS.find((x) => x.id === 'paste'),
   { id: 'category', type: 'single', options: VIDEO_TYPES, ask: () => 'What kind of video are we making?' },
   { id: 'name', type: 'text', ask: (b) => ({
-    birthday: 'Who are we celebrating?', church: 'What is the church or ministry called?',
+    birthday: 'Who are we celebrating?', memorial: 'Whose life are we honouring? Their name and title.', church: 'What is the church or ministry called?',
     announcement: 'Who is making the announcement?', event: 'What is the event called?',
     cause: 'What is the organization or cause called?',
   }[videoTypeOf(b)] || 'What is your business or brand called?'), placeholder: 'e.g. Tony, Kemi Cakes, Living Faith Ado, Annual Youth Convention' },
@@ -193,18 +195,20 @@ const VIDEO_QUESTIONS = [
   { id: 'personalMessage', type: 'long', show: (b) => videoTypeOf(b) === 'birthday', ask: (b) => `What would you like to say to ${b.name || 'them'}?`, hint: 'Animora will shape your words into several short, readable moments.', placeholder: 'e.g. Happy birthday, brother! I’m proud of you. May this new age bring you many blessings.' },
   { id: 'headline', type: 'long', show: (b) => videoTypeOf(b) !== 'birthday', ask: (b) => ({
     church: 'What should people know about the service or programme?',
+    memorial: 'What would you like the video to say? A short tribute, dates, or the programme of events.',
     announcement: 'What are you announcing? Write the key news clearly.',
     event: 'What is the main event message, and why should people come?',
     cause: 'What does the cause do, and who will it help?',
     tech: 'What does your app or technology help people do?',
   }[videoTypeOf(b)] || 'What is the main product, service or offer people should remember?'), hint: 'One clear message is enough. Include a price or key detail if it matters.', placeholder: 'e.g. Fresh cakes made to order, with free delivery this weekend' },
-  { id: 'when', type: 'text', optional: true, show: (b) => ['church', 'announcement', 'event'].includes(videoTypeOf(b)), ask: (b) => videoTypeOf(b) === 'church' ? 'When and where is the service or programme?' : 'When and where is it happening?', placeholder: 'e.g. Sunday 16 Nov, 10am · Living Faith Church, Ado Ekiti' },
+  { id: 'when', type: 'text', optional: true, show: (b) => ['church', 'announcement', 'event', 'memorial'].includes(videoTypeOf(b)), ask: (b) => videoTypeOf(b) === 'memorial' ? 'When and where are the burial, service or wake? Skip if there is none.' : videoTypeOf(b) === 'church' ? 'When and where is the service or programme?' : 'When and where is it happening?', placeholder: 'e.g. Sunday 16 Nov, 10am · Living Faith Church, Ado Ekiti' },
   { id: 'payment', type: 'long', optional: true, show: (b) => videoTypeOf(b) === 'cause', ask: () => 'Where should donations go? Add the bank, account number and account name.', hint: 'Shown on screen exactly as you enter it.', placeholder: 'GTBank · 0123456789 · Community Health Initiative' },
-  { id: 'cta', type: 'single', optional: true, typed: true, options: CTAS, optionsFor: (b) => ({ cause: CAUSE_CTAS, church: ['Join us', 'You are welcome', 'See you there', 'Invite a friend', 'Share this video'], event: ['Join us', 'Register now', 'RSVP', 'Save the date', 'See you there', 'Share this video'], announcement: ['Share this video', 'Save the date', 'Join us', 'Register now'] }[videoTypeOf(b)] || CTAS), show: (b) => videoTypeOf(b) !== 'birthday', ask: () => 'What should viewers do next?', placeholder: 'e.g. Register today or join us this Sunday' },
+  { id: 'cta', type: 'single', optional: true, typed: true, options: CTAS, optionsFor: (b) => ({ cause: CAUSE_CTAS, memorial: ['Forever in our hearts', 'Rest in peace', 'Gone but not forgotten', 'Join us to celebrate a life well lived', 'Gone too soon'], church: ['Join us', 'You are welcome', 'See you there', 'Invite a friend', 'Share this video'], event: ['Join us', 'Register now', 'RSVP', 'Save the date', 'See you there', 'Share this video'], announcement: ['Share this video', 'Save the date', 'Join us', 'Register now'] }[videoTypeOf(b)] || CTAS), show: (b) => videoTypeOf(b) !== 'birthday', ask: () => 'What should viewers do next?', placeholder: 'e.g. Register today or join us this Sunday' },
   { id: 'contact', type: 'text', optional: true, show: (b) => ['business', 'food', 'fashion', 'beauty', 'tech', 'service'].includes(videoTypeOf(b)), ask: () => 'What phone, WhatsApp number or website should appear?', placeholder: 'e.g. WhatsApp 0803 123 4567 · www.kemicakes.ng' },
   { id: 'pictures', type: 'upload', optional: true, ask: (b) => ({
     birthday: `Add photos of ${b.name || 'the birthday person'} if you have them (optional).`,
     church: `Add your church logo or programme photos if you have them (optional, up to ${MAX_PICS}).`,
+    memorial: `Add photos of ${b.name || 'your loved one'} if you have them (optional, up to ${MAX_PICS}).`,
     announcement: `Add a logo or relevant photos if you have them (optional, up to ${MAX_PICS}).`,
     event: `Add event or wedding photos if you have them (optional, up to ${MAX_PICS}).`,
     cause: `Add your organization logo or photos of the cause if you have them (optional, up to ${MAX_PICS}).`,

@@ -1,5 +1,7 @@
 // What a video ends on. A shop advert can say "Visit our store"; a birthday, a wedding or a tribute never should.
 // Used by the brief, the Pieces engine and the question flow so every part agrees.
+export const MEMORIAL = /burial|funeral|obituar|memorial|in memory|in loving memory|tribute|condolence|rest in peace|\brip\b|passed away|celebration of life|\bthe late\b|\blate (?:mr|mrs|mama|papa|pa|chief|dr|pastor|elder)\b|homegoing|home going|wake keep|vigil|eulogy|lying in state/i;
+export const EVENTISH = /announc|church|ministry|fellowship|crusade|revival|conference|summit|seminar|workshop|programme|program\b|concert|show\b|school event|prize giving|convocation|open day|meeting|invitation|reunion|launch party|party|gala|festival|ceremony|service of|thanksgiving|dedication|outreach|resumption|resumes|holiday|notice/i;
 const PERSONAL = /birthday|b-?day|anniversary|wedding|engagement|bridal|tribute|memorial|in memory|funeral|graduat|congrat|baby|naming|thank ?you|valentine|christmas|easter|eid|ramadan|new year|mother|father|mum|mom|dad|brother|sister|friend|love|celebrat|proposal|retire|promotion|farewell|welcome home/i;
 // shop-style calls to action
 export const SALES_CTA = /\b(visit|call|whats\s?app|order|buy|shop|store|website|web\s?site|dm\b|download|book(?:\s+now)?|contact|follow|subscribe|click|sign\s?up|get yours|our number)\b/i;
@@ -11,6 +13,7 @@ export function videoGroup(b = {}) {
   if (b.kind === 'cause') return 'cause';
   if (b.kind === 'business') return 'business';
   if (b.kind === 'personal' || b.kind === 'event' || b.kind === 'announcement') return 'social';
+  if (MEMORIAL.test(c) || EVENTISH.test(c)) { if (!/planner|studio|shop|store|boutique|catering|rentals?|hire|decor|designer|salon|funeral (?:home|directors?)|undertaker|mortuary/i.test(c)) return 'social'; }
   if (PERSONAL.test(c) && !/planner|studio|shop|store|boutique|bakery|cakes?\b|catering|rentals?|hire|photograph|decor|designer|salon|services?\b/i.test(c)) return 'social';
   return 'business';
 }
@@ -24,8 +27,9 @@ export function closingLine(b = {}) {
   if (/anniversary/.test(c)) return 'Happy anniversary!';
   if (/wedding|engagement|bridal/.test(c)) return 'See you there';
   if (/graduat/.test(c)) return 'Congratulations!';
-  if (/tribute|memorial|in memory|funeral/.test(c)) return 'Forever in our hearts';
-  if (b.kind === 'event' || b.kind === 'announcement') return 'You are invited';
+  if (MEMORIAL.test(c)) return 'Forever in our hearts';
+  if (/announc|notice|resum|holiday/.test(c) || b.kind === 'announcement') return 'Thank you';
+  if (b.kind === 'event' || EVENTISH.test(c)) return 'You are invited';
   return 'With love';
 }
 
@@ -34,7 +38,7 @@ export function fitCtas(b = {}) {
   const list = [].concat(b.ctas || (b.cta ? [b.cta] : [])).filter(Boolean);
   if (videoGroup(b) !== 'social') return list;
   const contact = String(b.contact || '');
-  const personal = b.kind === 'personal' || PERSONAL.test(`${b.category || ''} ${b.name || ''}`);
+  const personal = b.kind === 'personal' || MEMORIAL.test(`${b.category || ''} ${b.name || ''}`) || PERSONAL.test(`${b.category || ''} ${b.name || ''}`);
   return list.filter((x) => {
     if (!SALES_CTA.test(x)) return true;
     if (personal && b.kind !== 'event') return false;
@@ -54,7 +58,8 @@ export function ctaOptions(b = {}) {
   if (/anniversary/.test(c)) return ['Happy anniversary!', 'Here is to many more', 'Love you', 'Celebrate with us'];
   if (/wedding|engagement|bridal/.test(c)) return ['See you there', 'Save the date', 'RSVP', 'Join us', 'Celebrate with us'];
   if (/graduat/.test(c)) return ['Congratulations!', 'So proud of you', 'Celebrate with us'];
-  if (/tribute|memorial|in memory|funeral/.test(c)) return ['Forever in our hearts', 'Rest in peace', 'Gone but not forgotten'];
+  if (MEMORIAL.test(c)) return ['Forever in our hearts', 'Rest in peace', 'Gone but not forgotten', 'Join us to celebrate his life', 'Gone too soon'];
+  if (/announc|notice|resum|holiday/.test(c) || b.kind === 'announcement') return ['Thank you', 'Please share', 'See you there', 'Stay tuned', 'Stay informed'];
   if (b.kind === 'event' || b.kind === 'announcement' || /church|ministry|conference|programme|program|service|concert|party/.test(c)) return ['Join us', 'You are invited', 'Save the date', 'RSVP', 'See you there'];
   return ['Thank you', 'With love', 'Share this', 'Celebrate with us'];
 }

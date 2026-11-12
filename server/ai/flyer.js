@@ -8,6 +8,7 @@ import { geminiGenerate } from '../engine/gemini.js';
 import { flyerHtml2, chooseFlyerLayout, FLYER2_LAYOUTS } from './flyer2.js';
 import { lookFor } from './motion/looks.js';
 import { titleFromName } from './brief.js';
+import { MEMORIAL, closingLine, videoGroup } from './closing.js';
 import { CREATIVE_STANDARD, qaHtml, qaFilter } from './standard.js';
 
 export const FLYER_LAYOUTS = ['hero', 'grid', 'split', 'type'];
@@ -64,14 +65,16 @@ function rulesCopy(brief, assets, avoid) {
   const allItems = (products.length ? products : []).slice(0, 8).map((it, i) => ({ ...it, img: photos[i]?.name }));
   const when = parseWhen(brief.when), kinds = kindsOf(brief), offer = str(brief.offer, 40);
   const facts = { photos: photos.length, items: allItems.length || items.length, features: (brief.features || []).length, priced: allItems.filter((x) => x.price).length, offer, when, kinds };
-  const pref = brief.layout && brief.layout !== 'auto' ? brief.layout : '';
+  const memorial = MEMORIAL.test(`${brief.category || ''} ${brief.name || ''}`) && videoGroup(brief) === 'social';
+  const notice = !memorial && (brief.kind === 'announcement' || /announc|notice/i.test(brief.category || ''));
+  const pref = brief.layout && brief.layout !== 'auto' ? brief.layout : memorial ? 'invite' : '';
   let layout = chooseFlyerLayout({ ...facts, pref, avoid, seed: (Date.now() % 100000) + 1 });
   if (!layoutFits(layout, facts)) layout = FLYER2_LAYOUTS.find((l) => l !== avoid && layoutFits(l, facts) && l !== 'hiring' && l !== 'event') || 'poster';
   return {
     v: 2, kinds, offer, when, facts,
     layout, headline: str(brief.headline || brief.name, 60), highlight: '', subhead: str(brief.headlines?.[1] || '', 90),
-    badge: /sale|offer|discount|%|off/i.test(brief.goal || '') ? 'Special offer' : '',
-    items, features: (brief.features || []).slice(0, 4).map((f) => str(f, 34)), cta: str(brief.cta || (!brief.kind || brief.kind === 'business' ? 'Order now' : 'You are invited'), 30),
+    badge: memorial ? 'In loving memory' : notice ? 'Announcement' : /sale|offer|discount|%|off/i.test(brief.goal || '') ? 'Special offer' : '',
+    items, features: (brief.features || []).slice(0, 4).map((f) => str(f, 34)), cta: str(brief.cta || (!brief.kind || brief.kind === 'business' ? 'Order now' : closingLine(brief)), 30),
     contact: str(brief.contact, 120), heroImg: photos[0]?.name || null,
   };
 }

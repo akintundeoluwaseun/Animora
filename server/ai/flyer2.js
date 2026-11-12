@@ -45,6 +45,7 @@ function contactLines(contact) {
 
 /** Pick a composition from what the flyer is for, what the owner prefers, and what they gave us. */
 export function chooseFlyerLayout({ kinds = [], pref = '', photos = 0, items = 0, priced = 0, offer = '', when = null, features = 0, avoid = null, seed = 1 }) {
+  if (pref === 'invite') return 'invite';   // a burial or tribute: one calm framed layout
   const k = new Set([].concat(kinds).map((x) => String(x).toLowerCase()));
   const has = (re) => [...k].some((x) => re.test(x));
   const cands = [];
@@ -121,7 +122,8 @@ export function flyerHtml2(data) {
   const { W, H, brand, logo } = data;
   const look = data.look || { theme: 'dark', display: 'Inter', dw: 800, ui: 'Inter', text: 'plain', deco: 'none' };
   const c = data.colors || {};
-  const A = /^#[0-9a-f]{6}$/i.test(c.primary || '') ? c.primary : '#3D5AFE';
+  const solemn = /in loving memory|in memory/i.test(String(data.badge || ''));   // a burial or tribute: calm slate, no shiny button
+  const A = solemn ? '#4B5060' : /^#[0-9a-f]{6}$/i.test(c.primary || '') ? c.primary : '#3D5AFE';
   const A2 = /^#[0-9a-f]{6}$/i.test(look.accent2 || c.secondary || '') ? (look.accent2 || c.secondary) : mix(A, '#FFFFFF', 0.4);
   const dark = look.theme === 'dark';
   const BG = /^#[0-9a-f]{6}$/i.test(look.bg || c.background || '') ? (look.bg || c.background) : dark ? '#0E0E12' : '#F4F4F6';
@@ -156,7 +158,7 @@ export function flyerHtml2(data) {
     : !force ? ''   // no logo uploaded: show the business name only, never an invented badge
     : `<span class="mk mono ${onBrand ? 'on' : ''}" style="width:${n(size)};height:${n(size)};font-size:${n(size * (initials.length > 1 ? 0.4 : 0.52))}">${esc(initials)}</span>`;
   const brandRow = (onBrand = false) => `<header class="brandrow">${mark(96, onBrand)}<span class="bn">${esc(brand)}</span></header>`;
-  const cta = (cls = '') => `<div class="cta ${cls}"><span>${esc(data.cta || 'Order now')}</span>${ic('arrow', n(40).replace('px', ''), 'currentColor', 2.6)}</div>`;
+  const cta = (cls = '') => solemn ? `<div class="cta-quiet">${esc(data.cta || 'Forever in our hearts')}</div>` : `<div class="cta ${cls}"><span>${esc(data.cta || 'Order now')}</span>${ic('arrow', n(40).replace('px', ''), 'currentColor', 2.6)}</div>`;
   const contactList = (cls = '') => (contacts.length ? `<div class="contacts ${cls}">${contacts.map((x) => `<span>${ic(x.icon, Math.round(34 * U), 'currentColor')}${esc(x.text)}</span>`).join('')}</div>` : '');
   const feats = (max = 4, cls = '') => ((data.features || []).length ? `<ul class="feats ${cls}">${data.features.slice(0, max).map((f, i) => `<li><i>${ic(glyphFor(f, i), Math.round(30 * U), 'currentColor', 2.4)}</i><span>${esc(f)}</span></li>`).join('')}</ul>` : '');
   const sub = data.subhead ? `<p class="sub">${esc(data.subhead)}</p>` : '';
@@ -281,6 +283,7 @@ ${treat}
 .mk.mono::after { content:''; position:absolute; inset:0; background:linear-gradient(180deg, rgba(255,255,255,.35), rgba(255,255,255,0) 48%); }
 .tag { margin-left:auto; font-family:${uiF}; font-weight:800; font-size:${n(26)}; letter-spacing:.14em; text-transform:uppercase; padding:${n(12)} ${n(22)}; border-radius:999px; border:${n(2)} solid ${line}; }
 .tag.glass { color:#fff; border-color:rgba(255,255,255,.4); background:rgba(255,255,255,.12); backdrop-filter:blur(10px); }
+.cta-quiet { font-style:italic; font-weight:600; letter-spacing:.04em; font-size:${n(40)}; color:${A}; opacity:.9; text-align:center; }
 .cta { display:inline-flex; align-items:center; gap:${n(16)}; background:${A}; color:${onA}; font-weight:800; font-size:${n(42)}; padding:${n(26)} ${n(44)}; border-radius:999px; white-space:nowrap; box-shadow:0 ${n(20)} ${n(50)} ${n(-14)} ${rgba(A, 0.7)}; }
 .cta.dark { background:#111; color:#fff; box-shadow:none; }
 .contacts { display:flex; flex-direction:column; gap:${n(8)}; font-weight:700; font-size:${n(34)}; min-width:0; }

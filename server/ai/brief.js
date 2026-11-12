@@ -7,7 +7,7 @@
 import { config } from '../config.js';
 import { geminiGenerate } from '../engine/gemini.js';
 import { birthdayPhotoAssets, isPersonalBirthdayBrief } from './personal.js';
-import { videoGroup, closingLine, fitCtas } from './closing.js';
+import { videoGroup, closingLine, fitCtas, MEMORIAL } from './closing.js';
 
 // Reading someone's idea and writing the video plan are the steps where a small model sounds dumb and repeats itself,
 // so they use the full Flash model (the lighter one stays for quick chat). Override with GEMINI_BRIEF_MODEL.
@@ -416,13 +416,13 @@ const LOOK_POOLS = {
   food: ['naija-bold', 'fresh-market', 'retro-pop'], fashion: ['street-hype', 'afro-vibes', 'mono-editorial'], beauty: ['beauty-bloom', 'gold-luxe', 'studio-white'],
   tech: ['midnight-glow', 'tech-pulse', 'neon-nights'], finance: ['fintech-blue', 'clean-pro', 'graphite-pro'], health: ['health-pulse', 'fresh-market', 'ocean-breeze'],
   realestate: ['prime-estate', 'graphite-pro', 'gold-luxe'], events: ['owambe-party', 'glory-light', 'gold-luxe', 'afro-vibes'], education: ['clean-pro', 'kiddies-fun', 'ocean-breeze'],
-  faith: ['glory-light', 'gold-luxe', 'prime-estate', 'ocean-breeze'], party: ['owambe-party', 'neon-nights', 'retro-pop', 'afro-vibes'], kids: ['kiddies-fun', 'retro-pop', 'ocean-breeze'], sports: ['sports-blitz', 'street-hype', 'neon-nights'],
+  memorial: ['mono-editorial', 'graphite-pro', 'prime-estate'], faith: ['glory-light', 'gold-luxe', 'prime-estate', 'ocean-breeze'], party: ['owambe-party', 'neon-nights', 'retro-pop', 'afro-vibes'], kids: ['kiddies-fun', 'retro-pop', 'ocean-breeze'], sports: ['sports-blitz', 'street-hype', 'neon-nights'],
   default: ['studio-white', 'clean-pro', 'mono-editorial', 'ocean-breeze', 'midnight-glow', 'afro-vibes'],
 };
 export function autoStyleSlug(brief) {
   const b = cleanBrief(brief);
   const t = `${b.category || ''} ${b.name || ''}`;
-  const key = /church|ministry|fellowship|worship|christian|mosque|islam|prayer|gospel|crusade|revival|assembly/i.test(t) ? 'faith'
+  const key = MEMORIAL.test(t) ? 'memorial' : /church|ministry|fellowship|worship|christian|mosque|islam|prayer|gospel|crusade|revival|assembly/i.test(t) ? 'faith'
     : /birthday|party|celebrat|wedding|anniversary|owambe/i.test(t) ? 'party' : /kid|children|nursery|toddler|baby/i.test(t) ? 'kids' : /sport|football|gym|fitness|training/i.test(t) ? 'sports' : catKey(b.category);
   const pool = LOOK_POOLS[key] || LOOK_POOLS.default;
   let h = 7; for (const ch of `${b.name || ''}|${b.category || ''}`) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
@@ -456,8 +456,8 @@ export function parseBriefRules(text) {
   else if (/only (sound )?effects|no music/i.test(t)) out.sound = 'sfx';
   if (/voice[- ]?over|narrat/i.test(t)) out.voiceover = !/no (voice|narrat)/i.test(t);
   // a few words are enough: work out a title and the kind of video even without the AI
-  const KINDS = [[CAUSE_RE, 'Fundraiser', 'cause'], [/birthday|b-?day|anniversary/i, 'Birthday', 'personal'], [/wedding|engagement|bridal/i, 'Wedding', 'event'], [/church|ministry|sunday service|revival|crusade|mosque/i, 'Church event', 'event'],
-    [/tribute|in memory|memorial|funeral|rip\b/i, 'Tribute', 'personal'], [/graduat|convocation|school event|prize giving/i, 'Graduation', 'event'], [/announce|programme|program|invitation|invite|save the date/i, 'Announcement', 'announcement']];
+  const KINDS = [[CAUSE_RE, 'Fundraiser', 'cause'], [MEMORIAL, 'Burial or memorial', 'personal'], [/birthday|b-?day|anniversary/i, 'Birthday', 'personal'], [/wedding|engagement|bridal/i, 'Wedding', 'event'], [/church|ministry|sunday service|revival|crusade|mosque/i, 'Church event', 'event'],
+    [/graduat|convocation|school event|prize giving/i, 'Graduation', 'event'], [/announce|programme|program|invitation|invite|save the date/i, 'Announcement', 'announcement']];
   for (const [re, cat, kind] of KINDS) if (re.test(t)) { out.category = out.category || cat; out.kind = out.kind || kind; break; }
   const birthday = /birthday|b-?day/i.test(`${out.category || ''} ${t}`);
   if (birthday) {
