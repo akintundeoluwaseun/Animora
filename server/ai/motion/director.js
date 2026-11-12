@@ -8,6 +8,19 @@ import { motionHtml, readMotion } from './page.js';
 import { lookFor } from './looks.js';
 import { isPersonalBirthdayBrief } from '../personal.js';
 import { CREATIVE_STANDARD } from '../standard.js';
+import { videoGroup } from '../closing.js';
+
+// A different creative angle every time, so two people (or two tries) never get the same film with other words in it.
+const ANGLES = [
+  ['type', 'KINETIC TYPE. Words carry the film: open with a "slam" or "build", use "highlight" and "words" beats, at most one photo beat. No phone-UI objects.'],
+  ['photos', 'PHOTO-LED. Their pictures carry the film: open on "photos", add a "grid" if there are 4+, keep text to one short line per beat.'],
+  ['calm', 'CALM EDITORIAL. Slow and quiet: "glow" and "build" statements on a dark stage, few beats, long holds, "fade" and "rise" transitions.'],
+  ['loud', 'BOLD AND LOUD. Short beats, "slam" words, one brand-colour stage, "whip" and "zoom" transitions, a big number or price if one was given.'],
+  ['story', 'A SMALL STORY. A clear beginning, middle and end told with sentences ("words", "highlight", "quote" only if given): what it is, why it matters, what to do.'],
+  ['clean', 'CLEAN AND SIMPLE. Light stage, one idea per beat, "icon" then "stack" or "steps", a calm finish.'],
+];
+// phone-screen mock-ups (a WhatsApp chat, a search bar, a receipt...) only suit a business selling something
+const UI_BEATS = new Set(['chat', 'notif', 'search', 'receipt', 'toggles', 'swap', 'phone', 'button']);
 
 const MODEL = process.env.GEMINI_DIRECTOR_MODEL || process.env.GEMINI_CHAT_MODEL || 'gemini-flash-latest';
 // Speed: the director answers in seconds with light thinking; if it is slow (busy model, retries), the instant
@@ -133,7 +146,10 @@ export function sanitizeBeats(raw, { duration, assets = [] } = {}) {
 const seedOf = (s) => (Array.from(String(s)).reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7) % 2147483646) + 1;
 
 /** Storyboard -> Motion HTML. Tries Gemini first (when `useAi`), then the rule-based composer. */
-export async function directMotion({ plan, brief = null, assets = [], themeColors = {}, images = [], useAi = true, salt = '', avoid = [], style = null }) {
+export async function directMotion({ plan, brief = null, assets = [], themeColors = {}, images = [], useAi = true, salt = '', avoid = [], style = null, prevAngle = null, prevConcept = '' }) {
+  const group = videoGroup(brief || {});
+  const pool = ANGLES.filter((a) => a[0] !== prevAngle);
+  const angle = pool[Math.floor(Math.random() * pool.length)];
   const aspect = SIZES[plan.aspect_ratio] ? plan.aspect_ratio : '9:16';
   const [W, H] = SIZES[aspect];
   const duration = Math.max(10, Math.round(Number(plan.duration_seconds) || 24));
@@ -153,11 +169,13 @@ export async function directMotion({ plan, brief = null, assets = [], themeColor
       const wantLine = wants.length ? `\n\nTHE OWNER CHOSE THESE BEATS (include each, adapted to this business): ${wants.map((id) => `${id} -> ${MOTION_WANTS[id].join(' or ')}`).join('; ')}.` : '';
       const { text } = await withDeadline(geminiGenerate({
         system: system({ duration, aspect }),
-        messages: [{ role: 'user', images, text: `THE LOOK (the owner's chosen style): ${look.theme} stages ("bg": "${look.theme}" for most beats; one or two contrasting beats are fine), ${look.energy} energy${look.energy === 'high' ? ' (fast cuts, "slam" hooks, whip/zoom/drop transitions)' : look.energy === 'calm' ? ' (unhurried, "build" or "glow" hooks, push/fade/rise transitions)' : ''}.\n\nTHE BUSINESS (facts you may use, typed by the owner; clean them up): ${JSON.stringify(facts)}\n\nASSETS (use exact urls):\n${assetLines}${wantLine}${avoid.length ? `\n\nTHE LAST VERSION USED THESE BEATS (make this one clearly different): ${avoid.join(', ')}` : ''}\n\nA rule-based draft you may improve on or ignore: ${JSON.stringify(rules.beats.map((b) => b.type))}\n\nDirect the film. ${duration} seconds, ${aspect}.` }],
+        messages: [{ role: 'user', images, text: `THE LOOK (the owner's chosen style): ${look.theme} stages ("bg": "${look.theme}" for most beats; one or two contrasting beats are fine), ${look.energy} energy${look.energy === 'high' ? ' (fast cuts, "slam" hooks, whip/zoom/drop transitions)' : look.energy === 'calm' ? ' (unhurried, "build" or "glow" hooks, push/fade/rise transitions)' : ''}.\n\nTHE BUSINESS (facts you may use, typed by the owner; clean them up): ${JSON.stringify(facts)}\n\nASSETS (use exact urls):\n${assetLines}${wantLine}${avoid.length ? `\n\nTHE LAST VERSION USED THESE BEATS (make this one clearly different: another hook, another order, another stage colour): ${avoid.join(', ')}${prevConcept ? `. Its idea was: "${prevConcept}"` : ''}` : ''}\n\nCREATIVE ANGLE FOR THIS FILM (follow it; do not use the standard recipe): ${angle[1]}${group !== 'business' ? `\n\nTHIS IS NOT AN ADVERT. Never use these beats: ${[...UI_BEATS].join(', ')}, and no price, offer, order or shop language.` : `\n\nUse at most ONE phone-screen beat (${[...UI_BEATS].join(', ')}), and only if it genuinely fits this business; a WhatsApp chat is only for businesses that take orders on WhatsApp.`}\n\nA rule-based draft you may improve on or ignore: ${JSON.stringify(rules.beats.map((b) => b.type))}\n\nDirect the film. ${duration} seconds, ${aspect}.` }],
         model: MODEL, temperature: 0.9, maxOutputTokens: 8000, json: true, timeoutMs: DEADLINE, thinking: THINK,
       }), DEADLINE, 'The AI director');
       const j = JSON.parse(String(text).match(/\{[\s\S]*\}/)[0]);
       beats = sanitizeBeats(j.beats, { duration, assets });
+      if (beats && group !== 'business') { const kept = beats.filter((x) => !UI_BEATS.has(x.type)); if (kept.length >= 3) beats = kept; }
+      if (beats && group === 'business') { let seenUi = 0; const kept = beats.filter((x) => !UI_BEATS.has(x.type) || ++seenUi <= 1); if (kept.length >= 3) beats = kept; }
       if (FONTS.includes(j.font)) font = j.font;
       concept = clip(j.concept, 160);
     } catch (e) { console.warn('[motion] director failed, using the composer:', e.message); }
@@ -167,7 +185,7 @@ export async function directMotion({ plan, brief = null, assets = [], themeColor
   // sound: 'all'/'sfx' = effects, 'none' = silent, 'own' = the owner's track (+ effects), 'piano'/'soft' = a library track
   const sound = plan.sound || (plan.sfx === false ? 'none' : 'sfx');
   const music = sound === 'own' && plan.music_url ? { url: plan.music_url } : sound === 'piano' || sound === 'soft' ? { url: `/music/${sound}.mp3`, builtin: sound } : null;
-  const data = { W, H, seed: seedOf(`${rules.brand}${salt}`), brand: rules.brand, logo: logo?.url || null, font: look.ui || font, look, accent: rules.accent, accent2: look.accent2, beats, sound: sound === 'none' ? 'none' : 'on', music };
+  const data = { W, H, angle: angle[0], concept, seed: seedOf(`${rules.brand}${salt}${Math.random()}`), brand: rules.brand, logo: logo?.url || null, font: look.ui || font, look, accent: rules.accent, accent2: look.accent2, beats, sound: sound === 'none' ? 'none' : 'on', music };
   return { html: motionHtml(data), data, concept, source: aiBeats ? 'gemini' : 'template', aiSkipped: !!personalBirthday };
 }
 

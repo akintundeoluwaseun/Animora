@@ -4,6 +4,7 @@
 // no ratings, no customer counts, no delivery times unless they gave them.
 import { factsFrom, cleanText, fixPrices, glyphFor } from '../cinema/compose.js';
 import { isPersonalBirthdayBrief } from '../personal.js';
+import { videoGroup, closingLine, fitCtas } from '../closing.js';
 
 const hash = (s) => { let h = 2166136261; for (const c of String(s)) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); } return (h >>> 0) % 2147483646 + 1; };
 const OK = /^#[0-9a-f]{6}$/i;
@@ -209,7 +210,36 @@ export function composeMotion(plan, { brief = {}, assets = [], salt = '', avoid 
 
   // A personal birthday is a greeting, not an advert. Keep each supplied thought as its own animated beat.
   const personalBirthday = isPersonalBirthdayBrief(brief, plan);
-  if (personalBirthday) {
+  // Not an advert (burial, announcement, church, school, event, cause...): their own words and pictures, never a search bar,
+  // a shop button, a price or a chat. The opener, the order and the look change every time.
+  const social = !personalBirthday && videoGroup(brief) === 'social';
+  const socialBeats = () => {
+    const closing = (fitCtas(brief)[0] || closingLine(brief)).replace(/[.!]*$/, '');
+    const opening = H0 || f.brand;
+    const solemn = /burial|funeral|memorial|tribute|obituar|in memory|celebration of life|condolence/i.test(`${brief.category || ''} ${brief.name || ''}`);
+    const opener = solemn ? B.hookGlow() : (chance(slamP0) && B.hookSlam()) || (chance(0.4) ? B.hookGlow() : B.hookBuild());
+    const lineBeat = (line, i) => {
+      if (words(line).length >= 4 && chance(0.5)) { const a = accentOf(line)[0]; return { type: 'highlight', bg: base, text: line, hot: a > 0 ? [a - 1, a] : [a] }; }
+      const ls = balance(line, 22);
+      return { type: 'words', mode: solemn || chance(0.3) ? 'glow' : undefined, bg: solemn || (i % 3 === 0 && chance(0.5)) ? 'dark' : base, lines: ls, accent: accentOf(ls[ls.length - 1], ls.length > 1 ? words(ls[0]).length : 0) };
+    };
+    const said = [...heads.slice(1), ...feats].filter((x) => x && key(x) !== key(opening));
+    const uniq = []; for (const x of said) if (!uniq.some((u) => key(u) === key(x))) uniq.push(x);
+    const mid = [];
+    if (photos.length) mid.push(B.photos());
+    if (photos.length >= 4 && chance(0.6)) mid.push(B.grid());
+    if (when) mid.push(solemn && brief.when ? { type: 'words', mode: 'glow', bg: 'dark', lines: balance(String(brief.when).replace(/\s*·\s*/g, ', '), 24), accent: [] } : B.calendar());
+    uniq.slice(0, 4).forEach((x, i) => mid.push(lineBeat(x, i)));
+    if (address && chance(0.7)) mid.push(B.map());
+    const parts = mid.filter(Boolean);
+    for (let i = parts.length - 1; i > 0; i--) if (chance(0.4)) { const j = Math.floor(rnd() * (i + 1)); [parts[i], parts[j]] = [parts[j], parts[i]]; }   // a different order every time
+    // the name (or their uploaded logo) right after the opener; never "Welcome to", never for a burial
+    const hasLogo = (assets || []).some((a) => a.role === 'logo' || /logo/i.test(a.name || ''));
+    const nameBeat = !solemn && (hasLogo || !key(opening).includes(key(f.brand))) ? [{ type: 'icon', bg: base, mode: 'wordmark', tagline: '' }] : [];
+    return [opener, ...nameBeat, ...parts, { type: 'end', bg: pick(['brand', 'dark']), tagline: closing, accent: accentOf(closing), contact: handle || site || phone || '' }];
+  };
+  const slamP0 = (look?.energy || 'medium') === 'high' ? 0.45 : 0.15;
+  if (personalBirthday || social) {
     const storyScenes = plan.scenes || [];
     const sceneText = (scene) => [].concat(scene?.on_screen_text || []).map((x) => cleanText(x, 90, { keepCase: true })).filter(Boolean);
     const opening = sceneText(storyScenes.find((scene) => scene.purpose === 'hook') || storyScenes[0])[0] || `Happy Birthday, ${f.brand}!`;
@@ -229,7 +259,7 @@ export function composeMotion(plan, { brief = {}, assets = [], salt = '', avoid 
       const lines = balance(line, 22);
       return { type: 'words', mode: i % 2 === 0 ? 'glow' : undefined, bg: i % 3 === 0 ? 'dark' : base, lines, accent: accentOf(lines[lines.length - 1], lines.length > 1 ? words(lines[0]).length : 0) };
     });
-    const beats = [
+    const beats = social ? socialBeats() : [
       { type: 'words', mode: 'slam', bg: 'dark', lines: balance(opening, 22), accent: accentOf(opening) },
       intro,
       ...(photoBeat ? [photoBeat] : []),

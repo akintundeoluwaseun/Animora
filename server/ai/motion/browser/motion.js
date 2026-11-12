@@ -99,7 +99,7 @@
     const ic = el('div', 'squircle gloss', parent, '', { width: px(size), height: px(size), flex: '0 0 auto', boxShadow: onBrand ? `0 ${N(20)}px ${N(50)}px rgba(0,0,0,.22)` : shadow(1.1) });
     if (D.logo) {
       ic.style.background = '#FFFFFF';
-      el('img', '', ic, null, { width: '74%', height: '74%', objectFit: 'contain' }).src = D.logo;
+      el('img', '', ic, null, { width: '90%', height: '90%', objectFit: 'contain', imageRendering: 'auto' }).src = D.logo;
     } else if (D.monogram !== true) {
       ic.style.display = 'none';   // no logo uploaded: never invent one from the initials
     } else {

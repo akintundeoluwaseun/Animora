@@ -78,3 +78,28 @@ console.log('All creative QA checks passed');
   }
   console.log('name and logo checks passed');
 }
+
+// ---- non-business films: no phone-UI beats, and a different film every time
+{
+  const { composeMotion } = await import('../server/ai/motion/compose.js');
+  const { cleanBrief } = await import('../server/ai/brief.js');
+  const bad = (c, m) => { if (!c) { console.error('FAIL', m); process.exit(1); } };
+  const ph = [1, 2, 3, 4].map((i) => ({ id: String(i), kind: 'image', url: `/x/${i}.jpg`, name: `${i}.jpg`, role: 'photo', width: 1200, height: 1600 }));
+  for (const b of [
+    { kind: 'event', name: 'Night of Glory', category: 'Church event', headline: 'A night of worship', features: ['Live worship', 'Prayer', 'Testimonies'], when: 'Sunday 16 Nov, 6pm' },
+    { kind: 'personal', name: 'Late Chief Adeyemi', category: 'Burial or memorial', headline: 'A life well lived', features: ['Born 1948', 'Rested 2026'], when: 'Friday 21 Nov, 10am' },
+    { kind: 'announcement', name: 'Greenfield School', category: 'Announcement', headline: 'School resumes Monday', features: ['Uniform check', 'Fees on the portal'] },
+  ]) {
+    const brief = cleanBrief(b), plan = { aspect_ratio: '9:16', duration_seconds: 24, business: { name: b.name, category: b.category }, scenes: [] };
+    const seen = new Set();
+    for (const salt of ['', 'a', 'b', 'c', 'd', 'e']) {
+      const r = composeMotion(plan, { brief, assets: ph, salt, avoid: [], colors: {}, look: { theme: 'light', energy: 'medium' } });
+      const types = r.beats.map((x) => x.type).join('>');
+      bad(!/search|notif|receipt|chat|button|toggles|swap|phone|price/.test(types), `${b.name}: shop/phone beat in ${types}`);
+      bad(!r.beats.some((x) => x.type === 'icon' && x.mode === 'welcome'), `${b.name}: "Welcome to"`);
+      seen.add(types);
+    }
+    bad(seen.size >= 4, `${b.name}: only ${seen.size} different films in 6 tries`);
+  }
+  console.log('variety checks passed');
+}
