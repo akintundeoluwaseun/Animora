@@ -2,6 +2,7 @@
 // Real mode: Google Gemini (planner + code writer + editor), checked by our validator.
 // Offline mode (no key) or Gemini failure: our practice planner + template engine,
 // so the product never dead-ends in front of a customer (or a judge).
+import { qaPlan, qaHtml } from './standard.js';
 import { config } from '../config.js';
 import { getDbObject } from '../storage.js';
 import { planChat, generateAnimation, editAnimation } from '../engine/gemini.js';
@@ -123,7 +124,15 @@ export function aiReason(e) {
 }
 
 /** Plan -> HTML. Returns { html, source, problems, notice? } */
-export async function generateCode({ plan, style, assets, brief = null, previous = null, onStatus }) {
+export async function generateCode(args) {
+  // Creative QA: clean the plan before the film is made, and check the finished film before it is delivered
+  const b = args.brief || {};
+  if (args.plan) qaPlan(b, args.plan);
+  const out = await generateCodeInner(args);
+  if (out?.html && /<\/?(div|svg|canvas)/i.test(out.html)) { const r = qaHtml(b, out.html); out.html = r.html; out.qa = r.qa; }
+  return out;
+}
+async function generateCodeInner({ plan, style, assets, brief = null, previous = null, onStatus }) {
   if (isPersonalBirthdayBrief(brief || {}, plan || {})) assets = birthdayPhotoAssets(assets || [], brief || {});
   const themeKey = themeKeyFor(style);
   const engine = String(brief?.videoEngine || process.env.ANIMORA_ENGINE || 'motion').toLowerCase();

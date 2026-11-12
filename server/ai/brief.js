@@ -16,6 +16,7 @@ import { validatePlan } from '../engine/validate.js';
 import { WANT_IDS } from './cinema/compose.js';
 import { MOTION_WANTS } from './motion/compose.js';
 import { TEMPLATE_IDS } from './pieces/index.js';
+import { CREATIVE_STANDARD } from './standard.js';
 
 // fundraisers, donations and appeals
 export const CAUSE_RE = /donat|fundrais|charity|appeal\b|\bngo\b|foundation|relief fund|crowdfund|help us (raise|build|support)|sponsor (a|our)|\bgive (to|today)|support (our|the) (cause|community|school|clinic|orphan)/i;
@@ -309,7 +310,8 @@ export function briefToPlanRules(brief, { assets = [], limits = { minSeconds: 15
 // ---------------------------------------------------------------------------
 // Gemini plan (better copy, follows the special instructions)
 // ---------------------------------------------------------------------------
-const PLAN_SYSTEM = `You turn a small business's answers into a motion-graphics video ad plan. Do not ask questions.
+const PLAN_SYSTEM = `${CREATIVE_STANDARD}
+You turn a small business's answers into a motion-graphics video ad plan. Do not ask questions.
 Return JSON only, this shape:
 { "title": "", "business": { "name": "", "category": "", "location": "", "phone": "", "handle": "" },
   "scenes": [ { "purpose": "hook|brand|product|detail|menu|offer|stat|cta", "seconds": 4, "on_screen_text": ["short line", "..."],
@@ -517,7 +519,8 @@ export async function parseBrief(text, current = {}) {
     // never keep a person waiting: all Gemini attempts together get ~20 s, then the rules reader takes over
     const { text: out } = await Promise.race([geminiGenerate({
       model: BRIEF_MODEL(),
-      system: `You are a smart video director. A person describes ANY video they want: a business advert, a birthday, a wedding, a church or school event, an announcement, a tribute, a personal story, a promo, a music or lyric video. Read it and fill in a form. Return JSON only.
+      system: `${CREATIVE_STANDARD}
+You are a smart video director. A person describes ANY video they want: a business advert, a birthday, a wedding, a church or school event, an announcement, a tribute, a personal story, a promo, a music or lyric video. Read it and fill in a form. Return JSON only.
 Never invent facts (names, dates, places, ages, relationships, memories, prices, phone numbers, awards, or personal messages). For birthdays, set name only when the recipient's real name is clear; leave it empty when the prompt says only "my brother", "my friend" or similar so the form can ask. Extract personal wording only when the user explicitly wrote it. You MAY make sensible visual choices, but don't pretend generic filler is a personal message.
 Keys:
 { "kind": "business" | "event" | "personal" | "announcement" | "cause" | "other"  (cause = a donation, fundraiser, charity or community appeal),

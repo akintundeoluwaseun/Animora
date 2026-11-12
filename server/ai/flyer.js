@@ -8,6 +8,7 @@ import { geminiGenerate } from '../engine/gemini.js';
 import { flyerHtml2, chooseFlyerLayout, FLYER2_LAYOUTS } from './flyer2.js';
 import { lookFor } from './motion/looks.js';
 import { titleFromName } from './brief.js';
+import { CREATIVE_STANDARD, qaHtml, qaFilter } from './standard.js';
 
 export const FLYER_LAYOUTS = ['hero', 'grid', 'split', 'type'];
 const PHONE_RE = /(\+?234[\s-]?|0)[789][01]\d[\s-]?\d{3}[\s-]?\d{4}/;
@@ -97,7 +98,8 @@ ${avoid ? `The last version used the "${avoid}" layout. Use a different one.\n` 
 Write the flyer now.`;
   try {
     const { text } = await geminiGenerate({
-      system: `You are a senior graphic designer writing a one-page promotional flyer for a Nigerian business.
+      system: `${CREATIVE_STANDARD}
+You are a senior graphic designer writing a flyer (for a business, a celebration, an event or an announcement, whatever the brief says).
 Return JSON only:
 { "layout": "<one of LAYOUTS>",
   "headline": "max 6 words, punchy",  "highlight": "one word from the headline to colour",
@@ -350,7 +352,7 @@ export async function makeFlyer({ brief, plan, style, assets, previous = null, u
     logo: logo ? { url: logo.url, transparent: !!(logo.has_alpha ?? logo.transparent), light: logo.is_light ?? logo.light ?? null, ratio: logo.width && logo.height ? logo.width / logo.height : null } : null,
     images: Object.fromEntries(photosOf(assets).map((a) => [a.name, a.url])),
   };
-  return flyerHtml(data);
+  { const r = qaHtml(brief || {}, flyerHtml(data)); return r.html; }
 }
 
 export const readFlyer = (html) => {

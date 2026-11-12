@@ -7,6 +7,7 @@ import { composeMotion, accentFor, BEAT_MIN, BEAT_MAX, MOTION_WANTS, FONTS } fro
 import { motionHtml, readMotion } from './page.js';
 import { lookFor } from './looks.js';
 import { isPersonalBirthdayBrief } from '../personal.js';
+import { CREATIVE_STANDARD } from '../standard.js';
 
 const MODEL = process.env.GEMINI_DIRECTOR_MODEL || process.env.GEMINI_CHAT_MODEL || 'gemini-flash-latest';
 // Speed: the director answers in seconds with light thinking; if it is slow (busy model, retries), the instant
@@ -50,7 +51,8 @@ Glyph names: ${GLYPHS.join(', ')}.
 - button: lead? (max 22, e.g. "Ready?"), accent?, label (THE call to action, max 26), done? ("Sent", "Booked", "Calling…"), glyph, sub? (phone / handle). A cursor presses a real button.
 - end: tagline? (max 40), accent?, contact? (phone / @handle / website), contactGlyph ("phone"|"search"|"globe"|"pin"). Icon + name + tagline + contact. ALWAYS the last beat.`;
 
-const system = ({ duration, aspect }) => `You are the director of premium product films, in the style of Apple's motion graphics and the best TikTok ad studios: clean white or black stages, ONE idea per beat, sentences that build word by word with one word in the brand colour, real-looking UI objects (app icons, notifications, buttons pressed by a cursor, search bars, maps, order cards), springy physics and fast blurred moves, and a logo end card. You invent a storyboard that is UNIQUE to this business. Never a generic formula.
+const system = ({ duration, aspect }) => `${CREATIVE_STANDARD}
+You are the director of premium product films, in the style of Apple's motion graphics and the best TikTok ad studios: clean white or black stages, ONE idea per beat, sentences that build word by word with one word in the brand colour, real-looking UI objects (app icons, notifications, buttons pressed by a cursor, search bars, maps, order cards), springy physics and fast blurred moves, and a logo end card. You invent a storyboard that is UNIQUE to this business. Never a generic formula.
 
 YOU ARE ALSO THE COPY EDITOR. People type messily: typos, ALL CAPS, slang, broken English, repeated or nonsensical phrases, prices like N5000 / 5k / 5000 naira / "zobo 700". Make every word on screen correct, natural and premium:
 - Fix spelling, grammar and capitalisation. Turn fragments into short, confident ad lines that a stranger instantly understands. Keep the meaning.

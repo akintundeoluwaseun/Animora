@@ -15,6 +15,7 @@ const dir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'motio
 let RUNTIME = null;
 const runtime = () => (RUNTIME ||= ['pieces.js', 'atoms.js', 'pieces2.js', 'premium.js', 'signature.js', 'story.js'].map((f) => readFileSync(path.join(dir, f), 'utf8')).join('\n;\n'));
 import { closingLine, fitCtas, videoGroup } from '../closing.js';
+import { qaFilter } from '../standard.js';
 
 export const PIECES_ASPECTS = ['9:16'];   // the library is laid out for vertical video; other sizes use the Motion engine
 const SIZES = { '9:16': [1080, 1920], '4:5': [1080, 1350] };
@@ -46,6 +47,8 @@ const isBirthdayBrief = (brief = {}, plan = {}) => isPersonalBirthdayBrief(brief
 
 // the facts a video may use, taken from the owner's answers (never invented)
 export function factsOf(plan = {}, brief = {}, assets = []) {
+  // Creative QA at the source: no sales lines on a birthday, no websites or phone numbers the owner never gave
+  brief = { ...brief, headlines: qaFilter(brief, brief.headlines), features: qaFilter(brief, brief.features), phrases: qaFilter(brief, brief.phrases), memories: qaFilter(brief, brief.memories) };
   const birthday = isBirthdayBrief(brief, plan);
   const photoAssets = birthday ? birthdayPhotoAssets(assets, brief) : assets.filter((a) => (a.kind || 'image') === 'image' && a.role !== 'logo' && !/logo/i.test(a.name || ''));
   const photos = photoAssets.map((a) => a.url);
