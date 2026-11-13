@@ -7,6 +7,16 @@
   const U = Math.min(W, H) / 1080, N = (n) => n * U, px = (n) => N(n) + 'px';
   const PORTRAIT = H > W * 1.2, WIDE = W > H * 1.2;
   const tl = gsap.timeline({ paused: true, defaults: { ease: 'expo.out' } });
+  // MOTION PERSONALITY: how this film moves. kinetic (springy, the original), restrained, editorial, cinematic, documentary.
+  //   push: camera drift on every beat   drift: sideways camera travel (fraction of width)   enter: how text arrives   reveal: how pictures arrive
+  const MOTION_PROFILES = {
+    kinetic:     { push: 0.035, drift: 0,     enter: 'rise',  reveal: 'rise', ease: 'expo.out',   speed: 1,    exitMs: 0.32, outs: {} },
+    restrained:  { push: 0.008, drift: 0,     enter: 'fade',  reveal: 'fade', ease: 'power2.out', speed: 0.85, exitMs: 0.5,  outs: { _: 'dissolve' } },
+    editorial:   { push: 0.012, drift: 0.012, enter: 'mask',  reveal: 'wipe', ease: 'power3.out', speed: 0.95, exitMs: 0.45, outs: { push: 'wipe', whip: 'wipe', zoom: 'wipe', drop: 'wipe', rise: 'wipe', fade: 'wipe' } },
+    cinematic:   { push: 0.07,  drift: 0.02,  enter: 'settle', reveal: 'fade', ease: 'power2.out', speed: 0.8,  exitMs: 0.6,  outs: { _: 'dissolve' } },
+    documentary: { push: 0.02,  drift: 0.03,  enter: 'fade',  reveal: 'fade', ease: 'sine.out',   speed: 0.9,  exitMs: 0.4,  outs: { _: 'dissolve' } },
+  };
+  const MP = Object.assign({ id: 'kinetic' }, MOTION_PROFILES[(window.MOTION && window.MOTION.motion) || 'kinetic'] || MOTION_PROFILES.kinetic);
   // springy eases overshoot; a blur below zero is invalid CSS and would stick. Blur always gets its own smooth ease.
   // never insert at a negative time: GSAP would shift the WHOLE timeline later (once per insert)
   const pos0 = (p) => (typeof p === 'number' && p < 0 ? 0 : p);
@@ -113,7 +123,7 @@
   // text measuring (layout widths ignore transforms, so this is safe before animating)
   function fitFont(node, maxW, minPx) {
     let fs = parseFloat(node.style.fontSize);
-    const w = node.offsetWidth;
+    const w = Math.max(node.offsetWidth, node.scrollWidth);   // a flex child can be squeezed narrower than its text: measure the text
     if (w > maxW) { fs = Math.max(minPx || 10, fs * (maxW / w) * 0.98); node.style.fontSize = fs + 'px'; }
     return fs;
   }
@@ -231,7 +241,7 @@
   // left-aligned, wrapping lines written word by word, inside an absolutely placed block
   function leftLines(parent, lines, size, o) {
     o = o || {};
-    const pos = { position: 'absolute', left: px(o.left == null ? padX() : o.left), width: px(o.width || (W - 2 * padX())), display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: px(size * 0.1), textAlign: 'left' };
+    const pos = { position: 'absolute', left: px(o.left == null ? padX() : o.left), width: px(o.width || (W - 2 * padX())), display: 'flex', flexDirection: 'column', alignItems: o.align === 'right' ? 'flex-end' : 'flex-start', gap: px(size * 0.1), textAlign: o.align === 'right' ? 'right' : 'left' };
     if (o.top != null) pos.top = o.top; else pos.bottom = o.bottom == null ? '9%' : o.bottom;
     const box = el('div', '', parent, '', pos);
     const acc = new Set([].concat(o.accent || []));
@@ -240,7 +250,7 @@
     [].concat(lines).filter(Boolean).slice(0, 3).forEach((L, li) => {
       const r = wordsRow(box, L, li ? size * 0.62 : size, { accent: acc, offset: off, accColor: o.accColor, bg: o.bg, weight: o.weight || (li ? 550 : 700), color: o.color || (li && o.mute ? o.mute : undefined), fit: false });
       off += r.words.length;
-      Object.assign(r.row.style, { justifyContent: 'flex-start', flexWrap: 'wrap', maxWidth: '100%' });
+      Object.assign(r.row.style, { justifyContent: o.align === 'right' ? 'flex-end' : 'flex-start', flexWrap: 'wrap', maxWidth: '100%' });
       r.items.forEach((it) => { all.push(it); });
     });
     all.forEach((it, i) => { tl.fromTo(it, { opacity: 0, y: '0.4em', filter: blur(9) }, { opacity: 1, y: 0, filter: blur(0), duration: 0.75, ease: 'expo.out' }, at + i * (o.per || 0.11)); last = at + i * (o.per || 0.11) + 0.75; });
@@ -309,6 +319,139 @@
     tl.fromTo(rule, { scaleX: 0 }, { scaleX: 1, duration: 0.8, ease: 'expo.out' }, t0 + 0.8);
     if (lines.length) leftLines(s, lines, PORTRAIT ? 78 : 62, { at: t0 + 1.0, bg, color: inkOf(bg), mute: muteOf(bg), accColor: accOf(bg), accent: o.accent, top: PORTRAIT ? '67.5%' : '72%', width: PORTRAIT ? W - 2 * padX() : W * 0.6 });
     sfx(t0 + 0.1, 'whoosh', 0.3);
+  }
+
+  // ---- stage 3: compositions that are not centred. Each is the same content arranged for a different kind of storytelling.
+  // PHOTOS / spotlight (product-led): one hero picture bleeds off one edge, a magnified detail overlaps it, the words own the other side
+  function photosSpotlight(s, o, t0, t1, bg, urls) {
+    const dur = Math.max(1, t1 - t0), right = o.side !== 'left';
+    const hw = PORTRAIT ? W * 0.92 : W * 0.54, hh = PORTRAIT ? H * 0.5 : H * 0.84;
+    const hero = el('div', '', s, '', { position: 'absolute', overflow: 'hidden', width: px(hw), height: px(hh), top: PORTRAIT ? '4%' : '8%', [right ? 'right' : 'left']: PORTRAIT ? '-2%' : '0', boxShadow: shadow(1.4) });
+    const him = imgIn(hero, urls[0]);
+    tl.fromTo(hero, { clipPath: right ? 'inset(0 0 0 100%)' : 'inset(0 100% 0 0)' }, { clipPath: 'inset(0 0 0 0%)', duration: 1.0, ease: 'expo.inOut' }, t0);
+    tl.fromTo(him, { scale: 1.28 }, { scale: 1.04, duration: dur, ease: 'sine.out' }, t0);
+    const dd = PORTRAIT ? W * 0.4 : W * 0.2;
+    const det = el('div', '', s, '', { position: 'absolute', width: px(dd), height: px(dd), borderRadius: '50%', overflow: 'hidden', border: `${N(10)}px solid ${bg === 'dark' ? '#0d0d10' : '#fff'}`, boxShadow: shadow(1.6), top: PORTRAIT ? px(H * 0.04 + hh - dd * 0.55) : '56%', [right ? 'left' : 'right']: PORTRAIT ? (right ? '4%' : '4%') : (right ? px(W * 0.46 - dd / 2) : px(W * 0.46 - dd / 2)) });
+    const dim = imgIn(det, urls[1] || urls[0], urls[1] ? {} : { objectPosition: '72% 38%' });
+    tl.fromTo(det, { opacity: 0, scale: 0.5 }, { opacity: 1, scale: 1, duration: 0.9, ease: 'back.out(1.5)' }, t0 + 0.75);
+    tl.fromTo(dim, { scale: urls[1] ? 1.2 : 2.2 }, { scale: urls[1] ? 1.0 : 1.7, duration: Math.max(1, dur - 0.8), ease: 'sine.out' }, t0 + 0.75);
+    const lines = [].concat(o.lines || o.text || []).filter(Boolean);
+    if (lines.length) {
+      const rule = el('div', '', s, '', { position: 'absolute', height: px(6), width: px(110), background: ACC, borderRadius: px(3), transformOrigin: '0 50%', left: px(PORTRAIT ? padX() : (right ? padX() : W * 0.6)), top: PORTRAIT ? '67%' : '36%' });
+      tl.fromTo(rule, { scaleX: 0 }, { scaleX: 1, duration: 0.7, ease: 'expo.out' }, t0 + 0.9);
+      leftLines(s, lines, PORTRAIT ? 96 : 74, { at: t0 + 1.0, bg, color: inkOf(bg), mute: muteOf(bg), accColor: accOf(bg), accent: o.accent, top: PORTRAIT ? '69.5%' : '40%', left: PORTRAIT ? padX() : (right ? padX() : W * 0.6), width: PORTRAIT ? W - 2 * padX() : W * 0.34 });
+    }
+    sfx(t0 + 0.1, 'whoosh', 0.3);
+  }
+  // PHOTOS / cascade: up to three pictures step diagonally across the stage, overlapping; the words take the free corner
+  function photosCascade(s, o, t0, t1, bg, urls) {
+    const dur = Math.max(1, t1 - t0), use = urls.slice(0, 3), n = use.length, flip = o.side === 'left';
+    const w = PORTRAIT ? W * 0.62 : W * 0.34, h = PORTRAIT ? H * 0.28 : H * 0.44;
+    use.forEach((u, i) => {
+      const lx = PORTRAIT ? (flip ? 0.34 - i * 0.15 : 0.04 + i * 0.15) * W : (flip ? 0.61 - i * 0.19 : 0.05 + i * 0.19) * W;
+      const ly = PORTRAIT ? (0.05 + i * 0.205) * H : (0.06 + i * 0.22) * H;
+      const c = el('div', '', s, '', { position: 'absolute', left: px(lx), top: px(ly), width: px(w), height: px(h), overflow: 'hidden', boxShadow: shadow(1.5 + i * 0.2), border: i ? `${N(9)}px solid ${bg === 'dark' ? '#0d0d10' : '#fff'}` : 'none' });
+      const im = imgIn(c, u);
+      const a = t0 + 0.1 + i * 0.35;
+      tl.fromTo(c, { opacity: 0, x: (flip ? 1 : -1) * N(140), y: N(90) }, { opacity: 1, x: 0, y: 0, duration: 1.0, ease: 'expo.out' }, a);
+      tl.to(c, { x: (flip ? -1 : 1) * N(16 + i * 8), y: -N(10 + i * 8), duration: Math.max(0.5, dur - 1.2), ease: 'none' }, a + 1.0);
+      tl.fromTo(im, { scale: 1.3 }, { scale: 1.03, duration: dur, ease: 'sine.out' }, a);
+    });
+    const lines = [].concat(o.lines || o.text || []).filter(Boolean);
+    if (lines.length) {
+      if (PORTRAIT) leftLines(s, lines, 82, { at: t0 + 1.3, bg, color: inkOf(bg), mute: muteOf(bg), accColor: accOf(bg), accent: o.accent, top: '77%', align: flip ? 'right' : 'left' });
+      else leftLines(s, lines, 62, { at: t0 + 1.3, bg, color: inkOf(bg), mute: muteOf(bg), accColor: accOf(bg), accent: o.accent, top: '10%', left: flip ? padX() : W * 0.62, width: W * 0.32, align: flip ? 'left' : 'left' });
+    }
+    sfx(t0 + 0.1, 'whoosh', 0.3);
+  }
+  // PHOTOS / triptych (documentary): edge-to-edge panels side by side, each moving its own way, a numbered caption under the picture
+  function photosTriptych(s, o, t0, t1, bg, urls) {
+    const dur = Math.max(1, t1 - t0), n = Math.min(3, Math.max(2, urls.length));
+    const panels = []; for (let i = 0; i < n; i++) panels.push(urls[i] || urls[i % urls.length]);
+    const root = el('div', '', s, '', { position: 'absolute', inset: 0, display: 'flex', flexDirection: PORTRAIT ? 'column' : 'row', gap: px(N(6)), background: bg === 'dark' ? '#050507' : '#111' });
+    panels.forEach((u, i) => {
+      const c = el('div', '', root, '', { position: 'relative', flex: '1 1 0', overflow: 'hidden' });
+      const im = imgIn(c, u, urls.length < n ? { objectPosition: ['30% 40%', '70% 60%', '50% 20%'][i] } : {});
+      const a = t0 + i * 0.28;
+      tl.fromTo(c, { clipPath: (PORTRAIT ? (i % 2 ? 'inset(0 0 0 100%)' : 'inset(0 100% 0 0)') : (i % 2 ? 'inset(0 0 100% 0)' : 'inset(100% 0 0 0)')) }, { clipPath: 'inset(0 0 0 0)', duration: 1.0, ease: 'expo.inOut' }, a);
+      tl.fromTo(im, { scale: urls.length < n ? 1.5 : 1.2, [PORTRAIT ? 'xPercent' : 'yPercent']: (i % 2 ? -1 : 1) * 4 }, { scale: urls.length < n ? 1.25 : 1.02, [PORTRAIT ? 'xPercent' : 'yPercent']: (i % 2 ? 1 : -1) * 3, duration: dur, ease: 'sine.out' }, a);
+      const num = el('div', '', c, String(i + 1).padStart(2, '0'), { position: 'absolute', left: px(N(26)), top: px(N(22)), fontSize: px(34), fontWeight: 600, color: '#fff', letterSpacing: '0.14em', textShadow: '0 2px 12px rgba(0,0,0,.6)' });
+      tl.fromTo(num, { opacity: 0 }, { opacity: 1, duration: 0.6 }, a + 0.8);
+    });
+    const lines = [].concat(o.lines || o.text || []).filter(Boolean);
+    if (lines.length) {
+      scrimOf(root, 0.7, 48);
+      leftLines(root, lines, PORTRAIT ? 88 : 70, { at: t0 + 1.0, bg: 'dark', color: '#FFFFFF', mute: 'rgba(255,255,255,.8)', accColor: mix(ACC, '#FFFFFF', 0.25), accent: o.accent, bottom: PORTRAIT ? '6%' : '9%' });
+    }
+    sfx(t0 + 0.1, 'whoosh', 0.3);
+  }
+  // WORDS / right: the statement sits high and right-aligned, a rule above it on the right
+  function wordsRight(s, o, t0, t1, bg) {
+    const lines = [].concat(o.lines || o.text || '').filter(Boolean).slice(0, 3), size = o.size || (PORTRAIT ? 118 : 96);
+    const rule = el('div', '', s, '', { position: 'absolute', right: px(padX()), top: PORTRAIT ? '17%' : '18%', width: px(130), height: px(8), background: ACC, borderRadius: px(4), transformOrigin: '100% 50%' });
+    tl.fromTo(rule, { scaleX: 0 }, { scaleX: 1, duration: 0.7, ease: 'expo.out' }, t0 + 0.05);
+    const r = leftLines(s, lines, size, { at: t0 + 0.2, bg, color: inkOf(bg), mute: muteOf(bg), accColor: accOf(bg), accent: o.accent, top: PORTRAIT ? '20%' : '22%', align: 'right', weight: 700 });
+    if (o.sub) { const sub = el('div', '', s, esc(o.sub), { position: 'absolute', right: px(padX()), bottom: '11%', fontSize: px(o.subSize || 40), fontWeight: 500, color: muteOf(bg) }); tl.fromTo(sub, { opacity: 0, y: N(16) }, { opacity: 1, y: 0, duration: 0.8, ease: 'expo.out' }, Math.min(r.end, t1 - 1.0)); }
+  }
+  // WORDS / stagger: lines step down and across the stage on a diagonal, shrinking as they go
+  function wordsStagger(s, o, t0, t1, bg) {
+    const lines = [].concat(o.lines || o.text || '').filter(Boolean).slice(0, 3), base = o.size || (PORTRAIT ? 128 : 104);
+    const acc = new Set([].concat(o.accent || [])); let off = 0;
+    lines.forEach((L, i) => {
+      const size = base * (1 - i * 0.2), box = el('div', '', s, '', { position: 'absolute', left: px(padX() + i * (PORTRAIT ? W * 0.07 : W * 0.1)), right: px(padX()), top: PORTRAIT ? `${24 + i * 15}%` : `${22 + i * 20}%`, display: 'flex' });
+      const r = wordsRow(box, L, size, { accent: acc, offset: off, accColor: accOf(bg), bg, weight: i ? 600 : 750, fit: false }); off += r.words.length;
+      Object.assign(r.row.style, { justifyContent: 'flex-start', flexWrap: 'wrap', textAlign: 'left' });
+      if (i) r.row.style.color = i === lines.length - 1 && lines.length > 1 ? inkOf(bg) : muteOf(bg);
+      buildRow(r.row, r.items, t0 + 0.15 + i * 0.5, 0.1);
+    });
+  }
+  // WORDS / bleed: one word is set so large it leaves the frame; the rest is small print beneath it
+  function wordsBleed(s, o, t0, t1, bg) {
+    const lines = [].concat(o.lines || o.text || '').filter(Boolean).slice(0, 3);
+    const big = el('div', '', s, esc(String(lines[0] || '')), { position: 'absolute', left: px(-N(18)), top: PORTRAIT ? '17%' : '12%', fontSize: px(PORTRAIT ? 330 : 300), fontWeight: 800, letterSpacing: '-0.06em', lineHeight: 0.9, whiteSpace: 'nowrap', color: accOf(bg), fontFamily: DISPLAY });
+    fitFont(big, W * 1.12, N(120));
+    tl.fromTo(big, { opacity: 0, x: -N(200), filter: blur(18) }, { opacity: 1, x: 0, filter: blur(0), duration: 1.1, ease: 'expo.out' }, t0 + 0.05);
+    tl.to(big, { x: -N(60), duration: Math.max(1, t1 - t0), ease: 'none' }, t0 + 1.1);
+    if (lines.length > 1) leftLines(s, lines.slice(1), PORTRAIT ? 92 : 70, { at: t0 + 0.8, bg, color: inkOf(bg), mute: muteOf(bg), accColor: accOf(bg), accent: o.accent, top: PORTRAIT ? '48%' : '58%', width: PORTRAIT ? W - 2 * padX() : W * 0.6 });
+  }
+  // STACK / TOGGLES / ledger: structured, credible rows: the label left, its value right, hairlines between, set from the top
+  function ledgerLayout(s, o, t0, t1, bg) {
+    const items = [].concat(o.items || []).map((x) => (typeof x === 'string' ? { t: x } : x)).filter((x) => x && x.t).slice(0, 5);
+    const ink = inkOf(bg), mute = muteOf(bg), n = items.length, rowH = Math.min(H * 0.1, (PORTRAIT ? 0.52 : 0.58) * H / Math.max(1, n)), fs = Math.min(PORTRAIT ? 66 : 56, rowH * 0.5);
+    const top0 = PORTRAIT ? 0.24 : 0.28;
+    const ttl = el('div', '', s, esc(String(o.title || '').toUpperCase()), { position: 'absolute', left: px(padX()), top: px(H * (top0 - 0.1)), fontSize: px(PORTRAIT ? 92 : 74), fontWeight: 750, letterSpacing: '-0.03em', color: ink, fontFamily: DISPLAY, whiteSpace: 'nowrap' });
+    fitFont(ttl, W - 2 * padX(), N(40));
+    tl.fromTo(ttl, { opacity: 0, y: N(30) }, { opacity: 1, y: 0, duration: 0.8, ease: 'expo.out' }, t0 + 0.05);
+    const top = H * top0;
+    const head = el('div', '', s, '', { position: 'absolute', left: px(padX()), width: px(W - 2 * padX()), top: px(top - 3), height: px(4), background: ink, transformOrigin: '0 50%' });
+    tl.fromTo(head, { scaleX: 0 }, { scaleX: 1, duration: 0.9, ease: 'expo.inOut' }, t0 + 0.1);
+    items.forEach((it, i) => {
+      const y = top + i * rowH, a = t0 + 0.4 + i * 0.35;
+      const row = el('div', '', s, '', { position: 'absolute', left: px(padX()), width: px(W - 2 * padX()), top: px(y), height: px(rowH), display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: px(30) });
+      const l = el('div', '', row, esc(it.t), { fontSize: px(fs), fontWeight: 600, letterSpacing: '-0.02em', color: ink, whiteSpace: 'nowrap', minWidth: 0 });
+      fitFont(l, (W - 2 * padX()) * (it.s ? 0.62 : 0.9), N(26));
+      el('div', 'tnum', row, esc(it.s || String(i + 1).padStart(2, '0')), { fontSize: px(fs * (it.s ? 0.9 : 0.7)), fontWeight: 600, color: it.s ? accOf(bg) : mute, whiteSpace: 'nowrap', fontFamily: DISPLAY });
+      const line = el('div', '', s, '', { position: 'absolute', left: px(padX()), width: px(W - 2 * padX()), top: px(y + rowH), height: px(2), background: ink, opacity: 0.2, transformOrigin: '0 50%' });
+      tl.fromTo(row, { opacity: 0, y: N(24) }, { opacity: 1, y: 0, duration: 0.7, ease: 'expo.out' }, a);
+      tl.fromTo(line, { scaleX: 0 }, { scaleX: 1, duration: 0.8, ease: 'expo.out' }, a + 0.1);
+      sfx(a, 'tick', 0.3);
+    });
+  }
+  // STAT / side: the number is the picture: set huge and left, no card, a rule and a small label under it
+  function statSide(s, o, t0, t1, bg) {
+    const ink = inkOf(bg), box = el('div', '', s, '', { position: 'absolute', left: px(padX()), right: px(padX()), top: PORTRAIT ? '27%' : '22%', display: 'flex', flexDirection: 'column', alignItems: 'flex-start' });
+    const od = odometer(box, o.value, PORTRAIT ? 340 : 300, ink);
+    od.box.style.fontFamily = DISPLAY; od.box.style.fontWeight = '800'; od.box.style.letterSpacing = '-0.05em';
+    fitFont(od.box, W - 2 * padX(), N(120));
+    tl.fromTo(od.box, { opacity: 0, x: -N(80), filter: blur(14) }, { opacity: 1, x: 0, filter: blur(0), duration: 1.0, ease: 'expo.out' }, t0 + 0.1);
+    od.play(t0 + 0.2);
+    const rule = el('div', '', box, '', { width: px(150), height: px(8), background: ACC, borderRadius: px(4), marginTop: px(30), transformOrigin: '0 50%' });
+    tl.fromTo(rule, { scaleX: 0 }, { scaleX: 1, duration: 0.7, ease: 'expo.out' }, t0 + 0.8);
+    const lab = el('div', '', box, esc(o.label || ''), { fontSize: px(PORTRAIT ? 78 : 64), fontWeight: 700, letterSpacing: '-0.03em', color: ink, marginTop: px(24) });
+    fitFont(lab, W - 2 * padX(), N(30));
+    tl.fromTo(lab, { opacity: 0, y: N(24) }, { opacity: 1, y: 0, duration: 0.8, ease: 'expo.out' }, t0 + 1.0);
+    if (o.sub) { const sub = el('div', '', box, esc(o.sub), { fontSize: px(40), fontWeight: 500, color: muteOf(bg), marginTop: px(10) }); tl.fromTo(sub, { opacity: 0 }, { opacity: 1, duration: 0.8 }, t0 + 1.3); }
+    sfx(t0 + 0.2, 'pop', 0.4);
   }
   // WORDS / left: an editorial statement set left-aligned in the lower half with a short rule above it
   function wordsLeft(s, o, t0, t1, bg) {
@@ -400,7 +543,12 @@
 
   // WORDS: a sentence written word by word (build), one big word at a time (slam), or glowing on black (glow)
   B.words = (s, o, t0, t1, bg) => {
-    if (o.layout === 'left' && o.mode !== 'slam') return wordsLeft(s, o, t0, t1, bg);
+    if (o.mode !== 'slam') {
+      if (o.layout === 'left') return wordsLeft(s, o, t0, t1, bg);
+      if (o.layout === 'right') return wordsRight(s, o, t0, t1, bg);
+      if (o.layout === 'stagger') return wordsStagger(s, o, t0, t1, bg);
+      if (o.layout === 'bleed') return wordsBleed(s, o, t0, t1, bg);
+    }
     const lines = [].concat(o.lines || o.text || '').filter(Boolean).slice(0, 3);
     const acc = new Set([].concat(o.accent || []));
     const size = o.size || (PORTRAIT ? 120 : 100);
@@ -512,6 +660,7 @@
   // STACK: pastel cards that stack up (features, services, products)
   B.stack = (s, o, t0, t1, bg) => {
     if (o.layout === 'list') return listLayout(s, o, t0, t1, bg);
+    if (o.layout === 'ledger') return ledgerLayout(s, o, t0, t1, bg);
     const items = [].concat(o.items || []).filter((x) => x && x.t).slice(0, 4);
     if (o.title) { const tt = wordsRow(s, o.title, 76, { weight: 700, accent: new Set([].concat(o.accent || [])), accColor: accOf(bg), bg }); tt.row.style.marginBottom = px(56); buildRow(tt.row, tt.items, t0 + 0.05, 0.14); }
     const w = Math.min(W * (PORTRAIT ? 0.86 : 0.56), N(920));
@@ -535,6 +684,7 @@
   // TOGGLES: an iOS settings card where each strength switches on
   B.toggles = (s, o, t0, t1, bg) => {
     if (o.layout === 'list') return listLayout(s, o, t0, t1, bg);
+    if (o.layout === 'ledger') return ledgerLayout(s, o, t0, t1, bg);
     const items = [].concat(o.items || []).filter(Boolean).slice(0, 5);
     if (o.title) { const tt = wordsRow(s, o.title, 72, { weight: 700, accent: new Set([].concat(o.accent || [])), accColor: accOf(bg), bg }); tt.row.style.marginBottom = px(56); buildRow(tt.row, tt.items, t0 + 0.05, 0.14); }
     const w = Math.min(W * (PORTRAIT ? 0.84 : 0.56), N(880));
@@ -689,6 +839,7 @@
 
   // PRICE: a giant number rolls in
   B.price = (s, o, t0, t1, bg) => {
+    if (o.layout === 'side') return statSide(s, { value: o.value, label: o.sub || o.label || '', sub: o.old ? 'was ' + o.old : (o.sub ? o.label || '' : '') }, t0, t1, bg);
     if (o.label) { const l = el('div', '', s, esc(o.label), { fontSize: px(54), fontWeight: 600, color: muteOf(bg), letterSpacing: '-0.02em', marginBottom: px(10) }); tl.fromTo(l, { opacity: 0, y: N(20), filter: blur(8) }, { opacity: 1, y: 0, filter: blur(0), duration: 0.7 }, t0 + 0.1); }
     if (o.old) { const old = el('div', 'tnum', s, esc(o.old), { fontSize: px(70), fontWeight: 600, color: muteOf(bg), position: 'relative' }); const strike = el('div', '', old, '', { position: 'absolute', left: '-4%', right: '-4%', top: '52%', height: px(7), background: '#FF3B30', transformOrigin: '0 50%', borderRadius: px(4) }); tl.fromTo(old, { opacity: 0 }, { opacity: 1, duration: 0.4 }, t0 + 0.2); tl.fromTo(strike, { scaleX: 0 }, { scaleX: 1, duration: 0.45, ease: 'power3.inOut' }, t0 + 0.55); }
     const od = odometer(s, o.value, o.size || (PORTRAIT ? 250 : 220), accOf(bg));
@@ -711,6 +862,9 @@
     if (o.layout === 'full') return photosFull(s, o, t0, t1, bg, urls);
     if (o.layout === 'split') return photosSplit(s, o, t0, t1, bg, urls);
     if (o.layout === 'editorial') return photosEditorial(s, o, t0, t1, bg, urls);
+    if (o.layout === 'spotlight') return photosSpotlight(s, o, t0, t1, bg, urls);
+    if (o.layout === 'cascade') return photosCascade(s, o, t0, t1, bg, urls);
+    if (o.layout === 'triptych') return photosTriptych(s, o, t0, t1, bg, urls);
     const dur = Math.max(1, t1 - t0);
     const mw = PORTRAIT ? W * 0.66 : W * 0.4, mh = mw * (PORTRAIT ? 1.22 : 0.8);
     const spots = PORTRAIT
@@ -913,6 +1067,7 @@
 
   // STAT: a number card (only real numbers the owner gave)
   B.stat = (s, o, t0, t1, bg) => {
+    if (o.layout === 'side') return statSide(s, o, t0, t1, bg);
     const card = el('div', '', s, '', { width: px(PORTRAIT ? 640 : 600), padding: px(56), borderRadius: px(64), background: `linear-gradient(160deg, ${mix(ACC, '#000', 0.55)}, ${mix(ACC, '#000', 0.8)})`, boxShadow: `0 ${N(40)}px ${N(90)}px ${rgba(mix(ACC, '#000', 0.5), 0.45)}, inset 0 ${N(2)}px 0 rgba(255,255,255,.15)`, color: '#fff', position: 'relative', overflow: 'hidden' });
     const od = odometer(card, o.value, 170, '#fff');
     el('div', '', card, esc(o.label || ''), { fontSize: px(52), fontWeight: 700, letterSpacing: '-0.03em', marginTop: px(8), color: mix(ACC, '#FFFFFF', 0.55) });
@@ -1041,8 +1196,9 @@
   };
 
   // ================================================================ ambience: depth behind each beat
-  function ambience(wrap, bg, t0, t1, i) {
+  function ambience(wrap, bg, t0, t1, i, beat) {
     const amb = el('div', 'layer', wrap, '', { pointerEvents: 'none', overflow: 'hidden' });
+    if (beat && beat.type === 'photos' && beat.layout) return;   // a composed picture beat is its own world: the style's decoration would cut through its caption
     const dk = LOOK.deco;
     if (dk && DECO[dk] && (bg === LOOK.theme || DECO_ANYWHERE.has(dk))) { try { DECO[dk](amb, bg, t0, t1, i); } catch (e) { console.error('deco ' + dk + ': ' + e.message); } }
     if (dk && dk !== 'none' && bg === 'light' && LOOK.theme === 'light') return;   // the style's own world replaces the default light sweep
@@ -1268,19 +1424,29 @@
       }
       const wrap = el('div', 'beat ink-' + bg, world);
       wrap.style.color = inkOf(bg);
-      ambience(wrap, bg, t0, t1, i);
+      ambience(wrap, bg, t0, t1, i, b);
       const camEl = el('div', 'beat', wrap); camEl.style.visibility = 'inherit';
       tl.set(wrap, { visibility: 'visible' }, Math.max(0, t0 - 0.12));
       // incoming move matches the previous beat's exit
-      if (prevOut === 'whip') tl.fromTo(wrap, { x: W * 0.55, filter: blur(26) }, { x: 0, filter: blur(0), duration: 0.55, ease: 'expo.out', immediateRender: false }, t0 - 0.1);
+      if (prevOut === 'wipe') tl.fromTo(wrap, { x: W * 0.07, opacity: 0 }, { x: 0, opacity: 1, duration: 0.7 * MP.speed + 0.1, ease: MP.ease, immediateRender: false }, t0 - 0.12);
+      else if (prevOut === 'dissolve') tl.fromTo(wrap, { opacity: 0 }, { opacity: 1, duration: 0.5, ease: 'sine.inOut', immediateRender: false }, t0 - 0.1);
+      else if (prevOut === 'whip') tl.fromTo(wrap, { x: W * 0.55, filter: blur(26) }, { x: 0, filter: blur(0), duration: 0.55, ease: 'expo.out', immediateRender: false }, t0 - 0.1);
       else if (prevOut === 'zoom') tl.fromTo(wrap, { scale: 0.72, opacity: 0, filter: blur(16) }, { scale: 1, opacity: 1, filter: blur(0), duration: 0.6, ease: 'expo.out', immediateRender: false }, t0 - 0.12);
       else if (prevOut === 'drop') tl.fromTo(wrap, { y: -H * 0.35, filter: blur(22) }, { y: 0, filter: blur(0), duration: 0.6, ease: 'expo.out', immediateRender: false }, t0 - 0.1);
       else if (prevOut === 'rise') tl.fromTo(wrap, { y: H * 0.35, filter: blur(22) }, { y: 0, filter: blur(0), duration: 0.6, ease: 'expo.out', immediateRender: false }, t0 - 0.1);
       // the camera breathes
-      tl.fromTo(camEl, { scale: 1 }, { scale: 1 + (b.push == null ? 0.035 : b.push), duration: b.dur, ease: 'sine.inOut', immediateRender: false }, t0);
+      // a personality sets how far the camera pushes and whether it also drifts sideways (alternating direction beat to beat)
+      const push = b.push == null ? MP.push : b.push;
+      const drift = MP.drift ? W * MP.drift * (i % 2 ? -1 : 1) : 0;
+      tl.fromTo(camEl, { scale: 1, x: 0 }, { scale: 1 + push, x: drift, duration: b.dur, ease: MP.id === 'kinetic' ? 'sine.inOut' : 'none', immediateRender: false }, t0);
+      // how the whole composition arrives (kinetic beats animate their own parts, so they add nothing)
+      if (MP.enter === 'fade') tl.fromTo(camEl, { opacity: 0 }, { opacity: 1, duration: 0.55, ease: 'sine.out', immediateRender: false }, t0 + 0.02);
+      else if (MP.enter === 'settle') tl.fromTo(camEl, { opacity: 0, scale: 1.1 }, { opacity: 1, scale: 1, duration: 0.9, ease: 'power2.out', immediateRender: false }, t0 + 0.02);
+      else if (MP.enter === 'mask') tl.fromTo(camEl, { clipPath: 'inset(0 100% 0 0)' }, { clipPath: 'inset(0 0% 0 0)', duration: 0.75, ease: 'power3.inOut', immediateRender: false, onComplete() { camEl.style.clipPath = 'none'; } }, t0 + 0.02);
       try { B[b.type](camEl, b, t0, t1, bg); } catch (e) { console.error('beat ' + b.type + ' failed: ' + e.message); }
       // the exit
-      const out = last ? 'hold' : (b.out || 'push');
+      let out = last ? 'hold' : (b.out || 'push');
+      if (!last && MP.id !== 'kinetic' && out !== 'wipe' && out !== 'dissolve') out = MP.outs[out] || MP.outs._ || out;
       const ot = t1 - 0.3;
       if (out === 'push') tl.to(wrap, { scale: 1.14, opacity: 0, filter: blur(18), duration: 0.32, ease: 'power2.in' }, ot);
       else if (out === 'whip') { tl.to(wrap, { x: -W * 0.6, filter: blur(26), duration: 0.32, ease: 'power3.in' }, ot); sfx(ot, 'whoosh', 0.5); }
@@ -1288,6 +1454,8 @@
       else if (out === 'drop') { tl.to(wrap, { y: H * 0.5, filter: blur(24), duration: 0.32, ease: 'power3.in' }, ot); sfx(ot, 'whoosh', 0.4); }
       else if (out === 'rise') { tl.to(wrap, { y: -H * 0.5, filter: blur(24), duration: 0.32, ease: 'power3.in' }, ot); sfx(ot, 'whoosh', 0.4); }
       else if (out === 'fade') tl.to(wrap, { opacity: 0, duration: 0.3, ease: 'power1.in' }, ot);
+      else if (out === 'wipe') tl.to(wrap, { x: -W * 0.05, opacity: 0, duration: MP.exitMs, ease: 'power2.in' }, t1 - MP.exitMs);
+      else if (out === 'dissolve') tl.to(wrap, { opacity: 0, duration: 0.42, ease: 'sine.inOut' }, t1 - 0.4);
       if (!last) tl.set(wrap, { visibility: 'hidden' }, t1 + 0.02);
       prevOut = last ? null : out;
       t = t1;

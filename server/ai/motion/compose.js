@@ -6,7 +6,7 @@ import { factsFrom, cleanText, fixPrices, glyphFor } from '../cinema/compose.js'
 import { isPersonalBirthdayBrief } from '../personal.js';
 import { videoGroup, closingLine, fitCtas } from '../closing.js';
 import { directionOf } from '../direction.js';
-import { conformStructure } from './structure.js';
+import { conformStructure, composeMiddle } from './structure.js';
 const NEEDS_PIC = new Set(['photoFirst', 'atmospheric', 'documentary', 'reveal']);
 
 const hash = (s) => { let h = 2166136261; for (const c of String(s)) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); } return (h >>> 0) % 2147483646 + 1; };
@@ -170,6 +170,16 @@ export function composeMotion(plan, { brief = {}, assets = [], salt = '', avoid 
   };
   B.phone = () => (tech || /app|download/i.test(cta) ? { type: 'phone', bg: base, text: heads[1] || H0 } : null);
   B.photos = () => (photos.length ? { type: 'photos', bg: base, urls: photos.slice(0, 5), lines: [prods[0]?.name || heads[1] || H0], accent: accentOf(prods[0]?.name || heads[1] || H0) } : null);
+  // extra picture beats for the middle: the owner's pictures again, each beat from a different starting picture, captioned with a fact not yet said
+  B.midPics = (n) => {
+    const out = [];
+    for (let k = 1; k <= n && photos.length; k++) {
+      const rot = photos.slice(k % photos.length).concat(photos.slice(0, k % photos.length));
+      const cap = [prods[k]?.name, feats[k - 1], heads[k + 1]].filter(Boolean).find((c) => fresh(c));
+      out.push({ type: 'photos', bg: k % 2 ? base : (base === 'light' ? 'dark' : 'light'), urls: rot.slice(0, k === 1 ? 3 : 2), lines: cap ? [sentence(cap, 26)] : [], accent: cap ? accentOf(cap) : [], _pic: true, _want: true });
+    }
+    return out;
+  };
   B.grid = () => (photos.length >= 4 ? { type: 'grid', bg: base, urls: photos.slice(0, 9), text: heads[2] || heads[1] || (f.cat ? sentence(f.cat, 28) : '') } : null);
   B.price = () => {
     const p = offer && /\d/.test(offer) ? offer : priced[0]?.price;
@@ -177,7 +187,7 @@ export function composeMotion(plan, { brief = {}, assets = [], salt = '', avoid 
     const hero = priced[0];   // the owner's first item is the one they lead with
     const amount = Number(String(offer && /\d/.test(offer) ? offer : hero?.price || '').replace(/[^\d.]/g, '')) || 0;
     const label = event ? 'Tickets' : offer && /%|off/i.test(offer) ? 'Now' : amount && amount < 20000 ? 'Only' : '';
-    return { type: 'price', bg: 'brand', label, value: (offer && /\d/.test(offer) ? offer : hero.price).replace(/\s/g, ''), sub: event ? '' : offer && /%|off/i.test(offer) ? (hero?.name ? `on ${hero.name.toLowerCase()}` : '') : (hero?.name || '') };
+    return { type: 'price', bg: 'brand', label, value: ((v) => (/^[\d₦$€£.,%\s]+$/.test(v) ? v.replace(/\s/g, '') : v.replace(/\s+/g, ' ').trim()))(offer && /\d/.test(offer) ? offer : hero.price), sub: event ? '' : offer && /%|off/i.test(offer) ? (hero?.name ? `on ${hero.name.toLowerCase()}` : '') : (hero?.name || '') };
   };
   B.receipt = () => (priced.length >= 2 && (food || fashion || chance(0.5)) ? (() => {
     const items = priced.slice(0, 4).map((p) => ({ name: p.name, price: p.price }));
@@ -236,7 +246,7 @@ export function composeMotion(plan, { brief = {}, assets = [], salt = '', avoid 
   };
   /** Compose the finished list: photo layouts, left-set statements and the chosen ending (the essentials stay readable). */
   const composeLayouts = (list) => {
-    const out = conformStructure(list, S, { photoUrls: photos });
+    const out = conformStructure(composeMiddle(list, S, { solemn: solemnFilm }), S, { photoUrls: photos });
     let leftLeft = S.wordsLeft ? 2 : 0, n = 0;
     out.forEach((b, i) => { if (b.type === 'words' && !b.layout && b.mode !== 'slam' && i > 0 && i < out.length - 2 && leftLeft > 0 && n++ % 2 === 0) { b.layout = 'left'; leftLeft--; } });
     if (S.list) { const li = out.findIndex((b) => (b.type === 'stack' || b.type === 'toggles') && !b.layout && (b.items || []).length >= 2); if (li > -1) out[li].layout = 'list'; }
@@ -262,6 +272,7 @@ export function composeMotion(plan, { brief = {}, assets = [], salt = '', avoid 
     const uniq = []; for (const x of said) if (!uniq.some((u) => key(u) === key(x))) uniq.push(x);
     const mid = [];
     if (photos.length && !op.opener.urls && !(op.head && op.head.urls)) mid.push(B.photos());
+    if (photos.length >= 2 && S.presentation?.pics) mid.push(...B.midPics(Math.min(2, S.presentation.pics)));
     if (photos.length >= 4 && chance(0.6)) mid.push(B.grid());
     if (when) mid.push(solemn && brief.when ? { type: 'words', mode: 'glow', bg: 'dark', lines: balance(String(brief.when).replace(/\s*·\s*/g, ', '), 24), accent: [] } : B.calendar());
     uniq.slice(0, 4).forEach((x, i) => mid.push(lineBeat(x, i)));
@@ -371,13 +382,14 @@ export function composeMotion(plan, { brief = {}, assets = [], salt = '', avoid 
   const pool = [
     B.photos(), B.price(), B.menu(), B.receipt(), B.features(), ...B.heads(), B.stat(), B.ring(), B.calendar(), B.grid(), B.notif(), B.search(), B.map(),
   ].filter(Boolean).filter((b) => !dirAvoid.has(b.type))   // what suits a perfume is not what suits a school
+    .filter((b) => !(S.presentation?.avoid || []).includes(b.type))   // nor does every way of telling it want phone-screen cards
     .filter((b) => ANG !== 'type' || typeOnly.has(b.type))                    // type film: no screens or photos, only typography
     .filter((b) => ANG !== 'calm' || !['notif', 'search', 'receipt', 'stat', 'ring'].includes(b.type));   // calm film: nothing busy
   // a little shuffle so two businesses with the same facts still get different films (proof order matters less than hook/brand/cta)
   for (let i = pool.length - 1; i > 0; i--) { if (chance(0.35)) { const j = Math.max(0, i - 1 - Math.floor(rnd() * 2)); [pool[i], pool[j]] = [pool[j], pool[i]]; } }
   // photos first when there are photos; the map always late
   pool.sort((a, b) => (a.type === 'photos' ? -1 : b.type === 'photos' ? 1 : 0) || (a.type === 'map' ? 1 : b.type === 'map' ? -1 : 0));
-  const ctaBeat = dirAvoid.has('button') ? null : B.cta(), endBeat = B.end();
+  const ctaBeat = dirAvoid.has('button') || (S.presentation && !S.presentation.cta) ? null : B.cta(), endBeat = B.end();
   const est = (b) => BEAT_MIN[b.type] + 0.4;
   let budget = duration - est(opener) - (ctaBeat ? est(ctaBeat) : 0) - est(endBeat);
   const body = [];
@@ -403,6 +415,7 @@ export function composeMotion(plan, { brief = {}, assets = [], salt = '', avoid 
   const lateBrand = ANG === 'story' && duration >= 16 && !!brandBeat;
   if (brandBeat && duration >= 14 && !lateBrand && !(ANG === 'type' && !(assets || []).some((x) => x.role === 'logo' || /logo/i.test(x.name || '')))) take(brandBeat);
   wanted.forEach(take);
+  B.midPics(S.presentation?.pics || 0).forEach(take);
   // how much time the facts fill; with lots of time and few facts, every strength gets its own beat (one idea per beat)
   const need = pool.reduce((a, b) => a + est(b), 0);
   const spread = feats.length >= 2 && budget - need > 4;
@@ -422,7 +435,7 @@ export function composeMotion(plan, { brief = {}, assets = [], salt = '', avoid 
   }
   pool.filter((b) => !dirAvoid.has(b.type)).forEach((b) => { if (!body.some((x) => x.type === b.type && !['words', 'highlight'].includes(b.type))) take(b); });
   // still room? repeat the main message in a different form, then the strengths again
-  const fillers = [ feats.length >= 2 ? { type: 'toggles', bg: base, title: 'What you get', items: feats.slice(0, 4) } : null, B.search(), B.notif()].filter(Boolean).filter((b) => !dirAvoid.has(b.type));
+  const fillers = [ feats.length >= 2 ? { type: 'toggles', bg: base, title: 'What you get', items: feats.slice(0, 4) } : null, B.search(), B.notif()].filter(Boolean).filter((b) => !dirAvoid.has(b.type)).filter((b) => !(S.presentation?.avoid || []).includes(b.type));
   for (const fb of fillers) { if (budget < 2) break; if (!body.some((x) => x.type === fb.type && fb.type !== 'words')) take(fb); }
   if (lateBrand && !body.some((b) => b.type === 'icon')) { const at = Math.min(body.length, Math.max(1, 2)); if (est(brandBeat) <= budget + 0.01 || body.length > 2) body.splice(at, 0, brandBeat); }
   if (ANG === 'type') {   // a type film still needs variety: some lines become a highlighted sentence, others a quiet glow
@@ -435,6 +448,11 @@ export function composeMotion(plan, { brief = {}, assets = [], salt = '', avoid 
   }
   if (ANG === 'calm' && body.length > 3) body.length = 3;                       // calm: fewer ideas, each given room
   if (ANG === 'loud' && ctaBeat && chance(0.5)) { const pi = body.findIndex((b) => b.type === 'price'); if (pi > 0) body.push(body.splice(pi, 1)[0]); }   // loud: land the offer just before the close
+  {   // the middle's pictures are spread through the film rather than bunched up front
+    const pics = body.filter((b) => b._pic), rest = body.filter((b) => !b._pic);
+    pics.forEach((p, i) => rest.splice(Math.min(rest.length, Math.max(1, Math.round(rest.length * (pics.length === 1 ? 0.45 : i === 0 ? 0.3 : 0.72))) + i), 0, p));
+    if (pics.length) body.splice(0, body.length, ...rest);
+  }
   let beats = composeLayouts([opener, ...body, ctaBeat, endBeat].filter(Boolean));
 
   // ---- backgrounds: keep rhythm (never three of the same in a row unless it is the theme), one brand punch ----
@@ -471,7 +489,7 @@ export function composeMotion(plan, { brief = {}, assets = [], salt = '', avoid 
     let out = 'push';
     if (i < beats.length - 1) { let k = 0; do { out = pick(outs); k++; } while ((out === last || (out === 'drop' && beats[i + 1].type === 'map')) && k < 8); }
     last = out;
-    const { _want, _src, _num, _menu, ...rest } = b;
+    const { _want, _src, _num, _menu, _pic, ...rest } = b;
     if (Array.isArray(rest.items)) rest.items = uniqueGlyphs(rest.items);
     return { ...rest, dur: Math.round(durs[i] * 100) / 100, out };
   });

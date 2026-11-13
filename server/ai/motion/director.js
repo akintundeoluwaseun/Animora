@@ -12,7 +12,7 @@ import { videoGroup } from '../closing.js';
 import { directionOf } from '../direction.js';
 import { qaBeats } from './qa.js';
 import { recall, remember } from './memory.js';
-import { pickStructure, structureBrief, conformStructure, signatureOf, recency, LAYOUTS } from './structure.js';
+import { pickStructure, structureBrief, conformStructure, composeMiddle, signatureOf, recency, LAYOUTS, MOTIONS } from './structure.js';
 
 // A different creative angle every time, so two people (or two tries) never get the same film with other words in it.
 const ANGLES = [
@@ -35,22 +35,22 @@ const withDeadline = (p, ms, what) => Promise.race([p, new Promise((_, rej) => s
 export const SIZES = { '9:16': [1080, 1920], '1:1': [1080, 1080], '16:9': [1920, 1080], '4:5': [1080, 1350] };
 const GLYPHS = ['check', 'bolt', 'heart', 'star', 'bag', 'clock', 'pin', 'chat', 'phone', 'card', 'gift', 'sparkle', 'leaf', 'shield', 'truck', 'cake', 'cup', 'scissors', 'home', 'book', 'chart', 'search', 'tag', 'wifi', 'smile', 'car', 'dumbbell', 'shirt', 'tooth', 'globe', 'money'];
 const BGS = ['light', 'dark', 'brand'];
-const OUTS = ['push', 'whip', 'zoom', 'rise', 'drop', 'fade'];
+const OUTS = ['push', 'whip', 'zoom', 'rise', 'drop', 'fade', 'wipe', 'dissolve'];
 const clip = (s, n) => fixPrices(String(s == null ? '' : s).replace(/\s+/g, ' ').trim()).slice(0, n).trim();
 const num = (v, a, b, d) => { const n = Number(v); return Number.isFinite(n) ? Math.max(a, Math.min(b, n)) : d; };
 const idx = (a, n = 4) => (Array.isArray(a) ? a.filter(Number.isInteger).filter((x) => x >= 0 && x < 40).slice(0, n) : []);
 const glyph = (g, fb = 'check') => (GLYPHS.includes(g) ? g : fb);
 
-export const BEAT_GUIDE = `BEAT LIBRARY. Every beat: { "type", "dur" (seconds), "bg": "light"|"dark"|"brand", "out": "push"|"whip"|"zoom"|"rise"|"drop"|"fade", ...fields }.
+export const BEAT_GUIDE = `BEAT LIBRARY. Every beat: { "type", "dur" (seconds), "bg": "light"|"dark"|"brand", "out": "push"|"whip"|"zoom"|"rise"|"drop"|"fade"|"wipe"|"dissolve", ...fields }. "wipe" (a soft sideways slide) and "dissolve" (a slow cross-fade) are the quiet transitions; the others are fast and blurred.
 Glyph names: ${GLYPHS.join(', ')}.
-- words: layout? "left" (an editorial statement set left-aligned, lower half; not for slam), lines [1-3 strings, max 24 chars each], accent [word indexes counted across all lines: the 1-2 words that matter, shown in the brand colour], mode "build" (default: a sentence written word by word) | "slam" (1-5 short words, one huge word at a time) | "glow" (a quiet glowing statement; bg must be "dark"), sub? (a small grey line under it, max 40).
+- words: layout? "left" (an editorial statement set left-aligned, lower half) | "right" (right-aligned, high on the stage) | "stagger" (2-3 lines stepping down a diagonal; needs 2+ lines) | "bleed" (the FIRST line is one short word, max 14 chars, set so large it leaves the frame, the other lines small under it). None of these for slam. Omit layout for the centred default. lines [1-3 strings, max 24 chars each], accent [word indexes counted across all lines: the 1-2 words that matter, shown in the brand colour], mode "build" (default: a sentence written word by word) | "slam" (1-5 short words, one huge word at a time) | "glow" (a quiet glowing statement; bg must be "dark"), sub? (a small grey line under it, max 40).
 - icon: the brand's app icon (their logo when they gave one). mode "wordmark" (icon slides aside and the name appears) | "welcome" (prefix words then the icon: prefix "Welcome to" / "Meet" / "Say hello to") | "solo"; tagline? (max 34), accent? [word idx of the tagline].
-- photos: urls [1-5 EXACT photo urls from the asset list], lines [0-2 short lines], accent?, layout? . Default: their photos floating in depth. layout "full" = one picture fills the screen and drifts (the line sits low, left); "split" = a picture panel on one side, the words on the other; "editorial" = a large bleeding picture with a smaller one overlapping its corner and a quiet caption. USE THEIR PHOTOS when they have any.
+- photos: urls [1-5 EXACT photo urls from the asset list], lines [0-2 short lines], accent?, layout? . Default: their photos floating in depth. layout "full" = one picture fills the screen and drifts (the line sits low, left); "split" = a picture panel on one side, the words on the other; "editorial" = a large bleeding picture with a smaller one overlapping its corner and a quiet caption; "spotlight" = a product-led hero picture bleeding off one edge with a magnified detail circle (side "left"|"right" says which edge); "cascade" = up to 3 pictures stepping diagonally and overlapping, words in the free corner (side "left"|"right"); "triptych" = 2-3 edge-to-edge panels side by side, each moving its own way, lines as a caption. USE THEIR PHOTOS when they have any.
 - grid: urls [4-9 exact photo urls], text? (max 30). A tidy photo grid that tilts away in 3D.
 - price: label? ("Only" / "Now" / "From" / "Tickets"), value ("₦2,500" or "30% OFF"), sub? (what it is), old? (an old price to strike out, only if given). A giant rolling number. ONLY a real price or offer.
 - receipt: title ("Your order"), items [{name, price}] (2-5, REAL products and prices), total? (their sum, only if all prices are known), button? (the call to action). A clean order card; a cursor taps the button.
-- stack: title?, accent?, layout?, items [{t (max 24), s? (max 24, e.g. the price), glyph}] (2-4). Pastel cards that stack up; layout "list" = an editorial numbered list instead (typography, no cards).
-- toggles: title?, accent?, layout?, items [2-5 strings, max 26]. An iOS settings card; each strength switches on; layout "list" = an editorial numbered list instead.
+- stack: title?, accent?, layout?, items [{t (max 24), s? (max 24, e.g. the price), glyph}] (2-4). Pastel cards that stack up; layout "list" = an editorial numbered list instead (typography, no cards); layout "ledger" = structured rows (label left, its price or value right, hairlines), credible and calm.
+- toggles: title?, accent?, layout?, items [2-5 strings, max 26]. An iOS settings card; each strength switches on; layout "list" = an editorial numbered list instead; "ledger" as above.
 - swap: lead?, accent?, items [2-4 strings, max 20]. A button-pill whose words roll through the list.
 - orbit: items [{t (max 16), glyph}] (3-6). The brand icon in the centre, tiles fly in around it.
 - steps: title?, accent?, items [{t (max 20), s? (max 30), glyph}] (exactly 3). Cards joined by a line that draws through them.
@@ -61,7 +61,7 @@ Glyph names: ${GLYPHS.join(', ')}.
 - calendar: lead? ("Save the date"), accent?, month ("Dec"), day ("14"), title, time? ("8pm"), place?. ONLY a real date.
 - countdown: reveal (max 14: "Now open", "It's here"), sub?. 3-2-1 then the reveal. For launches, openings, events.
 - highlight: text (a 4-9 word sentence), hot [word indexes to select]. A text selection sweeps over the key words.
-- stat: value ("2,000+"), label ("Happy clients"), sub?, lead?. A number card. ONLY a real number.
+- stat: layout? "side" (no card: the number is set huge and left, a rule and the label under it), value ("2,000+"), label ("Happy clients"), sub?, lead?. By default a number card. ONLY a real number.
 - ring: value ("30", "24h"), label ("Under 30 minutes"), sub?, fill (0.5-1). A progress ring card. ONLY a real time/number.
 - quote: text (max 120), name. ONLY a real customer review they gave.
 - phone: text? (max 34). A 3D phone; their app icon gets a badge. Best for apps and online services.
@@ -69,7 +69,7 @@ Glyph names: ${GLYPHS.join(', ')}.
 - end: tagline? (max 40), accent?, contact? (phone / @handle / website), contactGlyph ("phone"|"search"|"globe"|"pin"), layout? ("minimal" = hairline + the name set large; "poster" = the closing line is the hero; "photo" = over one of their pictures, with url = an exact photo url; default = icon + name + tagline + contact pill). ALWAYS the last beat; the name and the way to reach them always appear.`;
 
 const system = ({ duration, aspect }) => `${CREATIVE_STANDARD}
-You are the director of premium product films, in the style of Apple's motion graphics and the best TikTok ad studios: clean white or black stages, ONE idea per beat, sentences that build word by word with one word in the brand colour, real-looking UI objects (app icons, notifications, buttons pressed by a cursor, search bars, maps, order cards), springy physics and fast blurred moves, and a logo end card. You invent a storyboard that is UNIQUE to this business. Never a generic formula.
+You are the creative director of premium films. Your craft has many registers: an Apple-style product film (real UI objects, springy moves), a magazine editorial (asymmetric, overlapping pictures, large type set left or right), a cinematic montage (full-bleed pictures, slow dissolves), a documentary (natural pictures, factual captions), a typographic poster (one huge word leaving the frame), a quiet minimal film (negative space, one idea per beat). The brief's MIDDLE line says which register fits THIS content; follow it. Do not reach for phone-screen cards, pastel lists or a shop button by habit, and do not put every beat in the centre of the stage. You invent a storyboard that is UNIQUE to this business. Never a generic formula.
 
 YOU ARE ALSO THE COPY EDITOR. People type messily: typos, ALL CAPS, slang, broken English, repeated or nonsensical phrases, prices like N5000 / 5k / 5000 naira / "zobo 700". Make every word on screen correct, natural and premium:
 - Fix spelling, grammar and capitalisation. Turn fragments into short, confident ad lines that a stranger instantly understands. Keep the meaning.
@@ -89,7 +89,7 @@ ${BEAT_GUIDE}
 
 FONTS: ${FONTS.join(', ')}.
 
-Return ONLY JSON: { "concept": "one sentence: the idea", "font": "...", "beats": [ ... ] }`;
+Return ONLY JSON: { "concept": "one sentence: the idea", "font": "...", "motion": "kinetic"|"restrained"|"editorial"|"cinematic"|"documentary" (how the film moves: kinetic = springy and fast; restrained = slow fades and tiny camera drift; editorial = sliding masks; cinematic = slow push and dissolves; documentary = gentle drift and cross-fades), "beats": [ ... ] }`;
 
 const strs = (a, n, len) => (Array.isArray(a) ? a : []).map((x) => clip(x, len)).filter(Boolean).slice(0, n);
 
@@ -125,6 +125,7 @@ export function sanitizeBeats(raw, { duration, assets = [] } = {}) {
     else if (t === 'button') { o.label = clip(b.label, 28); if (!o.label) continue; ['lead', 'done', 'sub'].forEach((k) => { if (b[k]) o[k] = clip(b[k], k === 'sub' ? 34 : 22); }); o.glyph = glyph(b.glyph, 'chat'); o.accent = idx(b.accent, 2); }
     else if (t === 'end') { ['tagline', 'contact'].forEach((k) => { if (b[k]) o[k] = clip(b[k], 42); }); o.accent = idx(b.accent, 2); o.contactGlyph = ['phone', 'search', 'globe', 'pin'].includes(b.contactGlyph) ? b.contactGlyph : 'phone'; }
     if ((LAYOUTS[t] || []).includes(b.layout) && !(t === 'words' && o.mode === 'slam')) o.layout = b.layout;
+    if (t === 'photos' && ['left', 'right'].includes(b.side)) o.side = b.side;
     if (t === 'end' && o.layout === 'photo') { o.url = urls.has(b.url) ? b.url : [...urls][0]; if (!o.url) delete o.layout; }
     out.push(o);
   }
@@ -188,11 +189,11 @@ export async function directMotion({ plan, brief = null, assets = [], themeColor
   const look = lookFor(useStyle?.slug || useStyle?.palette?.theme || '', { ...(useStyle?.palette || {}), ...(useStyle === style ? themeColors : {}) });
   // how the film opens, ends and is composed: chosen from the content, weighed against what was made recently
   const imageUrls = (assets || []).filter((a) => (a.kind || 'image') === 'image' && a.role !== 'logo' && !/logo/i.test(a.name || '')).map((a) => a.url);
-  const structure = pickStructure({ direction: dir.id || 'general', angle: angle[0], photos: imageUrls.length, group, memory: mem });
+  const structure = pickStructure({ direction: dir.id || 'general', angle: angle[0], photos: imageUrls.length, group, memory: mem, solemn: /burial|funeral|memorial|tribute|obituar|in memory|celebration of life|condolence/i.test(`${brief?.category || ''} ${brief?.name || ''}`) });
   const rules = composeMotion(plan, { brief: brief || {}, assets, salt, avoid, colors, look, angle: angle[0], structure });
   const personalBirthday = isPersonalBirthdayBrief(brief || {}, plan);
   const logo = personalBirthday ? null : (assets || []).find((a) => (a.kind || 'image') === 'image' && (a.role === 'logo' || /logo/i.test(a.name || '')));
-  let beats = null, font = rules.font, concept = '';
+  let beats = null, font = rules.font, concept = '', aiMotion = null;
   if (useAi && !personalBirthday) {
     try {
       const f = factsFrom(plan, brief || {}, assets);
@@ -207,7 +208,12 @@ export async function directMotion({ plan, brief = null, assets = [], themeColor
       }), DEADLINE, 'The AI director');
       const j = JSON.parse(String(text).match(/\{[\s\S]*\}/)[0]);
       beats = sanitizeBeats(j.beats, { duration, assets });
+      if (beats && structure.presentation) {   // the AI's own layouts are kept; what it left centred by default is composed from the presentation
+        beats = composeMiddle(beats, structure);
+        if (!structure.presentation.cta && beats.some((x) => x.type === 'button') && beats.length > 4) beats = beats.filter((x) => x.type !== 'button');
+      }
       if (beats) beats = conformStructure(beats, structure, { photoUrls: imageUrls });   // fills layouts the AI left out; its own choices are kept
+      if (MOTIONS.includes(j.motion)) aiMotion = j.motion;
       if (beats && group !== 'business') { const kept = beats.filter((x) => !UI_BEATS.has(x.type)); if (kept.length >= 3) beats = kept; }
       if (beats && group === 'business') { let seenUi = 0; const kept = beats.filter((x) => !UI_BEATS.has(x.type) || ++seenUi <= 1); if (kept.length >= 3) beats = kept; }
       if (FONTS.includes(j.font)) font = j.font;
@@ -219,11 +225,12 @@ export async function directMotion({ plan, brief = null, assets = [], themeColor
   // sound: 'all'/'sfx' = effects, 'none' = silent, 'own' = the owner's track (+ effects), 'piano'/'soft' = a library track
   const sound = plan.sound || (plan.sfx === false ? 'none' : 'sfx');
   const music = sound === 'own' && plan.music_url ? { url: plan.music_url } : sound === 'piano' || sound === 'soft' ? { url: `/music/${sound}.mp3`, builtin: sound } : null;
-  const qa = qaBeats(beats, { energy: look.energy || 'medium', caps: BEAT_MAX });
+  const motion = aiBeats && aiMotion ? aiMotion : structure.presentation?.motion || 'kinetic';
+  const qa = qaBeats(beats, { energy: look.energy || 'medium', caps: BEAT_MAX, motion });
   beats = qa.beats;
-  const sig = { ...signatureOf(beats, look), angle: angle[0], intended: { opening: structure.opening, ending: structure.ending, photos: structure.photos } };
+  const sig = { ...signatureOf(beats, look), angle: angle[0], presentation: structure.presentation?.id || '', motion, intended: { opening: structure.opening, ending: structure.ending, photos: structure.photos } };
   remember(sig);
-  const data = { W, H, qa: qa.fixes, angle: angle[0], sig, concept, seed: seedOf(`${rules.brand}${salt}${Math.random()}`), brand: rules.brand, logo: logo?.url || null, font: look.ui || font, look, accent: rules.accent, accent2: look.accent2, beats, sound: sound === 'none' ? 'none' : 'on', music };
+  const data = { W, H, qa: qa.fixes, angle: angle[0], motion, sig, concept, seed: seedOf(`${rules.brand}${salt}${Math.random()}`), brand: rules.brand, logo: logo?.url || null, font: look.ui || font, look, accent: rules.accent, accent2: look.accent2, beats, sound: sound === 'none' ? 'none' : 'on', music };
   return { html: motionHtml(data), data, concept, source: aiBeats ? 'gemini' : 'template', aiSkipped: !!personalBirthday };
 }
 

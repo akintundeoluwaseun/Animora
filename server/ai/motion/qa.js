@@ -5,9 +5,12 @@
 //   - the same words on screen twice
 //   - the film must open on its hook and end on the end card
 export const QA_OUTS = { high: ['whip', 'zoom', 'drop', 'push', 'rise'], medium: ['push', 'whip', 'zoom', 'rise', 'drop'], calm: ['push', 'fade', 'rise', 'zoom'] };
+// how a quieter film moves from beat to beat: its own pool of transitions (the fast, blurred ones belong to the kinetic films)
+export const QUIET_OUTS = { restrained: ['dissolve', 'fade', 'push'], documentary: ['dissolve', 'fade', 'wipe'], cinematic: ['dissolve', 'push', 'fade'], editorial: ['wipe', 'push', 'fade', 'dissolve'] };
+const FAST = new Set(['whip', 'zoom', 'drop', 'rise']);
 const keyOf = (t) => String(t || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
 const textsOf = (b) => [].concat(b.lines || [], b.text || [], b.tagline || [], b.lead || [], b.title || [], b.reveal || [], (b.items || []).map((x) => (typeof x === 'string' ? x : x?.t || x?.body || ''))).map((x) => (Array.isArray(x) ? x.join(' ') : x)).map(keyOf).filter((x) => x.length > 3);
-export function qaBeats(beats, { energy = 'medium', min = 3, caps = null } = {}) {
+export function qaBeats(beats, { energy = 'medium', min = 3, caps = null, motion = 'kinetic' } = {}) {
   const fixes = [];
   const target = beats.reduce((a, b) => a + (Number(b.dur) || 0), 0);   // the length the owner asked for: removing a beat must not shorten the film
   let out = beats.map((b) => ({ ...b }));
@@ -23,13 +26,15 @@ export function qaBeats(beats, { energy = 'medium', min = 3, caps = null } = {})
   // 2. neighbours that look the same
   for (let i = 1; i < out.length - 1; i++) {
     const a = out[i - 1], b = out[i];
-    if (a.type === b.type && (a.bg || '') === (b.bg || '') && (a.mode || '') === (b.mode || '')) {
+    if (a.type === b.type && (a.bg || '') === (b.bg || '') && (a.mode || '') === (b.mode || '') && (a.layout || '') === (b.layout || '')) {   // a different composition is already a different look
       if (b.type === 'words') { b.mode = a.mode === 'glow' ? undefined : 'glow'; b.bg = b.mode === 'glow' ? 'dark' : (a.bg === 'dark' ? 'light' : 'dark'); fixes.push(`beat ${i + 1} no longer looks like beat ${i}`); }
       else if (b.bg) { b.bg = a.bg === 'dark' ? 'light' : 'dark'; fixes.push(`beat ${i + 1} stage changed`); }
     }
   }
   // 3. transitions: no immediate repeat, no single favourite
-  const pool = QA_OUTS[energy] || QA_OUTS.medium;
+  const quiet = QUIET_OUTS[motion];
+  if (quiet) out.forEach((b, i) => { if (i < out.length - 1 && FAST.has(b.out)) { b.out = quiet[i % quiet.length]; } });   // fast blurred cuts do not belong to a quiet film
+  const pool = quiet || QA_OUTS[energy] || QA_OUTS.medium;
   const counts = {}; const cap = Math.max(2, Math.ceil((out.length - 1) * 0.4));
   for (let i = 0; i < out.length - 1; i++) {
     let o = out[i].out || 'push';

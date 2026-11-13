@@ -6,6 +6,7 @@ const { directMotion } = await import('../server/ai/motion/director.js');
 const { cleanBrief } = await import('../server/ai/brief.js');
 const { readMotion } = await import('../server/ai/motion/page.js');
 const { forget } = await import('../server/ai/motion/memory.js');
+const { LAYOUTS } = await import('../server/ai/motion/structure.js');
 let failed = 0;
 const bad = (c, m) => { if (!c) { failed++; console.log('FAIL', m); } };
 
@@ -62,7 +63,7 @@ bad(page.beats[0].layout === 'split' && page.beats.at(-1).layout === 'minimal', 
 // 4. bad AI output is cleaned, not trusted
 reply = ai([{ ...H('x'), layout: 'sideways' }, { type: 'photos', dur: 3, urls: ['/u/zzz.jpg'], layout: 'full' }, { type: 'words', mode: 'slam', lines: ['Big'], layout: 'left', dur: 2 }, H('Pepper soup now'), H('Jollof rice'), { type: 'end', layout: 'photo', url: '/not/theirs.jpg', tagline: 'Eat', contact: '0803 123 4567', dur: 4 }]);
 r = await run();
-bad(r.data.beats.every((x) => !x.layout || ['full', 'split', 'editorial', 'left', 'minimal', 'poster', 'photo'].includes(x.layout)), 'an invented layout got through');
+bad(r.data.beats.every((x) => !x.layout || Object.values(LAYOUTS).flat().includes(x.layout)), 'an invented layout got through');
 bad(!r.data.beats.some((x) => x.type === 'words' && x.mode === 'slam' && x.layout), 'slam words got a left layout');
 const e = r.data.beats.at(-1);
 bad(e.layout !== 'photo' || photos.some((p) => p.url === e.url), 'end photo used a picture the owner never gave');

@@ -68,10 +68,17 @@ try {
   ok('generate starts in the background', gen.project?.gen?.state === 'working', gen.project?.gen?.message);
   for (let i = 0; i < 120 && gen.project?.gen?.state === 'working'; i++) { await new Promise((r) => setTimeout(r, 500)); gen = await api('GET', `/api/projects/${P}`, null, T); }
   ok('code generated', gen.project?.code?.includes('window.__timeline') && gen.project?.gen?.state === 'done', gen.project?.aiSource);
-  const ed = await api('POST', `/api/projects/${P}/edit`, { instruction: 'make the text bigger' }, T);
-  ok('edit by prompt', ed.changed && ed.project.code.includes('--scale: 1.3'), ed.summary);
+  // The shipping engine is Motion (storyboard beats). Without a Gemini key its edits are colour, stage and pace; text is fitted to the
+  // stage, so "make the text bigger" is honestly refused (the old template engine's CSS scale no longer exists).
+  const { readMotion } = await import('../server/ai/motion/index.js');
+  const lenOf = (code) => (readMotion(code)?.beats || []).reduce((a, b) => a + b.dur, 0);
+  const len0 = lenOf(gen.project.code);
+  const ed = await api('POST', `/api/projects/${P}/edit`, { instruction: 'make it faster' }, T);
+  ok('edit by prompt', ed.changed && lenOf(ed.project.code) < len0 - 0.5 && /faster pace/.test(ed.summary || ''), `${len0.toFixed(1)}s -> ${lenOf(ed.project.code).toFixed(1)}s, ${ed.summary}`);
+  const refused = await api('POST', `/api/projects/${P}/edit`, { instruction: 'make the text bigger' }, T);
+  ok('an edit it cannot do offline is refused honestly (nothing changes)', !refused.changed && /Gemini key/.test(refused.summary || '') && lenOf(refused.project?.code || gen.project.code) === lenOf(ed.project.code), refused.summary);
   const un = await api('POST', `/api/projects/${P}/undo`, {}, T);
-  ok('undo', un.project.code.includes('--scale: 1;'));
+  ok('undo', Math.abs(lenOf(un.project.code) - len0) < 0.05, `${lenOf(un.project.code).toFixed(1)}s`);
   const bad = await api('PUT', `/api/projects/${P}/code`, { html: un.project.code.replace('{ paused: true,', '{') }, T);
   ok('broken hand edit rejected', bad.status === 400, bad.problems?.[0]);
 
