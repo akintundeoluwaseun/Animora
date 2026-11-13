@@ -8,7 +8,7 @@ import { motionHtml, readMotion } from './page.js';
 import { lookFor, LOOKS } from './looks.js';
 import { isPersonalBirthdayBrief } from '../personal.js';
 import { CREATIVE_STANDARD } from '../standard.js';
-import { videoGroup } from '../closing.js';
+import { videoGroup, MEMORIAL } from '../closing.js';
 import { directionOf } from '../direction.js';
 import { qaBeats } from './qa.js';
 import { recall, remember } from './memory.js';
@@ -153,7 +153,7 @@ export function sanitizeBeats(raw, { duration, assets = [] } = {}) {
 const seedOf = (s) => (Array.from(String(s)).reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7) % 2147483646) + 1;
 
 /** Storyboard -> Motion HTML. Tries Gemini first (when `useAi`), then the rule-based composer. */
-export async function directMotion({ plan, brief = null, assets = [], themeColors = {}, images = [], useAi = true, salt = '', avoid = [], style = null, prevAngle = null, prevConcept = '', prevLook = null, memory = [] }) {
+export async function directMotion({ plan, brief = null, assets = [], themeColors = {}, images = [], useAi = true, salt = '', avoid = [], style = null, prevAngle = null, prevConcept = '', prevLook = null, prevSig = null, memory = [] }) {
   const group = videoGroup(brief || {});
   // the content decides which storytelling approaches are appropriate; chance only picks among those, and never the one just used
   const dir = directionOf(brief || {});
@@ -189,7 +189,7 @@ export async function directMotion({ plan, brief = null, assets = [], themeColor
   const look = lookFor(useStyle?.slug || useStyle?.palette?.theme || '', { ...(useStyle?.palette || {}), ...(useStyle === style ? themeColors : {}) });
   // how the film opens, ends and is composed: chosen from the content, weighed against what was made recently
   const imageUrls = (assets || []).filter((a) => (a.kind || 'image') === 'image' && a.role !== 'logo' && !/logo/i.test(a.name || '')).map((a) => a.url);
-  const structure = pickStructure({ direction: dir.id || 'general', angle: angle[0], photos: imageUrls.length, group, memory: mem, solemn: /burial|funeral|memorial|tribute|obituar|in memory|celebration of life|condolence/i.test(`${brief?.category || ''} ${brief?.name || ''}`) });
+  const structure = pickStructure({ direction: dir.id || 'general', angle: angle[0], photos: imageUrls.length, group, memory: mem, solemn: MEMORIAL.test(`${brief?.category || ''} ${brief?.name || ''}`), prev: salt ? prevSig : null });
   const rules = composeMotion(plan, { brief: brief || {}, assets, salt, avoid, colors, look, angle: angle[0], structure });
   const personalBirthday = isPersonalBirthdayBrief(brief || {}, plan);
   const logo = personalBirthday ? null : (assets || []).find((a) => (a.kind || 'image') === 'image' && (a.role === 'logo' || /logo/i.test(a.name || '')));

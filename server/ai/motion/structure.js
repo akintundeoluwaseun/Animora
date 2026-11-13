@@ -87,17 +87,26 @@ const weighted = (items, rnd) => {
  * Choose how the film opens, how it ends and how its pictures are composed.
  * @param {object} o  { direction (id), angle, photos (count), hasLogo, group ('business'|'social'|...), memory ([signature, newest first]), rnd }
  */
-export function pickStructure({ direction = 'general', angle = 'clean', photos = 0, group = 'business', memory = [], rnd = Math.random, solemn = false } = {}) {
+// the signature prefix each opening produces (so a recorded film can be matched back to the opening that made it)
+const OPENING_SIG = { brandFirst: 'icon', story: 'words:left', photoFirst: 'photos:full', atmospheric: 'photos:full', documentary: 'photos:editorial' };
+const openingSig = (o) => OPENING_SIG[o] || 'words:slam';
+export function pickStructure({ direction = 'general', angle = 'clean', photos = 0, group = 'business', memory = [], rnd = Math.random, solemn = false, prev = null } = {}) {
   const d = BY_DIRECTION[direction] || BY_DIRECTION.general;
   const a = BY_ANGLE[angle] || BY_ANGLE.clean;
   const rank = (list, v) => { const i = list.indexOf(v); return i < 0 ? 0 : list.length - i; };   // earlier in the list = stronger fit
-  const openers = OPENINGS.filter((o) => (!NEEDS_PHOTO.has(o) || photos > 0) && !(BLOCK[direction] || []).includes(o)).map((o) => {
+  // Regenerate: never the same opening or ending as the film being replaced (when there is any alternative)
+  const notOpen = (o) => !(o === 'typo' ? /^words(:glow)?$/.test(String(prev?.opening)) : prev?.opening === openingSig(o));
+  let pool = OPENINGS.filter((o) => (!NEEDS_PHOTO.has(o) || photos > 0) && !(BLOCK[direction] || []).includes(o));
+  if (prev?.opening && pool.filter(notOpen).length) pool = pool.filter(notOpen);
+  const openers = pool.map((o) => {
     const fit = 1 + rank(d.open, o) * 1.3 + rank(a.open, o) * 1.1;
     const used = recency(memory, (m) => String(m.opening || '').startsWith(o === 'typo' ? 'words' : o === 'brandFirst' ? 'icon' : o === 'story' ? 'words:left' : o === 'photoFirst' ? 'photos:full' : o === 'atmospheric' ? 'photos:full' : o === 'documentary' ? 'photos:editorial' : 'words:slam'));
     return [o, Math.max(0.05, fit) / (1 + used * 3)];
   });
   const opening = weighted(openers, rnd);
-  const endings = ENDINGS.filter((e) => e !== 'photo' || photos > 0).map((e) => {
+  let endPool = ENDINGS.filter((e) => e !== 'photo' || photos > 0);
+  if (prev?.ending && endPool.filter((e) => prev.ending !== `end:${e}`).length) endPool = endPool.filter((e) => prev.ending !== `end:${e}`);
+  const endings = endPool.map((e) => {
     const fit = 1 + rank(d.end, e) * 1.3 + rank(a.end, e) * 1.0;
     const used = recency(memory, (m) => m.ending === `end:${e}`);
     return [e, Math.max(0.05, fit) / (1 + used * 3)];
@@ -107,7 +116,7 @@ export function pickStructure({ direction = 'general', angle = 'clean', photos =
   const photosLayout = weighted(layouts, rnd);
   const wordsLeft = rnd() < d.left * (1 / (1 + recency(memory, (m) => m.left > 0) * 0.5)) ? 1 : 0;
   const list = rnd() < (LIST_DIRECTIONS[direction] ?? 0.3) * (1 / (1 + recency(memory, (m) => m.lists > 0) * 0.8)) ? 1 : 0;
-  const presentation = pickPresentation({ direction, angle, photos, group, memory, rnd, solemn });
+  const presentation = pickPresentation({ direction, angle, photos, group, memory, rnd, solemn, prev });
   return { opening, ending, photos: photosLayout, wordsLeft, list, direction, angle, group, presentation };
 }
 
@@ -145,7 +154,7 @@ const PRES_BY_ANGLE = {
 };
 // subjects whose films are not about pictures cannot be product/documentary/cinematic without pictures
 const NEEDS_PICTURES = new Set(['product', 'documentary', 'cinematic']);
-export function pickPresentation({ direction = 'general', angle = 'clean', photos = 0, group = 'business', memory = [], rnd = Math.random, solemn = false } = {}) {
+export function pickPresentation({ direction = 'general', angle = 'clean', photos = 0, group = 'business', memory = [], rnd = Math.random, solemn = false, prev = null } = {}) {
   const d = PRES_BY_DIRECTION[direction] || PRES_BY_DIRECTION.general, a = PRES_BY_ANGLE[angle] || {};
   const strict = direction !== 'general' && PRES_BY_DIRECTION[direction];   // a known subject only ever gets presentations that suit it
   const cands = Object.keys(PRESENTATIONS).filter((k) => (photos > 0 || !NEEDS_PICTURES.has(k)) && !(solemn && ['typographic', 'split', 'demo'].includes(k)) && !(strict && !d[k]))
@@ -154,7 +163,8 @@ export function pickPresentation({ direction = 'general', angle = 'clean', photo
       const used = recency(memory, (m) => m.presentation === k);
       return [k, fit / (1 + used * 2.2)];
     });
-  const id = cands.length ? weighted(cands, rnd) : 'editorial';
+  const fresh = prev?.presentation ? cands.filter(([k]) => k !== prev.presentation) : cands;   // regenerate: tell the story another way
+  const id = cands.length ? weighted(fresh.length ? fresh : cands, rnd) : 'editorial';
   const P = PRESENTATIONS[id];
   let motion = P.motion;
   if (angle === 'loud' && !solemn) motion = 'kinetic'; else if (angle === 'calm' && motion === 'kinetic') motion = 'restrained';

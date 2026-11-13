@@ -4,7 +4,7 @@
 // no ratings, no customer counts, no delivery times unless they gave them.
 import { factsFrom, cleanText, fixPrices, glyphFor } from '../cinema/compose.js';
 import { isPersonalBirthdayBrief } from '../personal.js';
-import { videoGroup, closingLine, fitCtas } from '../closing.js';
+import { videoGroup, closingLine, fitCtas, MEMORIAL } from '../closing.js';
 import { directionOf } from '../direction.js';
 import { conformStructure, composeMiddle } from './structure.js';
 const NEEDS_PIC = new Set(['photoFirst', 'atmospheric', 'documentary', 'reveal']);
@@ -226,7 +226,7 @@ export function composeMotion(plan, { brief = {}, assets = [], salt = '', avoid 
   const dirAvoid = new Set(directionOf(brief).avoid || []);
   // ---- the structure: how the film opens, how it ends, how its pictures and statements are composed ----
   const S = structure || { opening: 'typo', ending: 'card', photos: 'float', wordsLeft: 0 };
-  const solemnFilm = /burial|funeral|memorial|tribute|obituar|in memory|celebration of life|condolence/i.test(`${brief.category || ''} ${brief.name || ''}`);
+  const solemnFilm = MEMORIAL.test(`${brief.category || ''} ${brief.name || ''}`);
   const captionOf = () => sentence([f.brand, catLabel, [].concat(brief.when || [])[0] ? String(brief.when).split(/\s*·\s*/).slice(-1)[0] : (address || city || '')].filter(Boolean).filter((x, i, a) => a.findIndex((y) => key(y) === key(x)) === i).join(' · '), 46);
   /** The first beat(s) of the film. `head` is the headline beat that follows when the opening does not already carry it. */
   const openingBeats = (typoPick) => {
@@ -260,7 +260,7 @@ export function composeMotion(plan, { brief = {}, assets = [], salt = '', avoid 
   const socialBeats = () => {
     const closing = (fitCtas(brief)[0] || closingLine(brief)).replace(/[.!]*$/, '');
     const opening = H0 || f.brand;
-    const solemn = /burial|funeral|memorial|tribute|obituar|in memory|celebration of life|condolence/i.test(`${brief.category || ''} ${brief.name || ''}`);
+    const solemn = solemnFilm;
     const op = openingBeats(() => (solemn ? B.hookGlow() : (chance(slamP0) && B.hookSlam()) || (chance(0.4) ? B.hookGlow() : B.hookBuild())));
     const opener = op.opener;
     const lineBeat = (line, i) => {
@@ -308,13 +308,25 @@ export function composeMotion(plan, { brief = {}, assets = [], salt = '', avoid 
       const lines = balance(line, 22);
       return { type: 'words', mode: i % 2 === 0 ? 'glow' : undefined, bg: i % 3 === 0 ? 'dark' : base, lines, accent: accentOf(lines[lines.length - 1], lines.length > 1 ? words(lines[0]).length : 0) };
     });
-    const beats = social ? composeLayouts(socialBeats()) : [
-      { type: 'words', mode: 'slam', bg: 'dark', lines: balance(opening, 22), accent: accentOf(opening) },
-      intro,
-      ...(photoBeat ? [photoBeat] : []),
-      ...detailBeats,
-      { type: 'end', bg: 'brand', tagline: closing, accent: accentOf(closing), contact: '' },
-    ];
+    // A birthday greeting is composed like every other film: its opening, picture layouts, middle compositions and ending come from the
+    // chosen structure (the words stay the owner's own), so two birthdays do not share one storyboard.
+    const birthdayBeats = () => {
+      const hello = { lines: balance(opening, 22), accent: accentOf(opening) };
+      const op = openingBeats(() => ({ type: 'words', mode: chance(0.5) ? 'slam' : 'glow', bg: 'dark', ...hello }));
+      let said = false;
+      const own = (b) => {   // the first statement of the film is the greeting itself
+        if (!b || said) return b;
+        if (b.type === 'words') { said = true; return { ...b, ...hello, mode: b.mode === 'slam' ? 'slam' : b.mode }; }
+        if (b.type === 'photos' && b.lines?.length) { said = true; return { ...b, ...hello }; }
+        return b;
+      };
+      const opener = own(op.opener), head = own(op.head);
+      if (op.brandDone && opener.type === 'icon') opener.tagline = relationship;
+      const openPic = [opener, head].some((b) => b && b.type === 'photos');
+      return [opener, ...(head ? [head] : []), ...(op.brandDone ? [] : [intro]), ...(photoBeat && !openPic ? [photoBeat] : []), ...detailBeats,
+        { type: 'end', bg: closing && S.direction === 'birthday' ? pick(['brand', 'dark', 'brand']) : 'brand', tagline: closing, accent: accentOf(closing), contact: '' }];
+    };
+    const beats = composeLayouts(social ? socialBeats() : birthdayBeats());
     const requested = Math.max(10, Number(plan.duration_seconds) || duration);
     const durs = beats.map((beat) => BEAT_MIN[beat.type] + extraFor(beat));
     let room = requested - durs.reduce((sum, value) => sum + value, 0);

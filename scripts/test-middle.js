@@ -105,6 +105,39 @@ bad(stats.corporate.buttons / stats.corporate.films < 1 || true, '');
 const mot = new Set([...stats.restaurant.motions, ...stats.burial.motions, ...stats.corporate.motions]);
 bad(mot.size >= 3, `only ${mot.size} motion personalities across three subjects`);
 
+// 5b. a personal birthday is composed like every other film (it used to be one fixed storyboard), and regenerate never repeats
+//     the opening, ending or presentation of the film it replaces
+{
+  const bday = mk({ kind: 'personal', name: 'Tony', category: 'Birthday', headline: 'Happy 25th Birthday', relationship: 'brother', milestone: '25', features: ['Another year, another blessing'], personalPhotoIds: ['a', 'b'] });
+  const openings = new Set(), endings = new Set(), shapes = new Set(); let repeats = 0, prev = null;
+  for (let i = 0; i < 14; i++) {
+    const r = await directMotion({ plan: plan(bday), brief: bday, assets: photos, useAi: false, salt: i ? 'b' + i : '', ...(prev ? { prevSig: prev.sig, prevAngle: prev.angle, prevLook: prev.look?.key } : {}) });
+    const d = readMotion(r.html);
+    openings.add(d.sig.opening); endings.add(d.sig.ending); shapes.add(d.beats.map((b) => b.type + (b.layout || '')).join('>'));
+    if (prev && (prev.sig.opening === d.sig.opening || prev.sig.ending === d.sig.ending || prev.sig.presentation === d.sig.presentation)) repeats++;
+    bad(d.beats.some((b) => /Tony/i.test(JSON.stringify(b))), 'the birthday greeting lost the person\'s name');
+    prev = d;
+  }
+  bad(openings.size >= 3 && endings.size >= 3 && shapes.size >= 6, `birthdays are still one storyboard: ${openings.size} openings, ${endings.size} endings, ${shapes.size} shapes`);
+  bad(repeats <= 1, `regenerate repeated the previous opening/ending/presentation ${repeats} times`);
+}
+
+// 5c. the owner's own style is preserved through regenerations; an automatic style is allowed to rotate
+{
+  const { STARTER_STYLES } = await import('../server/db/starter.js');
+  const own = STARTER_STYLES.find((x) => x.slug === 'gold-luxe') || STARTER_STYLES[0];
+  const owned = mk({ ...cases.restaurant, lookAuto: 'own' }), auto = mk({ ...cases.restaurant, lookAuto: 'auto' });
+  const looksOwn = new Set(), looksAuto = new Set(); let po = null, pa = null;
+  for (let i = 0; i < 8; i++) {
+    const a = await directMotion({ plan: plan(owned), brief: owned, assets: photos, useAi: false, style: own, salt: i ? 'o' + i : '', ...(po ? { prevSig: po.sig, prevAngle: po.angle, prevLook: po.look?.key } : {}) });
+    po = readMotion(a.html); looksOwn.add(po.look?.key);
+    const b = await directMotion({ plan: plan(auto), brief: auto, assets: photos, useAi: false, style: own, salt: i ? 'a' + i : '', ...(pa ? { prevSig: pa.sig, prevAngle: pa.angle, prevLook: pa.look?.key } : {}) });
+    pa = readMotion(b.html); looksAuto.add(pa.look?.key);
+  }
+  bad(looksOwn.size === 1, `the owner's chosen style changed on regenerate: ${[...looksOwn]}`);
+  bad(looksAuto.size >= 3, `an automatic style never rotated: ${[...looksAuto]}`);
+}
+
 // 6. the AI path: its layouts and motion survive, and what it leaves centred is composed from the presentation
 const realFetch = globalThis.fetch; let reply = null;
 globalThis.fetch = async (url, init) => {
