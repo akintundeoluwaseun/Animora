@@ -21,6 +21,7 @@ import { beatsFor, alignMusic } from '../engine/sfx.js';
 import { readFileSync } from 'node:fs';
 import { useCredit, NEED_CREDITS } from '../billing.js';
 import { describeAssets } from '../ai/describe.js';
+import { readMotion } from '../ai/motion/index.js';
 import { loadImage } from '../ai/index.js';
 
 const MAX_IMAGES = 10;
@@ -389,7 +390,7 @@ async function runGenerate(p, user) {
         }
         name = brief.name || plan.title || 'Birthday video';
       }
-      out = await generateCode({ plan, style: await loadStyle(p.style_id), assets: await projectAssets(p.id), brief, previous: p.code_html || null, onStatus: setMsg });
+      out = await generateCode({ plan, style: await loadStyle(p.style_id), assets: await projectAssets(p.id), brief, previous: p.code_html || null, onStatus: setMsg, memory: await recentSignatures() });
     }
     const versions = [...(p.code_versions || []), ...(p.code_html ? [p.code_html] : [])].slice(-MAX_VERSIONS);
     const u = await one(`UPDATE projects SET code_html=$2, code_versions=$3, status='ready', ai_source=$4, edit_history='[]'::jsonb, updated_at=now(),
@@ -404,6 +405,14 @@ async function runGenerate(p, user) {
       [p.id, `Something went wrong making the video (${String(e.message).slice(0, 120)}). Press Make my video to try again.`]).catch(() => {});
     await notifyUser(user.id, { title: "Your video didn't finish", body: `${name}: open Animora and press Make my video to try again.`, url: `/p/${p.id}/studio`, tag: `gen-${p.id}` });
   }
+}
+
+/** Creative memory: how the platform's most recent films opened, ended and looked (newest first), so a new film steers away from them. */
+async function recentSignatures() {
+  try {
+    const rows = await q(`SELECT code_html FROM projects WHERE code_html LIKE '%window.MOTION = %' ORDER BY updated_at DESC LIMIT 10`);
+    return rows.map((r) => readMotion(r.code_html)?.sig).filter(Boolean);
+  } catch (e) { console.warn('[memory] could not read recent films:', e.message); return []; }
 }
 
 r.post('/:id/edit', async (req, res) => {

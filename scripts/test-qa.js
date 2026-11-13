@@ -146,8 +146,52 @@ console.log('All creative QA checks passed');
     for (let i = 0; i < 4; i++) { const r = await directMotion({ plan, brief: { ...cb, lookAuto: 'own' }, assets: photos, useAi: false, salt: `o${i}`, style: STARTER_STYLES.find((x) => x.slug === 'mono-editorial'), prevLook: 'mono-editorial' }); if (r.data.look.key !== 'mono-editorial') owner++; }
     bad(owner === 0, "a look the owner picked themselves was changed on regenerate");
     const seqs = new Set();
-    for (let i = 0; i < 12; i++) { const r = await directMotion({ plan, brief: cb, assets: photos, useAi: false, salt: `v${i}` }); seqs.add(r.data.beats.map((b) => b.type).join('>')); if (r.data.angle === 'photos') bad(r.data.beats[0].type === 'photos', 'photos angle did not open on the pictures'); if (r.data.angle === 'type') bad(r.data.beats.every((b) => ['words', 'highlight', 'stat', 'calendar', 'price', 'countdown', 'ring', 'end', 'button', 'icon'].includes(b.type)), 'type angle used screens or photos'); }
+    for (let i = 0; i < 12; i++) { const r = await directMotion({ plan, brief: cb, assets: photos, useAi: false, salt: `v${i}` }); seqs.add(r.data.beats.map((b) => b.type).join('>')); { const o = r.data.sig.intended.opening, b0 = r.data.beats[0]; const want = { photoFirst: 'photos:full', atmospheric: 'photos:full', documentary: 'photos:editorial', brandFirst: 'icon', reveal: 'words', story: 'words:left', typo: 'words' }[o]; bad(`${b0.type}${b0.layout ? ':' + b0.layout : ''}`.startsWith(want), `film planned to open "${o}" but opened on ${b0.type}:${b0.layout || b0.mode}`); const e = r.data.beats.at(-1); bad(e.type === 'end' && (e.layout || 'card') === r.data.sig.intended.ending || (r.data.sig.intended.ending === 'photo' && !e.layout), `ending ${e.layout || 'card'} != planned ${r.data.sig.intended.ending}`); bad(!!e.contact || !cb.contact, 'ending lost the contact'); } if (r.data.angle === 'type') bad(r.data.beats.every((b) => ['words', 'highlight', 'stat', 'calendar', 'price', 'countdown', 'ring', 'end', 'button', 'icon'].includes(b.type)), 'type angle used screens or photos'); }
     bad(seqs.size >= 6, `only ${seqs.size} distinct film structures in 12 regenerations`);
+  }
+  // creative memory: a combination used recently is discouraged, and an owner's own look is never overridden
+  {
+    const { pickStructure, signatureOf } = await import('../server/ai/motion/structure.js');
+    let seed = 12345; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+    const share = (mem, n = 400) => { let photo = 0, card = 0; for (let i = 0; i < n; i++) { const st = pickStructure({ direction: 'restaurant', angle: 'photos', photos: 3, memory: mem, rnd }); if (st.opening === 'photoFirst') photo++; if (st.ending === 'card') card++; } return { photo: photo / n, card: card / n }; };
+    const fresh = share([]);
+    const used = share(Array.from({ length: 5 }, () => ({ opening: 'photos:full', ending: 'end:card', photos: 'full', left: 0, lists: 0 })));
+    bad(used.photo < fresh.photo * 0.6, `opening memory did not discourage a repeat (${fresh.photo.toFixed(2)} -> ${used.photo.toFixed(2)})`);
+    bad(used.card < fresh.card * 0.6, `ending memory did not discourage a repeat (${fresh.card.toFixed(2)} -> ${used.card.toFixed(2)})`);
+    const sig = signatureOf([{ type: 'photos', layout: 'full', out: 'zoom' }, { type: 'words', out: 'push' }, { type: 'end', layout: 'poster' }], { key: 'gold-luxe', deco: 'golddust', display: 'Playfair Display' });
+    bad(sig.opening === 'photos:full' && sig.ending === 'end:poster' && sig.look === 'gold-luxe', 'signature does not describe the film');
+    // a film made after others avoids their look; the owner's own pick stays
+    const { directMotion } = await import('../server/ai/motion/director.js');
+    const { forget } = await import('../server/ai/motion/memory.js');
+    const cb = cleanBrief({ kind: 'business', name: 'Maison Oud', category: 'Luxury perfume', headline: 'The scent of distinction', features: ['Hand-blended oud'] });
+    const pl = { aspect_ratio: '9:16', duration_seconds: 20, business: { name: cb.name, category: cb.category }, scenes: [] };
+    const crowd = Array.from({ length: 6 }, () => ({ opening: 'words', ending: 'end:card', photos: 'none', look: 'gold-luxe', angle: 'calm' }));
+    forget();
+    let moved = 0, kept = 0;
+    for (let i = 0; i < 8; i++) {
+      const a = await directMotion({ plan: pl, brief: cb, assets: [], useAi: false, style: STARTER_STYLES.find((x) => x.slug === 'gold-luxe'), memory: crowd });
+      if (a.data.look.key !== 'gold-luxe') moved++;
+      const b = await directMotion({ plan: pl, brief: { ...cb, lookAuto: 'own' }, assets: [], useAi: false, style: STARTER_STYLES.find((x) => x.slug === 'gold-luxe'), memory: crowd });
+      if (b.data.look.key === 'gold-luxe') kept++;
+    }
+    bad(moved >= 5, `the platform's recent look was repeated ${8 - moved}/8 times`);
+    bad(kept === 8, "an owner's explicit look was changed by creative memory");
+  }
+  // the film is exactly as long as the owner chose, even when QA removes a repeated beat
+  {
+    const { directMotion } = await import('../server/ai/motion/director.js');
+    const q2 = qaBeats([{ type: 'words', dur: 3, out: 'push', lines: ['Hello there'] }, { type: 'words', dur: 3, out: 'rise', lines: ['Second line'] }, { type: 'words', dur: 3, out: 'zoom', lines: ['Second line'] }, { type: 'end', dur: 4, out: 'push', tagline: 'Thanks' }], { caps: { words: 3.4, end: 4.2 } });
+    bad(Math.abs(q2.beats.reduce((a, b) => a + b.dur, 0) - 13) < 0.05, `QA shortened the film to ${q2.beats.reduce((a, b) => a + b.dur, 0)}s`);
+    for (const dur of [12, 17, 24, 30]) for (const o of [
+      { kind: 'business', name: 'Kemi Cakes', category: 'Bakery', headline: 'Fresh cakes', features: ['Wedding cakes', 'Cupcakes'], contact: '0803 123 4567' },
+      { kind: 'event', name: 'Night of Glory', category: 'Church programme', headline: 'A night of worship', features: ['Worship', 'Prayer'], when: 'Sunday 6pm · Grace Chapel' },
+      { kind: 'personal', name: 'Late Chief Adeyemi', category: 'Burial or memorial', headline: 'A life well lived', features: ['Born 1948', 'Rested 2026'] },
+    ]) for (let i = 0; i < 6; i++) {
+      const b = cleanBrief(o);
+      const r = await directMotion({ plan: { aspect_ratio: '9:16', duration_seconds: dur, business: { name: b.name, category: b.category }, scenes: [] }, brief: b, assets: [], useAi: false, salt: `len${i}`, style: STARTER_STYLES.find((x) => x.slug === autoStyleSlug(b)) });
+      const sum = r.data.beats.reduce((a, x) => a + x.dur, 0);
+      bad(Math.abs(sum - dur) < 0.15, `${o.name} ${dur}s film came out ${sum.toFixed(1)}s`);
+    }
   }
   console.log('direction / flyer / film QA checks passed');
 }

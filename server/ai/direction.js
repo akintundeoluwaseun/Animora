@@ -9,7 +9,7 @@ export const DIRECTIONS = [
     concept: 'Dignified and quiet: few words, long holds, no decoration.' },
   { id: 'faith', re: /church|ministry|fellowship|worship|christian|mosque|islam|prayer|gospel|crusade|revival|assembly|thanksgiving service|choir/i, styles: ['glory-light', 'gold-luxe', 'ocean-breeze', 'prime-estate'], angles: ['calm', 'story', 'photos'], layouts: ['invite', 'poster', 'event'],
     concept: 'Reverent and warm: light and rest, time and place clear, nothing loud.' },
-  { id: 'luxury', avoid: ['search','notif','toggles','swap','chat','receipt','phone','button','countdown','ring','stat'], re: /luxur|perfume|fragrance|\boud\b|jewel|watch(?:es)?\b|couture|bespoke|premium|high.?end|designer|diamond|signature collection|haute/i, styles: ['gold-luxe'], angles: ['calm', 'clean', 'story'], layouts: ['poster', 'photo', 'invite'],
+  { id: 'luxury', avoid: ['search','notif','toggles','swap','chat','receipt','phone','button','countdown','ring','stat'], re: /luxur|perfume|fragrance|\boud\b|jewel|watch(?:es)?\b|couture|bespoke|premium|high.?end|designer|diamond|signature collection|haute/i, styles: ['gold-luxe'], alts: ['graphite-pro', 'mono-editorial', 'studio-white'], angles: ['calm', 'clean', 'story'], layouts: ['poster', 'photo', 'invite'],
     concept: 'Restraint: dark stage, one serif voice, space around the product, almost no copy.' },
   { id: 'wedding', re: /wedding|engagement|bridal|traditional marriage|white wedding|save the date/i, styles: ['gold-luxe', 'beauty-bloom', 'glory-light', 'mono-editorial'], angles: ['calm', 'story', 'photos'], layouts: ['invite', 'photo', 'poster'],
     concept: 'Romantic and unhurried: serif type, soft light, their photos first.' },

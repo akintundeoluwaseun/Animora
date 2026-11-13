@@ -10,7 +10,7 @@ import { spawnSync } from 'node:child_process';
 const dataDir = await mkdtemp(path.join(tmpdir(), 'adflash-media-'));
 const PORT = 3998;
 Object.assign(process.env, {
-  ANIMORA_ENGINE: 'motion',   // this file checks the Motion engine (captions, motion-v4); premium films are covered by test-audio.js
+  ANIMORA_ENGINE: 'motion',   // this file checks the Motion director (and the older template engine as fallback); premium films are covered by test-audio.js
   DATA_DIR: dataDir, PORT: String(PORT), PUBLIC_BASE_URL: `http://localhost:${PORT}`, AI_MODE: 'offline', AUTH: 'off',
   DATABASE_URL: '', SUPABASE_URL: '', SEED_DEMO_HISTORY: 'false',
 });
@@ -96,8 +96,19 @@ try {
   for (let i = 0; i < 120 && !proj.code && proj.status === 'coding'; i++) { await new Promise((r) => setTimeout(r, 500)); proj = (await api('GET', `/projects/${P}`)).project || proj; }
   const code = proj.code || '';
   ok('code uses the uploaded images', [logo, cake, cup].every((a) => code.includes(a.asset.url)));
-  ok('code has captions', /"captions":\[\{/.test(code) && code.includes("'cap'"));
-  ok('code uses the motion engine v4 (beats with cuts, one at a time)', code.includes('engine=motion-v4') && code.includes('window.ADFLASH_DATA') && code.includes('"cut":'));
+  // The default engine is the Motion director (server/ai/motion): a storyboard of beats shown one at a time. Check what the owner sees.
+  const { readMotion } = await import('../server/ai/motion/index.js');
+  const film = readMotion(code);
+  ok('code is a Motion film: beats one at a time, each cut by a transition, finishing on the end card',
+    !!film && film.beats.length >= 4 && film.beats.slice(0, -1).every((b) => ['push', 'whip', 'zoom', 'rise', 'drop', 'fade'].includes(b.out)) && film.beats.at(-1).type === 'end', film ? film.beats.map((b) => b.type).join('>') : 'not a Motion film');
+  const textBeats = (film?.beats || []).filter((b) => [].concat(b.lines || b.text || b.tagline || b.title || []).filter(Boolean).length);
+  ok('film has on-screen text (hook, statements, closing line)', textBeats.length >= 3, `${textBeats.length} beats carry text`);
+  const filmLen = (film?.beats || []).reduce((a, b) => a + b.dur, 0);
+  ok('film length matches the plan', Math.abs(filmLen - plan.duration_seconds) <= 1, `${filmLen.toFixed(1)}s vs ${plan.duration_seconds}s planned`);
+  // the older template engine (templates.js) is still the fallback when the director cannot run; it keeps its captions and cuts
+  const { templateFromPlan } = await import('../server/ai/templates.js');
+  const legacy = templateFromPlan(plan, { themeKey: 'bold' });
+  ok('fallback template engine keeps captions and cuts (motion-v4)', /"captions":\s*\[\s*\{/.test(legacy) && legacy.includes("'cap'") && legacy.includes('engine=motion-v4') && legacy.includes('window.ADFLASH_DATA') && legacy.includes('"cut":'));
 
   const vo = await api('GET', `/projects/${P}/voiceover`);
   ok('TTS-ready script: prices and phone spelled out', vo.formats.plain.includes('fifteen thousand naira') && vo.formats.plain.includes('zero eight zero six, one two three, four five six seven'));

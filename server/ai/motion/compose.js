@@ -6,6 +6,8 @@ import { factsFrom, cleanText, fixPrices, glyphFor } from '../cinema/compose.js'
 import { isPersonalBirthdayBrief } from '../personal.js';
 import { videoGroup, closingLine, fitCtas } from '../closing.js';
 import { directionOf } from '../direction.js';
+import { conformStructure } from './structure.js';
+const NEEDS_PIC = new Set(['photoFirst', 'atmospheric', 'documentary', 'reveal']);
 
 const hash = (s) => { let h = 2166136261; for (const c of String(s)) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); } return (h >>> 0) % 2147483646 + 1; };
 const OK = /^#[0-9a-f]{6}$/i;
@@ -104,7 +106,7 @@ export function accentFor(colors = {}, text = '') {
  * The storyboard. Returns { beats, font, accent, accent2 }.
  * opts: { brief, assets, salt, avoid: [types used last time], duration }
  */
-export function composeMotion(plan, { brief = {}, assets = [], salt = '', avoid = [], colors = {}, look = null, angle = null } = {}) {
+export function composeMotion(plan, { brief = {}, assets = [], salt = '', avoid = [], colors = {}, look = null, angle = null, structure = null } = {}) {
   const f = factsFrom(plan, brief || {}, assets);
   f.brand = brandCase(smartClip(cleanText(brief.name || plan.business?.name || f.brand, 80, { keepCase: true }), 48) || f.brand);
   const specific = cleanText(plan.business?.category || '', 40);
@@ -212,6 +214,36 @@ export function composeMotion(plan, { brief = {}, assets = [], salt = '', avoid 
   // A personal birthday is a greeting, not an advert. Keep each supplied thought as its own animated beat.
   const personalBirthday = isPersonalBirthdayBrief(brief, plan);
   const dirAvoid = new Set(directionOf(brief).avoid || []);
+  // ---- the structure: how the film opens, how it ends, how its pictures and statements are composed ----
+  const S = structure || { opening: 'typo', ending: 'card', photos: 'float', wordsLeft: 0 };
+  const solemnFilm = /burial|funeral|memorial|tribute|obituar|in memory|celebration of life|condolence/i.test(`${brief.category || ''} ${brief.name || ''}`);
+  const captionOf = () => sentence([f.brand, catLabel, [].concat(brief.when || [])[0] ? String(brief.when).split(/\s*·\s*/).slice(-1)[0] : (address || city || '')].filter(Boolean).filter((x, i, a) => a.findIndex((y) => key(y) === key(x)) === i).join(' · '), 46);
+  /** The first beat(s) of the film. `head` is the headline beat that follows when the opening does not already carry it. */
+  const openingBeats = (typoPick) => {
+    let o = S.opening;
+    if (NEEDS_PIC.has(o) && !photos.length) o = 'typo';
+    if (o === 'photoFirst') return { opener: { ...B.photos(), layout: 'full', lines: [H0], accent: accentOf(H0) }, head: null, brandDone: false };
+    if (o === 'atmospheric') return { opener: { ...B.photos(), layout: 'full', lines: [], accent: [] }, head: B.hookGlow(), brandDone: false };
+    if (o === 'documentary') { const cap = captionOf(); return { opener: { ...B.photos(), layout: 'editorial', lines: cap ? [cap] : [], accent: [] }, head: solemnFilm ? B.hookGlow() : B.hookBuild(), brandDone: false }; }
+    if (o === 'reveal') {
+      const slam = B.hookSlam();
+      const sub = [heads[1], catLabel, f.brand].find((x) => x && key(x) !== key(H0)) || '';
+      if (slam) return { opener: slam, head: { ...B.photos(), layout: 'full', lines: sub ? [sentence(sub, 30)] : [], accent: [] }, brandDone: false };
+    }
+    if (o === 'brandFirst') { const b = B.brand(); return { opener: { ...b, mode: 'wordmark', tagline: b.tagline || '' }, head: B.hookBuild(), brandDone: true }; }
+    if (o === 'story') return { opener: { ...B.hookBuild(), layout: 'left' }, head: null, brandDone: false };
+    return { opener: typoPick(), head: null, brandDone: false };
+  };
+  /** Compose the finished list: photo layouts, left-set statements and the chosen ending (the essentials stay readable). */
+  const composeLayouts = (list) => {
+    const out = conformStructure(list, S, { photoUrls: photos });
+    let leftLeft = S.wordsLeft ? 2 : 0, n = 0;
+    out.forEach((b, i) => { if (b.type === 'words' && !b.layout && b.mode !== 'slam' && i > 0 && i < out.length - 2 && leftLeft > 0 && n++ % 2 === 0) { b.layout = 'left'; leftLeft--; } });
+    if (S.list) { const li = out.findIndex((b) => (b.type === 'stack' || b.type === 'toggles') && !b.layout && (b.items || []).length >= 2); if (li > -1) out[li].layout = 'list'; }
+    const last = out[out.length - 1];
+    if (last && last.type === 'end' && (solemnFilm || ['luxury', 'memorial'].includes(S.direction)) && last.bg === 'brand') last.bg = 'dark';   // a solemn or luxury film never closes on bright brand orbs
+    return out;
+  };
   // Not an advert (burial, announcement, church, school, event, cause...): their own words and pictures, never a search bar,
   // a shop button, a price or a chat. The opener, the order and the look change every time.
   const social = !personalBirthday && videoGroup(brief) === 'social';
@@ -219,8 +251,8 @@ export function composeMotion(plan, { brief = {}, assets = [], salt = '', avoid 
     const closing = (fitCtas(brief)[0] || closingLine(brief)).replace(/[.!]*$/, '');
     const opening = H0 || f.brand;
     const solemn = /burial|funeral|memorial|tribute|obituar|in memory|celebration of life|condolence/i.test(`${brief.category || ''} ${brief.name || ''}`);
-    const coldPic = !solemn && angle === 'photos' && photos.length ? { ...B.photos(), lines: [] } : null;
-    const opener = coldPic || (solemn ? B.hookGlow() : (chance(slamP0) && B.hookSlam()) || (chance(0.4) ? B.hookGlow() : B.hookBuild()));
+    const op = openingBeats(() => (solemn ? B.hookGlow() : (chance(slamP0) && B.hookSlam()) || (chance(0.4) ? B.hookGlow() : B.hookBuild())));
+    const opener = op.opener;
     const lineBeat = (line, i) => {
       if (words(line).length >= 4 && chance(0.5)) { const a = accentOf(line)[0]; return { type: 'highlight', bg: base, text: line, hot: a > 0 ? [a - 1, a] : [a] }; }
       const ls = balance(line, 22);
@@ -229,8 +261,7 @@ export function composeMotion(plan, { brief = {}, assets = [], salt = '', avoid 
     const said = [...heads.slice(1), ...feats].filter((x) => x && key(x) !== key(opening));
     const uniq = []; for (const x of said) if (!uniq.some((u) => key(u) === key(x))) uniq.push(x);
     const mid = [];
-    if (coldPic) mid.push(B.hookBuild());
-    else if (photos.length) mid.push(B.photos());
+    if (photos.length && !op.opener.urls && !(op.head && op.head.urls)) mid.push(B.photos());
     if (photos.length >= 4 && chance(0.6)) mid.push(B.grid());
     if (when) mid.push(solemn && brief.when ? { type: 'words', mode: 'glow', bg: 'dark', lines: balance(String(brief.when).replace(/\s*·\s*/g, ', '), 24), accent: [] } : B.calendar());
     uniq.slice(0, 4).forEach((x, i) => mid.push(lineBeat(x, i)));
@@ -241,9 +272,9 @@ export function composeMotion(plan, { brief = {}, assets = [], salt = '', avoid 
     const hasLogo = (assets || []).some((a) => a.role === 'logo' || /logo/i.test(a.name || ''));
     const nameBeat = !solemn && (hasLogo || !key(opening).includes(key(f.brand))) ? [{ type: 'icon', bg: base, mode: 'wordmark', tagline: '' }] : [];
     // where the name lands depends on the angle: right after the opener, late (story), or only on the end card (type)
-    const nm = angle === 'type' && !hasLogo ? [] : nameBeat;
-    if (angle === 'story' && nm.length && parts.length >= 2) { parts.splice(Math.min(2, parts.length), 0, ...nm); return [opener, ...parts, { type: 'end', bg: pick(['brand', 'dark']), tagline: closing, accent: accentOf(closing), contact: handle || site || phone || '' }]; }
-    return [opener, ...nm, ...parts, { type: 'end', bg: pick(['brand', 'dark']), tagline: closing, accent: accentOf(closing), contact: handle || site || phone || '' }];
+    const nm = op.brandDone || (angle === 'type' && !hasLogo) ? [] : nameBeat;
+    if (angle === 'story' && nm.length && parts.length >= 2) { parts.splice(Math.min(2, parts.length), 0, ...nm); return [opener, ...(op.head ? [op.head] : []), ...parts, { type: 'end', bg: pick(['brand', 'dark']), tagline: closing, accent: accentOf(closing), contact: handle || site || phone || '' }]; }
+    return [opener, ...(op.head ? [op.head] : []), ...nm, ...parts, { type: 'end', bg: pick(['brand', 'dark']), tagline: closing, accent: accentOf(closing), contact: handle || site || phone || '' }];
   };
   const slamP0 = (look?.energy || 'medium') === 'high' ? 0.45 : 0.15;
   if (personalBirthday || social) {
@@ -266,7 +297,7 @@ export function composeMotion(plan, { brief = {}, assets = [], salt = '', avoid 
       const lines = balance(line, 22);
       return { type: 'words', mode: i % 2 === 0 ? 'glow' : undefined, bg: i % 3 === 0 ? 'dark' : base, lines, accent: accentOf(lines[lines.length - 1], lines.length > 1 ? words(lines[0]).length : 0) };
     });
-    const beats = social ? socialBeats() : [
+    const beats = social ? composeLayouts(socialBeats()) : [
       { type: 'words', mode: 'slam', bg: 'dark', lines: balance(opening, 22), accent: accentOf(opening) },
       intro,
       ...(photoBeat ? [photoBeat] : []),
@@ -329,15 +360,14 @@ export function composeMotion(plan, { brief = {}, assets = [], salt = '', avoid 
   // the storytelling angle decides the shape of the film: how it opens, what it is made of, how it moves
   const ANG = angle || 'clean';
   const typeOnly = new Set(['words', 'highlight', 'stat', 'calendar', 'price', 'countdown', 'ring']);   // a purely typographic film
-  const coldPhoto = ANG === 'photos' && photos.length ? { ...B.photos(), lines: [] } : null;           // opens on the pictures, headline lands after
-  const opener = coldPhoto
-    || (ANG === 'loud' && B.hookSlam())
+  const op = openingBeats(() => (ANG === 'loud' && B.hookSlam())
     || (ANG === 'type' && (chance(0.6) ? B.hookSlam() : B.hookBuild()))
     || (ANG === 'calm' && B.hookGlow())
     || (ANG === 'story' && B.hookBuild())
-    || (event && !avoidSet.has('countdown') && chance(0.5) ? B.countdown() : null) || (chance(slamP) ? B.hookSlam() : null) || (chance(glowP) ? B.hookGlow() : B.hookBuild());
-  const brandBeat = (tech && ANG !== 'type' && chance(0.5) ? B.phone() : null) || B.brand();
-  const headBeat = coldPhoto ? B.hookBuild() : null;   // after a picture-first opening the headline is the second beat
+    || (event && !avoidSet.has('countdown') && chance(0.5) ? B.countdown() : null) || (chance(slamP) ? B.hookSlam() : null) || (chance(glowP) ? B.hookGlow() : B.hookBuild()));
+  const opener = op.opener;
+  const brandBeat = op.brandDone ? null : (tech && ANG !== 'type' && chance(0.5) ? B.phone() : null) || B.brand();
+  const headBeat = op.head;   // when the opening is a picture or the brand, the headline is the second beat
   const pool = [
     B.photos(), B.price(), B.menu(), B.receipt(), B.features(), ...B.heads(), B.stat(), B.ring(), B.calendar(), B.grid(), B.notif(), B.search(), B.map(),
   ].filter(Boolean).filter((b) => !dirAvoid.has(b.type))   // what suits a perfume is not what suits a school
@@ -370,8 +400,8 @@ export function composeMotion(plan, { brief = {}, assets = [], salt = '', avoid 
   textsOf(opener).forEach((t) => { used.add(key(t)); rawUsed.push(String(t).toLowerCase()); });
   if (headBeat) take(headBeat);
   // story: the brand is revealed late (after two ideas), clean: right after the opening
-  const lateBrand = ANG === 'story' && duration >= 16;
-  if (duration >= 14 && !lateBrand && !(ANG === 'type' && !(assets || []).some((x) => x.role === 'logo' || /logo/i.test(x.name || '')))) take(brandBeat);
+  const lateBrand = ANG === 'story' && duration >= 16 && !!brandBeat;
+  if (brandBeat && duration >= 14 && !lateBrand && !(ANG === 'type' && !(assets || []).some((x) => x.role === 'logo' || /logo/i.test(x.name || '')))) take(brandBeat);
   wanted.forEach(take);
   // how much time the facts fill; with lots of time and few facts, every strength gets its own beat (one idea per beat)
   const need = pool.reduce((a, b) => a + est(b), 0);
@@ -405,7 +435,7 @@ export function composeMotion(plan, { brief = {}, assets = [], salt = '', avoid 
   }
   if (ANG === 'calm' && body.length > 3) body.length = 3;                       // calm: fewer ideas, each given room
   if (ANG === 'loud' && ctaBeat && chance(0.5)) { const pi = body.findIndex((b) => b.type === 'price'); if (pi > 0) body.push(body.splice(pi, 1)[0]); }   // loud: land the offer just before the close
-  let beats = [opener, ...body, ctaBeat, endBeat].filter(Boolean);
+  let beats = composeLayouts([opener, ...body, ctaBeat, endBeat].filter(Boolean));
 
   // ---- backgrounds: keep rhythm (never three of the same in a row unless it is the theme), one brand punch ----
   const punch = beats.find((b) => b.bg === 'brand' && b.type !== 'end');

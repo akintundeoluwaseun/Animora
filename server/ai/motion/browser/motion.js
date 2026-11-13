@@ -225,8 +225,182 @@
   // ================================================================ BEATS
   const B = {};
 
+  // ================================================================ COMPOSITIONS
+  // A beat can carry a `layout`: the same content arranged differently (full-bleed, split-screen, editorial, left-aligned...).
+  const padX = () => N(PORTRAIT ? 84 : 120);
+  // left-aligned, wrapping lines written word by word, inside an absolutely placed block
+  function leftLines(parent, lines, size, o) {
+    o = o || {};
+    const pos = { position: 'absolute', left: px(o.left == null ? padX() : o.left), width: px(o.width || (W - 2 * padX())), display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: px(size * 0.1), textAlign: 'left' };
+    if (o.top != null) pos.top = o.top; else pos.bottom = o.bottom == null ? '9%' : o.bottom;
+    const box = el('div', '', parent, '', pos);
+    const acc = new Set([].concat(o.accent || []));
+    let off = 0, at = o.at, last = at;
+    const all = [];
+    [].concat(lines).filter(Boolean).slice(0, 3).forEach((L, li) => {
+      const r = wordsRow(box, L, li ? size * 0.62 : size, { accent: acc, offset: off, accColor: o.accColor, bg: o.bg, weight: o.weight || (li ? 550 : 700), color: o.color || (li && o.mute ? o.mute : undefined), fit: false });
+      off += r.words.length;
+      Object.assign(r.row.style, { justifyContent: 'flex-start', flexWrap: 'wrap', maxWidth: '100%' });
+      r.items.forEach((it) => { all.push(it); });
+    });
+    all.forEach((it, i) => { tl.fromTo(it, { opacity: 0, y: '0.4em', filter: blur(9) }, { opacity: 1, y: 0, filter: blur(0), duration: 0.75, ease: 'expo.out' }, at + i * (o.per || 0.11)); last = at + i * (o.per || 0.11) + 0.75; });
+    return { box, end: last };
+  }
+  const scrimOf = (parent, from, to) => el('div', '', parent, '', { position: 'absolute', left: 0, right: 0, bottom: 0, height: (to || 62) + '%', background: `linear-gradient(180deg, transparent, rgba(0,0,0,${from || 0.72}))`, pointerEvents: 'none' });
+  const imgIn = (parent, u, css) => { const i = el('img', '', parent, null, Object.assign({ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }, css || {})); i.src = u; return i; };
+
+  // PHOTOS / full: one picture fills the screen and drifts; more pictures cross-fade; the line sits low and left
+  function photosFull(s, o, t0, t1, bg, urls) {
+    const wrap = el('div', '', s, '', { position: 'absolute', inset: 0, overflow: 'hidden' });
+    const use = urls.slice(0, 3), per = Math.max(1.4, (t1 - t0) / use.length);
+    use.forEach((u, i) => {
+      const a = t0 + i * per, im = imgIn(wrap, u);
+      const dir = i % 2 ? -1 : 1;
+      tl.fromTo(im, { scale: 1.16, xPercent: 3 * dir, opacity: i ? 0 : 1 }, { scale: 1.0, xPercent: -2 * dir, duration: per + 0.8, ease: 'sine.out', immediateRender: i === 0 }, a);
+      if (i) tl.to(im, { opacity: 1, duration: 0.6, ease: 'power1.inOut' }, a);
+    });
+    scrimOf(wrap, 0.74, 66);
+    tl.fromTo(wrap, { filter: blur(14), scale: 1.05 }, { filter: blur(0), scale: 1, duration: 0.9, ease: 'expo.out' }, t0);
+    sfx(t0 + 0.05, 'whoosh', 0.35);
+    const lines = [].concat(o.lines || o.text || []).filter(Boolean);
+    if (lines.length) {
+      const rule = el('div', '', wrap, '', { position: 'absolute', left: px(padX()), bottom: PORTRAIT ? '27%' : '30%', width: px(120), height: px(8), background: ACC, transformOrigin: '0 50%', borderRadius: px(4) });
+      tl.fromTo(rule, { scaleX: 0 }, { scaleX: 1, duration: 0.7, ease: 'expo.out' }, t0 + 0.5);
+      leftLines(wrap, lines, PORTRAIT ? 104 : 84, { at: t0 + 0.7, bg: 'dark', color: '#FFFFFF', mute: 'rgba(255,255,255,.78)', accColor: mix(ACC, '#FFFFFF', 0.25), accent: o.accent, bottom: PORTRAIT ? '10%' : '12%' });
+    }
+  }
+  // PHOTOS / split: a picture panel on one side and the words on the stage on the other (asymmetric)
+  function photosSplit(s, o, t0, t1, bg, urls) {
+    const dur = Math.max(1, t1 - t0), vertical = PORTRAIT;
+    const panel = el('div', '', s, '', vertical ? { position: 'absolute', left: 0, right: 0, top: 0, height: '58%', overflow: 'hidden' } : { position: 'absolute', left: 0, top: 0, bottom: 0, width: '54%', overflow: 'hidden' });
+    const im = imgIn(panel, urls[0]);
+    tl.fromTo(panel, { clipPath: vertical ? 'inset(0 0 100% 0)' : 'inset(0 100% 0 0)' }, { clipPath: 'inset(0 0 0% 0)', duration: 1.0, ease: 'expo.inOut' }, t0);
+    tl.fromTo(im, { scale: 1.3 }, { scale: 1.02, duration: dur, ease: 'sine.out' }, t0);
+    if (urls[1]) {   // a second picture tucked over the seam
+      const w = vertical ? W * 0.36 : W * 0.2, h = w * 1.2;
+      const ins = el('div', '', s, '', vertical ? { position: 'absolute', right: px(padX()), top: '58%', width: px(w), height: px(h), marginTop: px(-h * 0.5), borderRadius: px(26), overflow: 'hidden', boxShadow: shadow(1.6), border: `${N(10)}px solid ${bg === 'dark' ? '#111' : '#fff'}` } : { position: 'absolute', left: '54%', top: '50%', width: px(w), height: px(h), marginLeft: px(-w * 0.5), marginTop: px(-h / 2), borderRadius: px(26), overflow: 'hidden', boxShadow: shadow(1.6), border: `${N(10)}px solid ${bg === 'dark' ? '#111' : '#fff'}` });
+      imgIn(ins, urls[1]);
+      tl.fromTo(ins, { opacity: 0, y: N(60), scale: 0.88 }, { opacity: 1, y: 0, scale: 1, duration: 0.9, ease: 'back.out(1.4)' }, t0 + 0.7);
+    }
+    const lines = [].concat(o.lines || o.text || []).filter(Boolean);
+    if (lines.length) {
+      const where = vertical ? { top: '64%', bottom: undefined } : { left: W * 0.58, width: W * 0.36, top: '34%' };
+      leftLines(s, lines, vertical ? 92 : 70, Object.assign({ at: t0 + 0.9, bg, color: inkOf(bg), mute: muteOf(bg), accColor: accOf(bg), accent: o.accent }, vertical ? { top: urls[1] ? '73%' : '65%' } : { left: W * 0.58, width: W * 0.34, top: '32%' }));
+    }
+    sfx(t0 + 0.1, 'whoosh', 0.35);
+  }
+  // PHOTOS / editorial: a large bleeding picture, a smaller one overlapping its corner, a hairline and a quiet caption
+  function photosEditorial(s, o, t0, t1, bg, urls) {
+    const dur = Math.max(1, t1 - t0);
+    const bw = PORTRAIT ? W * 0.86 : W * 0.5, bh = PORTRAIT ? H * 0.5 : H * 0.8;
+    const big = el('div', '', s, '', { position: 'absolute', left: PORTRAIT ? '-3%' : '6%', top: PORTRAIT ? '7%' : '10%', width: px(bw), height: px(bh), overflow: 'hidden', boxShadow: shadow(1.3) });
+    const im = imgIn(big, urls[0]);
+    tl.fromTo(big, { clipPath: 'inset(100% 0 0 0)', x: -N(40) }, { clipPath: 'inset(0% 0 0 0)', x: 0, duration: 1.0, ease: 'expo.inOut' }, t0);
+    tl.fromTo(im, { scale: 1.25, yPercent: 4 }, { scale: 1.02, yPercent: -2, duration: dur, ease: 'sine.out' }, t0);
+    if (urls[1]) {
+      const w = PORTRAIT ? W * 0.44 : W * 0.24, h = w * 1.28;
+      const sm = el('div', '', s, '', { position: 'absolute', right: PORTRAIT ? '5%' : '9%', top: PORTRAIT ? px(H * 0.07 + bh - h * 0.8) : px(H * 0.1 + bh - h * 0.9), width: px(w), height: px(h), overflow: 'hidden', boxShadow: shadow(1.8), border: `${N(12)}px solid ${bg === 'dark' ? '#0d0d10' : '#fff'}` });
+      imgIn(sm, urls[1]);
+      tl.fromTo(sm, { opacity: 0, y: N(90) }, { opacity: 1, y: 0, duration: 1.0, ease: 'expo.out' }, t0 + 0.55);
+      tl.to(sm, { y: -N(24), duration: Math.max(0.5, dur - 1.4), ease: 'sine.inOut' }, t0 + 1.5);
+    }
+    const lines = [].concat(o.lines || o.text || []).filter(Boolean);
+    const rule = el('div', '', s, '', { position: 'absolute', left: px(padX()), top: PORTRAIT ? '65%' : '68%', width: px(PORTRAIT ? W * 0.18 : W * 0.08), height: px(3), background: inkOf(bg), transformOrigin: '0 50%' });
+    tl.fromTo(rule, { scaleX: 0 }, { scaleX: 1, duration: 0.8, ease: 'expo.out' }, t0 + 0.8);
+    if (lines.length) leftLines(s, lines, PORTRAIT ? 78 : 62, { at: t0 + 1.0, bg, color: inkOf(bg), mute: muteOf(bg), accColor: accOf(bg), accent: o.accent, top: PORTRAIT ? '67.5%' : '72%', width: PORTRAIT ? W - 2 * padX() : W * 0.6 });
+    sfx(t0 + 0.1, 'whoosh', 0.3);
+  }
+  // WORDS / left: an editorial statement set left-aligned in the lower half with a short rule above it
+  function wordsLeft(s, o, t0, t1, bg) {
+    const lines = [].concat(o.lines || o.text || '').filter(Boolean).slice(0, 3);
+    const size = o.size || (PORTRAIT ? 124 : 100);
+    const rule = el('div', '', s, '', { position: 'absolute', left: px(padX()), top: PORTRAIT ? '47%' : '40%', width: px(PORTRAIT ? 150 : 120), height: px(8), background: ACC, borderRadius: px(4), transformOrigin: '0 50%' });
+    tl.fromTo(rule, { scaleX: 0 }, { scaleX: 1, duration: 0.7, ease: 'expo.out' }, t0 + 0.05);
+    const r = leftLines(s, lines, size, { at: t0 + 0.2, bg, color: inkOf(bg), mute: muteOf(bg), accColor: accOf(bg), accent: o.accent, top: PORTRAIT ? '51%' : '46%', weight: o.mode === 'glow' ? 600 : 700 });
+    if (o.mode === 'glow') Array.from(r.box.querySelectorAll('.row')).forEach((row) => { row.style.textShadow = `0 0 ${N(18)}px rgba(255,255,255,.5), 0 0 ${N(60)}px ${rgba(A_D, 0.5)}`; });
+    if (o.sub) { const sub = el('div', '', s, esc(o.sub), { position: 'absolute', left: px(padX()), top: PORTRAIT ? '77%' : '78%', fontSize: px(o.subSize || 40), fontWeight: 500, color: muteOf(bg), letterSpacing: '-0.01em' }); tl.fromTo(sub, { opacity: 0, y: N(16), filter: blur(6) }, { opacity: 1, y: 0, filter: blur(0), duration: 0.8, ease: 'expo.out' }, Math.min(r.end, t1 - 1.0)); }
+  }
+  // STACK / TOGGLES / list: strengths as an editorial numbered list (typography instead of pastel cards)
+  function listLayout(s, o, t0, t1, bg) {
+    const items = [].concat(o.items || []).map((x) => (typeof x === 'string' ? { t: x } : x)).filter((x) => x && x.t).slice(0, 5);
+    const ink = inkOf(bg), mute = muteOf(bg);
+    const n = items.length, rowH = Math.min((PORTRAIT ? 0.125 : 0.16) * H, (PORTRAIT ? 0.5 : 0.6) * H / Math.max(1, n)), fs = Math.min(PORTRAIT ? 108 : 84, rowH * (n > 3 ? 0.62 : 0.66));
+    const top = Math.max(PORTRAIT ? 0.27 : 0.24, 0.5 - (n * rowH) / (2 * H) + 0.025);
+    if (o.title) {
+      const t = el('div', '', s, esc(String(o.title).toUpperCase()), { position: 'absolute', left: px(padX()), top: px(H * (top - 0.075)), fontSize: px(38), fontWeight: 650, letterSpacing: '0.16em', color: accOf(bg) });
+      tl.fromTo(t, { opacity: 0, x: -N(30) }, { opacity: 1, x: 0, duration: 0.8, ease: 'expo.out' }, t0 + 0.05);
+    }
+    items.forEach((it, i) => {
+      const y = H * top + i * rowH, a = t0 + 0.3 + i * 0.4;
+      const row = el('div', '', s, '', { position: 'absolute', left: px(padX()), width: px(W - 2 * padX()), top: px(y), height: px(rowH), display: 'flex', alignItems: 'center', gap: px(34) });
+      el('div', '', row, String(i + 1).padStart(2, '0'), { fontSize: px(Math.max(34, fs * 0.38)), fontWeight: 600, color: accOf(bg), fontFamily: DISPLAY, letterSpacing: '0.04em', flex: '0 0 auto', minWidth: px(70) });
+      const col = el('div', '', row, '', { display: 'flex', flexDirection: 'column', gap: px(4), minWidth: 0 });
+      const t = el('div', '', col, esc(it.t), { fontSize: px(fs), fontWeight: 650, letterSpacing: '-0.03em', color: ink, whiteSpace: 'nowrap', lineHeight: 1.08 });
+      dressText(t, bg); t.style.color = ink; if (LOOK.text === 'outline') t.style.webkitTextStroke = '0'; t.style.textShadow = 'none'; t.style.fontSize = (parseFloat(t.style.fontSize) || fs) + 'px';
+      fitFont(t, W - 2 * padX() - N(120), N(32));
+      if (it.s) { const sub = el('div', '', col, esc(it.s), { fontSize: px(Math.max(30, fs * 0.36)), fontWeight: 500, color: mute, whiteSpace: 'nowrap' }); fitFont(sub, W - 2 * padX() - N(120), N(24)); }
+      const line = el('div', '', s, '', { position: 'absolute', left: px(padX()), width: px(W - 2 * padX()), top: px(y + rowH), height: px(2), background: ink, opacity: 0.18, transformOrigin: '0 50%' });
+      tl.fromTo(row, { opacity: 0, x: -N(60), filter: blur(8) }, { opacity: 1, x: 0, filter: blur(0), duration: 0.85, ease: 'expo.out' }, a);
+      tl.fromTo(line, { scaleX: 0 }, { scaleX: 1, duration: 0.9, ease: 'expo.out' }, a + 0.1);
+      sfx(a, 'tick', 0.35);
+    });
+  }
+  // END layouts: the same essentials (name, line, how to reach them), composed differently
+  const contactText = (parent, o, color, at, t1) => {
+    if (!o.contact) return;
+    const row = el('div', 'row', parent, '', { gap: px(18), marginTop: px(36), fontSize: px(44), fontWeight: 600, color, whiteSpace: 'nowrap', alignSelf: 'flex-start' });
+    el('div', '', row, glyph(o.contactGlyph || 'search', 44, color, 2.4), { display: 'grid' });
+    el('div', '', row, esc(o.contact));
+    fitFont(row, W - 2 * padX(), N(26));
+    tl.fromTo(row, { opacity: 0, y: N(30), filter: blur(8) }, { opacity: 1, y: 0, filter: blur(0), duration: 0.8, ease: 'expo.out' }, Math.min(at, t1 - 0.9));
+  };
+  const END = {};
+  END.minimal = (s, o, t0, t1, bg) => {   // quiet: a hairline, the name set large, the line and the contact below, all left
+    const ink = inkOf(bg), blk = el('div', '', s, '', { position: 'absolute', left: px(padX()), right: px(padX()), bottom: PORTRAIT ? '13%' : '14%', display: 'flex', flexDirection: 'column', alignItems: 'flex-start' });
+    const rule = el('div', '', blk, '', { width: '100%', height: px(3), background: ink, opacity: 0.85, transformOrigin: '0 50%', marginBottom: px(46) });
+    tl.fromTo(rule, { scaleX: 0 }, { scaleX: 1, duration: 1.1, ease: 'expo.inOut' }, t0 + 0.1);
+    let at = t0 + 0.5;
+    if (D.logo) { const ic = brandIcon(blk, N(120), {}); ic.style.marginBottom = px(30); tl.fromTo(ic, { opacity: 0, scale: 0.6 }, { opacity: 1, scale: 1, duration: 0.8, ease: 'back.out(1.6)' }, at); at += 0.2; }
+    const name = nameBlock(blk, D.brand, N(PORTRAIT ? 112 : 96), ink, W - 2 * padX());
+    name.style.alignSelf = 'flex-start';
+    tl.fromTo(name, { opacity: 0, y: N(40), filter: blur(10) }, { opacity: 1, y: 0, filter: blur(0), duration: 0.9, ease: 'expo.out' }, at); at += 0.5;
+    if (o.tagline) { const tg = wordsRow(blk, o.tagline, 54, { weight: 500, accent: new Set([].concat(o.accent || [])), accColor: accOf(bg), fit: false }); Object.assign(tg.row.style, { justifyContent: 'flex-start', flexWrap: 'wrap', marginTop: px(22), color: muteOf(bg), textAlign: 'left' }); tg.items.forEach((it, i) => tl.fromTo(it, { opacity: 0, y: '0.3em' }, { opacity: 1, y: 0, duration: 0.6, ease: 'expo.out' }, at + i * 0.09)); at += tg.items.length * 0.09 + 0.3; }
+    contactText(blk, o, ink, at, t1);
+    sfx(t0 + 0.2, 'whoosh', 0.25);
+  };
+  END.poster = (s, o, t0, t1, bg) => {   // the closing line is the hero; the name and contact are the small print
+    if (!o.tagline) return B.end(s, Object.assign({}, o, { layout: 'card' }), t0, t1, bg);
+    const onBrand = bg === 'brand', ink = onBrand ? inkOf(bg) : inkOf(bg), mute = onBrand ? inkOf(bg) : muteOf(bg);
+    const r = leftLines(s, [o.tagline], PORTRAIT ? 150 : 116, { at: t0 + 0.2, bg, color: ink, accColor: onBrand ? (BRAND_DARK ? '#FFFFFF' : '#111') : accOf(bg), accent: o.accent, top: PORTRAIT ? '26%' : '20%', weight: 750, per: 0.14 });
+    const foot = el('div', '', s, '', { position: 'absolute', left: px(padX()), right: px(padX()), bottom: PORTRAIT ? '10%' : '10%', display: 'flex', flexDirection: 'column', alignItems: 'flex-start' });
+    const row = el('div', 'row', foot, '', { gap: px(24), alignItems: 'center' });
+    if (D.logo) brandIcon(row, N(96), { onBrand });
+    const nm = el('div', '', row, esc(D.brand), { fontFamily: DISPLAY, fontWeight: DW, fontSize: px(58), letterSpacing: '-0.03em', color: ink, whiteSpace: 'nowrap', textTransform: LOOK.upper ? 'uppercase' : 'none' }); fitFont(nm, W - 2 * padX() - (D.logo ? N(120) : 0), N(30));
+    tl.fromTo(row, { opacity: 0, y: N(40) }, { opacity: 1, y: 0, duration: 0.9, ease: 'expo.out' }, Math.min(r.end, t1 - 1.4));
+    contactText(foot, o, mute, Math.min(r.end + 0.2, t1 - 1.0), t1);
+    sfx(t0 + 0.2, 'whoosh', 0.3);
+  };
+  END.photo = (s, o, t0, t1, bg) => {   // over their last picture, with the name, line and contact on a dark scrim
+    if (!o.url) return B.end(s, Object.assign({}, o, { layout: 'card' }), t0, t1, bg);
+    const wrap = el('div', '', s, '', { position: 'absolute', inset: 0, overflow: 'hidden' });
+    const im = imgIn(wrap, o.url);
+    tl.fromTo(im, { scale: 1.18 }, { scale: 1.0, duration: Math.max(1, t1 - t0) + 0.6, ease: 'sine.out' }, t0);
+    scrimOf(wrap, 0.82, 78);
+    tl.fromTo(wrap, { opacity: 0 }, { opacity: 1, duration: 0.6 }, t0);
+    const blk = el('div', '', wrap, '', { position: 'absolute', left: px(padX()), right: px(padX()), bottom: PORTRAIT ? '9%' : '10%', display: 'flex', flexDirection: 'column', alignItems: 'flex-start' });
+    let at = t0 + 0.5;
+    const row = el('div', 'row', blk, '', { gap: px(26), alignItems: 'center' });
+    if (D.logo) brandIcon(row, N(110), { onBrand: true });
+    const nm = el('div', '', row, esc(D.brand), { fontFamily: DISPLAY, fontWeight: DW, fontSize: px(PORTRAIT ? 96 : 80), letterSpacing: '-0.035em', color: '#FFFFFF', whiteSpace: 'nowrap', textTransform: LOOK.upper ? 'uppercase' : 'none' }); fitFont(nm, W - 2 * padX() - (D.logo ? N(140) : 0), N(34));
+    tl.fromTo(row, { opacity: 0, y: N(50), filter: blur(10) }, { opacity: 1, y: 0, filter: blur(0), duration: 0.9, ease: 'expo.out' }, at); at += 0.6;
+    if (o.tagline) { const tg = wordsRow(blk, o.tagline, 54, { weight: 500, accent: new Set([].concat(o.accent || [])), accColor: mix(ACC, '#FFFFFF', 0.25), fit: false }); Object.assign(tg.row.style, { justifyContent: 'flex-start', flexWrap: 'wrap', marginTop: px(20), color: 'rgba(255,255,255,.85)', textAlign: 'left' }); tg.items.forEach((it, i) => tl.fromTo(it, { opacity: 0, y: '0.3em' }, { opacity: 1, y: 0, duration: 0.6, ease: 'expo.out' }, at + i * 0.09)); at += tg.items.length * 0.09 + 0.3; }
+    contactText(blk, o, '#FFFFFF', at, t1);
+    sfx(t0 + 0.15, 'whoosh', 0.3);
+  };
+
   // WORDS: a sentence written word by word (build), one big word at a time (slam), or glowing on black (glow)
   B.words = (s, o, t0, t1, bg) => {
+    if (o.layout === 'left' && o.mode !== 'slam') return wordsLeft(s, o, t0, t1, bg);
     const lines = [].concat(o.lines || o.text || '').filter(Boolean).slice(0, 3);
     const acc = new Set([].concat(o.accent || []));
     const size = o.size || (PORTRAIT ? 120 : 100);
@@ -337,6 +511,7 @@
 
   // STACK: pastel cards that stack up (features, services, products)
   B.stack = (s, o, t0, t1, bg) => {
+    if (o.layout === 'list') return listLayout(s, o, t0, t1, bg);
     const items = [].concat(o.items || []).filter((x) => x && x.t).slice(0, 4);
     if (o.title) { const tt = wordsRow(s, o.title, 76, { weight: 700, accent: new Set([].concat(o.accent || [])), accColor: accOf(bg), bg }); tt.row.style.marginBottom = px(56); buildRow(tt.row, tt.items, t0 + 0.05, 0.14); }
     const w = Math.min(W * (PORTRAIT ? 0.86 : 0.56), N(920));
@@ -359,6 +534,7 @@
 
   // TOGGLES: an iOS settings card where each strength switches on
   B.toggles = (s, o, t0, t1, bg) => {
+    if (o.layout === 'list') return listLayout(s, o, t0, t1, bg);
     const items = [].concat(o.items || []).filter(Boolean).slice(0, 5);
     if (o.title) { const tt = wordsRow(s, o.title, 72, { weight: 700, accent: new Set([].concat(o.accent || [])), accColor: accOf(bg), bg }); tt.row.style.marginBottom = px(56); buildRow(tt.row, tt.items, t0 + 0.05, 0.14); }
     const w = Math.min(W * (PORTRAIT ? 0.84 : 0.56), N(880));
@@ -532,6 +708,9 @@
   B.photos = (s, o, t0, t1, bg) => {
     const urls = [].concat(o.urls || []).filter(Boolean).slice(0, 5);
     if (!urls.length) return;
+    if (o.layout === 'full') return photosFull(s, o, t0, t1, bg, urls);
+    if (o.layout === 'split') return photosSplit(s, o, t0, t1, bg, urls);
+    if (o.layout === 'editorial') return photosEditorial(s, o, t0, t1, bg, urls);
     const dur = Math.max(1, t1 - t0);
     const mw = PORTRAIT ? W * 0.66 : W * 0.4, mh = mw * (PORTRAIT ? 1.22 : 0.8);
     const spots = PORTRAIT
@@ -659,6 +838,7 @@
 
   // END: icon + wordmark, tagline, and a contact pill (like a creator end card)
   B.end = (s, o, t0, t1, bg) => {
+    if (END[o.layout]) return END[o.layout](s, o, t0, t1, bg);
     const onBrand = bg === 'brand';
     const grp = el('div', 'row', s, '', { alignItems: 'center' });
     const size = o.size || 170;

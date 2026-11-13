@@ -132,7 +132,7 @@ export async function generateCode(args) {
   if (out?.html && /<\/?(div|svg|canvas)/i.test(out.html)) { const r = qaHtml(b, out.html); out.html = r.html; out.qa = r.qa; }
   return out;
 }
-async function generateCodeInner({ plan, style, assets, brief = null, previous = null, onStatus }) {
+async function generateCodeInner({ plan, style, assets, brief = null, previous = null, onStatus, memory = [] }) {
   if (isPersonalBirthdayBrief(brief || {}, plan || {})) assets = birthdayPhotoAssets(assets || [], brief || {});
   const themeKey = themeKeyFor(style);
   const engine = String(brief?.videoEngine || process.env.ANIMORA_ENGINE || 'motion').toLowerCase();
@@ -168,7 +168,7 @@ async function generateCodeInner({ plan, style, assets, brief = null, previous =
       const r = await directMotion({
         plan: planWithAssets, brief, assets: planWithAssets.assets, themeColors: THEMES[themeKey]?.colors || {},
         images: config.useGemini ? await imageParts(assets) : [], useAi: !!config.useGemini,
-        salt: previous ? String(Date.now()) : '', avoid: (prev?.beats || prev?.scenes || []).map((x) => x.type), style, prevAngle: prev?.angle || null, prevConcept: prev?.concept || '', prevLook: prev?.look?.key || null,
+        salt: previous ? String(Date.now()) : '', avoid: (prev?.beats || prev?.scenes || []).map((x) => x.type), style, prevAngle: prev?.angle || null, prevConcept: prev?.concept || '', prevLook: prev?.look?.key || null, memory,
       });
       return { html: r.html, source: config.useGemini && r.source === 'gemini' ? 'gemini' : 'template', problems: [], ...(config.useGemini && r.source !== 'gemini' && !r.aiSkipped ? { notice: "The AI director couldn't finish, so this version was arranged automatically. Press Regenerate to try the AI again." } : {}) };
     } catch (e) { console.warn('[motion] failed, trying Cinema:', e.message); }
