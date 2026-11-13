@@ -142,7 +142,7 @@ const PRODUCT_HINT = {
   property: '3-bedroom flat, Ado Ekiti, ₦1.5m/year\nLand, 600 sqm, ₦4m',
 };
 // "Let Animora choose": one answer instead of four (colours, look, narration, sound)
-const lookAuto = (b) => b.lookAuto === 'auto';
+const lookAuto = (b) => b.lookAuto !== 'own';   // Animora chooses the look unless the owner explicitly asks to
 
 const QUESTIONS = [
   { id: 'mode', type: 'single', options: [
@@ -173,7 +173,6 @@ const QUESTIONS = [
     { v: 'motion', l: 'Classic story film (recommended)', d: 'Varied shots and transitions; the director follows your details.' },
     { v: 'pieces', l: 'Signature visual mix', d: 'A bold template-led treatment with kinetic type and graphic effects.' },
   ], ask: () => 'How should Animora direct this video?' },
-  { id: 'lookAuto', type: 'single', options: [{ v: 'auto', l: 'Yes, you choose', d: 'Look, colours and sound picked to fit your video' }, { v: 'own', l: "I'll choose myself" }], ask: () => 'Should I choose the look, colours and sound for you?' },
   { id: 'colors', show: (b) => !lookAuto(b), type: 'colors', ask: () => 'Which colours should the video use?' },
   { id: 'style', show: (b) => !lookAuto(b), type: 'style', ask: () => 'Pick a look for your video, or let me choose one that fits.' },
   { id: 'voiceover', type: 'single', options: [{ v: 'female', l: "Yes, a woman's voice", d: 'A natural voice reads your words, with real pauses' }, { v: 'male', l: "Yes, a man's voice", d: 'A natural voice reads your words, with real pauses' }, { v: 'no', l: 'No voice, just sound effects' }], ask: () => 'Do you want a voice in your video?' },
