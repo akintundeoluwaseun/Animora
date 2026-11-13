@@ -126,15 +126,15 @@ export function pickStructure({ direction = 'general', angle = 'clean', photos =
 // creative memory weigh. `photos`/`words` are ordered pools (first = strongest); `facts` is how a list of strengths is shown;
 // `cta` is the chance a shop-style button beat appears; `avoid` are UI-card beats that do not belong to this way of telling it.
 export const PRESENTATIONS = {
-  product:     { motion: 'editorial', pics: 2,   photos: ['spotlight', 'full', 'cascade'],        words: ['right', 'left'],                 facts: ['ledger', 'list'],         stat: 'side', cta: 0.3,  words_share: 0.5,  avoid: ['notif', 'search', 'ring', 'grid'] },
-  editorial:   { motion: 'editorial', pics: 1,   photos: ['editorial', 'cascade', 'spotlight'],   words: ['right', 'stagger', 'left'],      facts: ['list', 'ledger'],         stat: 'side', cta: 0.2,  words_share: 0.7,  avoid: ['notif', 'search', 'receipt', 'ring', 'grid'] },
-  cinematic:   { motion: 'cinematic', pics: 2,   photos: ['full', 'spotlight', 'triptych'],       words: ['left', 'bleed'],                 facts: ['list'],                   stat: 'side', cta: 0.15, words_share: 0.5,  avoid: ['notif', 'search', 'receipt', 'ring', 'grid'] },
-  split:       { motion: 'kinetic', pics: 1,     photos: ['split', 'cascade', 'float'],           words: ['stagger', 'right', 'left'],      facts: ['cards', 'ledger'],        stat: 'card', cta: 0.6,  words_share: 0.5,  avoid: [] },
-  typographic: { motion: 'kinetic', pics: 0,     photos: ['split', 'float', 'cascade'],           words: ['bleed', 'stagger', 'right', 'left'], facts: ['list', 'cards'],      stat: 'side', cta: 0.4,  words_share: 0.85, avoid: ['notif', 'search'] },
-  documentary: { motion: 'documentary', pics: 2, photos: ['triptych', 'editorial', 'full'],       words: ['left', 'right'],                 facts: ['ledger', 'list'],         stat: 'side', cta: 0.1,  words_share: 0.5,  avoid: ['notif', 'search', 'ring', 'grid'] },
-  minimalist:  { motion: 'restrained', pics: 1,  photos: ['full', 'editorial', 'spotlight'],      words: ['left', 'right'],                 facts: ['list', 'ledger'],         stat: 'side', cta: 0.1,  words_share: 0.6,  avoid: ['notif', 'search', 'receipt', 'ring', 'grid'] },
-  structured:  { motion: 'restrained', pics: 1,  photos: ['split', 'cascade', 'spotlight'],       words: ['left', 'right'],                 facts: ['ledger', 'list'],         stat: 'side', cta: 0.7,  words_share: 0.5,  avoid: ['notif', 'search'] },
-  demo:        { motion: 'kinetic', pics: 0,     photos: ['float', 'split'],                      words: ['left'],                          facts: ['cards'],                  stat: 'card', cta: 0.9,  words_share: 0.2,  avoid: [] },
+  product:     { motion: 'editorial', pics: 2,   textWords: ['right', 'left'], photos: ['spotlight', 'full', 'cascade'],        words: ['right', 'left'],                 facts: ['ledger', 'list'],         stat: 'side', cta: 0.3,  words_share: 0.5,  avoid: ['notif', 'search', 'ring', 'grid'] },
+  editorial:   { motion: 'editorial', pics: 1,   textWords: ['layers', 'right', 'stagger', 'columns'], photos: ['editorial', 'cascade', 'spotlight'],   words: ['right', 'stagger', 'left'],      facts: ['list', 'ledger'],         stat: 'side', cta: 0.2,  words_share: 0.7,  avoid: ['notif', 'search', 'receipt', 'ring', 'grid'] },
+  cinematic:   { motion: 'cinematic', pics: 2,   textWords: ['frame', 'left'], photos: ['full', 'spotlight', 'triptych'],       words: ['left', 'bleed'],                 facts: ['list'],                   stat: 'side', cta: 0.15, words_share: 0.5,  avoid: ['notif', 'search', 'receipt', 'ring', 'grid'] },
+  split:       { motion: 'kinetic', pics: 1,     textWords: ['split', 'marquee', 'stagger'], photos: ['split', 'cascade', 'float'],           words: ['stagger', 'right', 'left'],      facts: ['cards', 'ledger'],        stat: 'card', cta: 0.6,  words_share: 0.5,  avoid: [] },
+  typographic: { motion: 'kinetic', pics: 0,     textWords: ['marquee', 'bleed', 'split', 'stagger'], photos: ['split', 'float', 'cascade'],           words: ['bleed', 'stagger', 'right', 'left'], facts: ['list', 'cards'],      stat: 'side', cta: 0.4,  words_share: 0.85, avoid: ['notif', 'search'] },
+  documentary: { motion: 'documentary', pics: 2, textWords: ['columns', 'left'], photos: ['triptych', 'editorial', 'full'],       words: ['left', 'right'],                 facts: ['ledger', 'list'],         stat: 'side', cta: 0.1,  words_share: 0.5,  avoid: ['notif', 'search', 'ring', 'grid'] },
+  minimalist:  { motion: 'restrained', pics: 1,  textWords: ['frame', 'left', 'right'], photos: ['full', 'editorial', 'spotlight'],      words: ['left', 'right'],                 facts: ['list', 'ledger'],         stat: 'side', cta: 0.1,  words_share: 0.6,  avoid: ['notif', 'search', 'receipt', 'ring', 'grid'] },
+  structured:  { motion: 'restrained', pics: 1,  textWords: ['columns', 'split', 'right'], photos: ['split', 'cascade', 'spotlight'],       words: ['left', 'right'],                 facts: ['ledger', 'list'],         stat: 'side', cta: 0.7,  words_share: 0.5,  avoid: ['notif', 'search'] },
+  demo:        { motion: 'kinetic', pics: 0,     textWords: ['split', 'left'], photos: ['float', 'split'],                      words: ['left'],                          facts: ['cards'],                  stat: 'card', cta: 0.9,  words_share: 0.2,  avoid: [] },
 };
 // what each kind of content calls for (weights; the first is the natural fit)
 const PRES_BY_DIRECTION = {
@@ -170,7 +170,8 @@ export function pickPresentation({ direction = 'general', angle = 'clean', photo
   if (angle === 'loud' && !solemn) motion = 'kinetic'; else if (angle === 'calm' && motion === 'kinetic') motion = 'restrained';
   // the middle's compositions: a pool ordered by fit, the strongest first, the rest used as the film goes on
   const rot = (list) => { const k = list.length > 1 && rnd() < 0.4 ? 1 : 0; return k ? [...list.slice(1), list[0]] : list; };
-  return { id, motion, photos: photos > 0 ? rot(P.photos) : ['float'], words: rot(P.words), facts: P.facts[Math.floor(rnd() * P.facts.length)], stat: P.stat, cta: rnd() < P.cta, pics: P.pics, wordsShare: P.words_share, avoid: P.avoid };
+  const textOnly = photos <= 0;
+  return { id, motion, textOnly, photos: photos > 0 ? rot(P.photos) : ['float'], words: rot(textOnly ? (P.textWords || P.words) : [...P.words, ...(P.textWords || []).filter((l) => ['frame', 'columns', 'layers'].includes(l) && !P.words.includes(l)).slice(0, 1)]), facts: P.facts[Math.floor(rnd() * P.facts.length)], stat: P.stat, cta: rnd() < P.cta, pics: P.pics, wordsShare: P.words_share, avoid: P.avoid };
 }
 
 /** The instructions the AI director gets for the same structure (so the choice survives the AI path). */
@@ -252,18 +253,19 @@ export function composeMiddle(beats, st, { solemn = false } = {}) {
   });
   // statements: some are set off-centre, never the same composition twice in a row
   const cands = out.map((b, i) => [b, i]).filter(([b, i]) => b.type === 'words' && i > 0 && i < last && !b.layout && b.mode !== 'slam');
-  let want = cands.length ? Math.max(P.wordsShare >= 0.5 ? 1 : 0, Math.round(cands.length * P.wordsShare)) : 0;
+  let want = cands.length ? (P.textOnly ? cands.length : Math.max(P.wordsShare >= 0.5 ? 1 : 0, Math.round(cands.length * P.wordsShare))) : 0;
   let prev = '', w = 0;
   cands.forEach(([b], n) => {
     if (want <= 0) return;
     if (cands.length > 1 && n % 2 === 1 && want >= cands.length - n) { /* keep going: all remaining are needed */ }
-    else if (cands.length > 1 && n % 2 === 1 && P.wordsShare < 0.75) return;   // leave every other statement centred
+    else if (!P.textOnly && cands.length > 1 && n % 2 === 1 && P.wordsShare < 0.75) return;   // leave every other statement centred
     const lines = [].concat(b.lines || []);
-    const ok = (l) => (l === 'bleed' ? lines.length >= 1 && String(lines[0]).length <= 14 : l === 'stagger' ? lines.length >= 2 : true) && (b.mode !== 'glow' || l === 'left' || l === 'right');
+    const nWords = lines.join(' ').split(/\s+/).filter(Boolean).length;
+    const ok = (l) => (l === 'bleed' ? lines.length >= 1 && String(lines[0]).length <= 14 : l === 'stagger' ? lines.length >= 2 : l === 'columns' ? lines.length >= 2 : l === 'split' ? nWords >= 2 : l === 'marquee' ? lines.length >= 1 && String(lines[0]).length <= 16 : true) && (b.mode !== 'glow' || l === 'left' || l === 'right' || l === 'frame');
     const pool = P.words.filter((l) => ok(l) && l !== prev);
     const l = (pool.length ? pool : ['left'])[w % Math.max(1, pool.length)]; w++;
     b.layout = l; prev = l; want--;
-    if (b.mode === 'glow' && l !== 'left') delete b.mode;
+    if (b.mode === 'glow' && l !== 'left' && l !== 'frame') delete b.mode;
   });
   // facts
   out.forEach((b, i) => {
@@ -273,5 +275,5 @@ export function composeMiddle(beats, st, { solemn = false } = {}) {
   return out;
 }
 
-export const LAYOUTS = { photos: ['full', 'split', 'editorial', 'spotlight', 'cascade', 'triptych'], words: ['left', 'right', 'stagger', 'bleed'], end: ['minimal', 'poster', 'photo'], stack: ['list', 'ledger'], toggles: ['list', 'ledger'], stat: ['side'], price: ['side'] };
+export const LAYOUTS = { photos: ['full', 'split', 'editorial', 'spotlight', 'cascade', 'triptych'], words: ['left', 'right', 'stagger', 'bleed', 'split', 'layers', 'marquee', 'frame', 'columns'], end: ['minimal', 'poster', 'photo'], stack: ['list', 'ledger'], toggles: ['list', 'ledger'], stat: ['side'], price: ['side'] };
 export const MOTIONS = ['kinetic', 'restrained', 'editorial', 'cinematic', 'documentary'];

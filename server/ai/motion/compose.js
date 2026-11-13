@@ -168,7 +168,10 @@ export function composeMotion(plan, { brief = {}, assets = [], salt = '', avoid 
     const mode = f.brand.length > 18 ? 'wordmark' : pick(['welcome', 'wordmark', 'wordmark']);
     return mode === 'welcome' ? { type: 'icon', bg: base, mode: 'welcome', prefix: pick(['Welcome to', 'Meet', 'Say hello to']) } : { type: 'icon', bg: base, mode: 'wordmark', tagline: catLabel ? sentence(catLabel, 30) : '' };
   };
-  B.phone = () => (tech || /app|download/i.test(cta) ? { type: 'phone', bg: base, text: heads[1] || H0 } : null);
+  B.phone = () => {   // the screen shows a line that is not the headline (the opener has already said that)
+    const line = [heads[1], feats[0], catLabel].find((t) => t && key(t) !== key(H0));
+    return (tech || /app|download/i.test(cta)) && line ? { type: 'phone', bg: base, text: sentence(line, 36) } : null;
+  };
   B.photos = () => (photos.length ? { type: 'photos', bg: base, urls: photos.slice(0, 5), lines: [prods[0]?.name || heads[1] || H0], accent: accentOf(prods[0]?.name || heads[1] || H0) } : null);
   // extra picture beats for the middle: the owner's pictures again, each beat from a different starting picture, captioned with a fact not yet said
   B.midPics = (n) => {
@@ -383,7 +386,8 @@ export function composeMotion(plan, { brief = {}, assets = [], salt = '', avoid 
   // the storytelling angle decides the shape of the film: how it opens, what it is made of, how it moves
   const ANG = angle || 'clean';
   const typeOnly = new Set(['words', 'highlight', 'stat', 'calendar', 'price', 'countdown', 'ring']);   // a purely typographic film
-  const op = openingBeats(() => (ANG === 'loud' && B.hookSlam())
+  const op = openingBeats(() => (event && !solemnFilm && ANG !== 'calm' && !dirAvoid.has('countdown') && !avoidSet.has('countdown') && chance(0.45) ? B.countdown() : null)
+    || (ANG === 'loud' && B.hookSlam())
     || (ANG === 'type' && (chance(0.6) ? B.hookSlam() : B.hookBuild()))
     || (ANG === 'calm' && B.hookGlow())
     || (ANG === 'story' && B.hookBuild())

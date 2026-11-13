@@ -161,5 +161,20 @@ for (let i = 0; i < 8; i++) {
 bad(aiOk >= 2, `AI statements left centred are not composed from the presentation (${aiOk}/8)`);
 globalThis.fetch = realFetch;
 
+// 7. text-only films: statements get compositions of their own (not just left/right), and each can actually be drawn
+{
+  const used = {};
+  for (let i = 0; i < 80; i++) {
+    const P = pickPresentation({ direction: ['corporate', 'fashion', 'education', 'announcement', 'birthday'][i % 5], photos: 0 });
+    const beats = composeMiddle([{ type: 'words', lines: ['Start'] }, { type: 'words', lines: ['Fresh', 'every single morning'] }, { type: 'words', lines: ['Ten years of care'] }, { type: 'words', lines: ['Our promise', 'Honest prices', 'Fast delivery'] }, { type: 'end' }], { presentation: P });
+    beats.forEach((b) => { if (b.layout) used[b.layout] = (used[b.layout] || 0) + 1; });
+  }
+  const fresh = ['split', 'layers', 'marquee', 'frame', 'columns'].filter((l) => used[l]);
+  bad(fresh.length >= 4, `text-only films use too few new compositions ${JSON.stringify(used)}`);
+  bad((used.left || 0) + (used.right || 0) < 0.5 * Object.values(used).reduce((a, b) => a + b, 0), `left/right still dominate text-only films ${JSON.stringify(used)}`);
+  const sb = sanitizeBeats([{ type: 'words', layout: 'columns', lines: ['Only one'], dur: 3 }, { type: 'words', layout: 'split', lines: ['Word'], dur: 3 }, { type: 'words', layout: 'marquee', lines: ['A very very long first line'], dur: 3 }, { type: 'words', layout: 'layers', lines: ['Fine'], dur: 3 }]);
+  bad(sb.filter((b) => b.type === 'words').every((b) => !b.layout || b.layout === 'layers'), 'undrawable text layouts were not dropped');
+}
+
 console.log(failed ? `${failed} middle-section check(s) failed` : 'Middle-section checks passed');
 process.exit(failed ? 1 : 0);

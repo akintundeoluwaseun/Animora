@@ -414,6 +414,97 @@
     tl.to(big, { x: -N(60), duration: Math.max(1, t1 - t0), ease: 'none' }, t0 + 1.1);
     if (lines.length > 1) leftLines(s, lines.slice(1), PORTRAIT ? 92 : 70, { at: t0 + 0.8, bg, color: inkOf(bg), mute: muteOf(bg), accColor: accOf(bg), accent: o.accent, top: PORTRAIT ? '48%' : '58%', width: PORTRAIT ? W - 2 * padX() : W * 0.6 });
   }
+  // ---- text-only compositions: each arranges, moves and tells the line differently (they are not the same layout in other colours)
+  const wordsOf = (o) => [].concat(o.lines || o.text || '').filter(Boolean).slice(0, 3);
+  const readableOn = (c) => (lum(c) > 0.5 ? '#111114' : '#FFFFFF');
+  // WORDS / split: the stage is cut in two. A colour panel wipes in over one half and carries the keyword; the rest is set on the other half.
+  function wordsSplit(s, o, t0, t1, bg) {
+    const lines = wordsOf(o), all = lines.join(' ').split(/\s+/).filter(Boolean);
+    const key = lines.length > 1 ? lines[0] : all.slice(0, Math.max(1, Math.ceil(all.length / 3))).join(' ');
+    const rest = lines.length > 1 ? lines.slice(1) : [all.slice(Math.max(1, Math.ceil(all.length / 3))).join(' ')];
+    const panelBg = bg === 'brand' ? inkOf('brand') : ACC, onPanel = readableOn(panelBg);
+    const top = PORTRAIT, cut = top ? 0.46 : 0.5;
+    const panel = el('div', '', s, '', top ? { position: 'absolute', left: 0, right: 0, top: 0, height: px(H * cut), background: panelBg, transformOrigin: '50% 0%' } : { position: 'absolute', left: 0, top: 0, bottom: 0, width: px(W * cut), background: panelBg, transformOrigin: '0% 50%' });
+    tl.fromTo(panel, top ? { scaleY: 0 } : { scaleX: 0 }, top ? { scaleY: 1, duration: 0.8, ease: 'expo.inOut' } : { scaleX: 1, duration: 0.8, ease: 'expo.inOut' }, t0 + 0.02);
+    const kb = el('div', '', s, '', top ? { position: 'absolute', left: px(padX()), right: px(padX()), top: 0, height: px(H * cut), display: 'flex', alignItems: 'flex-end', paddingBottom: px(H * 0.04) } : { position: 'absolute', left: px(padX()), width: px(W * cut - padX() * 1.4), top: 0, bottom: 0, display: 'flex', alignItems: 'center' });
+    const kr = wordsRow(kb, key, PORTRAIT ? 240 : 170, { weight: 800, color: onPanel, accent: new Set(), bg: 'dark', maxW: top ? W - 2 * padX() : W * cut - padX() * 1.4, head: true });
+    Object.assign(kr.row.style, { flexWrap: 'wrap', textAlign: 'left' });
+    buildRow(kr.row, kr.items, t0 + 0.55, 0.12);
+    const rb = el('div', '', s, '', top ? { position: 'absolute', left: px(padX()), right: px(padX()), top: px(H * (cut + 0.07)) } : { position: 'absolute', left: px(W * cut + padX() * 0.8), right: px(padX()), top: 0, bottom: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center' });
+    const r = leftLines(rb, rest.filter(Boolean), PORTRAIT ? 92 : 72, { at: t0 + 1.0, bg, color: inkOf(bg), mute: muteOf(bg), accColor: accOf(bg), accent: [], top: top ? '0' : null, bottom: null, left: 0, width: top ? W - 2 * padX() : W * (1 - cut) - padX() * 1.8, weight: 650 });
+    if (!top) { r.box.style.position = 'relative'; r.box.style.left = '0'; }
+    tl.fromTo(panel, top ? { y: 0 } : { x: 0 }, top ? { y: -N(26), duration: Math.max(1, t1 - t0), ease: 'none' } : { x: -N(26), duration: Math.max(1, t1 - t0), ease: 'none' }, t0 + 0.9);
+    sfx(t0 + 0.05, 'whoosh', 0.3);
+  }
+  // WORDS / layers: a giant outlined word sits behind and drifts slowly the other way; the statement is set in front, off to one side
+  function wordsLayers(s, o, t0, t1, bg) {
+    const lines = wordsOf(o), words = lines.join(' ').split(/\s+/).filter(Boolean);
+    const ghostWord = words.slice().sort((a, b) => b.length - a.length)[0] || '';
+    const ink = inkOf(bg), g = el('div', '', s, esc(ghostWord.toUpperCase()), { position: 'absolute', left: px(-N(30)), top: PORTRAIT ? '20%' : '5%', fontSize: px(PORTRAIT ? 420 : 250), fontWeight: 850, letterSpacing: '-0.06em', lineHeight: 0.9, whiteSpace: 'nowrap', fontFamily: DISPLAY, color: 'transparent', WebkitTextStroke: `${N(3)}px ${rgba(bg === 'light' ? A_L : ink, bg === 'light' ? 0.55 : 0.35)}` });
+    fitFont(g, W * 1.15, N(140));
+    tl.fromTo(g, { opacity: 0, x: N(120) }, { opacity: 1, x: 0, duration: 1.0, ease: 'expo.out' }, t0 + 0.02);
+    tl.to(g, { x: -N(110), duration: Math.max(1, t1 - t0), ease: 'none' }, t0 + 1.0);
+    const g2 = el('div', '', s, esc(ghostWord.toUpperCase()), { position: 'absolute', left: px(-N(90)), top: PORTRAIT ? '48%' : '66%', fontSize: px(PORTRAIT ? 420 : 250), fontWeight: 850, letterSpacing: '-0.06em', lineHeight: 0.9, whiteSpace: 'nowrap', fontFamily: DISPLAY, color: rgba(bg === 'light' ? A_L : A_D, 0.12) });
+    fitFont(g2, W * 1.15, N(140));
+    tl.fromTo(g2, { opacity: 0, x: -N(100) }, { opacity: 1, x: 0, duration: 1.0, ease: 'expo.out' }, t0 + 0.2);
+    tl.to(g2, { x: N(90), duration: Math.max(1, t1 - t0), ease: 'none' }, t0 + 1.2);
+    leftLines(s, lines, o.size || (PORTRAIT ? 112 : 92), { at: t0 + 0.5, bg, color: ink, mute: muteOf(bg), accColor: accOf(bg), accent: o.accent, top: PORTRAIT ? '40%' : '40%', weight: 750, left: padX() + (PORTRAIT ? N(40) : N(80)), width: W - 2 * padX() - (PORTRAIT ? N(40) : N(80)) });
+  }
+  // WORDS / marquee: the keyword runs across the stage in two huge bands going opposite ways while the statement lands word by word on top
+  function wordsMarquee(s, o, t0, t1, bg) {
+    const lines = wordsOf(o), key = String(lines[0] || '').toUpperCase(), ink = inkOf(bg), span = Math.max(1, t1 - t0);
+    [[PORTRAIT ? 0.12 : 0.06, 1], [PORTRAIT ? 0.74 : 0.7, -1]].forEach(([y, dir], k) => {
+      const band = el('div', '', s, '', { position: 'absolute', left: 0, top: `${y * 100}%`, display: 'flex', whiteSpace: 'nowrap', fontFamily: DISPLAY, fontWeight: 850, letterSpacing: '-0.04em', fontSize: px(PORTRAIT ? 190 : 170), lineHeight: 1, color: k ? 'transparent' : rgba(bg === 'light' ? A_L : A_D, 0.9), WebkitTextStroke: k ? `${N(3)}px ${rgba(ink, 0.4)}` : '0' });
+      band.textContent = (key + '   ').repeat(Math.ceil(W * 3 / Math.max(80, key.length * N(110))) + 2);
+      const run = N(PORTRAIT ? 420 : 520);
+      tl.fromTo(band, { x: dir > 0 ? -N(40) : -run }, { x: dir > 0 ? -run : -N(40), duration: span + 0.6, ease: 'none' }, t0);
+      tl.fromTo(band, { opacity: 0 }, { opacity: 1, duration: 0.5 }, t0);
+    });
+    const rest = lines.length > 1 ? lines.slice(1) : lines;
+    const box = el('div', 'col', s, '', { gap: px(18), zIndex: 2 });
+    const r = wordsRow(box, rest.join(' '), PORTRAIT ? 124 : 100, { weight: 800, accent: new Set([].concat(o.accent || [])), accColor: accOf(bg), bg, head: true, maxW: maxTextW() });
+    r.row.style.justifyContent = 'center'; r.row.style.flexWrap = 'wrap'; r.row.style.textAlign = 'center';
+    r.row.style.textShadow = bg === 'light' ? `0 0 ${N(30)}px rgba(255,255,255,.9)` : `0 0 ${N(30)}px rgba(0,0,0,.6)`;
+    r.items.forEach((it, i) => tl.fromTo(it, { opacity: 0, scale: 1.6, filter: blur(14) }, { opacity: 1, scale: 1, filter: blur(0), duration: 0.45, ease: 'expo.out' }, t0 + 0.4 + i * 0.22));
+    sfx(t0 + 0.4, 'tick', 0.35);
+  }
+  // WORDS / frame: minimal. A hairline frame is drawn around a large empty stage and one small caption sits in a corner
+  function wordsFrame(s, o, t0, t1, bg) {
+    const lines = wordsOf(o), ink = inkOf(bg), m = N(PORTRAIT ? 56 : 64);
+    const edges = [
+      { left: m, top: m, width: W - 2 * m, height: 2, o: '0 50%', from: { scaleX: 0 } },
+      { left: W - m - 2, top: m, width: 2, height: H - 2 * m, o: '50% 0', from: { scaleY: 0 } },
+      { left: m, top: H - m - 2, width: W - 2 * m, height: 2, o: '100% 50%', from: { scaleX: 0 } },
+      { left: m, top: m, width: 2, height: H - 2 * m, o: '50% 100%', from: { scaleY: 0 } },
+    ];
+    edges.forEach((e, i) => {
+      const n = el('div', '', s, '', { position: 'absolute', left: px(e.left), top: px(e.top), width: px(e.width), height: px(e.height), background: ink, opacity: 0.55, transformOrigin: e.o });
+      tl.fromTo(n, e.from, Object.assign({ duration: 0.9, ease: 'expo.inOut' }, e.from.scaleX === 0 ? { scaleX: 1 } : { scaleY: 1 }), t0 + 0.05 + i * 0.18);
+    });
+    const tag = el('div', '', s, esc(o.sub || ''), { position: 'absolute', left: px(m + N(34)), top: px(m + N(30)), fontSize: px(30), letterSpacing: '0.22em', textTransform: 'uppercase', color: muteOf(bg), fontWeight: 600 });
+    if (o.sub) tl.fromTo(tag, { opacity: 0 }, { opacity: 1, duration: 0.8 }, t0 + 0.9);
+    const right = (o.align || 'left') === 'right';
+    leftLines(s, lines, o.size || (PORTRAIT ? 84 : 70), { at: t0 + 0.9, bg, color: ink, mute: muteOf(bg), accColor: accOf(bg), accent: o.accent, bottom: px(m + N(46)), left: m + N(34), width: Math.min(W - 2 * m - N(68), W * (PORTRAIT ? 0.8 : 0.55)), weight: 560, per: 0.16, align: right ? 'right' : 'left' });
+  }
+  // WORDS / columns: structured information: a title across the top, the rest laid out as ruled columns that rise one by one
+  function wordsColumns(s, o, t0, t1, bg) {
+    const lines = wordsOf(o), ink = inkOf(bg), title = lines[0] || '', cols = lines.slice(1).length ? lines.slice(1) : [];
+    const tr = wordsRow(el('div', '', s, '', { position: 'absolute', left: px(padX()), right: px(padX()), top: PORTRAIT ? '22%' : '14%' }), title, PORTRAIT ? 138 : 120, { weight: 750, accent: new Set([].concat(o.accent || [])), accColor: accOf(bg), bg, head: true, maxW: W - 2 * padX() });
+    Object.assign(tr.row.style, { flexWrap: 'wrap', textAlign: 'left', justifyContent: 'flex-start' });
+    buildRow(tr.row, tr.items, t0 + 0.15, 0.1);
+    const top = H * (PORTRAIT ? 0.47 : 0.52), n = Math.max(1, cols.length);
+    const rule = el('div', '', s, '', { position: 'absolute', left: px(padX()), width: px(W - 2 * padX()), top: px(top), height: px(4), background: ink, transformOrigin: '0 50%' });
+    tl.fromTo(rule, { scaleX: 0 }, { scaleX: 1, duration: 0.9, ease: 'expo.inOut' }, t0 + 0.5);
+    const cw = (W - 2 * padX()) / n;
+    (cols.length ? cols : ['']).forEach((c, i) => {
+      const col = el('div', '', s, '', { position: 'absolute', left: px(padX() + i * cw + (i ? N(30) : 0)), width: px(cw - (i ? N(24) : 0) - N(30)), top: px(top + N(26)) });
+      const num = el('div', 'tnum', col, String(i + 1).padStart(2, '0'), { fontSize: px(PORTRAIT ? 40 : 34), fontWeight: 600, color: accOf(bg), fontFamily: DISPLAY, marginBottom: px(10) });
+      const tx = el('div', '', col, esc(c), { fontSize: px(PORTRAIT ? (n > 2 ? 46 : n > 1 ? 56 : 100) : (n > 2 ? 52 : n > 1 ? 64 : 88)), fontWeight: 650, letterSpacing: '-0.025em', lineHeight: 1.12, color: ink });
+      if (i) { const v = el('div', '', s, '', { position: 'absolute', left: px(padX() + i * cw), top: px(top + N(16)), width: px(2), height: px(H * 0.2), background: ink, opacity: 0.25, transformOrigin: '50% 0' }); tl.fromTo(v, { scaleY: 0 }, { scaleY: 1, duration: 0.7, ease: 'expo.out' }, t0 + 1.0 + i * 0.35); }
+      tl.fromTo(col, { opacity: 0, y: N(40), filter: blur(8) }, { opacity: 1, y: 0, filter: blur(0), duration: 0.8, ease: 'expo.out' }, t0 + 1.0 + i * 0.35);
+      sfx(t0 + 1.0 + i * 0.35, 'tick', 0.3);
+    });
+  }
   // STACK / TOGGLES / ledger: structured, credible rows: the label left, its value right, hairlines between, set from the top
   function ledgerLayout(s, o, t0, t1, bg) {
     const items = [].concat(o.items || []).map((x) => (typeof x === 'string' ? { t: x } : x)).filter((x) => x && x.t).slice(0, 5);
@@ -548,6 +639,11 @@
       if (o.layout === 'right') return wordsRight(s, o, t0, t1, bg);
       if (o.layout === 'stagger') return wordsStagger(s, o, t0, t1, bg);
       if (o.layout === 'bleed') return wordsBleed(s, o, t0, t1, bg);
+      if (o.layout === 'split') return wordsSplit(s, o, t0, t1, bg);
+      if (o.layout === 'layers') return wordsLayers(s, o, t0, t1, bg);
+      if (o.layout === 'marquee') return wordsMarquee(s, o, t0, t1, bg);
+      if (o.layout === 'frame') return wordsFrame(s, o, t0, t1, bg);
+      if (o.layout === 'columns') return wordsColumns(s, o, t0, t1, bg);
     }
     const lines = [].concat(o.lines || o.text || '').filter(Boolean).slice(0, 3);
     const acc = new Set([].concat(o.accent || []));
@@ -1198,7 +1294,7 @@
   // ================================================================ ambience: depth behind each beat
   function ambience(wrap, bg, t0, t1, i, beat) {
     const amb = el('div', 'layer', wrap, '', { pointerEvents: 'none', overflow: 'hidden' });
-    if (beat && beat.type === 'photos' && beat.layout) return;   // a composed picture beat is its own world: the style's decoration would cut through its caption
+    if (beat && ((beat.type === 'photos' && beat.layout) || (beat.type === 'words' && /^(split|layers|marquee|frame|columns)$/.test(beat.layout || '')))) return;   // a composed picture beat is its own world: the style's decoration would cut through its caption
     const dk = LOOK.deco;
     if (dk && DECO[dk] && (bg === LOOK.theme || DECO_ANYWHERE.has(dk))) { try { DECO[dk](amb, bg, t0, t1, i); } catch (e) { console.error('deco ' + dk + ': ' + e.message); } }
     if (dk && dk !== 'none' && bg === 'light' && LOOK.theme === 'light') return;   // the style's own world replaces the default light sweep
