@@ -104,7 +104,7 @@ export function accentFor(colors = {}, text = '') {
  * The storyboard. Returns { beats, font, accent, accent2 }.
  * opts: { brief, assets, salt, avoid: [types used last time], duration }
  */
-export function composeMotion(plan, { brief = {}, assets = [], salt = '', avoid = [], colors = {}, look = null } = {}) {
+export function composeMotion(plan, { brief = {}, assets = [], salt = '', avoid = [], colors = {}, look = null, angle = null } = {}) {
   const f = factsFrom(plan, brief || {}, assets);
   f.brand = brandCase(smartClip(cleanText(brief.name || plan.business?.name || f.brand, 80, { keepCase: true }), 48) || f.brand);
   const specific = cleanText(plan.business?.category || '', 40);
@@ -219,7 +219,8 @@ export function composeMotion(plan, { brief = {}, assets = [], salt = '', avoid 
     const closing = (fitCtas(brief)[0] || closingLine(brief)).replace(/[.!]*$/, '');
     const opening = H0 || f.brand;
     const solemn = /burial|funeral|memorial|tribute|obituar|in memory|celebration of life|condolence/i.test(`${brief.category || ''} ${brief.name || ''}`);
-    const opener = solemn ? B.hookGlow() : (chance(slamP0) && B.hookSlam()) || (chance(0.4) ? B.hookGlow() : B.hookBuild());
+    const coldPic = !solemn && angle === 'photos' && photos.length ? { ...B.photos(), lines: [] } : null;
+    const opener = coldPic || (solemn ? B.hookGlow() : (chance(slamP0) && B.hookSlam()) || (chance(0.4) ? B.hookGlow() : B.hookBuild()));
     const lineBeat = (line, i) => {
       if (words(line).length >= 4 && chance(0.5)) { const a = accentOf(line)[0]; return { type: 'highlight', bg: base, text: line, hot: a > 0 ? [a - 1, a] : [a] }; }
       const ls = balance(line, 22);
@@ -228,7 +229,8 @@ export function composeMotion(plan, { brief = {}, assets = [], salt = '', avoid 
     const said = [...heads.slice(1), ...feats].filter((x) => x && key(x) !== key(opening));
     const uniq = []; for (const x of said) if (!uniq.some((u) => key(u) === key(x))) uniq.push(x);
     const mid = [];
-    if (photos.length) mid.push(B.photos());
+    if (coldPic) mid.push(B.hookBuild());
+    else if (photos.length) mid.push(B.photos());
     if (photos.length >= 4 && chance(0.6)) mid.push(B.grid());
     if (when) mid.push(solemn && brief.when ? { type: 'words', mode: 'glow', bg: 'dark', lines: balance(String(brief.when).replace(/\s*·\s*/g, ', '), 24), accent: [] } : B.calendar());
     uniq.slice(0, 4).forEach((x, i) => mid.push(lineBeat(x, i)));
@@ -238,7 +240,10 @@ export function composeMotion(plan, { brief = {}, assets = [], salt = '', avoid 
     // the name (or their uploaded logo) right after the opener; never "Welcome to", never for a burial
     const hasLogo = (assets || []).some((a) => a.role === 'logo' || /logo/i.test(a.name || ''));
     const nameBeat = !solemn && (hasLogo || !key(opening).includes(key(f.brand))) ? [{ type: 'icon', bg: base, mode: 'wordmark', tagline: '' }] : [];
-    return [opener, ...nameBeat, ...parts, { type: 'end', bg: pick(['brand', 'dark']), tagline: closing, accent: accentOf(closing), contact: handle || site || phone || '' }];
+    // where the name lands depends on the angle: right after the opener, late (story), or only on the end card (type)
+    const nm = angle === 'type' && !hasLogo ? [] : nameBeat;
+    if (angle === 'story' && nm.length && parts.length >= 2) { parts.splice(Math.min(2, parts.length), 0, ...nm); return [opener, ...parts, { type: 'end', bg: pick(['brand', 'dark']), tagline: closing, accent: accentOf(closing), contact: handle || site || phone || '' }]; }
+    return [opener, ...nm, ...parts, { type: 'end', bg: pick(['brand', 'dark']), tagline: closing, accent: accentOf(closing), contact: handle || site || phone || '' }];
   };
   const slamP0 = (look?.energy || 'medium') === 'high' ? 0.45 : 0.15;
   if (personalBirthday || social) {
@@ -321,11 +326,23 @@ export function composeMotion(plan, { brief = {}, assets = [], salt = '', avoid 
   // ---- order: hook, brand, the owner's picks, then the proof the facts support ----
   const energy = look?.energy || 'medium';
   const slamP = energy === 'high' ? 0.55 : energy === 'calm' ? 0.05 : 0.3, glowP = energy === 'calm' ? 0.5 : 0.3;
-  const opener = (event && !avoidSet.has('countdown') && chance(0.5) ? B.countdown() : null) || (chance(slamP) ? B.hookSlam() : null) || (chance(glowP) ? B.hookGlow() : B.hookBuild());
-  const brandBeat = (tech && chance(0.5) ? B.phone() : null) || B.brand();
+  // the storytelling angle decides the shape of the film: how it opens, what it is made of, how it moves
+  const ANG = angle || 'clean';
+  const typeOnly = new Set(['words', 'highlight', 'stat', 'calendar', 'price', 'countdown', 'ring']);   // a purely typographic film
+  const coldPhoto = ANG === 'photos' && photos.length ? { ...B.photos(), lines: [] } : null;           // opens on the pictures, headline lands after
+  const opener = coldPhoto
+    || (ANG === 'loud' && B.hookSlam())
+    || (ANG === 'type' && (chance(0.6) ? B.hookSlam() : B.hookBuild()))
+    || (ANG === 'calm' && B.hookGlow())
+    || (ANG === 'story' && B.hookBuild())
+    || (event && !avoidSet.has('countdown') && chance(0.5) ? B.countdown() : null) || (chance(slamP) ? B.hookSlam() : null) || (chance(glowP) ? B.hookGlow() : B.hookBuild());
+  const brandBeat = (tech && ANG !== 'type' && chance(0.5) ? B.phone() : null) || B.brand();
+  const headBeat = coldPhoto ? B.hookBuild() : null;   // after a picture-first opening the headline is the second beat
   const pool = [
     B.photos(), B.price(), B.menu(), B.receipt(), B.features(), ...B.heads(), B.stat(), B.ring(), B.calendar(), B.grid(), B.notif(), B.search(), B.map(),
-  ].filter(Boolean).filter((b) => !dirAvoid.has(b.type));   // what suits a perfume is not what suits a school
+  ].filter(Boolean).filter((b) => !dirAvoid.has(b.type))   // what suits a perfume is not what suits a school
+    .filter((b) => ANG !== 'type' || typeOnly.has(b.type))                    // type film: no screens or photos, only typography
+    .filter((b) => ANG !== 'calm' || !['notif', 'search', 'receipt', 'stat', 'ring'].includes(b.type));   // calm film: nothing busy
   // a little shuffle so two businesses with the same facts still get different films (proof order matters less than hook/brand/cta)
   for (let i = pool.length - 1; i > 0; i--) { if (chance(0.35)) { const j = Math.max(0, i - 1 - Math.floor(rnd() * 2)); [pool[i], pool[j]] = [pool[j], pool[i]]; } }
   // photos first when there are photos; the map always late
@@ -351,7 +368,10 @@ export function composeMotion(plan, { brief = {}, assets = [], salt = '', avoid 
   };
   const rawUsed = [];
   textsOf(opener).forEach((t) => { used.add(key(t)); rawUsed.push(String(t).toLowerCase()); });
-  if (duration >= 14) take(brandBeat);
+  if (headBeat) take(headBeat);
+  // story: the brand is revealed late (after two ideas), clean: right after the opening
+  const lateBrand = ANG === 'story' && duration >= 16;
+  if (duration >= 14 && !lateBrand && !(ANG === 'type' && !(assets || []).some((x) => x.role === 'logo' || /logo/i.test(x.name || '')))) take(brandBeat);
   wanted.forEach(take);
   // how much time the facts fill; with lots of time and few facts, every strength gets its own beat (one idea per beat)
   const need = pool.reduce((a, b) => a + est(b), 0);
@@ -374,6 +394,17 @@ export function composeMotion(plan, { brief = {}, assets = [], salt = '', avoid 
   // still room? repeat the main message in a different form, then the strengths again
   const fillers = [ feats.length >= 2 ? { type: 'toggles', bg: base, title: 'What you get', items: feats.slice(0, 4) } : null, B.search(), B.notif()].filter(Boolean).filter((b) => !dirAvoid.has(b.type));
   for (const fb of fillers) { if (budget < 2) break; if (!body.some((x) => x.type === fb.type && fb.type !== 'words')) take(fb); }
+  if (lateBrand && !body.some((b) => b.type === 'icon')) { const at = Math.min(body.length, Math.max(1, 2)); if (est(brandBeat) <= budget + 0.01 || body.length > 2) body.splice(at, 0, brandBeat); }
+  if (ANG === 'type') {   // a type film still needs variety: some lines become a highlighted sentence, others a quiet glow
+    let n = 0;
+    body.forEach((b, i) => {
+      if (b.type !== 'words') return;
+      const line = [].concat(b.lines || []).join(' ');
+      if (words(line).length >= 4 && n++ % 2 === 0) { const a = accentOf(line)[0]; body[i] = { type: 'highlight', bg: b.bg || base, text: line, hot: a > 0 ? [a - 1, a] : [a] }; }
+    });
+  }
+  if (ANG === 'calm' && body.length > 3) body.length = 3;                       // calm: fewer ideas, each given room
+  if (ANG === 'loud' && ctaBeat && chance(0.5)) { const pi = body.findIndex((b) => b.type === 'price'); if (pi > 0) body.push(body.splice(pi, 1)[0]); }   // loud: land the offer just before the close
   let beats = [opener, ...body, ctaBeat, endBeat].filter(Boolean);
 
   // ---- backgrounds: keep rhythm (never three of the same in a row unless it is the theme), one brand punch ----
@@ -404,7 +435,7 @@ export function composeMotion(plan, { brief = {}, assets = [], salt = '', avoid 
     const k = duration / tot; for (let i = 0; i < durs.length; i++) durs[i] *= k;
   }
   // ---- transitions: varied, never the same twice in a row ----
-  const outs = energy === 'high' ? ['whip', 'zoom', 'drop', 'whip', 'push', 'rise'] : energy === 'calm' ? ['push', 'fade', 'rise', 'push', 'fade'] : ['push', 'whip', 'zoom', 'rise', 'push', 'drop'];
+  const outs = ANG === 'loud' ? ['whip', 'zoom', 'drop', 'whip', 'zoom'] : ANG === 'calm' ? ['fade', 'rise', 'fade', 'push'] : ANG === 'type' ? ['push', 'rise', 'drop', 'push', 'zoom'] : ANG === 'story' ? ['push', 'rise', 'push', 'fade'] : ANG === 'photos' ? ['zoom', 'push', 'fade', 'zoom'] : energy === 'high' ? ['whip', 'zoom', 'drop', 'whip', 'push', 'rise'] : energy === 'calm' ? ['push', 'fade', 'rise', 'push', 'fade'] : ['push', 'whip', 'zoom', 'rise', 'push', 'drop'];
   let last = '';
   beats = beats.map((b, i) => {
     let out = 'push';

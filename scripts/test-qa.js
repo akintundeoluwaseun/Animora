@@ -132,5 +132,22 @@ console.log('All creative QA checks passed');
   // film QA fixes repeats
   const q = qaBeats([{ type: 'words', bg: 'light', out: 'push', lines: ['Hello there friend'] }, { type: 'words', bg: 'light', out: 'push', lines: ['Second line here'] }, { type: 'words', bg: 'light', out: 'push', lines: ['Second line here'] }, { type: 'end', bg: 'brand', out: 'push', tagline: 'Thanks' }]);
   bad(q.beats.length === 3 && q.beats[0].out !== q.beats[1].out && q.beats.at(-1).type === 'end', 'film QA did not fix repeats');
+  // regenerate: the look moves to another one that fits the content; the angle drives the film's structure
+  {
+    const { directMotion } = await import('../server/ai/motion/director.js');
+    const cb = cleanBrief({ kind: 'business', name: 'Mama Put Kitchen', category: 'Restaurant', headline: 'Home-cooked Nigerian meals', features: ['Jollof rice', 'Pounded yam', 'Pepper soup'], contact: '0803 123 4567' });
+    const plan = { aspect_ratio: '9:16', duration_seconds: 24, business: { name: cb.name, category: cb.category }, scenes: [] };
+    const photos = [1, 2, 3].map((i) => ({ id: String(i), kind: 'image', url: `/u/${i}.jpg`, name: `${i}.jpg`, role: 'photo' }));
+    const first = await directMotion({ plan, brief: cb, assets: photos, useAi: false, style: STARTER_STYLES.find((x) => x.slug === 'mono-editorial') });
+    let moved = 0;
+    for (let i = 0; i < 6; i++) { const r = await directMotion({ plan, brief: cb, assets: photos, useAi: false, salt: `s${i}`, style: STARTER_STYLES.find((x) => x.slug === 'mono-editorial'), prevLook: 'mono-editorial' }); if (r.data.look.key !== 'mono-editorial') moved++; }
+    bad(moved === 6, `regenerate kept the same look ${6 - moved}/6 times`);
+    let owner = 0;
+    for (let i = 0; i < 4; i++) { const r = await directMotion({ plan, brief: { ...cb, lookAuto: 'own' }, assets: photos, useAi: false, salt: `o${i}`, style: STARTER_STYLES.find((x) => x.slug === 'mono-editorial'), prevLook: 'mono-editorial' }); if (r.data.look.key !== 'mono-editorial') owner++; }
+    bad(owner === 0, "a look the owner picked themselves was changed on regenerate");
+    const seqs = new Set();
+    for (let i = 0; i < 12; i++) { const r = await directMotion({ plan, brief: cb, assets: photos, useAi: false, salt: `v${i}` }); seqs.add(r.data.beats.map((b) => b.type).join('>')); if (r.data.angle === 'photos') bad(r.data.beats[0].type === 'photos', 'photos angle did not open on the pictures'); if (r.data.angle === 'type') bad(r.data.beats.every((b) => ['words', 'highlight', 'stat', 'calendar', 'price', 'countdown', 'ring', 'end', 'button', 'icon'].includes(b.type)), 'type angle used screens or photos'); }
+    bad(seqs.size >= 6, `only ${seqs.size} distinct film structures in 12 regenerations`);
+  }
   console.log('direction / flyer / film QA checks passed');
 }

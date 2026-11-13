@@ -5,7 +5,7 @@ import { geminiGenerate } from '../../engine/gemini.js';
 import { fixPrices, factsFrom } from '../cinema/compose.js';
 import { composeMotion, accentFor, BEAT_MIN, BEAT_MAX, MOTION_WANTS, FONTS } from './compose.js';
 import { motionHtml, readMotion } from './page.js';
-import { lookFor } from './looks.js';
+import { lookFor, LOOKS } from './looks.js';
 import { isPersonalBirthdayBrief } from '../personal.js';
 import { CREATIVE_STANDARD } from '../standard.js';
 import { videoGroup } from '../closing.js';
@@ -148,7 +148,7 @@ export function sanitizeBeats(raw, { duration, assets = [] } = {}) {
 const seedOf = (s) => (Array.from(String(s)).reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7) % 2147483646) + 1;
 
 /** Storyboard -> Motion HTML. Tries Gemini first (when `useAi`), then the rule-based composer. */
-export async function directMotion({ plan, brief = null, assets = [], themeColors = {}, images = [], useAi = true, salt = '', avoid = [], style = null, prevAngle = null, prevConcept = '' }) {
+export async function directMotion({ plan, brief = null, assets = [], themeColors = {}, images = [], useAi = true, salt = '', avoid = [], style = null, prevAngle = null, prevConcept = '', prevLook = null }) {
   const group = videoGroup(brief || {});
   // the content decides which storytelling approaches are appropriate; chance only picks among those, and never the one just used
   const dir = directionOf(brief || {});
@@ -160,8 +160,14 @@ export async function directMotion({ plan, brief = null, assets = [], themeColor
   const duration = Math.max(10, Math.round(Number(plan.duration_seconds) || 24));
   const colors = { ...themeColors, ...(plan.style?.colors || {}) };
   // the chosen style is a whole look: stage, display type, background world, pacing
-  const look = lookFor(style?.slug || style?.palette?.theme || '', { ...(style?.palette || {}), ...themeColors });
-  const rules = composeMotion(plan, { brief: brief || {}, assets, salt, avoid, colors, look });
+  // Regenerate must not look like the same film in a new order: when Animora chose the look, move to another look that still fits the content
+  let useStyle = style;
+  if (salt && prevLook && brief?.lookAuto !== 'own') {
+    const alt = (dir.styles || []).filter((k) => k !== prevLook && LOOKS[k]);
+    if (alt.length) { const k = alt[Math.floor(Math.random() * alt.length)]; useStyle = { slug: k, palette: {} }; }
+  }
+  const look = lookFor(useStyle?.slug || useStyle?.palette?.theme || '', { ...(useStyle?.palette || {}), ...(useStyle === style ? themeColors : {}) });
+  const rules = composeMotion(plan, { brief: brief || {}, assets, salt, avoid, colors, look, angle: angle[0] });
   const personalBirthday = isPersonalBirthdayBrief(brief || {}, plan);
   const logo = personalBirthday ? null : (assets || []).find((a) => (a.kind || 'image') === 'image' && (a.role === 'logo' || /logo/i.test(a.name || '')));
   let beats = null, font = rules.font, concept = '';
