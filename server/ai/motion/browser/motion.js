@@ -483,12 +483,12 @@
     ];
     edges.forEach((e, i) => {
       const n = el('div', '', s, '', { position: 'absolute', left: px(e.left), top: px(e.top), width: px(e.width), height: px(e.height), background: ink, opacity: 0.55, transformOrigin: e.o });
-      tl.fromTo(n, e.from, Object.assign({ duration: 0.9, ease: 'expo.inOut' }, e.from.scaleX === 0 ? { scaleX: 1 } : { scaleY: 1 }), t0 + 0.05 + i * 0.18);
+      tl.fromTo(n, e.from, Object.assign({ duration: 0.7, ease: 'expo.inOut' }, e.from.scaleX === 0 ? { scaleX: 1 } : { scaleY: 1 }), t0 + 0.05 + i * 0.1);
     });
     const tag = el('div', '', s, esc(o.sub || ''), { position: 'absolute', left: px(m + N(34)), top: px(m + N(30)), fontSize: px(30), letterSpacing: '0.22em', textTransform: 'uppercase', color: muteOf(bg), fontWeight: 600 });
-    if (o.sub) tl.fromTo(tag, { opacity: 0 }, { opacity: 1, duration: 0.8 }, t0 + 0.9);
+    if (o.sub) tl.fromTo(tag, { opacity: 0 }, { opacity: 1, duration: 0.8 }, t0 + 0.5);
     const right = (o.align || 'left') === 'right';
-    leftLines(s, lines, o.size || (PORTRAIT ? 84 : 70), { at: t0 + 0.9, bg, color: ink, mute: muteOf(bg), accColor: accOf(bg), accent: o.accent, bottom: px(m + N(46)), left: m + N(34), width: Math.min(W - 2 * m - N(68), W * (PORTRAIT ? 0.8 : 0.55)), weight: 560, per: 0.16, align: right ? 'right' : 'left' });
+    leftLines(s, lines, o.size || (PORTRAIT ? 84 : 70), { at: t0 + 0.4, bg, color: ink, mute: muteOf(bg), accColor: accOf(bg), accent: o.accent, bottom: px(m + N(46)), left: m + N(34), width: Math.min(W - 2 * m - N(68), W * (PORTRAIT ? 0.8 : 0.55)), weight: 560, per: 0.16, align: right ? 'right' : 'left' });
   }
   // WORDS / columns: structured information: a title across the top, the rest laid out as ruled columns that rise one by one
   function wordsColumns(s, o, t0, t1, bg) {
@@ -1309,7 +1309,7 @@
     const amb = el('div', 'layer', wrap, '', { pointerEvents: 'none', overflow: 'hidden' });
     if (beat && ((beat.type === 'photos' && beat.layout) || (beat.type === 'words' && /^(split|layers|marquee|frame|columns)$/.test(beat.layout || '')))) return;   // a composed picture beat is its own world: the style's decoration would cut through its caption
     const dk = LOOK.deco;
-    if (dk && DECO[dk] && (bg === LOOK.theme || DECO_ANYWHERE.has(dk))) { try { DECO[dk](amb, bg, t0, t1, i); } catch (e) { console.error('deco ' + dk + ': ' + e.message); } }
+    if (dk && DECO[dk] && (bg === LOOK.theme || DECO_ANYWHERE.has(dk))) { try { DECO[dk](amb, bg, t0, t1, i, beat); } catch (e) { console.error('deco ' + dk + ': ' + e.message); } }
     if (dk && dk !== 'none' && bg === 'light' && LOOK.theme === 'light') return;   // the style's own world replaces the default light sweep
     const dur = Math.max(0.6, t1 - t0 + 0.4);
     if (bg === 'brand') {
@@ -1368,9 +1368,10 @@
     const sun = dlay(amb, { left: '50%', top: '30%', width: px(520), height: px(520), marginLeft: px(-260), borderRadius: '50%', background: `linear-gradient(180deg, ${A2}, ${ACC})`, opacity: 0.22, WebkitMaskImage: `repeating-linear-gradient(180deg, #000 0 ${N(26)}px, transparent ${N(26)}px ${N(34)}px)`, maskImage: `repeating-linear-gradient(180deg, #000 0 ${N(26)}px, transparent ${N(26)}px ${N(34)}px)` });
     tl.fromTo(sun, { y: N(40) }, { y: -N(30), duration: life(t0, t1), ease: 'sine.inOut', immediateRender: false }, Math.max(0, t0 - 0.2));
   };
-  DECO.tape = (amb, bg, t0, t1) => {
+  DECO.tape = (amb, bg, t0, t1, i, beat) => {
     const word = (String(D.brand || 'NEW DROP').toUpperCase() + '  ✦  ').repeat(10);
-    [[PORTRAIT ? 0.1 : 0.12, -7, 1], [PORTRAIT ? 0.88 : 0.86, 6, -1]].forEach(([y, rot, dir]) => {
+    [[PORTRAIT ? 0.1 : 0.12, -7, 1], [PORTRAIT ? 0.88 : 0.86, 6, -1]].filter((_, k) => !(k === 1 && beat && beat.type === 'end')).forEach(([y, rot, dir]) => {   // the closing card keeps its contact line clear of the lower band
+     
       const band = dlay(amb, { left: '-30%', width: '160%', top: y * H + 'px', height: px(92), marginTop: px(-46), background: ACC, color: lum(ACC) > 0.45 ? '#0A0A0A' : '#FFFFFF', fontFamily: DISPLAY, fontWeight: DW, fontSize: px(52), lineHeight: N(92) + 'px', whiteSpace: 'nowrap', overflow: 'hidden', transform: `rotate(${rot}deg)`, boxShadow: `0 ${N(14)}px ${N(30)}px rgba(0,0,0,.35)` });
       const inner = el('div', '', band, esc(word), { display: 'inline-block', letterSpacing: '0.02em' });
       tl.fromTo(inner, { x: dir > 0 ? 0 : -N(900) }, { x: dir > 0 ? -N(900) : 0, duration: life(t0, t1), ease: 'none', immediateRender: false }, Math.max(0, t0 - 0.2));
