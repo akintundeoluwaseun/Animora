@@ -1556,6 +1556,8 @@
       prevOut = last ? null : out;
       t = t1;
     });
+    // the film is exactly as long as its beats: a slow drift or a late tween in the last beat must not stretch the video past what was planned
+    tl.getChildren(false, true, true).forEach((c) => { const st = c.startTime(), e = st + c.duration(); if (e > total + 0.001 && st < total - 0.02) c.duration(total - st); });
     tl.set({}, {}, total);
     window.__sfx = D.sound === 'none' ? [] : SFX.filter((x) => x.t < total - 0.05).sort((a, b) => a.t - b.t).filter((x, i, arr) => !arr.slice(Math.max(0, i - 3), i).some((y) => y.k === x.k && x.t - y.t < 0.06));
     window.__timeline = tl;

@@ -21,5 +21,19 @@ bad(fitScenes([sc('hook', 'a'), sc('brand', 'b'), sc('cta', 'c'), sc('cta', 'd')
 const bd = cleanBrief({ name: 'Tola', relationship: 'sister', milestone: '30', personalMessage: 'You are kind. You are bold. You shine. You inspire. You laugh. You lead.', category: 'birthday' });
 const bp = briefToPlanRules({ ...bd, duration: 15, aspect: '9:16' }, { assets: [], limits });
 bad(bp.duration_seconds === 15, `birthday 15s became ${bp.duration_seconds}s`);
+// the timeline of a real film is exactly as long as its beats (a late tween in the last beat used to stretch the video by up to 2 s)
+{
+  const { generateCode } = await import('../server/ai/index.js');
+  const { readMotion } = await import('../server/ai/motion/page.js');
+  const { inspectAnimation } = await import('../server/engine/renderer.js');
+  for (const [d, name] of [[30, 'Fashion Hub'], [15, 'Ade Foods'], [60, 'Corporate Co']]) {
+    const b = { ...cleanBrief({ name, category: 'restaurant', headlines: ['Fresh daily', 'Free delivery'], features: ['Fast', 'Fresh', 'Fair'], cta: 'Order today' }), aspect: '9:16', duration: d };
+    const plan = briefToPlanRules(b, { assets: [], limits });
+    const out = await generateCode({ plan, assets: [], brief: b, memory: [] });
+    const total = readMotion(out.html).beats.reduce((a, x) => a + x.dur, 0);
+    const info = await inspectAnimation(out.html, { aspectRatio: '9:16' });
+    bad(Math.abs(info.duration - total) < 0.1 && Math.abs(info.duration - d) < 0.6, `${d}s film: timeline ${info.duration.toFixed(2)}s, beats ${total.toFixed(2)}s`);
+  }
+}
 console.log(failed ? `${failed} FAILED` : 'duration tests passed');
 process.exit(failed ? 1 : 0);
