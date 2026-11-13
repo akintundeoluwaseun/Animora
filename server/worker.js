@@ -48,6 +48,7 @@ async function runJob(job) {
       outFile,
       aspectRatio: job.aspect_ratio,
       duration: job.duration_seconds,
+      ...(job.quality === 'draft' ? { scale: 0.6667, crf: 23, preset: 'veryfast' } : {}),
       signal: controller.signal,
       onProgress: (p) => {
         const now = Date.now();

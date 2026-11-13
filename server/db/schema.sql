@@ -174,6 +174,7 @@ ALTER TABLE projects ADD COLUMN IF NOT EXISTS brief_json jsonb;
 -- ---- v4: motion-graphics sound effects (on by default, per video) ----
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS sfx_on boolean NOT NULL DEFAULT true;
 ALTER TABLE renders  ADD COLUMN IF NOT EXISTS sfx_on boolean NOT NULL DEFAULT true;
+ALTER TABLE renders  ADD COLUMN IF NOT EXISTS quality text NOT NULL DEFAULT 'hd';   -- draft (720p, fast) | hd (1080p)
 
 ALTER TABLE assets   ADD COLUMN IF NOT EXISTS is_light boolean;   -- light logo (needs a dark background)
 ALTER TABLE assets   ADD COLUMN IF NOT EXISTS description text;   -- what the picture shows (asked once, used to match words to pictures)

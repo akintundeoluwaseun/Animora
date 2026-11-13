@@ -74,6 +74,7 @@ try {
   }
   const result = await renderVideo({
     html, outFile, aspectRatio: job.aspectRatio, duration: job.duration, signal: controller.signal,
+    ...(job.quality === 'draft' ? { scale: 0.6667, crf: 23, preset: 'veryfast' } : {}),   // the user chose a quick 720p draft
     onProgress: (p) => {
       if (Date.now() - last < 4000 && p.framesDone < p.totalFrames) return;   // progress every 4 s (fewer calls to the free server)
       last = Date.now();

@@ -45,7 +45,7 @@ r.get('/render-jobs/:id', async (req, res) => {
   const j = await job(req, res); if (!j) return;
   if (j.status === 'cancelled') return res.status(410).json({ error: 'Cancelled' });
   await q("UPDATE renders SET status='rendering', started_at=COALESCE(started_at, now()), worker_id='github' WHERE id=$1 AND status='queued'", [j.id]);
-  res.json({ id: j.id, html: j.code_html, aspectRatio: j.aspect_ratio, duration: j.duration_seconds, sfx: j.sfx_on !== false, partSize: PART });
+  res.json({ id: j.id, html: j.code_html, aspectRatio: j.aspect_ratio, duration: j.duration_seconds, sfx: j.sfx_on !== false, quality: j.quality === 'draft' ? 'draft' : 'hd', partSize: PART });
 });
 
 r.post('/render-jobs/:id/progress', async (req, res) => {
