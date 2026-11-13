@@ -39,11 +39,11 @@ const DEFAULTS = {
   // 'auto': try beginframe, fall back to screenshot.
   captureMode: process.env.ADFLASH_CAPTURE_MODE || 'auto',
   // Capture scale: 0.6667 renders 1080p layouts at 720p (2.25x fewer pixels, about 2x faster). 1 = full 1080p.
-  scale: Number(process.env.ADFLASH_SCALE) || 0.6667,
+  scale: Number(process.env.ADFLASH_SCALE) || 1,   // true 1080p: text and logos stay sharp (set ADFLASH_SCALE=0.6667 for a quick draft)
   frameFormat: 'jpeg', // 'jpeg' is ~3x faster to capture than 'png'; quality 95 is visually lossless after H.264
-  jpegQuality: 90,
-  crf: 23,   // flat motion graphics stay crisp; files about a third smaller than crf 20
-  preset: 'veryfast',
+  jpegQuality: 95,
+  crf: 19,   // sharp text and logos; WhatsApp and Instagram re-compress anyway, so start from a clean master
+  preset: 'fast',
   loadTimeoutMs: 30000,
   assetTimeoutMs: 8000,
 };
@@ -252,10 +252,10 @@ function startEncoder(outFile, { fps, frameFormat, crf, preset, outW, outH, grai
     '-y', '-loglevel', 'error',
     '-f', 'image2pipe', '-framerate', String(fps),
     '-c:v', frameFormat === 'png' ? 'png' : 'mjpeg', '-i', '-',
-    '-c:v', 'libx264', '-preset', preset, '-crf', String(crf), '-maxrate', '4M', '-bufsize', '8M',   // cap busy scenes too
+    '-c:v', 'libx264', '-preset', preset, '-crf', String(crf), '-maxrate', '9M', '-bufsize', '18M', '-tune', 'animation',   // flat motion graphics; cap only the busiest scenes
     // fast captures are upscaled back to full HD with a sharp filter (cheap compared with painting 1080p)
     '-vf', (outW ? `scale=${outW}:${outH}:flags=lanczos:in_range=full:out_range=tv` : 'scale=in_range=full:out_range=tv') + noise,
-    '-pix_fmt', 'yuv420p', '-r', String(fps), '-video_track_timescale', String(fps * 1000),
+    '-pix_fmt', 'yuv420p', '-r', String(fps), '-video_track_timescale', String(fps * 1000), '-movflags', '+faststart',
     outFile,
   ];
   const ff = spawn('ffmpeg', args, { stdio: ['pipe', 'ignore', 'pipe'] });
