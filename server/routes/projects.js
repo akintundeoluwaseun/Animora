@@ -288,7 +288,9 @@ r.post('/:id/build', async (req, res) => {
   const p = await loadProject(req, res); if (!p) return;
   let brief = cleanBrief({ ...(p.brief_json || {}), ...(req.body?.brief || {}), done: true });
   // "anything" / "make a demo": invent believable sample content instead of printing those words
-  if (brief.demo || !brief.name) brief = await fillDemoBrief({ ...brief, demo: true }, { flyer: p.kind === 'flyer' });
+  // (a missing name alone is not a demo: if the owner told us anything real we use that and never invent a business around it)
+  const saidSomething = !!(brief.headline || brief.headlines?.length || brief.features?.length || brief.products?.length || brief.pasteText || brief.extra || brief.contact || brief.offer);
+  if (brief.demo || (!brief.name && !saidSomething)) brief = await fillDemoBrief({ ...brief, demo: true }, { flyer: p.kind === 'flyer' });
   let styleId = brief.styleId && !brief.styleAuto ? brief.styleId : null;
   if (!styleId) styleId = (await one("SELECT id FROM styles WHERE slug=$1 AND status='live'", [autoStyleSlug(brief)]))?.id || p.style_id;
   const style = await loadStyle(styleId);

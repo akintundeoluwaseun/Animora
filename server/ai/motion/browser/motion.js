@@ -1454,12 +1454,9 @@
   DECO.paper = (amb, bg, t0, t1, i) => {
     if (bg !== 'light') return;
     dlay(amb, { inset: 0, opacity: 0.5, backgroundImage: "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.75' numOctaves='3'/><feColorMatrix values='0 0 0 0 0.4  0 0 0 0 0.35  0 0 0 0 0.3  0 0 0 .18 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>\")" });
-    const num = dlay(amb, { right: '4%', top: PORTRAIT ? '3%' : '2%', fontFamily: DISPLAY, fontWeight: DW, fontSize: px(PORTRAIT ? 420 : 360), lineHeight: 1, color: 'rgba(17,17,17,.06)', letterSpacing: '-0.06em' });
-    num.textContent = String(i + 1).padStart(2, '0');
-    tl.fromTo(num, { y: N(40) }, { y: -N(20), duration: life(t0, t1), ease: 'sine.out', immediateRender: false }, Math.max(0, t0 - 0.2));
+    // thin rules top and bottom frame the page; no ghost numeral and no tiny footer (they said nothing and cost legibility)
     dlay(amb, { left: '6%', right: '6%', top: PORTRAIT ? '9%' : '10%', height: px(4), background: '#111' });
     dlay(amb, { left: '6%', right: '6%', bottom: PORTRAIT ? '9%' : '10%', height: px(2), background: '#111' });
-    dlay(amb, { left: '6%', bottom: PORTRAIT ? '6%' : '6.5%', fontSize: px(26), fontWeight: 700, letterSpacing: '0.18em', color: '#111', textTransform: 'uppercase' }).textContent = String(D.brand || '').slice(0, 30);
   };
   DECO.kente = (amb, bg, t0, t1) => {
     const green = '#1F8A3B';

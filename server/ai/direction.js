@@ -21,7 +21,7 @@ export const DIRECTIONS = [
     concept: 'Clear and credible: grid, one accent, sans type, details easy to scan.' },
   { id: 'realestate', avoid: ['notif','chat','search','swap','toggles','receipt'], re: /real ?estate|property|apartment|duplex|\bland\b|estate|house for|housing|rent(?:al)?s?\b|for sale|lease|mortgage/i, styles: ['prime-estate', 'graphite-pro', 'gold-luxe'], angles: ['photos', 'clean', 'calm'], layouts: ['photo', 'diagonal', 'services', 'poster'],
     concept: 'Aspirational and factual: the building first, price and place readable at a glance.' },
-  { id: 'restaurant', avoid: ['toggles','swap','chat','phone'], re: /restaurant|kitchen|\bcafe\b|eatery|bukka|buka|canteen|grill|suya|catering|\bbar\b|lounge|food|meal|menu|chop|bistro|pizza|burger/i, styles: ['naija-bold', 'retro-pop', 'mono-editorial'], angles: ['photos', 'loud', 'story'], layouts: ['menu', 'photo', 'price', 'collage'],
+  { id: 'restaurant', avoid: ['toggles','swap','chat','phone'], re: /restaurant|kitchen|\bcafe\b|eatery|bukka|buka|canteen|grill|suya|catering|\bbar\b|lounge|food|meal|menu|chop|bistro|pizza|burger/i, styles: ['naija-bold', 'retro-pop', 'fresh-market'], angles: ['photos', 'loud', 'story'], layouts: ['menu', 'photo', 'price', 'collage'],
     concept: 'Appetite first: warm colour, the food big, the offer and how to order obvious.' },
   { id: 'bakery', re: /bak(?:ery|ing|er)|cakes?\b|pastr|dessert|cupcake|ice ?cream|confection/i, styles: ['fresh-market', 'beauty-bloom', 'retro-pop'], angles: ['photos', 'type', 'clean'], layouts: ['photo', 'price', 'collage', 'poster'],
     concept: 'Sweet and light: soft colour, rounded type, the product close up.' },

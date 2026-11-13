@@ -7,7 +7,7 @@ import { minimizeExport, startExport, useExportJob } from '../lib/exportJob.js';
 export default function DownloadVideo({ project, size = 'md', className = '' }) {
   const job = useExportJob();
   const [open, setOpen] = useState(false);
-  const [quality, setQuality] = useState(() => (window.innerWidth < 900 ? 'fast' : 'hd'));
+  const [quality, setQuality] = useState(() => 'fast');
   const busy = job.status === 'working';
   const start = () => { setOpen(false); startExport({ project, quality }); };
   return (

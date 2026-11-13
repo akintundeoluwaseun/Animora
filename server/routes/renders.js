@@ -41,8 +41,8 @@ r.post('/projects/:id/renders', async (req, res) => {
   if (p.kind === 'flyer') return res.status(400).json({ error: 'Flyers are downloaded as pictures. Open your video to make an MP4.' });
   try {
     const render = await createRender(req.user, p, { adViewId: req.body?.adViewId });
-    // the quality the user chose: 'draft' (720p, quick) or 'hd' (1080p, the default)
-    render.quality = req.body?.quality === 'draft' ? 'draft' : 'hd';
+    // the quality the user chose: 'draft' (720p, quick, the default for now: about twice as fast) or 'hd' (1080p, on request)
+    render.quality = req.body?.quality === 'hd' ? 'hd' : 'draft';
     await q('UPDATE renders SET quality=$2 WHERE id=$1', [render.id, render.quality]);
     if (config.githubRender && config.serverless) await dispatchRender(render);   // a GitHub Actions run makes the MP4
     res.json({ render: shape(render, { queuePosition: await queuePosition(render.id) }), user: publicUser(await loadUser(req.user.id)) });

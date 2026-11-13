@@ -117,6 +117,9 @@ export function composeMotion(plan, { brief = {}, assets = [], salt = '', avoid 
   const chance = (p) => rnd() < p;
   const text = `${f.text} ${f.features.join(' ')} ${f.headlines.join(' ')}`;
   const food = FOOD.test(text), tech = TECH.test(text), beauty = BEAUTY.test(text), fashion = FASHION.test(text), service = SERVICE.test(text), event = EVENT.test(`${brief.goal || ''} ${brief.flyerType || ''} ${(brief.headlines || []).join(' ')}`);
+  // a PRODUCT people install or log into gets phone/app screens; a business that merely deals in computers (a laptop repair shop) does not
+  const appLike = /\b(apps?|software|saas|platform|startup|fintech|wallet|crypto|download)\b/i.test(`${f.cat} ${f.brand} ${f.text} ${f.headlines.join(' ')}`) && !/\b(repairs?|fix\w*|servic\w+|shop|store|dealer|sales|accessor\w+)\b/i.test(`${f.cat} ${f.brand}`);
+  const localBiz = (service || food || beauty) && !/\b(consult\w*|advis\w*|law\w*|bank\w*|estate|summit|conference|perfume|fragrance|luxury|jewel\w*|watch\w*)\b/i.test(`${f.cat} ${f.brand} ${f.text}`);
   const duration = Math.max(10, Math.round(Number(plan.duration_seconds) || 24));
   const avoidSet = new Set(avoid || []);
   const catLabel = f.cat && !GENERIC_CATS.test(f.cat) ? f.cat : '';   // only a real description goes on screen
@@ -170,7 +173,7 @@ export function composeMotion(plan, { brief = {}, assets = [], salt = '', avoid 
   };
   B.phone = () => {   // the screen shows a line that is not the headline (the opener has already said that)
     const line = [heads[1], feats[0], catLabel].find((t) => t && key(t) !== key(H0));
-    return (tech || /app|download/i.test(cta)) && line ? { type: 'phone', bg: base, text: sentence(line, 36) } : null;
+    return appLike && line ? { type: 'phone', bg: base, text: sentence(line, 36) } : null;
   };
   B.photos = () => (photos.length ? { type: 'photos', bg: base, urls: photos.slice(0, 5), lines: [prods[0]?.name || heads[1] || H0], accent: accentOf(prods[0]?.name || heads[1] || H0) } : null);
   // extra picture beats for the middle: the owner's pictures again, each beat from a different starting picture, captioned with a fact not yet said
@@ -215,8 +218,8 @@ export function composeMotion(plan, { brief = {}, assets = [], salt = '', avoid 
   });
   B.stat = () => (nums.stats[0] ? { _src: nums.stats[0].src, _num: nums.stats[0].value.replace(/\D/g, ''), type: 'stat', bg: base, value: nums.stats[0].value, label: titleish(nums.stats[0].label), lead: pick(['And counting', 'Trusted by many', '']) || undefined, accent: [1] } : null);
   B.ring = () => (nums.times[0] && !nums.times[0].always ? { _src: nums.times[0].src, _num: String(nums.times[0].n), type: 'ring', bg: base, value: nums.times[0].value, label: `Under ${nums.times[0].n} ${nums.times[0].unitWord}`.replace(/\s+$/, ''), sub: '', fill: 0.82 } : null);
-  B.search = () => ((service || food || beauty || fashion) && (catLabel || city) ? { type: 'search', bg: 'light', lead: pick(['So you search…', 'Looking for the best?', 'Next time you search…']), query: `${(catLabel || f.brand).toLowerCase()}${city ? ` in ${city.toLowerCase()}` : ' near me'}`.slice(0, 34), title: f.brand, sub: [catLabel, city].filter(Boolean).join(' · '), button: /call/i.test(cta) ? 'Call' : /book/i.test(cta) ? 'Book' : 'Open' } : null);
-  B.notif = () => ((food || service || fashion || tech) && (feats[0] || heads[1]) ? { type: 'notif', bg: base, items: [{ body: sentence(heads[1] || feats[0], 70) }, ...(feats[1] ? [{ body: sentence(feats[1], 70), time: '1m ago' }] : [])].slice(0, 2), lead: chance(0.5) ? sentence(f.cat || '', 24) || undefined : undefined } : null);
+  B.search = () => (localBiz && (catLabel || city) ? { type: 'search', bg: 'light', lead: pick(['So you search…', 'Looking for the best?', 'Next time you search…']), query: `${(catLabel || f.brand).toLowerCase()}${city ? ` in ${city.toLowerCase()}` : ' near me'}`.slice(0, 34), title: f.brand, sub: [catLabel, city].filter(Boolean).join(' · '), button: /call/i.test(cta) ? 'Call' : /book/i.test(cta) ? 'Book' : 'Open' } : null);
+  B.notif = () => ((appLike || (localBiz && !service)) && (feats[0] || heads[1]) ? { type: 'notif', bg: base, items: [{ body: sentence(heads[1] || feats[0], 70) }, ...(feats[1] ? [{ body: sentence(feats[1], 70), time: '1m ago' }] : [])].slice(0, 2), lead: chance(0.5) ? sentence(f.cat || '', 24) || undefined : undefined } : null);
   B.map = () => (address ? { type: 'map', bg: 'light', label: pick(['Find us', 'Visit us', 'Come through']), address: cleanText(address.split(/,\s*/)[0], 32), sub: address.split(/,\s*/).slice(1).join(', ') || city, area: address.split(/,\s*/)[0].replace(/^\d+\s*/, '').split(' ').slice(0, 2).join(' '), area2: city } : null);
   B.calendar = () => (when ? { type: 'calendar', bg: base, lead: pick(['Save the date', 'Mark your calendar', 'See you there']), accent: [2], month: when.month, day: when.day, title: heads[0] && heads[0].length < 28 ? heads[0] : f.brand, time: when.time, place: when.place || cleanText(address, 36) } : null);
   B.chat = () => ({ type: 'chat', bg: base, messages: [{ from: 'me', text: prods[0] ? `Hi! Do you have ${prods[0].name.toLowerCase()} today?` : `Hi ${f.brand.split(' ')[0]}, are you open today?` }, { from: 'biz', text: prods[0]?.price ? `Yes! ${prods[0].name} is ${prods[0].price}. Want one?` : 'Yes, we are! How can we help you? 😊' }, { from: 'me', text: 'Perfect, I\'ll take it 🙌' }] });
@@ -393,7 +396,7 @@ export function composeMotion(plan, { brief = {}, assets = [], salt = '', avoid 
     || (ANG === 'story' && B.hookBuild())
     || (event && !avoidSet.has('countdown') && chance(0.5) ? B.countdown() : null) || (chance(slamP) ? B.hookSlam() : null) || (chance(glowP) ? B.hookGlow() : B.hookBuild()));
   const opener = op.opener;
-  const brandBeat = op.brandDone ? null : (tech && ANG !== 'type' && chance(0.5) ? B.phone() : null) || B.brand();
+  const brandBeat = op.brandDone ? null : (appLike && ANG !== 'type' && chance(0.5) ? B.phone() : null) || B.brand();
   const headBeat = op.head;   // when the opening is a picture or the brand, the headline is the second beat
   const pool = [
     B.photos(), B.price(), B.menu(), B.receipt(), B.features(), ...B.heads(), B.stat(), B.ring(), B.calendar(), B.grid(), B.notif(), B.search(), B.map(),
@@ -451,7 +454,7 @@ export function composeMotion(plan, { brief = {}, assets = [], salt = '', avoid 
   }
   pool.filter((b) => !dirAvoid.has(b.type)).forEach((b) => { if (!body.some((x) => x.type === b.type && !['words', 'highlight'].includes(b.type))) take(b); });
   // still room? repeat the main message in a different form, then the strengths again
-  const fillers = [ feats.length >= 2 ? { type: 'toggles', bg: base, title: 'What you get', items: feats.slice(0, 4) } : null, B.search(), B.notif()].filter(Boolean).filter((b) => !dirAvoid.has(b.type)).filter((b) => !(S.presentation?.avoid || []).includes(b.type));
+  const fillers = [ feats.length >= 2 && appLike ? { type: 'toggles', bg: base, title: 'What you get', items: feats.slice(0, 4) } : null, B.search(), B.notif()].filter(Boolean).filter((b) => !dirAvoid.has(b.type)).filter((b) => !(S.presentation?.avoid || []).includes(b.type));
   for (const fb of fillers) { if (budget < 2) break; if (!body.some((x) => x.type === fb.type && fb.type !== 'words')) take(fb); }
   if (lateBrand && !body.some((b) => b.type === 'icon')) { const at = Math.min(body.length, Math.max(1, 2)); if (est(brandBeat) <= budget + 0.01 || body.length > 2) body.splice(at, 0, brandBeat); }
   if (ANG === 'type') {   // a type film still needs variety: some lines become a highlighted sentence, others a quiet glow

@@ -154,7 +154,7 @@ export default function Render() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [canShare, setCanShare] = useState(true);
-  const [quality, setQuality] = useState(() => { try { return localStorage.getItem('animora.quality') === 'draft' ? 'draft' : 'hd'; } catch { return 'hd'; } });
+  const [quality, setQuality] = useState(() => { try { return localStorage.getItem('animora.quality') === 'hd' ? 'hd' : 'draft'; } catch { return 'draft'; } });
   const pickQuality = (q) => { setQuality(q); try { localStorage.setItem('animora.quality', q); } catch { /* private window */ } };
   const [lastDone, setLastDone] = useState(null);   // the last finished MP4 of this video (maybe from before an edit)
 
