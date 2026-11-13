@@ -154,6 +154,8 @@ export default function Render() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [canShare, setCanShare] = useState(true);
+  const [quality, setQuality] = useState(() => { try { return localStorage.getItem('animora.quality') === 'draft' ? 'draft' : 'hd'; } catch { return 'hd'; } });
+  const pickQuality = (q) => { setQuality(q); try { localStorage.setItem('animora.quality', q); } catch { /* private window */ } };
   const [lastDone, setLastDone] = useState(null);   // the last finished MP4 of this video (maybe from before an edit)
 
   const loadRender = async (rid) => { const r = await api(`/renders/${rid}`); setRender(r.render); return r.render; };
@@ -172,7 +174,6 @@ export default function Render() {
         setLastDone(list.renders.find((x) => x.projectId === id && x.status === 'done') || null);
         const rid = params.get('r') || (last && (!last.stale || ['queued', 'rendering'].includes(last.status)) ? last.id : null);
         if (rid) await loadRender(rid);
-        else if (params.get('new') && c.ok !== false && !c.needsAd) autoStart.current = true;
       } catch (e) { setError(e.message); }
     })();
   }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -208,7 +209,7 @@ export default function Render() {
   const start = async (adViewId) => {
     setBusy(true); setError(''); setAdOpen(false);
     try {
-      const r = await api(`/projects/${id}/renders`, { method: 'POST', body: { adViewId } });
+      const r = await api(`/projects/${id}/renders`, { method: 'POST', body: { adViewId, quality } });
       setRender(r.render); setParams({ r: r.render.id }, { replace: true }); refresh();
     } catch (e) {
       if (e.data?.code === 'AD_REQUIRED') setAdOpen(true); else setError(e.message);
@@ -303,6 +304,24 @@ export default function Render() {
                     : user.testMode ? <p>Test mode: no ad, no limit. Your video starts rendering straight away.</p>
                     : <p>Ad-free · uses 1 of your Pro videos ({user.proVideosRemaining} left this month).</p>}
               </div>
+              {!tooLong && !render && (
+                <div className="mt-5" role="radiogroup" aria-label="Video quality">
+                  <p className="text-sm font-semibold">Choose the quality</p>
+                  <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                    {[['hd', 'Full HD · 1080p', 'Sharpest text and logos. Best for posting.', 2.4], ['draft', 'Quick draft · 720p', 'Smaller and faster. Good for checking it first.', 1.2]].map(([k, name, note, perSec]) => {
+                      const mins = Math.max(1, Math.round((60 + project.durationSeconds * perSec) / 60));
+                      return (
+                        <button key={k} type="button" role="radio" aria-checked={quality === k} onClick={() => pickQuality(k)}
+                          className={`rounded-2xl border p-3 text-left text-sm transition ${quality === k ? 'border-brand bg-lilac' : 'border-line bg-white'}`}>
+                          <span className="block font-semibold">{name}</span>
+                          <span className="block text-ink-soft">{note}</span>
+                          <span className="mt-1 block text-ink-soft">Ready in about {mins} min for your {project.durationSeconds}-second video</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
               {tooLong
                 ? <Button as={Link} to="/checkout" size="lg" className="mt-5 w-full">Upgrade to Pro — {naira(5000)}/month</Button>
                 : <Button size="lg" className="mt-5 w-full" onClick={render?.status === 'failed' ? retry : begin} loading={busy}>{check.needsAd ? 'Watch ad & ' : ''}{lastDone ? 'Render video again' : 'Generate Video'}</Button>}
