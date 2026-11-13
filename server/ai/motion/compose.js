@@ -351,7 +351,7 @@ export function composeMotion(plan, { brief = {}, assets = [], salt = '', avoid 
     const finalBeats = beats.map((beat, i) => {
       let out = 'push';
       if (i < beats.length - 1) {
-        const choices = outs.filter((candidate) => candidate !== lastOut);
+        const choices = outs.filter((candidate) => candidate !== lastOut && !(i === beats.length - 2 && candidate === 'push'));   // the last beat's own exit is 'push'
         out = choices[Math.floor(rnd() * choices.length)];
       }
       lastOut = out;
@@ -503,7 +503,7 @@ export function composeMotion(plan, { brief = {}, assets = [], salt = '', avoid 
   let last = '';
   beats = beats.map((b, i) => {
     let out = 'push';
-    if (i < beats.length - 1) { let k = 0; do { out = pick(outs); k++; } while ((out === last || (out === 'drop' && beats[i + 1].type === 'map')) && k < 8); }
+    if (i < beats.length - 1) { let k = 0; do { out = pick(outs); k++; } while ((out === last || (out === 'drop' && beats[i + 1].type === 'map') || (i === beats.length - 2 && out === 'push')) && k < 12); }
     last = out;
     const { _want, _src, _num, _menu, _pic, ...rest } = b;
     if (Array.isArray(rest.items)) rest.items = uniqueGlyphs(rest.items);
