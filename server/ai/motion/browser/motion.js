@@ -251,6 +251,10 @@
       const r = wordsRow(box, L, li ? size * 0.62 : size, { accent: acc, offset: off, accColor: o.accColor, bg: o.bg, weight: o.weight || (li ? 550 : 700), color: o.color || (li && o.mute ? o.mute : undefined), fit: false });
       off += r.words.length;
       Object.assign(r.row.style, { justifyContent: o.align === 'right' ? 'flex-end' : 'flex-start', flexWrap: 'wrap', maxWidth: '100%' });
+      {   // one long word (a handle, a long name) must never run past the edge: shrink the line until its widest word fits
+        const avail = o.width || (W - 2 * padX()), widest = Math.max(0, ...r.items.map((it) => it.offsetWidth));
+        if (widest > avail) r.row.style.fontSize = parseFloat(r.row.style.fontSize) * (avail / widest) * 0.97 + 'px';
+      }
       r.items.forEach((it) => { all.push(it); });
     });
     all.forEach((it, i) => { tl.fromTo(it, { opacity: 0, y: '0.4em', filter: blur(9) }, { opacity: 1, y: 0, filter: blur(0), duration: 0.75, ease: 'expo.out' }, at + i * (o.per || 0.11)); last = at + i * (o.per || 0.11) + 0.75; });
@@ -710,18 +714,19 @@
     }
     const grp = el('div', 'row', s, '', { alignItems: 'center' });
     const ic = brandIcon(grp, size, { onBrand: bg === 'brand' });
-    tl.fromTo(ic, { opacity: 0, scale: 0.25, rotation: -14, filter: blur(14) }, { opacity: 1, scale: 1, rotation: 0, filter: blur(0), duration: 1.0, ease: 'back.out(1.7)' }, t0 + 0.08);
+    tl.fromTo(ic, { opacity: 0 }, { opacity: 1, duration: 0.25, ease: 'none' }, t0 + 0.04);   // visible at once: the stage is never empty while the mark settles
+    tl.fromTo(ic, { scale: 0.25, rotation: -14, filter: blur(14) }, { scale: 1, rotation: 0, filter: blur(0), duration: 0.8, ease: 'back.out(1.7)', immediateRender: false }, t0 + 0.04);
     sfx(t0 + 0.12, 'pop', 0.8);
-    let after = t0 + 0.9;
+    let after = t0 + 0.8;
     if (mode === 'wordmark') {
       const nameSize = o.textSize || Math.round(size * 0.56);
       const wrap = el('div', '', grp, '', { overflow: 'hidden', paddingLeft: px(size * 0.2), paddingRight: px(6) });
       const name = nameBlock(wrap, o.name || D.brand, N(nameSize), ink, maxTextW() - N(size) - N(size * 0.2));
       const shift = wrap.offsetWidth / 2;
-      tl.fromTo(grp, { x: shift }, { x: 0, duration: 1.0, ease: 'expo.inOut', immediateRender: true }, t0 + 0.75);
-      tl.fromTo(name, { xPercent: -105, opacity: 0 }, { xPercent: 0, opacity: 1, duration: 1.0, ease: 'expo.inOut' }, t0 + 0.75);
-      sfx(t0 + 0.8, 'whoosh', 0.3);
-      after = t0 + 1.6;
+      tl.fromTo(grp, { x: shift }, { x: 0, duration: 0.9, ease: 'expo.inOut', immediateRender: true }, t0 + 0.5);
+      tl.fromTo(name, { xPercent: -105, opacity: 0 }, { xPercent: 0, opacity: 1, duration: 0.9, ease: 'expo.inOut' }, t0 + 0.5);
+      sfx(t0 + 0.55, 'whoosh', 0.3);
+      after = t0 + 1.35;
     }
     if (o.tagline) {
       const tg = wordsRow(s, o.tagline, o.tagSize || 54, { weight: 550, accent: new Set([].concat(o.accent || [])), accColor: accOf(bg), bg, color: mode === 'solo' ? ink : muteOf(bg) });
@@ -1103,11 +1108,12 @@
     const wrap = el('div', '', grp, '', { overflow: 'hidden', paddingLeft: px(size * 0.2), paddingRight: px(6) });
     const name = nameBlock(wrap, D.brand, N(size * 0.56), inkOf(bg), maxTextW() - N(size * 1.2));
     const shift = wrap.offsetWidth / 2;
-    tl.fromTo(ic, { opacity: 0, scale: 0.3, rotation: -12, filter: blur(14) }, { opacity: 1, scale: 1, rotation: 0, filter: blur(0), duration: 0.9, ease: 'back.out(1.7)' }, t0 + 0.1);
-    tl.fromTo(grp, { x: shift }, { x: 0, duration: 0.95, ease: 'expo.inOut', immediateRender: true }, t0 + 0.65);
-    tl.fromTo(name, { xPercent: -105, opacity: 0 }, { xPercent: 0, opacity: 1, duration: 0.95, ease: 'expo.inOut' }, t0 + 0.65);
-    sfx(t0 + 0.12, 'pop', 0.7); sfx(t0 + 0.7, 'whoosh', 0.3);
-    let at = t0 + 1.4;
+    tl.fromTo(ic, { opacity: 0 }, { opacity: 1, duration: 0.25, ease: 'none' }, t0 + 0.04);
+    tl.fromTo(ic, { scale: 0.3, rotation: -12, filter: blur(14) }, { scale: 1, rotation: 0, filter: blur(0), duration: 0.8, ease: 'back.out(1.7)', immediateRender: false }, t0 + 0.04);
+    tl.fromTo(grp, { x: shift }, { x: 0, duration: 0.9, ease: 'expo.inOut', immediateRender: true }, t0 + 0.45);
+    tl.fromTo(name, { xPercent: -105, opacity: 0 }, { xPercent: 0, opacity: 1, duration: 0.9, ease: 'expo.inOut' }, t0 + 0.45);
+    sfx(t0 + 0.08, 'pop', 0.7); sfx(t0 + 0.5, 'whoosh', 0.3);
+    let at = t0 + 1.2;
     if (o.tagline) { const tg = wordsRow(s, o.tagline, 60, { weight: 600, accent: new Set([].concat(o.accent || [])), accColor: onBrand ? (BRAND_DARK ? '#FFFFFF' : '#111') : accOf(bg) }); tg.row.style.marginTop = px(56); tg.row.style.color = onBrand ? inkOf(bg) : muteOf(bg); at = buildRow(tg.row, tg.items, at, 0.13, { blur: 6 }) - 0.3; }
     if (o.contact) {
       const pill = el('div', 'pill', s, '', { marginTop: px(70), height: px(104), padding: `0 ${N(46)}px`, gap: px(18), background: onBrand ? 'rgba(255,255,255,.95)' : bg === 'light' ? '#FFFFFF' : '#1E1E23', boxShadow: onBrand ? '0 20px 50px rgba(0,0,0,.2)' : shadow(0.8), fontSize: px(40), fontWeight: 600, color: onBrand || bg === 'light' ? '#111' : '#F5F5F7', whiteSpace: 'nowrap' });
