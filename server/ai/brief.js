@@ -202,6 +202,37 @@ function shortPersonalLines(value, limit = 8) {
   return lines.map((x) => str(x, 90)).filter(Boolean).slice(0, limit);
 }
 
+
+// ---- the requested length is a constraint: content is merged and prioritised to fit it (never silently lengthened) ----
+export const MIN_SCENE_SECONDS = 3;   // below this a scene cannot be read
+const PRIORITY = { hook: 99, brand: 99, cta: 99, menu: 8, product: 6, offer: 5, detail: 3 };
+/**
+ * Fit scenes into D seconds. Adjacent plain "detail" scenes are merged (up to 3 lines) first; then the least important scene is
+ * dropped. Hook, brand and call to action are never dropped. Returns { trimmed: [text...], impossible: seconds needed or 0 }.
+ */
+export function fitScenes(scenes, D, minScene = MIN_SCENE_SECONDS) {
+  const capacity = Math.max(3, Math.floor(D / minScene));
+  const trimmed = [];
+  const base = (sc) => sc.pri ?? PRIORITY[sc.purpose] ?? 3;
+  const pri = (sc, i) => base(sc) - i * 0.01;
+  const merge = () => {
+    for (let i = 1; i < scenes.length - 2; i++) {
+      const a = scenes[i], b = scenes[i + 1];
+      if (a.purpose === 'detail' && b.purpose === 'detail' && !(a.images || []).length && !(b.images || []).length && a.pri == null && b.pri == null
+        && a.on_screen_text.length + b.on_screen_text.length <= 3) { a.on_screen_text = [...a.on_screen_text, ...b.on_screen_text]; scenes.splice(i + 1, 1); return true; }
+    }
+    return false;
+  };
+  while (scenes.length > capacity) {
+    if (merge()) continue;
+    let k = -1, low = Infinity;
+    for (let i = 1; i < scenes.length - 1; i++) { const v = pri(scenes[i], i); if (v < low) { low = v; k = i; } }
+    if (k < 0 || base(scenes[k]) >= 99) break;
+    trimmed.push(...scenes[k].on_screen_text); scenes.splice(k, 1);
+  }
+  return { trimmed, impossible: scenes.length > capacity ? scenes.length * minScene : 0 };
+}
+
 function birthdayPlan(b, { assets, limits, palette }) {
   const min = limits.minSeconds || 15, max = limits.maxSeconds || 300;
   const photos = birthdayPhotoAssets(assets, b);
@@ -221,8 +252,21 @@ function birthdayPlan(b, { assets, limits, palette }) {
     ...message.map((x) => ({ purpose: 'detail', text: [x], weight: 1 })),
     { purpose: 'cta', text: [closing], weight: 1.2 },
   ];
-  const needed = Math.ceil((lines.length * 3.5) / 5) * 5;
-  const D = Math.max(min, Math.min(max, Math.max(b.duration || 20, needed)));
+  const D = Math.max(min, Math.min(max, b.duration || 20));
+  // fit the requested length: the generic wishes go first, then the later memories; the greeting, the name and the closing always stay
+  const cap = Math.max(3, Math.floor(D / MIN_SCENE_SECONDS)); const droppedLines = [];
+  // first pair up neighbouring short wishes on one screen (nothing is lost), only then leave lines out
+  for (let i = lines.length - 3; i >= 1 && lines.length > cap; i--) {
+    const x = lines[i], y = lines[i + 1];
+    if (x.purpose === 'detail' && y.purpose === 'detail' && !x.photo && !y.photo && x.text.length + y.text.length <= 2) { x.text = [...x.text, ...y.text]; lines.splice(i + 1, 1); i--; }
+  }
+  for (const group of [message.length, memories.length]) {
+    for (let n = 0; n < group && lines.length > cap; n++) {
+      const idx = lines.map((l, i) => [l, i]).filter(([l]) => l.purpose === 'detail' && (group === message.length ? !memories.some((m) => l.text[0] === m) : true)).map(([, i]) => i).pop();
+      if (idx == null) break; droppedLines.push(...lines[idx].text); lines.splice(idx, 1);
+    }
+  }
+  const durationNote = droppedLines.length ? `To fit ${Math.round(D)} seconds, ${droppedLines.length} of your lines were left out. Choose a longer video to include everything.` : '';
   const total = lines.reduce((sum, s) => sum + s.weight, 0);
   let t = 0;
   const scenes = lines.map((s, i) => {
@@ -237,6 +281,7 @@ function birthdayPlan(b, { assets, limits, palette }) {
     title: `${name}'s ${age ? `${age} ` : ''}Birthday`.slice(0, 110),
     business: { name, category: 'Birthday celebration', location: '', phone: '', handle: '' },
     aspect_ratio: b.aspect || '9:16', duration_seconds: D,
+    ...(durationNote ? { duration_note: durationNote } : {}),
     style: { colors: readable({ ...(palette || {}), ...(b.colors || {}) }, b.colors) },
     assets: photos.map((a) => ({ name: a.name, url: a.url, use: 'personal photo' })),
     scenes,
@@ -275,7 +320,7 @@ export function briefToPlanRules(brief, { assets = [], limits = { minSeconds: 15
   const scenes = [];
   const add = (purpose, text, weight, imgs = []) => scenes.push({ purpose, on_screen_text: text.filter(Boolean), weight, images: imgs });
   add('hook', [b.headline || `${b.name}`, b.offer], 1);
-  if (b.when) add('detail', [b.when], 1);
+  if (b.when) scenes.push({ purpose: 'detail', on_screen_text: [b.when].filter(Boolean), weight: 1, images: [], pri: 9 });   // when and where are never the first thing to go
   add('brand', [b.name, b.category ? `${b.category}${place ? ` · ${place}` : ''}` : place], 1, logo ? [{ asset: logo.name, placement: 'center', fit: 'contain' }] : []);
   (b.headlines || []).slice(1).forEach((h) => add('detail', [h], 1));   // the other chosen messages
   if (photos[0]) add('product', [b.features[0] || b.headline || b.name, b.category].slice(0, 2), 1, [{ asset: photos[0].name, placement: 'center', fit: 'cover' }]);
@@ -303,11 +348,11 @@ export function briefToPlanRules(brief, { assets = [], limits = { minSeconds: 15
     if (scenes.length > 1 && scenes[0].on_screen_text.length === 1 && norm(scenes[0].on_screen_text[0]) === norm(last.on_screen_text[0]) && (b.category || place)) scenes[0].on_screen_text = [b.category || place];
   }
 
-  // More answers = a longer video: every scene gets at least ~3.5 s, up to the plan's maximum length.
-  const maxD = limits.maxSeconds || 300;
-  D = Math.max(D, Math.min(maxD, Math.ceil((scenes.length * 3.5) / 5) * 5));
-  // drop middle scenes only if the plan's maximum is still too short for them (keep hook, brand and CTA)
-  while (scenes.length > 3 && D / scenes.length < 3) scenes.splice(scenes.length - 2, 1);
+  // The length the owner asked for is kept. More answers than fit are merged and the least important are left out (hook, brand and
+  // call to action always stay); the owner is told what was left out so they can choose a longer video instead.
+  const fit = fitScenes(scenes, D);
+  let durationNote = fit.trimmed.length ? `To fit ${Math.round(D)} seconds, ${fit.trimmed.length === 1 ? `"${fit.trimmed[0]}" was` : `${fit.trimmed.length} points (${fit.trimmed.slice(0, 3).join(', ')}${fit.trimmed.length > 3 ? '…' : ''}) were`} left out. Choose a longer video to include everything.` : '';
+  if (fit.impossible) { D = Math.min(limits.maxSeconds || 300, Math.ceil(fit.impossible)); durationNote = `This much content needs about ${D} seconds to be readable, so the video is ${D} seconds instead of the ${Math.round(b.duration || 20)} requested.`; }
   const total = scenes.reduce((a, s) => a + s.weight, 0);
   let t = 0;
   const planScenes = scenes.map((s, i) => {
@@ -323,6 +368,7 @@ export function briefToPlanRules(brief, { assets = [], limits = { minSeconds: 15
     business: { name: b.name || '', category: b.category || '', location: place, phone, handle: site },
     aspect_ratio: b.aspect || '9:16',
     duration_seconds: D,
+    ...(durationNote ? { duration_note: durationNote } : {}),
     style: { colors: readable({ ...(palette || {}), ...(b.colors || {}) }, b.colors) },
     assets: images.map((a) => ({ name: a.name, url: a.url, use: a.role === 'logo' ? 'logo' : 'product photo' })),
     scenes: planScenes,

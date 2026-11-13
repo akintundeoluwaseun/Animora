@@ -129,6 +129,8 @@ export async function generateCode(args) {
   const b = args.brief || {};
   if (args.plan) qaPlan(b, args.plan);
   const out = await generateCodeInner(args);
+  // the length the owner asked for was kept: say plainly if content had to be left out (or the film made longer) to stay readable
+  if (out && args.plan?.duration_note && !out.notice) out.notice = args.plan.duration_note;
   if (out?.html && /<\/?(div|svg|canvas)/i.test(out.html)) { const r = qaHtml(b, out.html); out.html = r.html; out.qa = r.qa; }
   return out;
 }
