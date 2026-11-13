@@ -1006,6 +1006,13 @@
   // HIGHLIGHT: a sentence, then a text selection with handles sweeps over the key words
   B.highlight = (s, o, t0, t1, bg) => {
     const words = String(o.text || '').split(/\s+/).filter(Boolean);
+    if (String(o.text || '').length > 34) {   // a long sentence on one line would shrink to a whisper: set it as wrapped lines, the key words accented
+      const n = words.length > 9 || String(o.text).length > 64 ? 3 : 2, target = Math.ceil(String(o.text).length / n), lines = [];
+      let cur = '';
+      words.forEach((w) => { if (cur && (cur + ' ' + w).length > target && lines.length < n - 1) { lines.push(cur); cur = w; } else cur = cur ? cur + ' ' + w : w; });
+      if (cur) lines.push(cur);
+      return B.words(s, { lines, accent: [].concat(o.hot || [words.length - 1]), size: PORTRAIT ? 104 : 84 }, t0, t1, bg);
+    }
     const hot = [].concat(o.hot || [words.length - 1]).filter((i) => i >= 0 && i < words.length);
     const lo = Math.min(...hot), hi = Math.max(...hot);
     const row = el('div', 'row', s, '', { fontSize: px(o.size || 92), fontWeight: 650, letterSpacing: '-0.035em', position: 'relative', fontFamily: DISPLAY }); if (LOOK.upper) row.style.textTransform = 'uppercase'; row.style.fontWeight = String(DW);
