@@ -1534,7 +1534,7 @@
       }
       const wrap = el('div', 'beat ink-' + bg, world);
       wrap.style.color = inkOf(bg);
-      ambience(wrap, bg, t0, t1, i, b);
+      try { ambience(wrap, bg, t0, t1, i, b); } catch (e) { console.error('ambience failed: ' + e.message); }
       const camEl = el('div', 'beat', wrap); camEl.style.visibility = 'inherit';
       tl.set(wrap, { visibility: 'visible' }, Math.max(0, t0 - 0.12));
       // incoming move matches the previous beat's exit
@@ -1571,13 +1571,13 @@
       t = t1;
     });
     // the film is exactly as long as its beats: a slow drift or a late tween in the last beat must not stretch the video past what was planned
-    tl.getChildren(false, true, true).forEach((c) => {
+    try { tl.getChildren(false, true, true).forEach((c) => {
       const st = c.startTime();
       if (st + c.totalDuration() <= total + 0.001 || st >= total - 0.02) return;
       const per = c.duration() + (c.repeatDelay ? c.repeatDelay() : 0);
       if (c.repeat && c.repeat() > 0 && per > 0) c.repeat(Math.max(0, Math.floor((total - st) / per) - 1));   // a looping decoration plays only the loops that fit
       if (st + c.totalDuration() > total + 0.001) { if (c.repeat && c.repeat() > 0) c.repeat(0); c.duration(total - st); }
-    });
+    }); } catch (e) { console.error('timeline fit failed: ' + e.message); }
     tl.set({}, {}, total);
     window.__sfx = D.sound === 'none' ? [] : SFX.filter((x) => x.t < total - 0.05).sort((a, b) => a.t - b.t).filter((x, i, arr) => !arr.slice(Math.max(0, i - 3), i).some((y) => y.k === x.k && x.t - y.t < 0.06));
     window.__timeline = tl;
@@ -1597,5 +1597,5 @@
   Promise.race([Promise.all([fontLoads(), document.fonts.ready]), new Promise((r) => setTimeout(r, 4000))]).then(() => {
     const imgs = Array.from(document.images);
     return Promise.race([Promise.all(imgs.map((im) => im.decode ? im.decode().catch(() => {}) : null)), new Promise((r) => setTimeout(r, 3000))]);
-  }).then(build);
+  }).then(build).catch((e) => { console.error('build failed: ' + (e && e.message)); if (!window.__timeline) { try { tl.set({}, {}, 1); } catch (_) {} window.__timeline = tl; } });
 })();

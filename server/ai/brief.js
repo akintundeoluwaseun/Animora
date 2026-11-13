@@ -513,18 +513,35 @@ export function autoStyleSlug(brief) {
 // ---------------------------------------------------------------------------
 const ASPECT_WORDS = [[/landscape|16\s*[:x/]\s*9|youtube|horizontal|wide/i, '16:9'], [/square|1\s*[:x/]\s*1|instagram feed|facebook feed/i, '1:1'], [/portrait|vertical|9\s*[:x/]\s*16|tiktok|reels?|status|shorts|stories/i, '9:16']];
 
+
+// The words people use to ASK for a video are instructions, not content: "Use this prompt to make a video: …",
+// "Can you create a 30 second ad for …", "make a video for us". Strip that preamble (and request-only sentences)
+// so no title, headline or caption is ever built from them.
+const REQ_VERB = '(?:make|create|generate|design|build|produce|write|prepare|do|put together|come up with)';
+const REQ_OBJ = '(?:video|videos|ad|ads|advert|adverts|advertisement|flyer|flier|poster|clip|film|reel|animation|promo)';
+const REQ_START = new RegExp(`^\\s*(?:(?:hi|hello|hey)[,!.]?\\s+)?(?:please\\s+)?(?:(?:can|could|would|will) you (?:please )?|i (?:want|need|would like|'d like|wish) (?:you )?to |(?:use|using|take) (?:this|the|my) (?:prompt|text|brief|idea|info(?:rmation)?|description|details?|message)(?: below| here)?\\s*(?:to|and|&|,)?\\s*|let'?s |kindly )?${REQ_VERB}\\s+(?:me\\s+|us\\s+)?(?:(?:a|an|the|my|our|one|some)\\s+)?(?:[\\w'’-]+\\s+){0,5}?${REQ_OBJ}\\b\\s*(?:for|about|of|on|called|named|that|which|with|to promote|promoting|:|-|–|—|,)?\\s*(?:us\\b|me\\b|the following\\b|this\\b)?\\s*[:\\-–—,]?\\s*`, 'i');
+const REQ_SENTENCE = new RegExp(`^\\s*(?:please\\s+)?(?:${REQ_VERB}|keep|use|add|include|show|let|give|put|try|ensure|avoid|don'?t|do not|no)\\b[^.!?\\n]*(?:\\b${REQ_OBJ}\\b|\\bit (?:short|simple|fun|clean|professional)|\\bseconds?\\b|\\bcolou?rs?\\b|\\bmusic\\b|\\bvoice|\\bstyle\\b)[^.!?\\n]*[.!?]?\\s*$`, 'i');
+export function stripAsk(text) {
+  let t = String(text || '').trim();
+  for (let i = 0; i < 2; i++) t = t.replace(REQ_START, '');
+  t = t.replace(/^\s*(?:use|using) (?:this|the|my) (?:prompt|text|brief|idea)[^:\n]{0,40}[:\-–—]\s*/i, '');
+  const parts = t.split(/(?<=[.!?])\s+|\n+/);
+  const kept = parts.filter((p) => !REQ_SENTENCE.test(p));
+  return (kept.length ? kept : parts).join('\n').trim();
+}
 export function parseBriefRules(text) {
-  const t = String(text || '');
+  const full = String(text || '');
+  const t = /birthday|b-?day/i.test(full) ? full : stripAsk(full);   // what the video is ABOUT: the request wording ("make a video…", "use this prompt…") is not content
   const out = {};
   const phone = t.match(PHONE_RE)?.[0];
   const site = t.match(URL_RE)?.[0];
   const addr = t.match(/(?:address|located at|we are at|find us at|location)\s*[:-]?\s*([^\n.]{4,80})/i)?.[1];
   const contact = [phone, site, addr].filter(Boolean).join(', ');
   if (contact) out.contact = contact;
-  for (const [re, v] of ASPECT_WORDS) if (re.test(t)) { out.aspect = v; break; }
+  for (const [re, v] of ASPECT_WORDS) if (re.test(full)) { out.aspect = v; break; }
   { const q = [...t.matchAll(/["“]([^"”\n]{3,90})["”]/g)].map((m) => m[1].trim()).filter((x) => x && !PHONE_RE.test(x)); if (q.length) out.phrases = q.slice(0, 12); }
   if (/\b(slide ?show|slides? of (my )?(photos|pictures)|all (my |the )?(photos|pictures|images))\b/i.test(t)) out.slideshow = true;
-  const sec = t.match(/(\d{1,3})\s*(?:s\b|secs?\b|seconds?\b)/i)?.[1] || (t.match(/(\d)\s*(?:min|minutes?)\b/i)?.[1] * 60);
+  const sec = full.match(/(\d{1,3})\s*(?:s\b|secs?\b|seconds?\b)/i)?.[1] || (full.match(/(\d)\s*(?:min|minutes?)\b/i)?.[1] * 60);
   if (sec) out.duration = Number(sec);
   const name = t.match(/(?:business(?:\s+name)?\s*(?:is|:|-)|(?:company|brand|shop|store)\s+(?:name\s+)?(?:is|:)|(?:called|named))\s*["'“‘]?([A-Z0-9][\w&'’. -]{1,40}?)["'”’]?(?=[,.\n”"]|\s+(?:and|we|i|in|at|is)\b|$)/i)?.[1];
   if (name) out.name = name.trim();
@@ -579,10 +596,32 @@ export function parseBriefRules(text) {
     const first = t.split(/[\n.,;!?]/)[0].replace(/^\s*(?:please\s+)?(?:i\s+(?:want|need|would like)\s+(?:to\s+make\s+)?)?(?:make\s+(?:me\s+)?)?(?:an?\s+)?(?:(?:birthday|wedding|promo|promotional|short|nice|cool|donation|donations|fundraising|fundraiser|charity|appeal)\s+)?(?:video|ad|advert|advertisement|flyer|clip)?\s*(?:for|about|of|on)?\s*(?:my\s+|our\s+|the\s+)?/i, '').trim();
     if (first.length >= 3) out.name = first.charAt(0).toUpperCase() + str(first, 40).slice(1);
   }
+  // a sentence about the business is not its name: "We sell cupcakes and wedding cakes" is named by what it sells
+  if (out.name && /^(?:we|i|our|it|they|this|my|there)\s/i.test(out.name)) out.name = '';
+  if (!out.name && out.features?.length) out.name = out.features.slice(0, 2).join(' & ');
+  // what the thing IS: "a music app called Music mart", "Techwave Repairs, a laptop repair business"
+  {
+    const isA = t.match(/\b(?:an?|the)\s+([a-z][\w' -]{2,40}?)\s+(?:called|named)\s+["'“‘]?[A-Z0-9]/i)?.[1]
+      || t.match(/[A-Z][\w&'’ -]{1,40},\s+(?:an?|the)\s+([a-z][\w' -]{2,50}?)(?=[.,\n!?]|$)/)?.[1];
+    if (isA && !out.category) out.category = isA.trim().replace(/^./, (c) => c.toUpperCase());
+  }
+  // the owner's own question or one-line pitch is the hook, in their words
+  {
+    const sentences = t.split(/(?<=[.!?])\s+|\n+/).map((x) => x.trim()).filter(Boolean);
+    const q = sentences.find((x) => /\?$/.test(x) && x.length >= 8 && x.length <= 80);
+    const pitch = sentences.find((x) => /^(?:it|they|we)\s+(?:helps?|lets?|makes?|allows?|gives?|brings?|keeps?|turns?|fix(?:es)?|repairs?|delivers?|offers?)\b/i.test(x) && x.length <= 90);
+    const heads = [q, pitch && pitch.replace(/[.!\s]+$/, '').replace(/\.(?=\p{L})/gu, '. ')].filter(Boolean);
+    if (heads.length && !out.headline) { out.headlines = heads.slice(0, 3); out.headline = heads[0]; }
+  }
+  // a street address is part of the contact details, whole (never cut at "or")
+  {
+    const street = t.match(/(?:\b(?:[Vv]isit|[Aa]t|[Ff]ind us at|[Ll]ocated at|[Cc]ome to|[Aa]ddress(?: is)?)\s*[:-]?\s+)(\d+[A-Za-z]?[,\s]+[A-Z][\w'’. -]{2,40}?(?:,\s*[A-Z][\p{L} .'-]{2,30}?)?)(?=\s+(?:or|and|call|whatsapp|dm)\b|[.\n;]|$)/u)?.[1];
+    if (street && !(out.contact || '').includes(street)) out.contact = [street.trim().replace(/[,\s]+$/, ''), out.contact].filter(Boolean).join(', ');
+  }
   if (!out.aspect) out.aspect = '9:16';
   if (!out.duration) out.duration = 20;
   const pay = findPayment(t); if (pay) { out.payment = pay; out.kind = out.kind || 'cause'; out.category = out.category || 'Fundraiser'; }
-  out.pasteText = str(t, 6000);   // the whole text also goes to the AI director (kept apart from the last question's answer)
+  out.pasteText = str(full, 6000);   // the whole text also goes to the AI director (kept apart from the last question's answer)
   return out;
 }
 

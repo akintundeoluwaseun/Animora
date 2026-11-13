@@ -216,6 +216,11 @@ export async function directMotion({ plan, brief = null, assets = [], themeColor
         beats = composeMiddle(beats, structure);
         if (!structure.presentation.cta && beats.some((x) => x.type === 'button') && beats.length > 4) beats = beats.filter((x) => x.type !== 'button');
       }
+      // a phone number, website or handle on screen must be one the owner gave: the AI may not make one up ("Musicmart.com")
+      if (beats) {
+        const given = `${f.phone || ''} ${f.address || ''} ${brief?.contact || ''} ${brief?.pasteText || ''} ${brief?.extra || ''}`.toLowerCase().replace(/\s+/g, '');
+        beats = beats.map((x) => (x.type === 'end' && x.contact && !given.includes(String(x.contact).toLowerCase().replace(/\s+/g, '')) ? { ...x, contact: f.phone || f.address || undefined } : x));
+      }
       if (beats) beats = conformStructure(beats, structure, { photoUrls: imageUrls });   // fills layouts the AI left out; its own choices are kept
       if (MOTIONS.includes(j.motion)) aiMotion = j.motion;
       if (beats && group !== 'business') { const kept = beats.filter((x) => !UI_BEATS.has(x.type)); if (kept.length >= 3) beats = kept; }
