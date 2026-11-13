@@ -26,7 +26,7 @@ bad(bp.duration_seconds === 15, `birthday 15s became ${bp.duration_seconds}s`);
   const { generateCode } = await import('../server/ai/index.js');
   const { readMotion } = await import('../server/ai/motion/page.js');
   const { inspectAnimation } = await import('../server/engine/renderer.js');
-  for (const [d, name] of [[30, 'Fashion Hub'], [15, 'Ade Foods'], [60, 'Corporate Co']]) {
+  for (const [d, name] of [[30, 'Fashion Hub'], [15, 'Ade Foods'], [60, 'Corporate Co'], [15, 'Wedding Wonders'], [20, 'Chu Kitchen'], [30, 'Tola Estates'], [15, 'Bello Church'], [20, 'Per Fume']]) {
     const b = { ...cleanBrief({ name, category: 'restaurant', headlines: ['Fresh daily', 'Free delivery'], features: ['Fast', 'Fresh', 'Fair'], cta: 'Order today' }), aspect: '9:16', duration: d };
     const plan = briefToPlanRules(b, { assets: [], limits });
     const out = await generateCode({ plan, assets: [], brief: b, memory: [] });
