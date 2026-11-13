@@ -368,7 +368,7 @@
   function photosTriptych(s, o, t0, t1, bg, urls) {
     const dur = Math.max(1, t1 - t0), n = Math.min(3, Math.max(2, urls.length));
     const panels = []; for (let i = 0; i < n; i++) panels.push(urls[i] || urls[i % urls.length]);
-    const root = el('div', '', s, '', { position: 'absolute', inset: 0, display: 'flex', flexDirection: PORTRAIT ? 'column' : 'row', gap: px(N(6)), background: bg === 'dark' ? '#050507' : '#111' });
+    const root = el('div', '', s, '', { position: 'absolute', inset: 0, display: 'flex', flexDirection: PORTRAIT ? 'column' : 'row', gap: px(N(6)) });   // no solid backing: the panels wipe in over the beat's own stage, so there is no dark gap while they arrive
     panels.forEach((u, i) => {
       const c = el('div', '', root, '', { position: 'relative', flex: '1 1 0', overflow: 'hidden' });
       const im = imgIn(c, u, urls.length < n ? { objectPosition: ['30% 40%', '70% 60%', '50% 20%'][i] } : {});

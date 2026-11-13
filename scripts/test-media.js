@@ -100,7 +100,7 @@ try {
   const { readMotion } = await import('../server/ai/motion/index.js');
   const film = readMotion(code);
   ok('code is a Motion film: beats one at a time, each cut by a transition, finishing on the end card',
-    !!film && film.beats.length >= 4 && film.beats.slice(0, -1).every((b) => ['push', 'whip', 'zoom', 'rise', 'drop', 'fade'].includes(b.out)) && film.beats.at(-1).type === 'end', film ? film.beats.map((b) => b.type).join('>') : 'not a Motion film');
+    !!film && film.beats.length >= 4 && film.beats.slice(0, -1).every((b) => ['push', 'whip', 'zoom', 'rise', 'drop', 'fade', 'wipe', 'dissolve'].includes(b.out)) && film.beats.at(-1).type === 'end', film ? film.beats.map((b) => b.type).join('>') : 'not a Motion film');
   const textBeats = (film?.beats || []).filter((b) => [].concat(b.lines || b.text || b.tagline || b.title || []).filter(Boolean).length);
   ok('film has on-screen text (hook, statements, closing line)', textBeats.length >= 3, `${textBeats.length} beats carry text`);
   const filmLen = (film?.beats || []).reduce((a, b) => a + b.dur, 0);
