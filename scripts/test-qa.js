@@ -103,3 +103,34 @@ console.log('All creative QA checks passed');
   }
   console.log('variety checks passed');
 }
+
+// ---- creative direction, flyer information check, film QA
+{
+  const { directionOf } = await import('../server/ai/direction.js');
+  const { autoStyleSlug, cleanBrief } = await import('../server/ai/brief.js');
+  const { makeFlyer, flyerCoverage } = await import('../server/ai/flyer.js');
+  const { qaBeats } = await import('../server/ai/motion/qa.js');
+  const { STARTER_STYLES } = await import('../server/db/starter.js');
+  const bad = (c, m) => { if (!c) { console.error('FAIL', m); process.exit(1); } };
+  const want = { 'Luxury perfume': 'luxury', 'Church programme': 'faith', 'Corporate event': 'corporate', Restaurant: 'restaurant', Bakery: 'bakery', Birthday: 'birthday', 'Real estate': 'realestate', Wedding: 'wedding', 'Music concert': 'music', School: 'education', Announcement: 'announcement' };
+  for (const [cat, id] of Object.entries(want)) bad(directionOf({ category: cat, name: 'X' }).id === id, `${cat} should be ${id}, got ${directionOf({ category: cat, name: 'X' }).id}`);
+  bad(autoStyleSlug({ category: 'Luxury perfume', name: 'Maison Oud' }) === 'gold-luxe', 'luxury style');
+  bad(autoStyleSlug({ category: 'Corporate event', name: 'Summit' }) !== 'glory-light', 'a corporate event is not a church night');
+  // a flyer shows everything the owner gave
+  for (const b of [
+    { kind: 'event', name: 'Night of Glory', category: 'Church programme', headline: 'A night of worship', when: 'Sunday 16 Nov · 6pm · Grace Chapel, Ado', features: ['Live worship', 'Prayer'] },
+    { kind: 'business', name: 'Kemi Cakes', category: 'Bakery', headline: 'Fresh cakes, baked daily', features: ['Wedding cakes', 'Cupcakes'], contact: '0803 123 4567', offer: '20% off this week' },
+  ]) {
+    const cb = cleanBrief(b);
+    for (let i = 0; i < 4; i++) {
+      const html = await makeFlyer({ brief: cb, plan: {}, style: STARTER_STYLES.find((s) => s.slug === autoStyleSlug(cb)), assets: [], useAI: false });
+      const c = flyerCoverage(cb, html);
+      bad(c.score > 0.99, `${b.name}: flyer is missing ${c.missing.join(', ')}`);
+      await new Promise((r) => setTimeout(r, 25));
+    }
+  }
+  // film QA fixes repeats
+  const q = qaBeats([{ type: 'words', bg: 'light', out: 'push', lines: ['Hello there friend'] }, { type: 'words', bg: 'light', out: 'push', lines: ['Second line here'] }, { type: 'words', bg: 'light', out: 'push', lines: ['Second line here'] }, { type: 'end', bg: 'brand', out: 'push', tagline: 'Thanks' }]);
+  bad(q.beats.length === 3 && q.beats[0].out !== q.beats[1].out && q.beats.at(-1).type === 'end', 'film QA did not fix repeats');
+  console.log('direction / flyer / film QA checks passed');
+}

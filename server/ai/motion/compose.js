@@ -5,6 +5,7 @@
 import { factsFrom, cleanText, fixPrices, glyphFor } from '../cinema/compose.js';
 import { isPersonalBirthdayBrief } from '../personal.js';
 import { videoGroup, closingLine, fitCtas } from '../closing.js';
+import { directionOf } from '../direction.js';
 
 const hash = (s) => { let h = 2166136261; for (const c of String(s)) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); } return (h >>> 0) % 2147483646 + 1; };
 const OK = /^#[0-9a-f]{6}$/i;
@@ -210,6 +211,7 @@ export function composeMotion(plan, { brief = {}, assets = [], salt = '', avoid 
 
   // A personal birthday is a greeting, not an advert. Keep each supplied thought as its own animated beat.
   const personalBirthday = isPersonalBirthdayBrief(brief, plan);
+  const dirAvoid = new Set(directionOf(brief).avoid || []);
   // Not an advert (burial, announcement, church, school, event, cause...): their own words and pictures, never a search bar,
   // a shop button, a price or a chat. The opener, the order and the look change every time.
   const social = !personalBirthday && videoGroup(brief) === 'social';
@@ -323,14 +325,14 @@ export function composeMotion(plan, { brief = {}, assets = [], salt = '', avoid 
   const brandBeat = (tech && chance(0.5) ? B.phone() : null) || B.brand();
   const pool = [
     B.photos(), B.price(), B.menu(), B.receipt(), B.features(), ...B.heads(), B.stat(), B.ring(), B.calendar(), B.grid(), B.notif(), B.search(), B.map(),
-  ].filter(Boolean);
+  ].filter(Boolean).filter((b) => !dirAvoid.has(b.type));   // what suits a perfume is not what suits a school
   // a little shuffle so two businesses with the same facts still get different films (proof order matters less than hook/brand/cta)
   for (let i = pool.length - 1; i > 0; i--) { if (chance(0.35)) { const j = Math.max(0, i - 1 - Math.floor(rnd() * 2)); [pool[i], pool[j]] = [pool[j], pool[i]]; } }
   // photos first when there are photos; the map always late
   pool.sort((a, b) => (a.type === 'photos' ? -1 : b.type === 'photos' ? 1 : 0) || (a.type === 'map' ? 1 : b.type === 'map' ? -1 : 0));
-  const ctaBeat = B.cta(), endBeat = B.end();
+  const ctaBeat = dirAvoid.has('button') ? null : B.cta(), endBeat = B.end();
   const est = (b) => BEAT_MIN[b.type] + 0.4;
-  let budget = duration - est(opener) - est(ctaBeat) - est(endBeat);
+  let budget = duration - est(opener) - (ctaBeat ? est(ctaBeat) : 0) - est(endBeat);
   const body = [];
   const seen = new Set([opener.type === 'words' ? 'words-hook' : opener.type]);
   // beats that show the same list count as one (a menu and a receipt, or two lists of strengths)
@@ -368,11 +370,11 @@ export function composeMotion(plan, { brief = {}, assets = [], salt = '', avoid 
     if (rest.length >= 2) pool.push(rest.every((x) => x.length <= 22) && chance(0.5) ? { type: 'swap', bg: base, lead: 'There\'s more', items: rest } : { type: 'toggles', bg: base, title: 'There\'s more', items: rest });
     fb.forEach((b, i) => pool.splice(Math.min(pool.length, 1 + i * 2), 0, b));
   }
-  pool.forEach((b) => { if (!body.some((x) => x.type === b.type && !['words', 'highlight'].includes(b.type))) take(b); });
+  pool.filter((b) => !dirAvoid.has(b.type)).forEach((b) => { if (!body.some((x) => x.type === b.type && !['words', 'highlight'].includes(b.type))) take(b); });
   // still room? repeat the main message in a different form, then the strengths again
-  const fillers = [ feats.length >= 2 ? { type: 'toggles', bg: base, title: 'What you get', items: feats.slice(0, 4) } : null, B.search(), B.notif()].filter(Boolean);
+  const fillers = [ feats.length >= 2 ? { type: 'toggles', bg: base, title: 'What you get', items: feats.slice(0, 4) } : null, B.search(), B.notif()].filter(Boolean).filter((b) => !dirAvoid.has(b.type));
   for (const fb of fillers) { if (budget < 2) break; if (!body.some((x) => x.type === fb.type && fb.type !== 'words')) take(fb); }
-  let beats = [opener, ...body, ctaBeat, endBeat];
+  let beats = [opener, ...body, ctaBeat, endBeat].filter(Boolean);
 
   // ---- backgrounds: keep rhythm (never three of the same in a row unless it is the theme), one brand punch ----
   const punch = beats.find((b) => b.bg === 'brand' && b.type !== 'end');

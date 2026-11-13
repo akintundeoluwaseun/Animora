@@ -8,6 +8,7 @@ import { config } from '../config.js';
 import { geminiGenerate } from '../engine/gemini.js';
 import { birthdayPhotoAssets, isPersonalBirthdayBrief } from './personal.js';
 import { videoGroup, closingLine, fitCtas, MEMORIAL } from './closing.js';
+import { directionOf } from './direction.js';
 
 // Reading someone's idea and writing the video plan are the steps where a small model sounds dumb and repeats itself,
 // so they use the full Flash model (the lighter one stays for quick chat). Override with GEMINI_BRIEF_MODEL.
@@ -450,12 +451,13 @@ const LOOK_POOLS = {
 export function autoStyleSlug(brief) {
   const b = cleanBrief(brief);
   const t = `${b.category || ''} ${b.name || ''}`;
-  const key = MEMORIAL.test(t) ? 'memorial' : /church|ministry|fellowship|worship|christian|mosque|islam|prayer|gospel|crusade|revival|assembly/i.test(t) ? 'faith'
-    : /birthday|party|celebrat|wedding|anniversary|owambe/i.test(t) ? 'party' : /kid|children|nursery|toddler|baby/i.test(t) ? 'kids' : /sport|football|gym|fitness|training/i.test(t) ? 'sports' : catKey(b.category);
-  let pool = LOOK_POOLS[key] || LOOK_POOLS.default;
+  let pool = directionOf(b).styles;
   // the kente ribbon along the top and bottom is only for videos that ask for an African or cultural look
   if (!/afric|ankara|aso.?oke|kente|afro|adire|naija|cultur|traditional|owambe/i.test(`${t} ${b.styleNote || ''} ${b.extra || ''}`)) pool = pool.filter((x) => x !== 'afro-vibes');
+  // a birthday for a child should be playful, not a nightclub
+  if (/kid|child|toddler|baby/i.test(`${t} ${b.headline || ''}`) && directionOf(b).id === 'birthday') pool = ['kiddies-fun', 'fresh-market', 'retro-pop'];
   let h = 7; for (const ch of `${b.name || ''}|${b.category || ''}`) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  pool = [pool[0], ...pool];   // the ranked first choice is twice as likely
   return pool[h % pool.length];
 }
 

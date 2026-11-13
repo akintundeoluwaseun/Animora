@@ -9,6 +9,7 @@ import { flyerHtml2, chooseFlyerLayout, FLYER2_LAYOUTS } from './flyer2.js';
 import { lookFor } from './motion/looks.js';
 import { titleFromName } from './brief.js';
 import { MEMORIAL, closingLine, videoGroup } from './closing.js';
+import { directionOf } from './direction.js';
 import { CREATIVE_STANDARD, qaHtml, qaFilter } from './standard.js';
 
 export const FLYER_LAYOUTS = ['hero', 'grid', 'split', 'type'];
@@ -68,12 +69,12 @@ function rulesCopy(brief, assets, avoid) {
   const memorial = MEMORIAL.test(`${brief.category || ''} ${brief.name || ''}`) && videoGroup(brief) === 'social';
   const notice = !memorial && (brief.kind === 'announcement' || /announc|notice/i.test(brief.category || ''));
   const pref = brief.layout && brief.layout !== 'auto' ? brief.layout : memorial ? 'invite' : '';
-  let layout = chooseFlyerLayout({ ...facts, pref, avoid, seed: (Date.now() % 100000) + 1 });
+  let layout = chooseFlyerLayout({ ...facts, direction: directionOf(brief), pref, avoid, seed: (Date.now() % 100000) + 1 });
   if (!layoutFits(layout, facts)) layout = FLYER2_LAYOUTS.find((l) => l !== avoid && layoutFits(l, facts) && l !== 'hiring' && l !== 'event') || 'poster';
   return {
     v: 2, kinds, offer, when, facts,
     layout, headline: str(brief.headline || brief.name, 60), highlight: '', subhead: str(brief.headlines?.[1] || '', 90),
-    badge: memorial ? 'In loving memory' : notice ? 'Announcement' : /sale|offer|discount|%|off/i.test(brief.goal || '') ? 'Special offer' : '',
+    badge: memorial ? 'In loving memory' : notice ? 'Announcement' : offer ? offer : /sale|offer|discount|%|off/i.test(brief.goal || '') ? 'Special offer' : '',   // the offer is always on the flyer, as its tag
     items, features: (brief.features || []).slice(0, 4).map((f) => str(f, 34)), cta: str(brief.cta || (!brief.kind || brief.kind === 'business' ? 'Order now' : closingLine(brief)), 30),
     contact: str(brief.contact, 120), heroImg: photos[0]?.name || null,
   };
@@ -355,7 +356,51 @@ export async function makeFlyer({ brief, plan, style, assets, previous = null, u
     logo: logo ? { url: logo.url, transparent: !!(logo.has_alpha ?? logo.transparent), light: logo.is_light ?? logo.light ?? null, ratio: logo.width && logo.height ? logo.width / logo.height : null } : null,
     images: Object.fromEntries(photosOf(assets).map((a) => [a.name, a.url])),
   };
-  { const r = qaHtml(brief || {}, flyerHtml(data)); return r.html; }
+  const best = fitInformation(brief || {}, data);
+  { const r = qaHtml(brief || {}, best.html); return r.html; }
+}
+
+// ---- quality check: is everything the owner gave actually on the flyer? ----
+const plain = (html) => String(html).replace(/<(style|script)[\s\S]*?<\/\1>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/&amp;/g, '&').replace(/&#?\w+;/g, ' ').toLowerCase().replace(/\s+/g, ' ');
+const squash = (t) => String(t || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
+/** What fraction of the owner's information is visible in this rendering, and what is missing. */
+export function flyerCoverage(brief, html) {
+  const txt = plain(html), sq = squash(txt);
+  const missing = []; let want = 0, got = 0;
+  const need = (label, ok, weight = 1) => { want += weight; if (ok) got += weight; else missing.push(label); };
+  const head = String(brief.headline || brief.name || '').split(/\s+/).slice(0, 3).join(' ');
+  if (head) need('headline', sq.includes(squash(head)), 2);
+  if (brief.name) need('name', sq.includes(squash(String(brief.name).split(/\s+/).slice(0, 2).join(' '))), 1);
+  if (brief.when) {
+    const w = String(brief.when);
+    const time = w.match(/\d{1,2}(?::\d{2})?\s?(?:am|pm)/i)?.[0], day = w.match(/\b(\d{1,2})(?:st|nd|rd|th)?\b/)?.[1];
+    if (time) need('time', sq.includes(squash(time)), 1.5);
+    if (day) need('date', new RegExp(`(?:^|\\D)${day}(?:\\D|$)`).test(txt), 1.5);
+    const place = w.split(/[·|,]/).map((x) => x.trim()).filter((x) => x && !/\d/.test(x) && x.length > 3).pop();
+    if (place) need('place', sq.includes(squash(place.split(/\s+/).slice(0, 2).join(' '))), 1.5);
+  }
+  const digits = String(brief.contact || '').replace(/\D/g, '');
+  if (digits.length >= 7) need('phone', txt.replace(/\D/g, '').includes(digits.slice(-7)), 1.5);
+  else if (brief.contact) need('contact', sq.includes(squash(String(brief.contact).split(/[·|,]/)[0])), 1);
+  if (brief.offer) need('offer', sq.includes(squash(String(brief.offer).slice(0, 18))), 1.5);
+  for (const f of (brief.features || []).slice(0, 4)) need(`"${f}"`, sq.includes(squash(f)), 0.75);
+  return { score: want ? got / want : 1, missing };
+}
+/** Try the chosen layout first; if it drops information the owner gave, try the others and keep the one that shows the most. */
+function fitInformation(brief, data) {
+  let bestHtml = flyerHtml(data), bestCov = flyerCoverage(brief, bestHtml), bestLayout = data.layout;
+  if (bestCov.score >= 0.999 || data.layout === 'invite' && MEMORIAL.test(`${brief.category || ''} ${brief.name || ''}`)) return { html: bestHtml, cov: bestCov, layout: bestLayout };
+  const facts = data.facts || {};
+  const order = [...new Set([...(directionOf(brief).layouts || []), ...FLYER2_LAYOUTS])];   // the content's own layouts first
+  for (const l of order) {
+    if (!FLYER2_LAYOUTS.includes(l)) continue;
+    if (l === data.layout || l === 'hiring' && !/hiring|job|vacan/i.test(`${brief.category || ''}`)) continue;
+    if (!(facts.photos > 0) && ['photo', 'diagonal', 'collage'].includes(l)) continue;   // a picture layout needs a picture
+    if (!layoutFits(l, facts)) continue;
+    const html = flyerHtml({ ...data, layout: l }), cov = flyerCoverage(brief, html);
+    if (cov.score > bestCov.score + 0.01) { bestHtml = html; bestCov = cov; bestLayout = l; if (cov.score >= 0.999) break; }
+  }
+  return { html: bestHtml, cov: bestCov, layout: bestLayout };
 }
 
 export const readFlyer = (html) => {

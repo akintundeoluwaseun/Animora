@@ -44,7 +44,7 @@ function contactLines(contact) {
 }
 
 /** Pick a composition from what the flyer is for, what the owner prefers, and what they gave us. */
-export function chooseFlyerLayout({ kinds = [], pref = '', photos = 0, items = 0, priced = 0, offer = '', when = null, features = 0, avoid = null, seed = 1 }) {
+export function chooseFlyerLayout({ kinds = [], direction = null, pref = '', photos = 0, items = 0, priced = 0, offer = '', when = null, features = 0, avoid = null, seed = 1 }) {
   if (pref === 'invite') return 'invite';   // a burial or tribute: one calm framed layout
   const k = new Set([].concat(kinds).map((x) => String(x).toLowerCase()));
   const has = (re) => [...k].some((x) => re.test(x));
@@ -67,6 +67,8 @@ export function chooseFlyerLayout({ kinds = [], pref = '', photos = 0, items = 0
   if (!photos) { if (when || has(/event|party|wedding|church|invit|concert|service/)) add('invite', 5); add('blocks', 4); }
   if (photos >= 1) add('blocks', 1);
   if (offer || priced) add('price', 2);
+  // the creative direction's own layouts get a strong lead, so a perfume, a school notice and a concert are composed differently
+  for (const l of direction?.layouts || []) { const c = cands.find((x) => x[0] === l); if (c) c[1] += 7; else if (l !== avoid && !(l === 'photo' || l === 'diagonal' || l === 'collage') ) cands.push([l, 6]); else if (l !== avoid && photos) cands.push([l, 6]); }
   let s = (Math.imul(seed | 0, 2654435761) >>> 0) % 2147483647 || 1; const rnd = () => ((s = (s * 16807) % 2147483647) / 2147483647); rnd(); rnd();   // scrambled, so nearby seeds do not give the same pick
   // gentle weights: the business's signals still lead, but another good layout can win, so flyers stop looking alike
   if (photos >= 1) { add('photo', 2); add('diagonal', 2); }
@@ -208,7 +210,7 @@ export function flyerHtml2(data) {
       <section class="ph-copy">${h1('onphoto')}${sub}${feats(3, 'glass')}</section>
       <footer class="foot onphoto">${cta()}${contactList()}</footer></div>`;
   } else if (L === 'diagonal') {
-    body = `<div class="pf diag"><div class="dg-top">${hero ? `<img src="${esc(hero)}" crossorigin="anonymous" alt="">` : `<div class="dg-art">${mark(240, true, true)}</div>`}</div>
+    body = `<div class="pf diag"><div class="dg-top">${hero ? `<img src="${esc(hero)}" crossorigin="anonymous" alt="">` : `<div class="dg-art"><span class="dg-name">${esc(brand)}</span></div>`}</div>
       <div class="dg-top-row">${brandRow(true)}</div>
       ${data.badge || offer ? `<div class="seal"><span>${esc(data.badge || offer)}</span></div>` : ''}
       <section class="dg-copy">${h1()}${sub}${feats(4)}</section>
@@ -368,9 +370,10 @@ ${treat}
 .foot.onphoto { margin-top:${n(10)}; } .onphoto .contacts svg { color:#fff; }
 /* diagonal */
 .dg-top { position:absolute; left:0; right:0; top:0; height:${tall ? 54 : 50}%; clip-path:polygon(0 0, 100% 0, 100% 78%, 0 100%); background:${A}; }
+.dg-name { font-family:${display}; font-weight:${Math.max(look.dw || 800, 500)}; font-size:${n(120)}; line-height:1; color:#fff; text-align:center; padding:0 ${n(60)}; text-shadow:0 ${n(4)} ${n(30)} rgba(0,0,0,.25); max-width:88%; overflow-wrap:anywhere; }
 .dg-art { width:100%; height:100%; display:grid; place-items:center; background:radial-gradient(circle at 50% 45%, ${mix(A, '#fff', 0.25)}, ${A} 55%, ${mix(A, '#000', 0.3)}); }
 .dg-top-row { position:relative; z-index:2; } .diag .dg-top-row .bn { color:#fff; text-shadow:0 ${n(2)} ${n(12)} rgba(0,0,0,.35); }
-.seal { position:absolute; z-index:4; right:${n(70)}; top:calc(${tall ? 54 : 50}% - ${n(190)}); width:${n(230)}; height:${n(230)}; border-radius:50%; background:${A2}; color:${onA2}; display:grid; place-items:center; text-align:center; transform:rotate(-12deg); box-shadow:${shadow}; font-family:${display}; font-weight:800; font-size:${n(48)}; line-height:1; padding:${n(24)}; }
+.seal { position:absolute; z-index:4; right:${n(70)}; top:calc(${tall ? 54 : 50}% - ${n(380)}); width:${n(230)}; height:${n(230)}; border-radius:50%; background:${A2}; color:${onA2}; display:grid; place-items:center; text-align:center; transform:rotate(-12deg); box-shadow:${shadow}; font-family:${display}; font-weight:800; font-size:${n(48)}; line-height:1; padding:${n(24)}; }
 .seal::before { content:''; position:absolute; inset:${n(12)}; border-radius:50%; border:${n(3)} dashed ${onA2 === '#FFFFFF' ? 'rgba(255,255,255,.5)' : 'rgba(0,0,0,.3)'}; }
 .dg-copy { margin-top:${tall ? Math.round(H * 0.4) : Math.round(H * 0.36)}px; display:flex; flex-direction:column; gap:${n(22)}; position:relative; z-index:2; min-height:0; overflow:hidden; } .dg-copy h1 { font-size:${n(tall ? 140 : 112)}; max-height:${n(tall ? 330 : 240)}; }
 /* collage */
