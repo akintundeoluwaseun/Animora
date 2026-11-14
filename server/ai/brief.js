@@ -73,7 +73,18 @@ export function titleFromName(raw) {
   const core = t.replace(ASK_WORDS, ' ').replace(FILLER, ' ').replace(/[,;:]+/g, ' ').replace(/\s+/g, ' ').trim();
   return str(core.replace(/\b\p{L}/gu, (c) => c.toUpperCase()), 60);
 }
+// Whatever read the idea (rules or AI), a "name" that is really a description or a request ("A music app called Music mart",
+// "make a video for Techwave") is cut down to the name itself, and what it said about the thing becomes its category.
+function realName(name, category) {
+  let n = String(name || '').trim(), cat = category;
+  const called = n.match(/^(?:an?|the|our|my)\s+([\w' -]{2,40}?)\s+(?:called|named)\s+["'“‘]?(.+?)["'”’]?$/i);
+  if (called) { n = called[2]; if (!cat) cat = called[1].replace(/^./, (c) => c.toUpperCase()); }
+  n = stripAsk(n).replace(/[.!]+$/, '');
+  return { n, cat };
+}
 export function cleanBrief(b = {}) {
+  const rn = realName(b.name, b.category);
+  b = { ...b, name: rn.n, category: rn.cat };
   const out = {
     name: titleFromName(b.name), category: str(b.category, 60),
     relationship: str(b.relationship, 50), milestone: str(b.milestone, 60),

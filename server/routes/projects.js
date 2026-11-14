@@ -262,11 +262,11 @@ r.post('/:id/brief/parse', async (req, res) => {
     merged.personalMessage = found.personalMessage || rules.personalMessage || current.personalMessage || '';
     merged.memories = found.memories?.length ? found.memories : current.memories || [];
   }
-  // The AI decides the rest, so the person never has to answer a form: a title from their own words if nothing else was found
+  // No name found: the first five words of what they typed are NOT a name ("A music app c…"). Use "…called X" if they said it; otherwise leave it
+  // unnamed (the video then rests on what they described, never on an invented or quoted-sentence name).
   if (!merged.name && merged.kind !== 'personal') {
-    const first = text.split(/[.!?\n]/)[0].replace(/^\s*(please\s+)?(i\s+(want|need|would like)\s+(to\s+(make|create)\s+)?|(make|create|build|do)\s+(me\s+)?)?(an?\s+|the\s+|my\s+)?(video|ad|advert|promo|slideshow|flyer)\s+(for|about|of|on)\s+/i, '').replace(/[“”"]/g, '').trim();
-    const words = first.split(/\s+/).filter(Boolean).slice(0, 5).join(' ');
-    if (words.length >= 3) merged.name = words.charAt(0).toUpperCase() + words.slice(1, 40);
+    const called = text.match(/\b(?:called|named)\s+["'“‘]?([A-Z0-9][\w'&.-]*(?:\s+[A-Za-z0-9][\w'&.-]*){0,3})/);
+    if (called) merged.name = called[1].trim();
   }
   if (!merged.name && merged.kind !== 'personal') { const nm = text.match(/^\s*([A-Z][\w'&.-]*(?:\s+[A-Z][\w'&.-]*){0,3})\s+(?:is|are|sells|makes|offers|does|runs)\b/); if (nm) merged.name = nm[1].trim(); }
   // pictures given: a slideshow needs time for each one (about 2 s each), unless they named a length
