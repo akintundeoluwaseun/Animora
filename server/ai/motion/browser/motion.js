@@ -103,6 +103,7 @@
   const initials = (s) => { const w = String(s || '?').replace(/[^\p{L}\p{N} ]/gu, '').trim().split(/\s+/).filter((x) => !/^(the|and|of|&)$/i.test(x)); return (w.length > 1 ? w[0][0] + w[1][0] : (w[0] || '?')[0]).toUpperCase(); };
 
   // the brand's app icon: a glossy squircle (their logo on white, or a monogram on the brand colour)
+  const hasMark = () => !!D.logo || D.monogram === true;   // is there a visible brand mark (an uploaded logo), or only a name?
   function brandIcon(parent, size, opts) {
     opts = opts || {};
     const onBrand = opts.onBrand;
@@ -596,8 +597,8 @@
   END.minimal = (s, o, t0, t1, bg) => {   // quiet: a hairline, the name set large, the line and the contact below, all left
     const ink = inkOf(bg), blk = el('div', '', s, '', { position: 'absolute', left: px(padX()), right: px(padX()), bottom: PORTRAIT ? '13%' : '14%', display: 'flex', flexDirection: 'column', alignItems: 'flex-start' });
     const rule = el('div', '', blk, '', { width: '100%', height: px(3), background: ink, opacity: 0.85, transformOrigin: '0 50%', marginBottom: px(46) });
-    tl.fromTo(rule, { scaleX: 0 }, { scaleX: 1, duration: 1.1, ease: 'expo.inOut' }, t0 + 0.1);
-    let at = t0 + 0.5;
+    tl.fromTo(rule, { scaleX: 0 }, { scaleX: 1, duration: 0.9, ease: 'expo.out' }, t0 + 0.05);
+    let at = D.logo ? t0 + 0.4 : t0 + 0.12;
     if (D.logo) { const ic = brandIcon(blk, N(120), {}); ic.style.marginBottom = px(30); tl.fromTo(ic, { opacity: 0, scale: 0.6 }, { opacity: 1, scale: 1, duration: 0.8, ease: 'back.out(1.6)' }, at); at += 0.2; }
     const name = nameBlock(blk, D.brand, N(PORTRAIT ? 112 : 96), ink, W - 2 * padX());
     name.style.alignSelf = 'flex-start';
@@ -607,7 +608,7 @@
     sfx(t0 + 0.2, 'whoosh', 0.25);
   };
   END.poster = (s, o, t0, t1, bg) => {   // the closing line is the hero; the name and contact are the small print
-    if (!o.tagline) return B.end(s, Object.assign({}, o, { layout: 'card' }), t0, t1, bg);
+    if (!o.tagline || o.generic) return B.end(s, Object.assign({}, o, { layout: 'card' }), t0, t1, bg);   // a description ("Laptop repair business, Ikeja") is never the hero; the business name is
     const onBrand = bg === 'brand', ink = onBrand ? inkOf(bg) : inkOf(bg), mute = onBrand ? inkOf(bg) : muteOf(bg);
     const r = leftLines(s, [o.tagline], PORTRAIT ? 150 : 116, { at: t0 + 0.2, bg, color: ink, accColor: onBrand ? (BRAND_DARK ? '#FFFFFF' : '#111') : accOf(bg), accent: o.accent, top: PORTRAIT ? '26%' : '20%', weight: 750, per: 0.14 });
     const foot = el('div', '', s, '', { position: 'absolute', left: px(padX()), right: px(padX()), bottom: PORTRAIT ? '10%' : '10%', display: 'flex', flexDirection: 'column', alignItems: 'flex-start' });
@@ -700,7 +701,7 @@
 
   // ICON: the brand's app icon. solo | wordmark (icon slides aside, name reveals) | welcome ("Welcome to [icon]")
   B.icon = (s, o, t0, t1, bg) => {
-    const mode = o.mode || 'wordmark';
+    const mode = (o.mode === 'solo' && !hasMark()) ? 'wordmark' : (o.mode || 'wordmark');
     const size = o.size || (mode === 'solo' ? 300 : 190);
     const ink = inkOf(bg);
     if (mode === 'welcome') {
@@ -722,11 +723,17 @@
       const nameSize = o.textSize || Math.round(size * 0.56);
       const wrap = el('div', '', grp, '', { overflow: 'hidden', paddingLeft: px(size * 0.2), paddingRight: px(6) });
       const name = nameBlock(wrap, o.name || D.brand, N(nameSize), ink, maxTextW() - N(size) - N(size * 0.2));
+      if (!hasMark()) {   // no mark to show: the name itself is the first thing on the stage, at once
+        tl.fromTo(name, { xPercent: -28, opacity: 0 }, { xPercent: 0, opacity: 1, duration: 0.85, ease: 'expo.out' }, t0 + 0.04);
+        sfx(t0 + 0.08, 'whoosh', 0.3);
+        after = t0 + 0.7;
+      } else {
       const shift = wrap.offsetWidth / 2;
       tl.fromTo(grp, { x: shift }, { x: 0, duration: 0.9, ease: 'expo.inOut', immediateRender: true }, t0 + 0.5);
       tl.fromTo(name, { xPercent: -105, opacity: 0 }, { xPercent: 0, opacity: 1, duration: 0.9, ease: 'expo.inOut' }, t0 + 0.5);
       sfx(t0 + 0.55, 'whoosh', 0.3);
       after = t0 + 1.35;
+      }
     }
     if (o.tagline) {
       const tg = wordsRow(s, o.tagline, o.tagSize || 54, { weight: 550, accent: new Set([].concat(o.accent || [])), accColor: accOf(bg), bg, color: mode === 'solo' ? ink : muteOf(bg) });
@@ -1108,12 +1115,15 @@
     const wrap = el('div', '', grp, '', { overflow: 'hidden', paddingLeft: px(size * 0.2), paddingRight: px(6) });
     const name = nameBlock(wrap, D.brand, N(size * 0.56), inkOf(bg), maxTextW() - N(size * 1.2));
     const shift = wrap.offsetWidth / 2;
+    const mark = hasMark();
     tl.fromTo(ic, { opacity: 0 }, { opacity: 1, duration: 0.25, ease: 'none' }, t0 + 0.04);
     tl.fromTo(ic, { scale: 0.3, rotation: -12, filter: blur(14) }, { scale: 1, rotation: 0, filter: blur(0), duration: 0.8, ease: 'back.out(1.7)', immediateRender: false }, t0 + 0.04);
-    tl.fromTo(grp, { x: shift }, { x: 0, duration: 0.9, ease: 'expo.inOut', immediateRender: true }, t0 + 0.45);
-    tl.fromTo(name, { xPercent: -105, opacity: 0 }, { xPercent: 0, opacity: 1, duration: 0.9, ease: 'expo.inOut' }, t0 + 0.45);
+    if (mark) {
+      tl.fromTo(grp, { x: shift }, { x: 0, duration: 0.9, ease: 'expo.inOut', immediateRender: true }, t0 + 0.45);
+      tl.fromTo(name, { xPercent: -105, opacity: 0 }, { xPercent: 0, opacity: 1, duration: 0.9, ease: 'expo.inOut' }, t0 + 0.45);
+    } else tl.fromTo(name, { xPercent: -28, opacity: 0 }, { xPercent: 0, opacity: 1, duration: 0.85, ease: 'expo.out' }, t0 + 0.04);
     sfx(t0 + 0.08, 'pop', 0.7); sfx(t0 + 0.5, 'whoosh', 0.3);
-    let at = t0 + 1.2;
+    let at = mark ? t0 + 1.2 : t0 + 0.8;
     if (o.tagline) { const tg = wordsRow(s, o.tagline, 60, { weight: 600, accent: new Set([].concat(o.accent || [])), accColor: onBrand ? (BRAND_DARK ? '#FFFFFF' : '#111') : accOf(bg) }); tg.row.style.marginTop = px(56); tg.row.style.color = onBrand ? inkOf(bg) : muteOf(bg); at = buildRow(tg.row, tg.items, at, 0.13, { blur: 6 }) - 0.3; }
     if (o.contact) {
       const pill = el('div', 'pill', s, '', { marginTop: px(70), height: px(104), padding: `0 ${N(46)}px`, gap: px(18), background: onBrand ? 'rgba(255,255,255,.95)' : bg === 'light' ? '#FFFFFF' : '#1E1E23', boxShadow: onBrand ? '0 20px 50px rgba(0,0,0,.2)' : shadow(0.8), fontSize: px(40), fontWeight: 600, color: onBrand || bg === 'light' ? '#111' : '#F5F5F7', whiteSpace: 'nowrap' });
@@ -1533,10 +1543,15 @@
       wrap.style.color = inkOf(bg);
       try { ambience(wrap, bg, t0, t1, i, b); } catch (e) { console.error('ambience failed: ' + e.message); }
       const camEl = el('div', 'beat', wrap); camEl.style.visibility = 'inherit';
-      tl.set(wrap, { visibility: 'visible' }, Math.max(0, t0 - 0.12));
+      // quiet transitions are true cross-fades: the next beat starts arriving while the last one is still leaving, so the stage never dips to empty
+      const quietIn = prevOut === 'wipe' || prevOut === 'dissolve';
+      const lead = prevOut === 'dissolve' ? 0.42 : prevOut === 'wipe' ? 0.32 : prevOut === 'fade' ? 0.3 : 0.12;
+      const inLead = (quietIn || prevOut === 'fade') ? lead : 0;   // the beat's own entrance starts this much early, under the last beat's exit
+      tl.set(wrap, { visibility: 'visible' }, Math.max(0, t0 - lead));
       // incoming move matches the previous beat's exit
-      if (prevOut === 'wipe') tl.fromTo(wrap, { x: W * 0.07, opacity: 0 }, { x: 0, opacity: 1, duration: 0.7 * MP.speed + 0.1, ease: MP.ease, immediateRender: false }, t0 - 0.12);
-      else if (prevOut === 'dissolve') tl.fromTo(wrap, { opacity: 0 }, { opacity: 1, duration: 0.5, ease: 'sine.inOut', immediateRender: false }, t0 - 0.1);
+      if (prevOut === 'wipe') tl.fromTo(wrap, { x: W * 0.05, opacity: 0 }, { x: 0, opacity: 1, duration: 0.62, ease: MP.ease, immediateRender: false }, Math.max(0, t0 - 0.3));
+      else if (prevOut === 'dissolve') tl.fromTo(wrap, { opacity: 0 }, { opacity: 1, duration: 0.5, ease: 'sine.inOut', immediateRender: false }, Math.max(0, t0 - 0.4));
+      else if (prevOut === 'fade') tl.fromTo(wrap, { opacity: 0 }, { opacity: 1, duration: 0.3, ease: 'power1.out', immediateRender: false }, Math.max(0, t0 - 0.3));
       else if (prevOut === 'whip') tl.fromTo(wrap, { x: W * 0.55, filter: blur(26) }, { x: 0, filter: blur(0), duration: 0.55, ease: 'expo.out', immediateRender: false }, t0 - 0.1);
       else if (prevOut === 'zoom') tl.fromTo(wrap, { scale: 0.72, opacity: 0, filter: blur(16) }, { scale: 1, opacity: 1, filter: blur(0), duration: 0.6, ease: 'expo.out', immediateRender: false }, t0 - 0.12);
       else if (prevOut === 'drop') tl.fromTo(wrap, { y: -H * 0.35, filter: blur(22) }, { y: 0, filter: blur(0), duration: 0.6, ease: 'expo.out', immediateRender: false }, t0 - 0.1);
@@ -1547,10 +1562,10 @@
       const drift = MP.drift ? W * MP.drift * (i % 2 ? -1 : 1) : 0;
       tl.fromTo(camEl, { scale: 1, x: 0 }, { scale: 1 + push, x: drift, duration: b.dur, ease: MP.id === 'kinetic' ? 'sine.inOut' : 'none', immediateRender: false }, t0);
       // how the whole composition arrives (kinetic beats animate their own parts, so they add nothing)
-      if (MP.enter === 'fade') tl.fromTo(camEl, { opacity: 0 }, { opacity: 1, duration: 0.55, ease: 'sine.out', immediateRender: false }, t0 + 0.02);
-      else if (MP.enter === 'settle') tl.fromTo(camEl, { opacity: 0, scale: 1.1 }, { opacity: 1, scale: 1, duration: 0.9, ease: 'power2.out', immediateRender: false }, t0 + 0.02);
-      else if (MP.enter === 'mask') tl.fromTo(camEl, { clipPath: 'inset(0 100% 0 0)' }, { clipPath: 'inset(0 0% 0 0)', duration: 0.75, ease: 'power3.inOut', immediateRender: false, onComplete() { camEl.style.clipPath = 'none'; } }, t0 + 0.02);
-      try { B[b.type](camEl, b, t0, t1, bg); } catch (e) { console.error('beat ' + b.type + ' failed: ' + e.message); }
+      if (MP.enter === 'fade') { if (!quietIn) tl.fromTo(camEl, { opacity: 0 }, { opacity: 1, duration: 0.45, ease: 'sine.out', immediateRender: false }, t0 + 0.02); }   // after a cross-fade the beat has already arrived
+      else if (MP.enter === 'settle') tl.fromTo(camEl, { opacity: quietIn ? 1 : 0, scale: 1.1 }, { opacity: 1, scale: 1, duration: 0.8, ease: 'power2.out', immediateRender: false }, quietIn ? Math.max(0, t0 - 0.3) : t0 + 0.02);
+      else if (MP.enter === 'mask') tl.fromTo(camEl, { clipPath: 'inset(0 100% 0 0)' }, { clipPath: 'inset(0 0% 0 0)', duration: 0.6, ease: 'power3.inOut', immediateRender: false, onComplete() { camEl.style.clipPath = 'none'; } }, quietIn ? Math.max(0, t0 - 0.25) : t0 + 0.02);
+      try { B[b.type](camEl, b, Math.max(0, t0 - inLead), t1, bg); } catch (e) { console.error('beat ' + b.type + ' failed: ' + e.message); }
       // the exit
       let out = last ? 'hold' : (b.out || 'push');
       if (!last && MP.id !== 'kinetic' && out !== 'wipe' && out !== 'dissolve') out = MP.outs[out] || MP.outs._ || out;

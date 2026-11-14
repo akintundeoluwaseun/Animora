@@ -150,7 +150,8 @@ export function composeMotion(plan, { brief = {}, assets = [], salt = '', avoid 
   const ctaGlyph = /whatsapp|chat|message|dm/i.test(cta) ? 'chat' : /call|phone/i.test(cta) ? 'phone' : /book|reserve/i.test(cta) ? 'clock' : /visit|store|shop/i.test(cta) ? 'pin' : /download|app/i.test(cta) ? 'phone' : 'bag';
   const doneWord = /book|reserve/i.test(cta) ? 'Booked' : /call/i.test(cta) ? 'Calling…' : /download/i.test(cta) ? 'Installed' : /visit|website/i.test(cta) ? 'Opening…' : /whatsapp|message|dm|chat/i.test(cta) ? 'Sent' : 'Done';
   const H0 = heads[0] || sentence(f.goal, 40) || `Meet ${f.brand}`;
-  const tagline = sentence(heads.find((h) => h.length <= 34 && h !== H0) || (f.cat ? `${f.cat}${city ? `, ${city}` : ''}` : ''), 40);
+  const ownLine = heads.find((h) => h.length <= 34 && h !== H0);   // a line the owner wrote; otherwise the caption is only a description (category, city)
+  const tagline = sentence(ownLine || (f.cat ? `${f.cat}${city ? `, ${city}` : ''}` : ''), 40);
 
   // ---- the look: mostly light (Apple-clean) or mostly dark (premium night) ----
   const darkPref = tech || beauty ? 0.55 : fashion ? 0.5 : 0.3;
@@ -225,7 +226,7 @@ export function composeMotion(plan, { brief = {}, assets = [], salt = '', avoid 
   B.chat = () => ({ type: 'chat', bg: base, messages: [{ from: 'me', text: prods[0] ? `Hi! Do you have ${prods[0].name.toLowerCase()} today?` : `Hi ${f.brand.split(' ')[0]}, are you open today?` }, { from: 'biz', text: prods[0]?.price ? `Yes! ${prods[0].name} is ${prods[0].price}. Want one?` : 'Yes, we are! How can we help you? 😊' }, { from: 'me', text: 'Perfect, I\'ll take it 🙌' }] });
   B.steps = () => ({ type: 'steps', bg: chance(0.5) ? 'dark' : base, title: 'How it works', items: [{ t: /book/i.test(cta) ? 'Book' : /whatsapp|message|chat/i.test(cta) ? 'Message us' : 'Reach out', s: phone || handle || 'It takes a minute', glyph: ctaGlyph }, { t: food ? 'We cook it fresh' : service ? 'We get to work' : 'We get it ready', s: '', glyph: food ? 'cup' : 'bolt' }, { t: food ? 'Enjoy' : 'You are sorted', s: '', glyph: 'smile' }] });
   B.cta = () => ({ type: 'button', bg: base, lead: pick([heads[3] || '', 'Ready?', 'Don\'t wait.', 'Your turn.']) || 'Ready?', accent: [0], label: cta, done: doneWord, glyph: ctaGlyph, sub: phone || handle || site || '' });
-  B.end = () => ({ type: 'end', bg: pick(['brand', 'brand', base === 'light' ? 'dark' : 'light', base]), tagline: tagline || '', accent: tagline ? accentOf(tagline) : [], contact: handle || site || phone || '', contactGlyph: handle ? 'search' : site ? 'globe' : 'phone' });
+  B.end = () => ({ type: 'end', generic: !ownLine || undefined, bg: pick(['brand', 'brand', base === 'light' ? 'dark' : 'light', base]), tagline: tagline || '', accent: tagline ? accentOf(tagline) : [], contact: handle || site || phone || '', contactGlyph: handle ? 'search' : site ? 'globe' : 'phone' });
 
   // A personal birthday is a greeting, not an advert. Keep each supplied thought as its own animated beat.
   const personalBirthday = isPersonalBirthdayBrief(brief, plan);
