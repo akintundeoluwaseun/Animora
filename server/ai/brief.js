@@ -364,6 +364,12 @@ export function briefToPlanRules(brief, { assets = [], limits = { minSeconds: 15
   const fit = fitScenes(scenes, D);
   let durationNote = fit.trimmed.length ? `To fit ${Math.round(D)} seconds, ${fit.trimmed.length === 1 ? `"${fit.trimmed[0]}" was` : `${fit.trimmed.length} points (${fit.trimmed.slice(0, 3).join(', ')}${fit.trimmed.length > 3 ? '…' : ''}) were`} left out. Choose a longer video to include everything.` : '';
   if (fit.impossible) { D = Math.min(limits.maxSeconds || 300, Math.ceil(fit.impossible)); durationNote = `This much content needs about ${D} seconds to be readable, so the video is ${D} seconds instead of the ${Math.round(b.duration || 20)} requested.`; }
+  // Too little to say is the opposite problem: a name and a closing card cannot honestly fill 20 seconds (it would be one frame held for
+  // 14 s). The film is only as long as what was given supports, and the owner is told why and how to get a longer one.
+  if (!fit.impossible && scenes.length <= 3 && D > Math.max(10, scenes.length * 5 + 2) && !(b.images?.length || images.length)) {
+    const old = D; D = Math.max(8, scenes.length * 5);
+    durationNote = `There is only ${scenes.length === 1 ? 'one point' : `${scenes.length} points`} to show, so this is a ${D}-second film instead of ${Math.round(old)}. Add what you offer, a headline or some photos for a longer one.`;
+  }
   const total = scenes.reduce((a, s) => a + s.weight, 0);
   let t = 0;
   const planScenes = scenes.map((s, i) => {
