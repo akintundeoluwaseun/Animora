@@ -160,7 +160,8 @@ console.log('All creative QA checks passed');
     bad(used.card < fresh.card * 0.6, `ending memory did not discourage a repeat (${fresh.card.toFixed(2)} -> ${used.card.toFixed(2)})`);
     const sig = signatureOf([{ type: 'photos', layout: 'full', out: 'zoom' }, { type: 'words', out: 'push' }, { type: 'end', layout: 'poster' }], { key: 'gold-luxe', deco: 'golddust', display: 'Playfair Display' });
     bad(sig.opening === 'photos:full' && sig.ending === 'end:poster' && sig.look === 'gold-luxe', 'signature does not describe the film');
-    // a film made after others avoids their look; the owner's own pick stays
+    // a FIRST film keeps the look that fits its business however busy the platform was (recovery: other films' looks are no reason to restyle it);
+    // Regenerate moves on; the owner's own pick always stays
     const { directMotion } = await import('../server/ai/motion/director.js');
     const { forget } = await import('../server/ai/motion/memory.js');
     const cb = cleanBrief({ kind: 'business', name: 'Maison Oud', category: 'Luxury perfume', headline: 'The scent of distinction', features: ['Hand-blended oud'] });
@@ -174,7 +175,13 @@ console.log('All creative QA checks passed');
       const b = await directMotion({ plan: pl, brief: { ...cb, lookAuto: 'own' }, assets: [], useAi: false, style: STARTER_STYLES.find((x) => x.slug === 'gold-luxe'), memory: crowd });
       if (b.data.look.key === 'gold-luxe') kept++;
     }
-    bad(moved >= 5, `the platform's recent look was repeated ${8 - moved}/8 times`);
+    bad(moved === 0, `a first film was restyled because of other films (${moved}/8)`);
+    let regenMoved = 0;
+    for (let i = 0; i < 8; i++) {
+      const r = await directMotion({ plan: pl, brief: cb, assets: [], useAi: false, style: STARTER_STYLES.find((x) => x.slug === 'gold-luxe'), memory: [], salt: 'regen', prevLook: 'gold-luxe' });
+      if (r.data.look.key !== 'gold-luxe') regenMoved++;
+    }
+    bad(regenMoved === 8, `Regenerate repeated the same look ${8 - regenMoved}/8 times`);
     bad(kept === 8, "an owner's explicit look was changed by creative memory");
   }
   // the film is exactly as long as the owner chose, even when QA removes a repeated beat

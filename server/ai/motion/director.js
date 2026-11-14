@@ -173,13 +173,13 @@ export async function directMotion({ plan, brief = null, assets = [], themeColor
   const duration = Math.max(10, Math.round(Number(plan.duration_seconds) || 24));
   const colors = { ...themeColors, ...(plan.style?.colors || {}) };
   // the chosen style is a whole look: stage, display type, background world, pacing
-  // The look stays as chosen unless it was just used (regenerate, or one of the platform's recent films): then Animora moves to another
+  // The look stays as chosen unless the owner pressed Regenerate: then Animora moves to another
   // look that still fits the content. A look the owner picked themselves is never changed.
   let useStyle = style;
   const chosen = lookFor(style?.slug || style?.palette?.theme || '', { ...(style?.palette || {}), ...themeColors });
   if (brief?.lookAuto !== 'own' && chosen.key !== 'custom') {
     const regen = !!(salt && prevLook);
-    const crowded = regen || recency(mem, (m) => m.look === chosen.key) > 0.4;
+    const crowded = regen;   // a first film keeps the look that fits its business; only Regenerate moves on (what other films used lately is no reason to dress a restaurant as a retro poster)
     if (crowded) {
       const cands = [...new Set([chosen.key, ...(dir.styles || []), ...(dir.alts || [])])].filter((k) => LOOKS[k] && !(regen && k === prevLook));
       if (cands.length > 1 || (cands.length === 1 && cands[0] !== chosen.key)) {
