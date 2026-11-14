@@ -312,7 +312,7 @@ function birthdayPlan(b, { assets, limits, palette }) {
 // ---------------------------------------------------------------------------
 // Rule-based plan (always works)
 // ---------------------------------------------------------------------------
-export function briefToPlanRules(brief, { assets = [], limits = { minSeconds: 15, maxSeconds: 300 }, palette = null } = {}) {
+export function briefToPlanRules(brief, { assets = [], limits = { minSeconds: 15, maxSeconds: 300 }, palette = null, keepLength = false } = {}) {
   // cleanBrief drops empty lists (a skipped question), so every list is read with a safe default here
   const b = { ...cleanBrief(brief) }; for (const k of ['features', 'products', 'headlines', 'ctas', 'goals', 'steps']) if (!Array.isArray(b[k])) b[k] = [];
   let D = Math.max(limits.minSeconds || 15, Math.min(limits.maxSeconds || 300, b.duration || 20));
@@ -366,7 +366,7 @@ export function briefToPlanRules(brief, { assets = [], limits = { minSeconds: 15
   if (fit.impossible) { D = Math.min(limits.maxSeconds || 300, Math.ceil(fit.impossible)); durationNote = `This much content needs about ${D} seconds to be readable, so the video is ${D} seconds instead of the ${Math.round(b.duration || 20)} requested.`; }
   // Too little to say is the opposite problem: a name and a closing card cannot honestly fill 20 seconds (it would be one frame held for
   // 14 s). The film is only as long as what was given supports, and the owner is told why and how to get a longer one.
-  if (!fit.impossible && scenes.length <= 3 && D > Math.max(10, scenes.length * 5 + 2) && !(b.images?.length || images.length)) {
+  if (!keepLength && !fit.impossible && scenes.length <= 3 && D > Math.max(10, scenes.length * 5 + 2) && !(b.images?.length || images.length)) {
     const old = D; D = Math.max(8, scenes.length * 5);
     durationNote = `There is only ${scenes.length === 1 ? 'one point' : `${scenes.length} points`} to show, so this is a ${D}-second film instead of ${Math.round(old)}. Add what you offer, a headline or some photos for a longer one.`;
   }
@@ -417,7 +417,7 @@ With narration on, write one natural spoken line per scene (about 2.3 words per 
 
 export async function briefToPlan(brief, { assets = [], limits, palette, style = null } = {}) {
   const b = cleanBrief(brief);
-  const rules = briefToPlanRules(b, { assets, limits, palette });
+  const rules = briefToPlanRules(b, { assets, limits, palette, keepLength: true });
   if (!config.useGemini) return { plan: rules, source: 'rules' };
   try {
     const images = assets.filter((a) => a.kind === 'image');

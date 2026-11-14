@@ -36,4 +36,11 @@ for (const n of ['Mama Put Kitchen', 'Chop Life', 'Buka Hut', 'Suya Spot']) asse
 const motionSrc = fs.readFileSync(new URL('../server/ai/motion/browser/motion.js', import.meta.url), 'utf8');
 assert.ok(!/padStart\(2, '0'\);\s*\n\s*tl\.fromTo\(num, \{ y: N\(40\) \}/.test(motionSrc), 'ghost numeral is back');
 assert.ok(lap.filter((x) => x.type === 'end').every((x) => x.generic || !x.tagline || x.layout !== 'poster'), 'closing headlines a description');
+// a name and a category cannot fill 20 s: shorter film, owner told; a real brief keeps its length
+{
+  const thin = briefToPlanRules({ ...cleanBrief({ kind: 'business', name: 'Luxury perfume', category: 'Beauty & salon' }), aspect: '16:9', duration: 20 }, { assets: [] });
+  assert.ok(thin.duration_seconds < 20 && /instead of 20/.test(thin.duration_note || ''), 'thin brief was held for 20 s');
+  const full = briefToPlanRules({ ...cleanBrief({ kind: 'business', name: 'Maison Oud', category: 'Perfume', headline: 'The scent of distinction', features: ['Hand-blended oud', 'Limited edition'] }), aspect: '16:9', duration: 20 }, { assets: [] });
+  assert.equal(full.duration_seconds, 20);
+}
 console.log('prompt-reading ok');
