@@ -43,4 +43,11 @@ assert.ok(lap.filter((x) => x.type === 'end').every((x) => x.generic || !x.tagli
   const full = briefToPlanRules({ ...cleanBrief({ kind: 'business', name: 'Maison Oud', category: 'Perfume', headline: 'The scent of distinction', features: ['Hand-blended oud', 'Limited edition'] }), aspect: '16:9', duration: 20 }, { assets: [] });
   assert.equal(full.duration_seconds, 20);
 }
+// a product description that merely LISTS birthdays and tributes is not a memorial; hyphenated sub-domains stay whole
+{
+  const P = 'Animora is a video maker that turns a few typed words into a finished video ad.\nIs making a video ad too hard or too expensive for your small business?\nAnimora writes the scenes, picks the look and animates it for you.\nMake ads for your business, flyers, birthday videos and tributes.\nStart now at animora-ivory.vercel.app';
+  const b = cleanBrief({ ...parseBriefRules(P), mode: 'paste' });
+  assert.equal(b.kind, 'business'); assert.equal(b.name, 'Animora'); assert.equal(b.contact, 'animora-ivory.vercel.app');
+  assert.equal(parseBriefRules('Burial service for the late Chief Adeyemi, Saturday 10am').kind, 'personal');
+}
 console.log('prompt-reading ok');

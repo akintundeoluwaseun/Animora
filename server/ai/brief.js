@@ -33,7 +33,7 @@ export function findPayment(text) {
   return [bank.replace(/\s+/g, ' ').trim(), num, nm.trim()].filter(Boolean).join(' · ');
 }
 const PHONE_RE = /(\+?234[\s-]?|0)[789][01]\d[\s-]?\d{3}[\s-]?\d{4}/;
-const URL_RE = /\b((?:https?:\/\/)?(?:www\.)?[a-z0-9-]+\.(?:com|ng|com\.ng|space|app|io|co|org|net|store|shop)(?:\/\S*)?)\b/i;
+const URL_RE = /\b((?:https?:\/\/)?(?:www\.)?(?:[a-z0-9-]+\.)+(?:com|ng|com\.ng|space|app|io|co|org|net|store|shop)(?:\/\S*)?)\b/i;
 // cut at a whole word, never in the middle of one ("This flyer was mad", "fix your devi")
 const str = (v, max = 200) => { const t = v == null ? '' : String(v).replace(/\s+/g, ' ').trim(); if (t.length <= max) return t; const c = t.slice(0, max), sp = c.lastIndexOf(' '); return (sp > max * 0.5 ? c.slice(0, sp) : c).replace(/[\s,;:&–—-]+$/, ''); };
 const list = (v) => (Array.isArray(v) ? v : String(v || '').split(/\n|;/)).map((x) => str(x, 80)).filter(Boolean);
@@ -584,12 +584,17 @@ export function parseBriefRules(text) {
   const KINDS = [[CAUSE_RE, 'Fundraiser', 'cause'], [MEMORIAL, 'Burial or memorial', 'personal'], [/birthday|b-?day|anniversary/i, 'Birthday', 'personal'], [/church|ministry|sunday service|revival|crusade|mosque/i, 'Church event', 'event'],
     [/\bwe (?:sell|offer|make|provide|do|bake|cook|deliver)\b|\bour (?:shop|store|business|products?|services?|menu|brand)\b|\bpromo\b|\bpromotional\b|\badverts?\b|\bad for\b|\bdiscount|\bbakery|\brestaurant|\bsalon\b|\bboutique/i, 'Business', 'business'], [/wedding|engagement|bridal/i, 'Wedding', 'event'],
     [/graduat|convocation|school event|prize giving/i, 'Graduation', 'event'], [/announc|resum|notice|programme|program|invitation|invite|save the date/i, 'Announcement', 'announcement']];
-  for (const [re, cat, kind] of KINDS) if (re.test(t)) { out.category = out.category || cat; out.kind = out.kind || kind; break; }
+  // A text that says what ITS subject is ("Animora is a video maker…", "your small business") is about that business, even if it lists
+  // "birthday videos and tributes" among the things it does. Only a real bereavement signal can turn it into a memorial.
+  const aboutBusiness = /\b(?:is|are)\s+(?:an?|the)\s+[^.\n]{0,50}?\b(?:app|software|platform|tool|maker|generator|service|company|brand|shop|store|business|agency|startup|website|studio)\b|\byour (?:small )?business\b|\bour customers\b|\bwe (?:sell|offer|provide)\b/i.test(t)
+    && !/burial|funeral|obituar|passed away|in loving memory|rest in peace|\bthe late\b|homegoing|eulogy|wake keep/i.test(t);
+  if (aboutBusiness) { out.category = out.category || 'Business'; out.kind = out.kind || 'business'; }
+  else for (const [re, cat, kind] of KINDS) if (re.test(t)) { out.category = out.category || cat; out.kind = out.kind || kind; break; }
   if (out.kind === 'announcement') {
     const said = t.match(/\bannounc\w*\s+(?:that\s+|about\s+|the\s+)?([^.\n]{8,110})/i)?.[1];
     if (said) { const h = said.trim().replace(/\s+(?:keep|make|and make|please)\b.*$/i, '').replace(/[,;:\s]+$/, ''); out.headline = h.charAt(0).toUpperCase() + h.slice(1); }
   }
-  const birthday = /birthday|b-?day/i.test(`${out.category || ''} ${t}`);
+  const birthday = !aboutBusiness && /birthday|b-?day/i.test(`${out.category || ''} ${t}`);
   if (birthday) {
     const relation = t.match(/\b(?:my|our)\s+(brother|sister|mum|mom|mother|dad|father|friend|partner|husband|wife|son|daughter|cousin|uncle|aunt|grandma|grandmother|grandpa|grandfather)\b/i)
       || t.match(/\bfor\s+(brother|sister|mum|mom|mother|dad|father|friend|partner|husband|wife|son|daughter|cousin|uncle|aunt|grandma|grandmother|grandpa|grandfather)\b/i);
