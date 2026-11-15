@@ -618,6 +618,11 @@ export function parseBriefRules(text) {
     const first = t.split(/[\n.,;!?]/)[0].replace(/^\s*(?:please\s+)?(?:i\s+(?:want|need|would like)\s+(?:to\s+make\s+)?)?(?:make\s+(?:me\s+)?)?(?:an?\s+)?(?:(?:birthday|wedding|promo|promotional|short|nice|cool|donation|donations|fundraising|fundraiser|charity|appeal)\s+)?(?:video|ad|advert|advertisement|flyer|clip)?\s*(?:for|about|of|on)?\s*(?:my\s+|our\s+|the\s+)?/i, '').trim();
     if (first.length >= 3) out.name = first.charAt(0).toUpperCase() + str(first, 40).slice(1);
   }
+  // bullet or numbered lines are the things offered ("- Your own photos and logo"): they become the selling points, as written
+  if (!out.features?.length) {
+    const bullets = t.split('\n').map((l) => l.match(/^\s*(?:[-•*–]|\d{1,2}[.)])\s+(.{3,60}?)\s*[.;]?$/)?.[1]).filter(Boolean);
+    if (bullets.length >= 2) out.features = bullets.slice(0, 5);
+  }
   // a sentence about the business is not its name: "We sell cupcakes and wedding cakes" is named by what it sells
   if (out.name && /^(?:we|i|our|it|they|this|my|there)\s/i.test(out.name)) out.name = '';
   if (!out.name && out.features?.length) out.name = out.features.slice(0, 2).join(' & ');
