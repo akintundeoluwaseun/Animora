@@ -10,6 +10,7 @@
 import { geminiGenerate } from '../engine/gemini.js';
 import { THEMES } from './themes.js';
 import { SHOT_VALID, ICON_NAMES, iconFor, priceOf, templateFromPlan, LEGACY_SHOTS } from './templates.js';
+import { CREATIVE_STANDARD } from './standard.js';
 
 const DIRECTOR_MODEL = process.env.GEMINI_DIRECTOR_MODEL || process.env.GEMINI_CHAT_MODEL || 'gemini-flash-latest';
 
@@ -266,7 +267,8 @@ const SHOT_MENU = () => Object.entries(SHOTS).filter(([k]) => !LEGACY_SHOTS.incl
 const CUT_MENU = () => Object.entries(CUTS).map(([k, v]) => `${k} (${v})`).join(', ');
 
 function directorSystem({ duration, aspect, style, themeKey }) {
-  return `You are the Animora motion director: an After Effects-level motion designer who directs short video ads
+  return `${CREATIVE_STANDARD}
+You are the Animora motion director: an After Effects-level motion designer who directs short video ads
 shot by shot. You do not write code. You return JSON only: { "beats": [ ... ] }.
 
 Each beat is one shot of about 1-3 seconds:

@@ -5,8 +5,28 @@ import { mkdtemp, readFile, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
-import { renderVideo } from '../server/engine/renderer.js';
+import { renderVideo, inspectAnimation } from '../server/engine/renderer.js';
 import { addSfxToVideo } from '../server/engine/sfx.js';
+import { writeFile, readFile as readText } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
+
+// Natural voice-over for premium films (scripts/voice.py, Kokoro on this machine). The script travels inside the film's code,
+// and the film shows every spoken line as on-screen captions; the voice's exact timing is put back into the page before recording.
+function voiceData(html) {
+  const m = String(html).match(/window\.ANIMORA_PREMIUM=(\{.*?\});(?:\(function\(\)\{var a=|window\.__hyperframes)/);
+  try { const d = m ? JSON.parse(m[1]) : null; return d?.voice?.lines?.length ? d.voice : null; } catch { return null; }
+}
+function makeVoice(spec, dir) {
+  return new Promise((resolve) => {
+    const file = path.join(dir, 'voice.wav'), specFile = path.join(dir, 'voice.json');
+    writeFile(specFile, JSON.stringify(spec)).then(() => {
+      const py = spawn('python3', [fileURLToPath(new URL('./voice.py', import.meta.url)), specFile, file], { stdio: ['ignore', 'pipe', 'pipe'] });
+      let out = ''; py.stdout.on('data', (d) => { out += d; }); py.stderr.on('data', (d) => { out += d; });
+      py.on('close', (code) => { console.log('voice:', out.trim().split('\n').pop()); resolve(code === 0 ? file : null); });
+      py.on('error', () => resolve(null));
+    });
+  });
+}
 
 const jobUrl = process.argv[2];
 if (!jobUrl) { console.error('usage: node scripts/render-job.js <job url>'); process.exit(2); }
@@ -38,8 +58,23 @@ try {
   const outFile = path.join(dir, 'video.mp4');
   const controller = new AbortController();
   let last = 0;
+  // voice first: its exact timing decides when each caption word appears
+  let html = job.html, voiceFile = null;
+  const voice = voiceData(html);
+  if (voice) {
+    try {
+      const info = await inspectAnimation(html, { aspectRatio: job.aspectRatio });
+      const plan = info.caps || [];
+      voiceFile = await makeVoice({ voice: voice.voice, lines: voice.lines, show: voice.show, times: plan.map((c) => c.t0), duration: info.duration }, dir);
+      if (voiceFile) {
+        const caps = await readText(`${voiceFile}.captions.json`, 'utf8');
+        html = html.replace(/<head>/i, () => `<head><script>window.__captions=${caps.replace(/</g, '\\u003c')};</script>`);
+      }
+    } catch (e) { console.warn('voice skipped:', e.message); voiceFile = null; }
+  }
   const result = await renderVideo({
-    html: job.html, outFile, aspectRatio: job.aspectRatio, duration: job.duration, signal: controller.signal,
+    html, outFile, aspectRatio: job.aspectRatio, duration: job.duration, signal: controller.signal,
+    ...(job.quality === 'draft' ? { scale: 0.6667, crf: 23, preset: 'veryfast' } : {}),   // the user chose a quick 720p draft
     onProgress: (p) => {
       if (Date.now() - last < 4000 && p.framesDone < p.totalFrames) return;   // progress every 4 s (fewer calls to the free server)
       last = Date.now();
@@ -48,8 +83,8 @@ try {
     },
   });
   // sound mixing and the thumbnail run side by side
-  const withSound = job.sfx && (result.sfx?.length || result.music)
-    ? addSfxToVideo(outFile, path.join(dir, 'video-sfx.mp4'), result.sfx || [], job.duration, { music: result.music }).catch((e) => { console.warn('sound skipped:', e.message); return outFile; })
+  const withSound = (job.sfx && (result.sfx?.length || result.music)) || voiceFile
+    ? addSfxToVideo(outFile, path.join(dir, 'video-sfx.mp4'), job.sfx ? result.sfx || [] : [], result.duration || job.duration, { music: job.sfx ? result.music : null, voiceFile }).catch((e) => { console.warn('sound skipped:', e.message); return outFile; })
     : Promise.resolve(outFile);
   const thumbSent = thumbFrom(outFile, Math.min(2, job.duration / 4)).then((t) => (t ? post('/thumb', t, 'image/jpeg') : null)).catch(() => {});
   const finalFile = await withSound;

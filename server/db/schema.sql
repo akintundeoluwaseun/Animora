@@ -174,6 +174,7 @@ ALTER TABLE projects ADD COLUMN IF NOT EXISTS brief_json jsonb;
 -- ---- v4: motion-graphics sound effects (on by default, per video) ----
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS sfx_on boolean NOT NULL DEFAULT true;
 ALTER TABLE renders  ADD COLUMN IF NOT EXISTS sfx_on boolean NOT NULL DEFAULT true;
+ALTER TABLE renders  ADD COLUMN IF NOT EXISTS quality text NOT NULL DEFAULT 'hd';   -- draft (720p, fast) | hd (1080p)
 
 ALTER TABLE assets   ADD COLUMN IF NOT EXISTS is_light boolean;   -- light logo (needs a dark background)
 ALTER TABLE assets   ADD COLUMN IF NOT EXISTS description text;   -- what the picture shows (asked once, used to match words to pictures)
@@ -270,3 +271,6 @@ ALTER TABLE renders ADD COLUMN IF NOT EXISTS downloaded_at timestamptz;
 -- code_md5: which version of the video the MP4 was, so making the same one again after it expired is free.
 ALTER TABLE renders ADD COLUMN IF NOT EXISTS served_at timestamptz;
 ALTER TABLE renders ADD COLUMN IF NOT EXISTS code_md5 text;
+
+-- v12: where a finger / mouse taps on an app screenshot ("x,y" 0..1), measured in the browser at upload
+ALTER TABLE assets ADD COLUMN IF NOT EXISTS focus text;

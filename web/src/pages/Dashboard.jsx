@@ -67,6 +67,10 @@ function OtherDevice({ onLinked }) {
   const [msg, setMsg] = useState('');
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
+  const [info, setInfo] = useState({ count: 1, canUnlink: false });
+  const [sure, setSure] = useState(false);
+  useEffect(() => { if (open) api('/devices').then(setInfo).catch(() => {}); setSure(false); }, [open]);
+  const unlink = async () => { setBusy(true); setError(''); try { await api('/devices/unlink', { method: 'POST' }); window.location.assign('/videos'); } catch (e) { setError(e.message); setBusy(false); } };
   useEffect(() => { if (!code) return undefined; const t = setInterval(() => setLeft((s) => { if (s <= 1) { setCode(null); return 0; } return s - 1; }), 1000); return () => clearInterval(t); }, [code]);
   const make = async () => { setError(''); try { const r = await api('/devices/code', { method: 'POST' }); setCode(r.code); setLeft(r.minutes * 60); } catch (e) { setError(e.message); } };
   const link = async () => {
@@ -106,6 +110,15 @@ function OtherDevice({ onLinked }) {
         {msg && <p className="mt-3 text-sm font-semibold text-money" role="status">{msg}</p>}
         {error && <p className="mt-3 text-sm text-alert" role="alert">{publicMessage(error)}</p>}
         <button onClick={copyLink} className="mt-4 text-xs font-semibold text-ink-mute hover:text-ink">{copied ? 'Private link copied' : 'Or copy a private link instead'}</button>
+        {info.canUnlink && (
+          <div className="mt-5 rounded-[16px] border border-alert/30 p-4">
+            <p className="font-semibold text-ink">Linked to {info.count - 1} other device{info.count - 1 === 1 ? '' : 's'}</p>
+            <p className="mt-1 text-sm text-ink-soft">Unlink this device to stop seeing the shared videos here. It starts empty, and the videos stay on the other devices.</p>
+            {sure
+              ? <div className="mt-3 flex gap-2"><Button className="flex-1" onClick={unlink} loading={busy}>Yes, unlink this device</Button><button onClick={() => setSure(false)} className="px-3 text-sm font-semibold text-ink-soft">Cancel</button></div>
+              : <button onClick={() => setSure(true)} className="mt-3 text-sm font-bold text-alert hover:underline">Unlink this device</button>}
+          </div>
+        )}
       </Modal>
     </>
   );
@@ -291,7 +304,7 @@ export default function Dashboard({ kind = 'video' }) {   // /videos shows video
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className={`text-3xl font-bold tracking-[-0.045em] sm:text-4xl ${kind === 'flyer' ? 'text-flyer' : 'text-video'}`}>{kind === 'flyer' ? 'Your flyers' : 'Your videos'}</h1>
-          <p className="mt-1 text-sm text-ink-mute">{projects ? `${projects.length} ${kind === 'flyer' ? 'flyer' : 'video'}${projects.length === 1 ? '' : 's'}` : '\u00a0'}</p>
+          <p className="mt-1 text-sm text-ink-mute">{projects?.length ? `${projects.length} ${kind === 'flyer' ? 'flyer' : 'video'}${projects.length === 1 ? '' : 's'}` : '\u00a0'}</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <Button className={kind === 'flyer' ? '!bg-flyer hover:!bg-flyer' : '!bg-video hover:!bg-video'} onClick={startNew}><svg width="16" height="16" viewBox="0 0 14 14" aria-hidden="true"><path d="M7 1v12M1 7h12" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" /></svg>New {kind === 'flyer' ? 'flyer' : 'video'}</Button>
@@ -312,7 +325,25 @@ export default function Dashboard({ kind = 'video' }) {   // /videos shows video
       <BuyCredits open={buyOpen} onClose={() => setBuyOpen(false)} />
       {paidMsg && <div className="mt-6 rounded-[12px] border border-money/30 bg-money/10 px-4 py-3 text-sm font-semibold text-ink" role="status">{paidMsg}</div>}
       <div className="mt-8"><Alert>{error}</Alert></div>
-      {!projects ? <PageLoader /> : (
+      {!projects ? <PageLoader /> : !projects.length ? (
+        // first visit: say what happens next, in three short steps, with one clear button
+        <div className={`first-run rounded-3xl p-6 sm:p-10 ${kind === 'flyer' ? 'first-run-flyer' : ''}`}>
+          <h2 className="max-w-[18ch] text-[1.75rem] font-bold leading-[1.1] tracking-[-0.04em] sm:text-4xl">{kind === 'flyer' ? 'Your first flyer is a few answers away.' : 'Your first video is a few answers away.'}</h2>
+          <ol className="mt-6 grid gap-4 sm:grid-cols-3">
+            {(kind === 'flyer'
+              ? [['Tell me about your business', 'Name, what you sell, your offer. Skip anything you like.'], ['Pick a look', 'Or let Animora choose one that suits you.'], ['Download the picture', 'Ready for WhatsApp, Instagram or print.']]
+              : [['Say what you want', 'A birthday, an invite, a tribute or an ad. One sentence is enough, add photos if you like.'], ['Watch the preview', 'Change anything by typing it, like "make it red".'], ['Download the MP4', 'With music and sound, ready for WhatsApp, TikTok or Instagram.']]
+            ).map(([t, d], i) => (
+              <li key={t} className="first-run-step">
+                <span className="first-run-num" aria-hidden="true">{i + 1}</span>
+                <b className="block text-[15px]">{t}</b>
+                <span className="mt-0.5 block text-sm text-ink-soft">{d}</span>
+              </li>
+            ))}
+          </ol>
+          <Button size="lg" className={`mt-7 w-full sm:w-auto ${kind === 'flyer' ? '!bg-flyer hover:!bg-flyer' : '!bg-video hover:!bg-video'}`} onClick={startNew}>{kind === 'flyer' ? 'Make my first flyer' : 'Make my first video'}</Button>
+        </div>
+      ) : (
         <ul className="grid grid-cols-2 gap-x-5 gap-y-8 sm:grid-cols-3 lg:grid-cols-4">
           <li>
             <button onClick={startNew} className="press group grid aspect-[9/14] w-full place-items-center rounded-xl border border-dashed border-ink/20 bg-white text-ink-soft hover:border-ink/40 hover:text-ink">

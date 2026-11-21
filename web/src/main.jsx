@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { Analytics } from '@vercel/analytics/react';
 import { initTheme } from './components/ThemeToggle.jsx';
 import { BrowserRouter, Routes, Route, Navigate, useParams, useLocation } from 'react-router-dom';
-import { MotionConfig, motion } from 'motion/react';
+import { MotionConfig } from 'motion/react';
 import './styles.css';
 import { AuthProvider, useAuth } from './lib.jsx';
 import { PageLoader } from './components/ui.jsx';
@@ -15,7 +15,8 @@ import InstallPrompt from './components/InstallApp.jsx';
 // every page fades in softly (opacity only, so fixed toasts and dialogs inside keep their place)
 function PageFade({ children }) {
   const { pathname } = useLocation();
-  return <motion.div key={pathname} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.28, ease: 'easeOut' }}>{children}</motion.div>;
+  // a CSS fade (not a JS animation): it always ends fully visible, even when the first frame is slow or the tab starts hidden
+  return <div key={pathname} className="page-fade">{children}</div>;
 }
 
 function Keyed({ el: Page }) { const { id } = useParams(); return <Page key={id} />; }

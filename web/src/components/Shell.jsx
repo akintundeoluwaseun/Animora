@@ -7,7 +7,7 @@ import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import ThemeToggle from './ThemeToggle.jsx';
 import { useAuth, api, naira } from '../lib.jsx';
 import { useInstall } from './InstallApp.jsx';
-import { Logo, Modal, PlanBadge, DeveloperCard, DeveloperSignature } from './ui.jsx';
+import { Logo, Modal, PlanBadge, BuiltBy } from './ui.jsx';
 import { creditsLeft } from './BuyCredits.jsx';
 
 export function modeFor(pathname, signedIn = false) {
@@ -36,7 +36,7 @@ function CreateSheet({ open, onClose }) {
   const navigate = useNavigate();
   const go = (kind) => { onClose(); navigate(newPath(kind)); };
   const items = [
-    ['video', 'Video ad', 'Motion graphics as an MP4 for WhatsApp, TikTok and YouTube', 'videos'],
+    ['video', 'Video', 'Motion graphics as an MP4 for any occasion: birthdays, events, announcements or business', 'videos'],
     ['flyer', 'Flyer', 'A still design: a picture to post or a PDF to print', 'flyers'],
   ];
   return (
@@ -44,7 +44,7 @@ function CreateSheet({ open, onClose }) {
       <h2 className="text-2xl font-bold tracking-[-0.03em]">What are we making?</h2>
       <div className="mt-5 grid gap-3 sm:grid-cols-2">
         {items.map(([k, t, d, icon]) => (
-          <button key={k} onClick={() => go(k)} className={`press group rounded-2xl border-2 p-5 text-left ${k === 'flyer' ? 'border-[#FFD9BF] bg-[#FFF8F3] hover:border-flyer' : 'border-[#D9D6FF] bg-[#F6F5FF] hover:border-video'}`}>
+          <button key={k} data-k={k} onClick={() => go(k)} className={`create-card press group rounded-2xl border-2 p-5 text-left ${k === 'flyer' ? 'border-[#FFD9BF] bg-[#FFF8F3] hover:border-flyer' : 'border-[#D9D6FF] bg-[#F6F5FF] hover:border-video'}`}>
             <span className={`grid size-11 place-items-center rounded-xl text-white ${k === 'flyer' ? 'bg-flyer' : 'bg-video'}`}><Icon k={icon} /></span>
             <span className="mt-4 block text-lg font-semibold tracking-[-0.02em]">{t}</span>
             <span className="mt-1 block text-sm leading-snug text-ink-mute">{d}</span>
@@ -69,20 +69,20 @@ function SiteBar({ onCreate }) {
     on(); window.addEventListener('scroll', on, { passive: true });
     return () => window.removeEventListener('scroll', on);
   }, []);
-  const link = ({ isActive }) => `rounded-lg px-3 py-2 text-[15px] font-medium transition-colors ${isActive ? 'text-ink' : 'text-ink-mute hover:text-ink'}`;
+  const link = ({ isActive }) => `glass-pill px-4 py-2 text-[15px] font-medium ${isActive ? 'glass-pill-on' : ''}`;
   return (
     <header className={`sticky top-0 z-40 transition-colors site-bar ${solid ? 'site-bar-solid' : ''}`}>
       <div className="mx-auto flex h-16 max-w-[1180px] items-center gap-2 px-6 sm:px-10">
         <Logo />
-        <nav className="ml-8 hidden items-center gap-1 sm:flex" aria-label="Main">
+        <nav className="ml-4 hidden items-center gap-1 sm:flex" aria-label="Main">
           <NavLink to="/styles" className={link}>Styles</NavLink>
           <NavLink to="/pricing" className={link}>Pricing</NavLink>
-          {!user && <NavLink to="/videos" className={link}>My work</NavLink>}
+          {!user && <NavLink to="/videos" className={(s) => `${link(s)} hidden sm:inline-flex`}>My work</NavLink>}
         </nav>
         <div className="ml-auto flex items-center gap-2">
           <ThemeToggle />
-          {user && <Link to={lastLib()} className="rounded-lg px-3 py-2 text-[15px] font-medium text-ink-soft hover:text-ink">My work</Link>}
-          <button onClick={onCreate} className="press flex h-10 items-center gap-1.5 rounded-[10px] bg-ink px-4 text-[15px] font-semibold text-white hover:opacity-90"><Icon k="plus" size={17} />Create</button>
+          {user && <Link to={lastLib()} className="glass-pill !hidden whitespace-nowrap px-4 py-2 text-[15px] font-medium sm:!inline-flex">My work</Link>}
+          <button onClick={onCreate} className="press flex h-10 items-center gap-1.5 whitespace-nowrap rounded-full bg-ink px-3.5 text-[15px] font-semibold text-white hover:opacity-90 sm:px-4"><Icon k="plus" size={17} />Create</button>
         </div>
       </div>
     </header>
@@ -105,7 +105,7 @@ function SiteFooter() {
           <Link to="/flyers" className="text-ink-soft hover:text-ink">My flyers</Link>
         </nav>
       </div>
-      <div className="mx-auto max-w-[1180px] px-6 pb-12 sm:px-10"><DeveloperSignature /></div>
+      <div className="mx-auto flex max-w-[1180px] justify-center border-t border-ink/8 px-6 pb-12 pt-6 sm:px-10"><BuiltBy /></div>
     </footer>
   );
 }
@@ -114,7 +114,7 @@ function SiteFooter() {
 const RAIL_LINKS = [
   ['Explore', [['/styles', 'Styles', 'styles'], ['/pricing', 'Pricing', 'pricing']]],
 ];
-const railCls = ({ isActive }) => `group flex items-center gap-3 rounded-[10px] px-3 py-2.5 text-[14.5px] font-medium transition-colors ${isActive ? 'bg-ink text-white' : 'text-ink-soft hover:bg-ink/5 hover:text-ink'}`;
+const railCls = ({ isActive }) => `group flex items-center gap-3 rounded-full px-3 py-2.5 text-[14.5px] font-medium transition-colors ${isActive ? 'bg-ink text-white' : 'text-ink-soft hover:bg-ink/5 hover:text-ink'}`;
 
 function Account() {
   const { user, logout } = useAuth();
@@ -183,9 +183,10 @@ function Rail({ onCreate }) {
       </nav>
       <div className="mt-auto space-y-3 p-4">
         {status?.ai === 'offline' && <p className="rounded-xl border border-ink/10 bg-white p-3 text-xs leading-relaxed text-ink-mute">Practice mode: add a Gemini key for the full AI director.</p>}
-        {inst.can && <button onClick={inst.install} className="flex w-full items-center gap-2 rounded-[10px] border border-ink/12 bg-white px-3 py-2.5 text-sm font-semibold text-ink-soft hover:text-ink">Install the app</button>}
+        {inst.can && <button onClick={inst.install} className="flex w-full items-center gap-2 rounded-full border border-ink/12 bg-white px-3 py-2.5 text-sm font-semibold text-ink-soft hover:text-ink">Install the app</button>}
         <Account />
-        <Link to="/" className="block px-1 text-xs text-ink-mute hover:text-ink">About Animora · Built by the developer</Link>
+        <Link to="/" className="block px-1 text-xs text-ink-mute hover:text-ink">About Animora</Link>
+        <BuiltBy />
       </div>
     </aside>
   );
@@ -279,7 +280,7 @@ function MeSheet({ open, onClose }) {
       </div>
       {inst.can && <button onClick={() => { inst.install(); onClose(); }} className="press mt-3 flex w-full items-center justify-center gap-2 rounded-2xl border border-ink/12 py-3.5 text-[15px] font-semibold">Install the app on this phone</button>}
       <div className="mt-4"><Account /></div>
-      <div className="mt-4"><DeveloperCard /></div>
+      <div className="mt-4 flex justify-center"><BuiltBy /></div>
     </Modal>
   );
 }

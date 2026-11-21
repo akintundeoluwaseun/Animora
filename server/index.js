@@ -91,6 +91,8 @@ export async function createApp() {
     });
   }
   // GSAP served from our own server for the preview iframe (same build the renderer uses).
+  // the preview runs in a sandboxed frame (origin "null"): fonts and sounds it fetches need this header
+  app.use(['/premium', '/sfx', '/music', '/vendor', '/voices'], (req, res, next) => { res.setHeader('Access-Control-Allow-Origin', '*'); next(); });
   app.use('/sfx', express.static(SFX_DIR, { maxAge: '30d' }));   // sound effects for the live preview
   app.use('/music', express.static(MUSIC_DIR, { maxAge: '30d' })); // background music beds
   // (on Vercel these are static files copied by scripts/vercel-build.js, and gsap isn't in the function bundle)

@@ -6,21 +6,93 @@
 
 import { config } from '../config.js';
 import { geminiGenerate } from '../engine/gemini.js';
+import { birthdayPhotoAssets, isPersonalBirthdayBrief } from './personal.js';
+import { videoGroup, closingLine, fitCtas, MEMORIAL } from './closing.js';
+import { directionOf } from './direction.js';
+
+// Reading someone's idea and writing the video plan are the steps where a small model sounds dumb and repeats itself,
+// so they use the full Flash model (the lighter one stays for quick chat). Override with GEMINI_BRIEF_MODEL.
+const BRIEF_MODEL = () => process.env.GEMINI_BRIEF_MODEL || 'gemini-flash-latest';
 import { validatePlan } from '../engine/validate.js';
 import { WANT_IDS } from './cinema/compose.js';
 import { MOTION_WANTS } from './motion/compose.js';
 import { TEMPLATE_IDS } from './pieces/index.js';
+import { CREATIVE_STANDARD } from './standard.js';
 
+// fundraisers, donations and appeals
+export const CAUSE_RE = /donat|fundrais|charity|appeal\b|\bngo\b|foundation|relief fund|crowdfund|help us (raise|build|support)|sponsor (a|our)|\bgive (to|today)|support (our|the) (cause|community|school|clinic|orphan)/i;
+const BANKS = 'access|gtb(?:ank)?|guaranty trust|zenith|uba|united bank|first ?bank|fidelity|fcmb|sterling|stanbic|wema|union|polaris|keystone|ecobank|opay|palm ?pay|kuda|moniepoint|providus|jaiz|taj|titan|globus|lotus|carbon|paga';
+/** "GTBank 0123456789 Community Health Initiative" from free text: bank + 10-digit account number + account name. */
+export function findPayment(text) {
+  const t = String(text || '');
+  const m = t.match(new RegExp(`(?:acc(?:ount)?(?:\\s*(?:no|num|number))?\\.?\\s*[:\\-]?\\s*)(\\d{10})\\b`, 'i')) || t.match(/\b(\d{10})\b(?=[^\n]{0,40}\b(?:bank|acct|account)\b)/i) || t.match(new RegExp(`\\b(?:${BANKS})\\b[^\\n\\d]{0,20}(\\d{10})\\b`, 'i'));
+  if (!m) return '';
+  const num = m[1];
+  const bank = (t.match(new RegExp(`\\b(${BANKS})(?:\\s*bank)?\\b`, 'i')) || [])[0] || '';
+  const nm = (t.match(/(?:account\s*name|acct\s*name|name)\s*[:\-]\s*([^\n,;.]{3,50})/i) || [])[1] || '';
+  return [bank.replace(/\s+/g, ' ').trim(), num, nm.trim()].filter(Boolean).join(' · ');
+}
 const PHONE_RE = /(\+?234[\s-]?|0)[789][01]\d[\s-]?\d{3}[\s-]?\d{4}/;
-const URL_RE = /\b((?:https?:\/\/)?(?:www\.)?[a-z0-9-]+\.(?:com|ng|com\.ng|space|app|io|co|org|net|store|shop)(?:\/\S*)?)\b/i;
+const URL_RE = /\b((?:https?:\/\/)?(?:www\.)?(?:[a-z0-9-]+\.)+(?:com|ng|com\.ng|space|app|io|co|org|net|store|shop)(?:\/\S*)?)\b/i;
 // cut at a whole word, never in the middle of one ("This flyer was mad", "fix your devi")
 const str = (v, max = 200) => { const t = v == null ? '' : String(v).replace(/\s+/g, ' ').trim(); if (t.length <= max) return t; const c = t.slice(0, max), sp = c.lastIndexOf(' '); return (sp > max * 0.5 ? c.slice(0, sp) : c).replace(/[\s,;:&–—-]+$/, ''); };
 const list = (v) => (Array.isArray(v) ? v : String(v || '').split(/\n|;/)).map((x) => str(x, 80)).filter(Boolean);
+// "anything", "whatever", "just make a demo"...: the owner wants us to choose. Never print these words in a video.
+const VAGUE = /^(?:(?:just\s+)?(?:do|make|use|put|write|create|show)?\s*(?:me\s+)?(?:any\s*thing|anything|something|whatever|any|random(?:\s+stuff)?|a\s+demo(?:\s+video)?|demo(?:\s+video)?|test(?:ing)?|sample|example)(?:\s+(?:at\s+all|you\s+like|you\s+want|is\s+fine|works|video|ad))?|you\s+(?:choose|decide|pick)|your\s+choice|surprise\s+me|suggest(?:\s+(?:one|something|anything))?|idk|i\s+don'?t\s+know|no\s+idea|not\s+sure|nothing|none|n\/?a|na|nil|\.+|-+|\?+)[\s.!?]*$/i;
+export const isVague = (s) => VAGUE.test(String(s || '').trim());
+const keep = (arr) => arr.filter((x) => !isVague(x));
 
 /** Keep only known fields, trimmed. */
+
+// A name that is really an instruction ("Design a high-quality, professional Christian fellowship flyer") becomes a short title ("Christian Fellowship").
+const ASK_WORDS = /^(please\s+)?(can you |could you |i want (you )?to |i need (you )?to |i want |i need )?(design|make|create|generate|build|produce|write|prepare|do)\b/i;
+const FILLER = /\b(a|an|the|me|my|our|some|high[- ]?quality|professional|beautiful|nice|good|great|amazing|stunning|modern|simple|best|cool|awesome|attractive|catchy|premium|classy|elegant|flyer|flier|poster|video|ad|advert|advertisement|for|about|of|please)\b/gi;
+
+// The title of a video from a pasted prompt: a quoted title, "the late <name>", or the first proper name. Never the instruction.
+const NOT_NAMES = /^(?:generate|create|make|design|write|build|produce|please|can|could|i|we|our|my|the|a|an|this|that|it|its|call|whatsapp|dm|visit|order|book|keep|use|add|include|show|let|also|and|but|then|for|with|on|at|in|to|from|monday|tuesday|wednesday|thursday|friday|saturday|sunday|january|february|march|april|may|june|july|august|september|october|november|december|today|tomorrow|tonight|video|ad|advert|flyer|status|whatsapp|instagram|tiktok|youtube|facebook|reels?|nigeria|lagos|ibadan|abuja|ado|ekiti|ikeja|lekki|yaba|ogun|oyo|god|lord|jesus|christ|hello|hi|dear|thanks|thank|make|emotional|fun|funny|professional|colourful|colorful|vertical|landscape|square|portrait|seconds?|secs?|minutes?)$/i;
+export function subjectFromPrompt(text) {
+  const t = String(text || '');
+  const late = t.match(/\b(?:the\s+)?late\s+((?:(?:Chief|Mr|Mrs|Miss|Dr|Pastor|Elder|Prof|Alhaji|Alhaja|Engr|Mama|Papa|Pa|Ma|Sir|Lady|Evangelist|Deaconess|Deacon|Rev|Hon|Barr)\.?\s+)?[A-Z][\p{L}'’.-]+(?:\s+[A-Z][\p{L}'’.-]+){0,3})/u);
+  if (late) return `Late ${late[1].trim()}`;
+  const quoted = [...t.matchAll(/["“‘]([^"”’\n]{3,50})["”’]/g)].map((m) => m[1].trim()).find((q) => !/\d{7,}/.test(q) && q.split(/\s+/).length <= 7 && /^[A-Z0-9]/.test(q));
+  if (quoted) return quoted;
+  const re = /(?<![\p{L}\d'’])([A-Z][\p{L}&'’.-]*(?:\s+(?:of|and|&|the|for)\s+[A-Z][\p{L}&'’.-]*|\s+[A-Z][\p{L}&'’.-]*){0,4})/gu;
+  for (const m of t.matchAll(re)) {
+    const words = m[1].trim().split(/\s+/);
+    while (words.length && NOT_NAMES.test(words[0].replace(/[.,]$/, ''))) words.shift();
+    while (words.length && NOT_NAMES.test(words[words.length - 1].replace(/[.,]$/, ''))) words.pop();
+    if (words.length && !NOT_NAMES.test(words.join(' ')) && words.join(' ').length >= 3) return words.join(' ').replace(/[.,]$/, '');
+  }
+  return '';
+}
+export function titleFromName(raw) {
+  const t = str(raw, 120);
+  if (!t) return '';
+  if (!ASK_WORDS.test(t) && t.length <= 60) return str(t, 60);
+  if (!ASK_WORDS.test(t)) return str(t, 60);
+  const core = t.replace(ASK_WORDS, ' ').replace(FILLER, ' ').replace(/[,;:]+/g, ' ').replace(/\s+/g, ' ').trim();
+  return str(core.replace(/\b\p{L}/gu, (c) => c.toUpperCase()), 60);
+}
+// Whatever read the idea (rules or AI), a "name" that is really a description or a request ("A music app called Music mart",
+// "make a video for Techwave") is cut down to the name itself, and what it said about the thing becomes its category.
+function realName(name, category) {
+  let n = String(name || '').trim(), cat = category;
+  const called = n.match(/^(?:an?|the|our|my)\s+([\w' -]{2,40}?)\s+(?:called|named)\s+["'“‘]?(.+?)["'”’]?$/i);
+  if (called) { n = called[2]; if (!cat) cat = called[1].replace(/^./, (c) => c.toUpperCase()); }
+  n = stripAsk(n).replace(/[.!]+$/, '');
+  return { n, cat };
+}
 export function cleanBrief(b = {}) {
+  const rn = realName(b.name, b.category);
+  b = { ...b, name: rn.n, category: rn.cat };
   const out = {
-    name: str(b.name, 60), category: str(b.category, 60),
+    name: titleFromName(b.name), category: str(b.category, 60),
+    relationship: str(b.relationship, 50), milestone: str(b.milestone, 60),
+    personalMessage: str(b.personalMessage, 1200), memories: list(b.memories).slice(0, 8),
+    // what the video is for: a business ad, an event, a personal moment, an announcement
+    kind: ['business', 'event', 'personal', 'announcement', 'cause', 'other'].includes(b.kind) ? b.kind : (CAUSE_RE.test(`${b.category || ''} ${b.name || ''}`) ? 'cause' : undefined),
+    // fundraising: where gifts go (bank, account number, account name). Shown exactly as written, never treated as a phone number.
+    payment: str(b.payment, 120),
     // goal: one or more; `goal` is them joined (used in prompts and titles), `goals` the list
     goals: list(Array.isArray(b.goals) ? b.goals : Array.isArray(b.goal) ? b.goal : b.goal ? [b.goal] : []).slice(0, 6),
     // main message: one or more (up to 8); `headline` is the first, `headlines` all of them
@@ -30,13 +102,19 @@ export function cleanBrief(b = {}) {
     ctas: list(Array.isArray(b.ctas) ? b.ctas : Array.isArray(b.cta) ? b.cta : b.cta ? [b.cta] : []).slice(0, 5),
     contact: str(b.contact, 120), aspect: ['9:16', '16:9', '1:1', '4:5', 'A4'].includes(b.aspect) ? b.aspect : undefined,
     duration: Number(b.duration) || undefined, styleId: b.styleId ? String(b.styleId) : undefined, styleAuto: !!b.styleAuto,
+    videoEngine: ['motion', 'pieces'].includes(b.videoEngine) ? b.videoEngine : undefined,
     colors: b.colors && typeof b.colors === 'object' ? Object.fromEntries(Object.entries(b.colors).filter(([k, v]) => ['primary', 'secondary', 'background', 'text'].includes(k) && /^#[0-9a-f]{6}$/i.test(v))) : undefined,
-    voiceover: b.voiceover === undefined || b.voiceover === null ? undefined : b.voiceover === true || b.voiceover === 'yes',
+    voiceover: b.voiceover === undefined || b.voiceover === null ? undefined : [true, 'yes', 'female', 'male'].includes(b.voiceover),
+    voiceGender: b.voiceover === 'male' || b.voiceGender === 'male' ? 'male' : b.voiceover === 'female' || b.voiceGender === 'female' ? 'female' : undefined,
     sound: ['all', 'sfx', 'none', 'own'].includes(b.sound) ? b.sound : b.sfx === true || b.sfx === 'yes' ? 'all' : b.sfx === false || b.sfx === 'no' ? 'none' : undefined,
     // which scene styles the owner asked for (ids from the form's scene picker); sceneAuto = let the AI decide
     scenes: (Array.isArray(b.scenes) ? b.scenes : []).map(String).filter((x) => WANT_IDS.includes(x) || x in MOTION_WANTS).slice(0, 8), sceneAuto: b.sceneAuto === undefined ? undefined : !!b.sceneAuto,
     // flyer-only answers
     flyerType: (Array.isArray(b.flyerType) ? list(b.flyerType) : b.flyerType ? [str(b.flyerType, 60)] : []).map((x) => str(x, 60)).filter(Boolean).slice(0, 3), offer: str(b.offer, 60), when: str(b.when, 120), layout: ['photo', 'type', 'price', 'auto'].includes(b.layout) ? b.layout : undefined,
+    // exact on-screen wording the owner gave (shown as written, in order, as picture captions first); slideshow = show every picture one after another
+    phrases: (Array.isArray(b.phrases) ? b.phrases : String(b.phrases || '').split(/\n/)).map((x) => str(x, 90)).filter(Boolean).slice(0, 12), slideshow: b.slideshow === true || b.slideshow === 'yes' ? true : undefined,
+    personalPhotoIds: (Array.isArray(b.personalPhotoIds) ? b.personalPhotoIds : []).map((x) => str(x, 80)).filter(Boolean).slice(0, 10),
+    steps: list(b.steps).slice(0, 8), lookAuto: ['auto', 'own'].includes(b.lookAuto) ? b.lookAuto : undefined,
     extra: str(b.extra, 3000), done: !!b.done, mode: ['steps', 'paste'].includes(b.mode) ? b.mode : undefined, pasted: b.pasted ? true : undefined, pasteText: str(b.pasteText, 6000),
     colorMode: ['style', 'logo', 'own'].includes(b.colorMode) ? b.colorMode : undefined, picturesDone: b.picturesDone ? true : undefined,
     // signature templates (After Effects-style recipes); 'auto' or empty means the library mixes its own film
@@ -46,12 +124,71 @@ export function cleanBrief(b = {}) {
     quality: ['preview', 'premium', 'max'].includes(b.quality) ? b.quality : undefined,
   };
   // optional questions the user skipped (so they are not asked again)
-  for (const k of ['features', 'products', 'contact', 'pictures', 'extra', 'scenes', 'category', 'goal', 'headline', 'cta', 'aspect', 'duration', 'colors', 'style', 'template', 'intensity', 'voiceover', 'sound', 'flyerType', 'layout', 'offer', 'when']) if (b[`${k}Skipped`] !== undefined) out[`${k}Skipped`] = !!b[`${k}Skipped`];
+  for (const k of ['steps', 'lookAuto', 'features', 'products', 'contact', 'pictures', 'extra', 'scenes', 'category', 'goal', 'headline', 'cta', 'aspect', 'duration', 'colors', 'style', 'template', 'intensity', 'voiceover', 'sound', 'flyerType', 'layout', 'offer', 'when', 'payment', 'relationship', 'milestone', 'personalMessage', 'memories']) if (b[`${k}Skipped`] !== undefined) out[`${k}Skipped`] = !!b[`${k}Skipped`];
   if (out.headlines.length) out.headline = out.headlines[0]; else delete out.headlines;
-  if (out.ctas.length) out.cta = str(out.ctas[0], 60); else delete out.ctas;
+  { const fit = fitCtas(out); out.ctas = out.ctas.filter((x) => fit.includes(x)); }   // no shop lines on a wedding, tribute or event
+  if (out.ctas.length) out.cta = str(out.ctas[0], 60); else { delete out.ctas; if (out.cta) delete out.cta; }
   if (out.goals.length) out.goal = str(out.goals.join(' + '), 200); else delete out.goals;
   if (Array.isArray(out.flyerType) && !out.flyerType.length) delete out.flyerType;
+  // vague answers ("anything", "just make a demo") are dropped; demo = invent sample content for this kind of business
+  let vague = false;
+  // "none", "n/a", "skip" typed into a box are answers meaning nothing: never print them on a video or flyer
+  { const NONE = /^(none|n\/?a|nil|nothing|no|skip|skipped|-+|\.+|null|undefined)\.?$/i;
+    for (const [k, v] of Object.entries(out)) {
+      if (typeof v === 'string' && NONE.test(v.trim()) && !['mode', 'kind', 'aspect', 'voiceover', 'sound'].includes(k)) delete out[k];
+      else if (Array.isArray(v) && v.every((x) => typeof x === 'string')) out[k] = v.filter((x) => !NONE.test(x.trim()));
+    } }
+  for (const k of ['name', 'category', 'contact', 'extra', 'pasteText', 'offer', 'when', 'goal', 'headline', 'cta', 'relationship', 'milestone', 'personalMessage']) if (typeof out[k] === 'string' && isVague(out[k])) { out[k] = ''; vague = true; }
+  for (const k of ['goals', 'headlines', 'products', 'features', 'ctas', 'steps', 'memories']) if (Array.isArray(out[k])) { const n = out[k].length; out[k] = keep(out[k]); if (out[k].length < n) vague = true; if (!out[k].length) delete out[k]; }
+  if (out.headline === '' && out.headlines?.length) out.headline = out.headlines[0];
+  if (out.cta === '' && out.ctas?.length) out.cta = str(out.ctas[0], 60);
+  // "Brother turning 20" typed as the name: that is the relationship and the age, not a name
+  if (out.name && (out.kind === 'personal' || /birthday|b-?day/i.test(out.category || ''))) {
+    const REL = 'brother|sister|mum|mom|mother|dad|father|friend|partner|husband|wife|son|daughter|cousin|uncle|aunt|grandma|grandmother|grandpa|grandfather|boss|pastor|baby';
+    const m = out.name.match(new RegExp(`^(?:(?:my|our|the)\\s+)?(${REL})(?:\\s+(?:is\\s+)?(?:turning|turns|celebrating|at|age[d]?)\\s+(\\d{1,3})(?:st|nd|rd|th)?)?(?:['’]s)?(?:\\s+birthday)?$`, 'i'));
+    if (m) {
+      out.relationship = out.relationship || m[1].toLowerCase();
+      if (m[2] && !out.milestone) out.milestone = m[2];
+      out.name = m[1].charAt(0).toUpperCase() + m[1].slice(1).toLowerCase();   // "Happy 20th Birthday, Brother!"
+    }
+  }
+  if (vague || b.demo) out.demo = true;
   for (const k of Object.keys(out)) if (out[k] === undefined || out[k] === '') delete out[k];
+  return out;
+}
+
+// Sample content when the owner said "anything" / "make a demo": a believable business of the kind they chose
+// (the AI writes it; built-in samples without a key). Only fills what is missing: real answers always win.
+const SAMPLES = {
+  food: { name: 'Mama Tee Kitchen', category: 'Food & drinks', headlines: ['Hot meals, delivered fast', 'Taste the difference'], features: ['Fresh every day', 'Fast delivery', 'Fair prices'], products: ['Jollof rice ₦2,500', 'Fried rice ₦2,800', 'Small chops ₦1,500'], cta: 'Order on WhatsApp' },
+  tech: { name: 'Taskly', category: 'Tech & software', headlines: ['Your day, organised', 'Plan less, do more'], features: ['Smart reminders', 'Works offline', 'Team sharing'], products: [], cta: 'Download the app' },
+  fashion: { name: 'Adire House', category: 'Fashion & clothing', headlines: ['Wear your story', 'New collection is here'], features: ['Handmade prints', 'Custom fits', 'Nationwide delivery'], products: ['Adire shirt ₦12,000', 'Two-piece set ₦25,000'], cta: 'DM us on Instagram' },
+  beauty: { name: 'Glow Lounge', category: 'Beauty & salon', headlines: ['Look good, feel better', 'Your glow-up starts here'], features: ['Expert stylists', 'Clean studio', 'Easy booking'], products: ['Braids from ₦8,000', 'Facials from ₦10,000'], cta: 'Book now' },
+  generic: { name: 'Nova Studio', category: 'Services', headlines: ['Made for people who want more', 'Quality you can see'], features: ['Fast service', 'Trusted by customers', 'Fair prices'], products: [], cta: 'Call now' },
+};
+const sampleFor = (cat = '') => (/food|drink|restaurant|kitchen|cake/i.test(cat) ? SAMPLES.food : /tech|software|app/i.test(cat) ? SAMPLES.tech : /fashion|cloth/i.test(cat) ? SAMPLES.fashion : /beauty|salon|hair|spa/i.test(cat) ? SAMPLES.beauty : SAMPLES.generic);
+export async function fillDemoBrief(brief, { flyer = false } = {}) {
+  if (!brief?.demo) return brief;
+  let s = sampleFor(brief.category);
+  if (config.useGemini) {
+    try {
+      const { text } = await geminiGenerate({
+        system: `You invent believable sample content for a ${flyer ? 'flyer' : 'video ad'} demo for a Nigerian small business. Plain words, no marketing jargon, no fake numbers, reviews or awards. Return JSON only.`,
+        messages: [{ role: 'user', text: `Known: ${JSON.stringify({ name: brief.name, category: brief.category, products: brief.products, extra: brief.extra })}
+Invent what is missing. Return { "name": "", "category": "", "headlines": ["2-3 short messages, under 7 words"], "features": ["3 selling points, 2-4 words"], "products": ["0-3 'Item ₦price' lines, only if the business sells items"], "cta": "" }` }],
+        json: true, temperature: 0.9, timeoutMs: 25000, maxOutputTokens: 2048, thinking: 'low',
+      });
+      const g = JSON.parse(text);
+      if (g && g.name) s = { name: str(g.name, 60), category: str(g.category, 60) || s.category, headlines: list(g.headlines).slice(0, 3), features: list(g.features).slice(0, 4), products: list(g.products).slice(0, 3), cta: str(g.cta, 40) || s.cta };
+    } catch { /* built-in sample */ }
+  }
+  const out = { ...brief };
+  if (!out.name) out.name = s.name;
+  if (!out.category) out.category = s.category;
+  if (!out.headlines?.length) { out.headlines = s.headlines; out.headline = s.headlines[0]; }
+  if (!out.features?.length) out.features = s.features;
+  if (!out.products?.length && s.products?.length) out.products = s.products;
+  if (!out.ctas?.length) { out.ctas = [s.cta]; out.cta = s.cta; }
   return out;
 }
 
@@ -62,26 +199,139 @@ function readable(colors, chosen) {
   return { ...colors, text: lum(colors.background) > 0.4 ? '#111318' : '#F7F7FA' };
 }
 
+function birthdayAge(value) {
+  const n = Number(String(value || '').match(/\d{1,2}/)?.[0]);
+  if (!n) return str(value, 30);
+  const suffix = n % 100 >= 11 && n % 100 <= 13 ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' }[n % 10] || 'th');
+  return `${n}${suffix}`;
+}
+
+function shortPersonalLines(value, limit = 8) {
+  const words = String(value || '').replace(/\s+/g, ' ').trim().split(' ').filter(Boolean);
+  const lines = [];
+  for (let i = 0; i < words.length; i += 8) lines.push(words.slice(i, i + 8).join(' '));
+  return lines.map((x) => str(x, 90)).filter(Boolean).slice(0, limit);
+}
+
+
+// ---- the requested length is a constraint: content is merged and prioritised to fit it (never silently lengthened) ----
+export const MIN_SCENE_SECONDS = 3;   // below this a scene cannot be read
+const PRIORITY = { hook: 99, brand: 99, cta: 99, menu: 8, product: 6, offer: 5, detail: 3 };
+/**
+ * Fit scenes into D seconds. Adjacent plain "detail" scenes are merged (up to 3 lines) first; then the least important scene is
+ * dropped. Hook, brand and call to action are never dropped. Returns { trimmed: [text...], impossible: seconds needed or 0 }.
+ */
+export function fitScenes(scenes, D, minScene = MIN_SCENE_SECONDS) {
+  const capacity = Math.max(3, Math.floor(D / minScene));
+  const trimmed = [];
+  const base = (sc) => sc.pri ?? PRIORITY[sc.purpose] ?? 3;
+  const pri = (sc, i) => base(sc) - i * 0.01;
+  const merge = () => {
+    for (let i = 1; i < scenes.length - 2; i++) {
+      const a = scenes[i], b = scenes[i + 1];
+      if (a.purpose === 'detail' && b.purpose === 'detail' && !(a.images || []).length && !(b.images || []).length && a.pri == null && b.pri == null
+        && a.on_screen_text.length + b.on_screen_text.length <= 3) { a.on_screen_text = [...a.on_screen_text, ...b.on_screen_text]; scenes.splice(i + 1, 1); return true; }
+    }
+    return false;
+  };
+  while (scenes.length > capacity) {
+    if (merge()) continue;
+    let k = -1, low = Infinity;
+    for (let i = 1; i < scenes.length - 1; i++) { const v = pri(scenes[i], i); if (v < low) { low = v; k = i; } }
+    if (k < 0 || base(scenes[k]) >= 99) break;
+    trimmed.push(...scenes[k].on_screen_text); scenes.splice(k, 1);
+  }
+  return { trimmed, impossible: scenes.length > capacity ? scenes.length * minScene : 0 };
+}
+
+function birthdayPlan(b, { assets, limits, palette }) {
+  const min = limits.minSeconds || 15, max = limits.maxSeconds || 300;
+  const photos = birthdayPhotoAssets(assets, b);
+  const name = b.name || 'Someone special';
+  const relationship = str(b.relationship, 40).replace(/^(my|our)\s+/i, '').toLowerCase();
+  const age = birthdayAge(b.milestone);
+  const greeting = `Happy${age ? ` ${age}` : ''} Birthday${name ? `, ${name}` : ''}!`;
+  const memories = (b.memories || []).flatMap((x) => shortPersonalLines(x, 2)).slice(0, 4);
+  const message = b.personalMessage
+    ? shortPersonalLines(b.personalMessage, 8)
+    : ['May your new age be filled with blessings.', 'Wishing you joy, good health and beautiful opportunities.', "I'm so happy to celebrate you."];
+  const closing = `Blessed new age, ${name}!`;
+  const lines = [
+    { purpose: 'hook', text: [greeting], weight: 1.25, photo: photos[0] },
+    { purpose: 'brand', text: [name, relationship ? `From your ${relationship}` : 'A day all about you'], weight: 1.05 },
+    ...memories.map((x, i) => ({ purpose: 'detail', text: [x], weight: 1, photo: photos[i + 1] })),
+    ...message.map((x) => ({ purpose: 'detail', text: [x], weight: 1 })),
+    { purpose: 'cta', text: [closing], weight: 1.2 },
+  ];
+  const D = Math.max(min, Math.min(max, b.duration || 20));
+  // fit the requested length: the generic wishes go first, then the later memories; the greeting, the name and the closing always stay
+  const cap = Math.max(3, Math.floor(D / MIN_SCENE_SECONDS)); const droppedLines = [];
+  // first pair up neighbouring short wishes on one screen (nothing is lost), only then leave lines out
+  for (let i = lines.length - 3; i >= 1 && lines.length > cap; i--) {
+    const x = lines[i], y = lines[i + 1];
+    if (x.purpose === 'detail' && y.purpose === 'detail' && !x.photo && !y.photo && x.text.length + y.text.length <= 2) { x.text = [...x.text, ...y.text]; lines.splice(i + 1, 1); i--; }
+  }
+  for (const group of [message.length, memories.length]) {
+    for (let n = 0; n < group && lines.length > cap; n++) {
+      const idx = lines.map((l, i) => [l, i]).filter(([l]) => l.purpose === 'detail' && (group === message.length ? !memories.some((m) => l.text[0] === m) : true)).map(([, i]) => i).pop();
+      if (idx == null) break; droppedLines.push(...lines[idx].text); lines.splice(idx, 1);
+    }
+  }
+  const durationNote = droppedLines.length ? `To fit ${Math.round(D)} seconds, ${droppedLines.length} of your lines were left out. Choose a longer video to include everything.` : '';
+  const total = lines.reduce((sum, s) => sum + s.weight, 0);
+  let t = 0;
+  const scenes = lines.map((s, i) => {
+    const end = i === lines.length - 1 ? D : Math.round((t + (D * s.weight) / total) * 10) / 10;
+    const text = s.text.filter(Boolean);
+    const scene = { id: i + 1, start: t, end, purpose: s.purpose, on_screen_text: text, images: s.photo ? [{ asset: s.photo.name, placement: i === 0 ? 'background' : 'center' }] : [] };
+    if (b.voiceover) scene.voiceover = (i === 0 ? greeting : text.join('. ')).slice(0, 180);
+    t = end;
+    return scene;
+  });
+  return {
+    title: `${name}'s ${age ? `${age} ` : ''}Birthday`.slice(0, 110),
+    business: { name, category: 'Birthday celebration', location: '', phone: '', handle: '' },
+    aspect_ratio: b.aspect || '9:16', duration_seconds: D,
+    ...(durationNote ? { duration_note: durationNote } : {}),
+    style: { colors: readable({ ...(palette || {}), ...(b.colors || {}) }, b.colors) },
+    assets: photos.map((a) => ({ name: a.name, url: a.url, use: 'personal photo' })),
+    scenes,
+    voiceover: b.voiceover ? { enabled: true, source: 'ai', voice_style: 'warm, sincere and celebratory', captions: true } : { enabled: false },
+    cta: closing, goal: 'Celebrate someone special',
+    special_instructions: [
+      'This is a personal birthday greeting, not a business advert. Do not add prices, sales language, contact details, or a call to action.',
+      `Recipient: ${name}${relationship ? `; the sender is their ${relationship}` : ''}${age ? `; celebrating ${age}` : ''}.`,
+      b.personalMessage ? `Use the sender's own message and preserve its meaning: ${b.personalMessage}` : 'Use the warm birthday wishes in the scene plan. Do not invent personal history or personality traits.',
+      memories.length ? `Use only these personal details: ${memories.join(' · ')}` : '', b.extra,
+    ].filter(Boolean).join('\n\n'),
+    sound: b.sound || 'all', sfx: b.sound !== 'none',
+    music_url: b.sound === 'own' ? (assets.find((a) => a.kind === 'audio' && a.role === 'music') || {}).url || '' : '',
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Rule-based plan (always works)
 // ---------------------------------------------------------------------------
-export function briefToPlanRules(brief, { assets = [], limits = { minSeconds: 15, maxSeconds: 300 }, palette = null } = {}) {
-  const b = cleanBrief(brief);
+export function briefToPlanRules(brief, { assets = [], limits = { minSeconds: 15, maxSeconds: 300 }, palette = null, keepLength = false } = {}) {
+  // cleanBrief drops empty lists (a skipped question), so every list is read with a safe default here
+  const b = { ...cleanBrief(brief) }; for (const k of ['features', 'products', 'headlines', 'ctas', 'goals', 'steps']) if (!Array.isArray(b[k])) b[k] = [];
   let D = Math.max(limits.minSeconds || 15, Math.min(limits.maxSeconds || 300, b.duration || 20));
   const images = assets.filter((a) => a.kind === 'image');
+  if (isPersonalBirthdayBrief(b)) return birthdayPlan(b, { assets, limits, palette });
   const logo = images.find((a) => a.role === 'logo');
   const photos = images.filter((a) => a.role !== 'logo');
-  const phone = (b.contact || '').match(PHONE_RE)?.[0] || '';
-  const site = (b.contact || '').match(URL_RE)?.[0] || '';
-  const place = str((b.contact || '').replace(phone, '').replace(site, '').replace(/^[\s,·|-]+|[\s,·|-]+$/g, ''), 60);
-  const action = b.cta || (phone ? 'Call or WhatsApp us' : site ? 'Visit our website' : 'Contact us today');
+  const pay = b.payment || '';
+  const phone = pay || (b.contact || '').match(PHONE_RE)?.[0] || '';
+  const site = pay ? '' : (b.contact || '').match(URL_RE)?.[0] || '';
+  const place = pay ? '' : str((b.contact || '').replace(phone, '').replace(site, '').replace(/^[\s,·|-]+|[\s,·|-]+$/g, ''), 60);
+  const action = b.cta || (pay || b.kind === 'cause' ? 'Donate today' : videoGroup(b) === 'social' ? closingLine(b) : phone ? 'Call or WhatsApp us' : site ? 'Visit our website' : 'Contact us today');
   const otherActions = (b.ctas || []).slice(1);
   const ctaLine = [[action, ...otherActions].join(' or '), phone || site].filter(Boolean).join(' ');
 
   const scenes = [];
   const add = (purpose, text, weight, imgs = []) => scenes.push({ purpose, on_screen_text: text.filter(Boolean), weight, images: imgs });
   add('hook', [b.headline || `${b.name}`, b.offer], 1);
-  if (b.when) add('detail', [b.when], 1);
+  if (b.when) scenes.push({ purpose: 'detail', on_screen_text: [b.when].filter(Boolean), weight: 1, images: [], pri: 9 });   // when and where are never the first thing to go
   add('brand', [b.name, b.category ? `${b.category}${place ? ` · ${place}` : ''}` : place], 1, logo ? [{ asset: logo.name, placement: 'center', fit: 'contain' }] : []);
   (b.headlines || []).slice(1).forEach((h) => add('detail', [h], 1));   // the other chosen messages
   if (photos[0]) add('product', [b.features[0] || b.headline || b.name, b.category].slice(0, 2), 1, [{ asset: photos[0].name, placement: 'center', fit: 'cover' }]);
@@ -92,11 +342,34 @@ export function briefToPlanRules(brief, { assets = [], limits = { minSeconds: 15
   if (photos[1]) add('offer', [b.products[0] || b.headline || b.name], 1, [{ asset: photos[1].name, placement: 'background', fit: 'cover' }]);
   add('cta', [action, phone || site, otherActions.join(' · '), place].filter(Boolean), 1.2, logo ? [{ asset: logo.name, placement: 'corner', fit: 'contain' }] : []);
 
-  // More answers = a longer video: every scene gets at least ~3.5 s, up to the plan's maximum length.
-  const maxD = limits.maxSeconds || 300;
-  D = Math.max(D, Math.min(maxD, Math.ceil((scenes.length * 3.5) / 5) * 5));
-  // drop middle scenes only if the plan's maximum is still too short for them (keep hook, brand and CTA)
-  while (scenes.length > 3 && D / scenes.length < 3) scenes.splice(scenes.length - 2, 1);
+  // Never show the same line twice: a thin brief used to repeat the name in every scene ("Visit here" x5).
+  {
+    const norm = (x) => String(x || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+    const last = scenes[scenes.length - 1];
+    const ctaKeys = new Set(last.on_screen_text.map(norm));
+    const seen = new Set();
+    for (const s of scenes.slice(0, -1)) {
+      s.on_screen_text = s.on_screen_text.filter((x) => { const k = norm(x); if (!k || seen.has(k)) return false; seen.add(k); return true; });
+    }
+    for (let i = scenes.length - 2; i >= 1; i--) if (!scenes[i].on_screen_text.length) scenes.splice(i, 1);   // keep the opening scene
+    if (!scenes[0].on_screen_text.length) scenes[0].on_screen_text = [action];
+    last.on_screen_text = last.on_screen_text.filter((x) => { const k = norm(x); return k && !(seen.has(k) && ctaKeys.size > 1); });
+    if (!last.on_screen_text.length) last.on_screen_text = [action];
+    // a closing line that is word-for-word the opening one is dropped from the opening scene instead
+    if (scenes.length > 1 && scenes[0].on_screen_text.length === 1 && norm(scenes[0].on_screen_text[0]) === norm(last.on_screen_text[0]) && (b.category || place)) scenes[0].on_screen_text = [b.category || place];
+  }
+
+  // The length the owner asked for is kept. More answers than fit are merged and the least important are left out (hook, brand and
+  // call to action always stay); the owner is told what was left out so they can choose a longer video instead.
+  const fit = fitScenes(scenes, D);
+  let durationNote = fit.trimmed.length ? `To fit ${Math.round(D)} seconds, ${fit.trimmed.length === 1 ? `"${fit.trimmed[0]}" was` : `${fit.trimmed.length} points (${fit.trimmed.slice(0, 3).join(', ')}${fit.trimmed.length > 3 ? '…' : ''}) were`} left out. Choose a longer video to include everything.` : '';
+  if (fit.impossible) { D = Math.min(limits.maxSeconds || 300, Math.ceil(fit.impossible)); durationNote = `This much content needs about ${D} seconds to be readable, so the video is ${D} seconds instead of the ${Math.round(b.duration || 20)} requested.`; }
+  // Too little to say is the opposite problem: a name and a closing card cannot honestly fill 20 seconds (it would be one frame held for
+  // 14 s). The film is only as long as what was given supports, and the owner is told why and how to get a longer one.
+  if (!keepLength && !fit.impossible && scenes.length <= 3 && D > Math.max(10, scenes.length * 5 + 2) && !(b.images?.length || images.length)) {
+    const old = D; D = Math.max(8, scenes.length * 5);
+    durationNote = `There is only ${scenes.length === 1 ? 'one point' : `${scenes.length} points`} to show, so this is a ${D}-second film instead of ${Math.round(old)}. Add what you offer, a headline or some photos for a longer one.`;
+  }
   const total = scenes.reduce((a, s) => a + s.weight, 0);
   let t = 0;
   const planScenes = scenes.map((s, i) => {
@@ -112,13 +385,14 @@ export function briefToPlanRules(brief, { assets = [], limits = { minSeconds: 15
     business: { name: b.name || '', category: b.category || '', location: place, phone, handle: site },
     aspect_ratio: b.aspect || '9:16',
     duration_seconds: D,
+    ...(durationNote ? { duration_note: durationNote } : {}),
     style: { colors: readable({ ...(palette || {}), ...(b.colors || {}) }, b.colors) },
     assets: images.map((a) => ({ name: a.name, url: a.url, use: a.role === 'logo' ? 'logo' : 'product photo' })),
     scenes: planScenes,
     voiceover: b.voiceover ? { enabled: true, source: 'ai', voice_style: 'warm, friendly and confident', captions: true } : { enabled: false },
     cta: ctaLine,
     goal: b.goal || '',
-    special_instructions: [b.extra, b.pasteText && `The business owner's full description (follow it): ${b.pasteText}`].filter(Boolean).join('\n\n'),
+    special_instructions: [b.kind === 'cause' ? 'This is a fundraising video for a cause, not a business advert. Never invent statistics, quotes, ratings, stars, reviews or testimonials, and never present the organiser\'s own words as a customer review. Show the account details exactly as given, as an account to give to (never as a phone number to call). Speak about the cause and the people it helps.' : b.kind && b.kind !== 'business' ? `This is a ${b.kind} video, not a business advert. Do not add selling language, prices, "order now" or contact calls unless the person asked for them.` : '', b.extra, b.pasteText && `The business owner's full description (follow it): ${b.pasteText}`].filter(Boolean).join('\n\n'),
     sound: b.sound || 'all',
     sfx: b.sound !== 'none',
     music_url: b.sound === 'own' ? (assets.find((a) => a.kind === 'audio' && a.role === 'music') || {}).url || '' : '',
@@ -128,7 +402,8 @@ export function briefToPlanRules(brief, { assets = [], limits = { minSeconds: 15
 // ---------------------------------------------------------------------------
 // Gemini plan (better copy, follows the special instructions)
 // ---------------------------------------------------------------------------
-const PLAN_SYSTEM = `You turn a small business's answers into a motion-graphics video ad plan. Do not ask questions.
+const PLAN_SYSTEM = `${CREATIVE_STANDARD}
+You turn a small business's answers into a motion-graphics video ad plan. Do not ask questions.
 Return JSON only, this shape:
 { "title": "", "business": { "name": "", "category": "", "location": "", "phone": "", "handle": "" },
   "scenes": [ { "purpose": "hook|brand|product|detail|menu|offer|stat|cta", "seconds": 4, "on_screen_text": ["short line", "..."],
@@ -142,12 +417,12 @@ With narration on, write one natural spoken line per scene (about 2.3 words per 
 
 export async function briefToPlan(brief, { assets = [], limits, palette, style = null } = {}) {
   const b = cleanBrief(brief);
-  const rules = briefToPlanRules(b, { assets, limits, palette });
+  const rules = briefToPlanRules(b, { assets, limits, palette, keepLength: true });
   if (!config.useGemini) return { plan: rules, source: 'rules' };
   try {
     const images = assets.filter((a) => a.kind === 'image');
     const { text } = await geminiGenerate({
-      system: PLAN_SYSTEM, json: true, temperature: 0.7, timeoutMs: 60000,
+      system: PLAN_SYSTEM, model: BRIEF_MODEL(), json: true, temperature: 0.7, timeoutMs: 30000, thinking: 'low', maxOutputTokens: 4096,
       messages: [{ role: 'user', text: `ANSWERS:\n${JSON.stringify({ ...b, step: undefined, done: undefined })}\nVIDEO: ${rules.duration_seconds} seconds, ${rules.aspect_ratio}${style ? `, style "${style.name}"` : ''}\nIMAGES: ${images.length ? images.map((a) => `"${a.name}" (${a.role || 'photo'})`).join(', ') : 'none'}\nNarration: ${b.voiceover ? 'on' : 'off'}` }],
     });
     const g = JSON.parse(String(text).replace(/^```(?:json)?|```$/g, '').trim());
@@ -228,12 +503,25 @@ export async function suggest(kind, brief) {
 }
 
 /** Pick a starter style that fits the business when the user lets AdFlash choose. */
+// Several good looks per kind of business, chosen by the name, so two flyers or videos never come out the same.
+const LOOK_POOLS = {
+  food: ['naija-bold', 'fresh-market', 'retro-pop'], fashion: ['street-hype', 'afro-vibes', 'mono-editorial'], beauty: ['beauty-bloom', 'gold-luxe', 'studio-white'],
+  tech: ['midnight-glow', 'tech-pulse', 'neon-nights'], finance: ['fintech-blue', 'clean-pro', 'graphite-pro'], health: ['health-pulse', 'fresh-market', 'ocean-breeze'],
+  realestate: ['prime-estate', 'graphite-pro', 'gold-luxe'], events: ['owambe-party', 'glory-light', 'gold-luxe', 'afro-vibes'], education: ['clean-pro', 'kiddies-fun', 'ocean-breeze'],
+  memorial: ['mono-editorial', 'graphite-pro', 'prime-estate'], faith: ['glory-light', 'gold-luxe', 'prime-estate', 'ocean-breeze'], party: ['owambe-party', 'neon-nights', 'retro-pop', 'afro-vibes'], kids: ['kiddies-fun', 'retro-pop', 'ocean-breeze'], sports: ['sports-blitz', 'street-hype', 'neon-nights'],
+  default: ['studio-white', 'clean-pro', 'mono-editorial', 'ocean-breeze', 'midnight-glow', 'afro-vibes'],
+};
 export function autoStyleSlug(brief) {
   const b = cleanBrief(brief);
-  return {
-    food: 'naija-bold', fashion: 'street-hype', beauty: 'beauty-bloom', tech: 'midnight-glow', finance: 'fintech-blue', health: 'health-pulse',
-    realestate: 'prime-estate', events: 'owambe-party', education: 'clean-pro', default: 'studio-white',
-  }[catKey(b.category)];
+  const t = `${b.category || ''} ${b.name || ''}`;
+  let pool = directionOf(b).styles;
+  // the kente ribbon along the top and bottom is only for videos that ask for an African or cultural look
+  if (!/afric|ankara|aso.?oke|kente|afro|adire|naija|cultur|traditional|owambe/i.test(`${t} ${b.styleNote || ''} ${b.extra || ''}`)) pool = pool.filter((x) => x !== 'afro-vibes');
+  // a birthday for a child should be playful, not a nightclub
+  if (/kid|child|toddler|baby/i.test(`${t} ${b.headline || ''}`) && directionOf(b).id === 'birthday') pool = ['kiddies-fun', 'fresh-market', 'retro-pop'];
+  let h = 7; for (const ch of `${b.name || ''}|${b.category || ''}`) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  pool = [pool[0], ...pool];   // the ranked first choice is twice as likely
+  return pool[h % pool.length];
 }
 
 // ---------------------------------------------------------------------------
@@ -242,45 +530,183 @@ export function autoStyleSlug(brief) {
 // ---------------------------------------------------------------------------
 const ASPECT_WORDS = [[/landscape|16\s*[:x/]\s*9|youtube|horizontal|wide/i, '16:9'], [/square|1\s*[:x/]\s*1|instagram feed|facebook feed/i, '1:1'], [/portrait|vertical|9\s*[:x/]\s*16|tiktok|reels?|status|shorts|stories/i, '9:16']];
 
+
+// The words people use to ASK for a video are instructions, not content: "Use this prompt to make a video: …",
+// "Can you create a 30 second ad for …", "make a video for us". Strip that preamble (and request-only sentences)
+// so no title, headline or caption is ever built from them.
+const REQ_VERB = '(?:make|create|generate|design|build|produce|write|prepare|do|put together|come up with)';
+const REQ_OBJ = '(?:video|videos|ad|ads|advert|adverts|advertisement|flyer|flier|poster|clip|film|reel|animation|promo)';
+const REQ_START = new RegExp(`^\\s*(?:(?:hi|hello|hey)[,!.]?\\s+)?(?:please\\s+)?(?:(?:can|could|would|will) you (?:please )?|i (?:want|need|would like|'d like|wish) (?:you )?to |(?:use|using|take) (?:this|the|my) (?:prompt|text|brief|idea|info(?:rmation)?|description|details?|message)(?: below| here)?\\s*(?:to|and|&|,)?\\s*|let'?s |kindly )?${REQ_VERB}\\s+(?:me\\s+|us\\s+)?(?:(?:a|an|the|my|our|one|some)\\s+)?(?:[\\w'’-]+\\s+){0,5}?${REQ_OBJ}\\b\\s*(?:for|about|of|on|called|named|that|which|with|to promote|promoting|:|-|–|—|,)?\\s*(?:us\\b|me\\b|the following\\b|this\\b)?\\s*[:\\-–—,]?\\s*`, 'i');
+const REQ_SENTENCE = new RegExp(`^\\s*(?:please\\s+)?(?:${REQ_VERB}|keep|use|add|include|show|let|give|put|try|ensure|avoid|don'?t|do not|no)\\b[^.!?\\n]*(?:\\b${REQ_OBJ}\\b|\\bit (?:short|simple|fun|clean|professional)|\\bseconds?\\b|\\bcolou?rs?\\b|\\bmusic\\b|\\bvoice|\\bstyle\\b)[^.!?\\n]*[.!?]?\\s*$`, 'i');
+export function stripAsk(text) {
+  let t = String(text || '').trim();
+  for (let i = 0; i < 2; i++) t = t.replace(REQ_START, '');
+  t = t.replace(/^\s*(?:use|using) (?:this|the|my) (?:prompt|text|brief|idea)[^:\n]{0,40}[:\-–—]\s*/i, '');
+  const parts = t.split(/(?<=[.!?])\s+|\n+/);
+  const kept = parts.filter((p) => !REQ_SENTENCE.test(p));
+  return (kept.length ? kept : parts).join('\n').trim();
+}
 export function parseBriefRules(text) {
-  const t = String(text || '');
+  const full = String(text || '');
+  const t = /birthday|b-?day/i.test(full) ? full : stripAsk(full);   // what the video is ABOUT: the request wording ("make a video…", "use this prompt…") is not content
   const out = {};
   const phone = t.match(PHONE_RE)?.[0];
   const site = t.match(URL_RE)?.[0];
   const addr = t.match(/(?:address|located at|we are at|find us at|location)\s*[:-]?\s*([^\n.]{4,80})/i)?.[1];
   const contact = [phone, site, addr].filter(Boolean).join(', ');
   if (contact) out.contact = contact;
-  for (const [re, v] of ASPECT_WORDS) if (re.test(t)) { out.aspect = v; break; }
-  const sec = t.match(/(\d{1,3})\s*(?:s\b|secs?\b|seconds?\b)/i)?.[1] || (t.match(/(\d)\s*(?:min|minutes?)\b/i)?.[1] * 60);
+  for (const [re, v] of ASPECT_WORDS) if (re.test(full)) { out.aspect = v; break; }
+  { const q = [...t.matchAll(/["“]([^"”\n]{3,90})["”]/g)].map((m) => m[1].trim()).filter((x) => x && !PHONE_RE.test(x)); if (q.length) out.phrases = q.slice(0, 12); }
+  if (/\b(slide ?show|slides? of (my )?(photos|pictures)|all (my |the )?(photos|pictures|images))\b/i.test(t)) out.slideshow = true;
+  const sec = full.match(/(\d{1,3})\s*(?:s\b|secs?\b|seconds?\b)/i)?.[1] || (full.match(/(\d)\s*(?:min|minutes?)\b/i)?.[1] * 60);
   if (sec) out.duration = Number(sec);
   const name = t.match(/(?:business(?:\s+name)?\s*(?:is|:|-)|(?:company|brand|shop|store)\s+(?:name\s+)?(?:is|:)|(?:called|named))\s*["'“‘]?([A-Z0-9][\w&'’. -]{1,40}?)["'”’]?(?=[,.\n”"]|\s+(?:and|we|i|in|at|is)\b|$)/i)?.[1];
   if (name) out.name = name.trim();
   const priced = t.split(/\n|;|\.\s+(?=[A-Z])/).map((l) => l.trim()).filter((l) => /(₦|N\s?\d|naira|\d+k\b)/i.test(l) && l.length < 70);
   if (priced.length) out.products = priced.slice(0, 8);
+  // what is sold or offered, and where / when, straight from the sentence ("We sell cupcakes and wedding cakes in Lekki")
+  {
+    const offers = t.match(/\b(?:we|i)\s+(?:sell|offer|make|provide|bake|cook|deliver|do|specialis[ez]e in|specialize in)\s+([^.\n;]{3,120})/i)?.[1] || t.match(/\bspeciali[sz]e[sd]?\s+in\s+([^.\n;]{3,120})/i)?.[1];
+    if (offers) {
+      const head = offers.split(/\s+(?:in|at|around|across|within|near)\s+(?=[A-Z])/)[0];
+      const items = head.split(/\s*(?:,|&|\band\b)\s*/i).map((x) => x.trim().replace(/^(?:all|many|different|various|some|the)\s+/i, '')).filter((x) => x.length >= 3 && x.length <= 34 && !/^(?:more|others?|etc)$/i.test(x));
+      if (items.length) out.features = items.slice(0, 5).map((x) => x.charAt(0).toUpperCase() + x.slice(1));
+      const place = offers.match(/\b(?:in|at|around|across|within|near)\s+([A-Z][\p{L}' -]{2,30})/u)?.[1];
+      if (place && !/\d/.test(place)) out.contact = [out.contact, place.trim()].filter(Boolean).join(', ');
+    }
+    const when = t.match(/\b((?:(?:this|next|on)\s+)?(?:mon|tues|wednes|thurs|fri|satur|sun)day\b[^.\n]{0,70}|tomorrow[^.\n]{0,50}|tonight[^.\n]{0,50}|\d{1,2}(?:st|nd|rd|th)?\s+(?:of\s+)?(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?(?:\s+\d{4})?[^.\n]{0,60})/i)?.[1];
+    if (when && !/birthday|b-?day/i.test(t)) out.when = when.trim().replace(/[,;:\s]+$/, '').replace(/^on\s+/i, '');
+  }
   if (/no (music|sound|audio)|without (music|sound)|silent/i.test(t)) out.sound = 'none';
   else if (/only (sound )?effects|no music/i.test(t)) out.sound = 'sfx';
   if (/voice[- ]?over|narrat/i.test(t)) out.voiceover = !/no (voice|narrat)/i.test(t);
-  out.pasteText = str(t, 6000);   // the whole text also goes to the AI director (kept apart from the last question's answer)
+  // a few words are enough: work out a title and the kind of video even without the AI
+  const KINDS = [[CAUSE_RE, 'Fundraiser', 'cause'], [MEMORIAL, 'Burial or memorial', 'personal'], [/birthday|b-?day|anniversary/i, 'Birthday', 'personal'], [/church|ministry|sunday service|revival|crusade|mosque/i, 'Church event', 'event'],
+    [/\bwe (?:sell|offer|make|provide|do|bake|cook|deliver)\b|\bour (?:shop|store|business|products?|services?|menu|brand)\b|\bpromo\b|\bpromotional\b|\badverts?\b|\bad for\b|\bdiscount|\bbakery|\brestaurant|\bsalon\b|\bboutique/i, 'Business', 'business'], [/wedding|engagement|bridal/i, 'Wedding', 'event'],
+    [/graduat|convocation|school event|prize giving/i, 'Graduation', 'event'], [/announc|resum|notice|programme|program|invitation|invite|save the date/i, 'Announcement', 'announcement']];
+  // A text that says what ITS subject is ("Animora is a video maker…", "your small business") is about that business, even if it lists
+  // "birthday videos and tributes" among the things it does. Only a real bereavement signal can turn it into a memorial.
+  const aboutBusiness = /\b(?:is|are)\s+(?:an?|the)\s+[^.\n]{0,50}?\b(?:app|software|platform|tool|maker|generator|service|company|brand|shop|store|business|agency|startup|website|studio)\b|\byour (?:small )?business\b|\bour customers\b|\bwe (?:sell|offer|provide)\b/i.test(t)
+    && !/burial|funeral|obituar|passed away|in loving memory|rest in peace|\bthe late\b|homegoing|eulogy|wake keep/i.test(t);
+  if (aboutBusiness) { out.category = out.category || 'Business'; out.kind = out.kind || 'business'; }
+  else for (const [re, cat, kind] of KINDS) if (re.test(t)) { out.category = out.category || cat; out.kind = out.kind || kind; break; }
+  if (out.kind === 'announcement') {
+    const said = t.match(/\bannounc\w*\s+(?:that\s+|about\s+|the\s+)?([^.\n]{8,110})/i)?.[1];
+    if (said) { const h = said.trim().replace(/\s+(?:keep|make|and make|please)\b.*$/i, '').replace(/[,;:\s]+$/, ''); out.headline = h.charAt(0).toUpperCase() + h.slice(1); }
+  }
+  const birthday = !aboutBusiness && /birthday|b-?day/i.test(`${out.category || ''} ${t}`);
+  if (birthday) {
+    const relation = t.match(/\b(?:my|our)\s+(brother|sister|mum|mom|mother|dad|father|friend|partner|husband|wife|son|daughter|cousin|uncle|aunt|grandma|grandmother|grandpa|grandfather)\b/i)
+      || t.match(/\bfor\s+(brother|sister|mum|mom|mother|dad|father|friend|partner|husband|wife|son|daughter|cousin|uncle|aunt|grandma|grandmother|grandpa|grandfather)\b/i);
+    if (relation) out.relationship = relation[1].toLowerCase();
+    const possessiveName = t.match(/\b([A-Z][\p{L}'’.-]*(?:\s+[A-Z][\p{L}'’.-]*){0,1})['’]s\s+(?:\d{1,2}(?:st|nd|rd|th)?\s+)?birthday\b/u);
+    const nameAfterRole = t.match(/\b(?:for|to)\s+(?:(?:my|our)\s+)?(?:(?:brother|sister|mum|mom|mother|dad|father|friend|partner|husband|wife|son|daughter|cousin|uncle|aunt|grandma|grandmother|grandpa|grandfather)\s*,?\s+)?(?!my\b|our\b|turning\b|turns\b|age\b|celebrating\b|brother\b|sister\b|mum\b|mom\b|mother\b|dad\b|father\b|friend\b|partner\b|husband\b|wife\b|son\b|daughter\b|cousin\b|uncle\b|aunt\b|grandma\b|grandmother\b|grandpa\b|grandfather\b)([A-Z][\p{L}'’.-]*(?:\s+[A-Z][\p{L}'’.-]*){0,1})(?=\s+(?:turning|turns|celebrating|who|is|will)\b|[,!?;.]|$)/iu);
+    if (possessiveName) out.name = possessiveName[1].trim();
+    else if (nameAfterRole) out.name = nameAfterRole[1].trim();
+    const age = t.match(/\b(?:turning|turns|turn|celebrating|celebrates|age|the big)\s+(?:the\s+)?(\d{1,2}(?:st|nd|rd|th)?|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty)\b/i)
+      || t.match(/\b(\d{1,2}(?:st|nd|rd|th))\s+birthday\b/i);
+    if (age) {
+      const raw = age[1].toLowerCase().replace(/(?:st|nd|rd|th)$/i, '');
+      const words = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16, seventeen: 17, eighteen: 18, nineteen: 19, twenty: 20, thirty: 30, forty: 40, fifty: 50, sixty: 60 };
+      out.milestone = String(words[raw] || raw);
+    }
+    const message = t.match(/\b(?:message(?:\s+for\s+(?:him|her|them))?|say|write|include(?:\s+the\s+words)?|tell\s+(?:him|her|them))\s*(?:is|:|-|,)?\s*["“]?([^"”\n]{8,1200})/i);
+    if (message) out.personalMessage = message[1].trim().replace(/["”]+$/, '');
+  }
+  if (!out.name && !birthday) { const subj = subjectFromPrompt(t); if (subj) out.name = str(subj, 60); }
+  if (!out.name && !birthday) {
+    const first = t.split(/[\n.,;!?]/)[0].replace(/^\s*(?:please\s+)?(?:i\s+(?:want|need|would like)\s+(?:to\s+make\s+)?)?(?:make\s+(?:me\s+)?)?(?:an?\s+)?(?:(?:birthday|wedding|promo|promotional|short|nice|cool|donation|donations|fundraising|fundraiser|charity|appeal)\s+)?(?:video|ad|advert|advertisement|flyer|clip)?\s*(?:for|about|of|on)?\s*(?:my\s+|our\s+|the\s+)?/i, '').trim();
+    if (first.length >= 3) out.name = first.charAt(0).toUpperCase() + str(first, 40).slice(1);
+  }
+  // bullet or numbered lines are the things offered ("- Your own photos and logo"): they become the selling points, as written
+  if (!out.features?.length) {
+    const bullets = t.split('\n').map((l) => l.match(/^\s*(?:[-•*–]|\d{1,2}[.)])\s+(.{3,60}?)\s*[.;]?$/)?.[1]).filter(Boolean);
+    if (bullets.length >= 2) out.features = bullets.slice(0, 5);
+  }
+  // a sentence about the business is not its name: "We sell cupcakes and wedding cakes" is named by what it sells
+  if (out.name && /^(?:we|i|our|it|they|this|my|there)\s/i.test(out.name)) out.name = '';
+  if (!out.name && out.features?.length) out.name = out.features.slice(0, 2).join(' & ');
+  // what the thing IS: "a music app called Music mart", "Techwave Repairs, a laptop repair business"
+  {
+    const isA = t.match(/\b(?:an?|the)\s+([a-z][\w' -]{2,40}?)\s+(?:called|named)\s+["'“‘]?[A-Z0-9]/i)?.[1]
+      || t.match(/[A-Z][\w&'’ -]{1,40},\s+(?:an?|the)\s+([a-z][\w' -]{2,50}?)(?=[.,\n!?]|$)/)?.[1];
+    if (isA && !out.category) out.category = isA.trim().replace(/^./, (c) => c.toUpperCase());
+  }
+  // the owner's own question or one-line pitch is the hook, in their words
+  {
+    const sentences = t.split(/(?<=[.!?])\s+|\n+/).map((x) => x.trim()).filter(Boolean);
+    const q = sentences.find((x) => /\?$/.test(x) && x.length >= 8 && x.length <= 80);
+    const pitch = sentences.find((x) => /^(?:it|they|we)\s+(?:helps?|lets?|makes?|allows?|gives?|brings?|keeps?|turns?|fix(?:es)?|repairs?|delivers?|offers?)\b/i.test(x) && x.length <= 90);
+    const heads = [q, pitch && pitch.replace(/[.!\s]+$/, '').replace(/\.(?=\p{L})/gu, '. ')].filter(Boolean);
+    if (heads.length && !out.headline) { out.headlines = heads.slice(0, 3); out.headline = heads[0]; }
+  }
+  // a street address is part of the contact details, whole (never cut at "or")
+  {
+    const street = t.match(/(?:\b(?:[Vv]isit|[Aa]t|[Ff]ind us at|[Ll]ocated at|[Cc]ome to|[Aa]ddress(?: is)?)\s*[:-]?\s+)(\d+[A-Za-z]?[,\s]+[A-Z][\w'’. -]{2,40}?(?:,\s*[A-Z][\p{L} .'-]{2,30}?)?)(?=\s+(?:or|and|call|whatsapp|dm)\b|[.\n;]|$)/u)?.[1];
+    if (street && !(out.contact || '').includes(street)) out.contact = [street.trim().replace(/[,\s]+$/, ''), out.contact].filter(Boolean).join(', ');
+  }
+  if (!out.aspect) out.aspect = '9:16';
+  if (!out.duration) out.duration = 20;
+  const pay = findPayment(t); if (pay) { out.payment = pay; out.kind = out.kind || 'cause'; out.category = out.category || 'Fundraiser'; }
+  out.pasteText = str(full, 6000);   // the whole text also goes to the AI director (kept apart from the last question's answer)
   return out;
+}
+
+/** Convert an older wrongly-classified birthday project into a safe, personal brief before regeneration. */
+export function repairLegacyBirthdayBrief(brief = {}, plan = {}) {
+  if (!isPersonalBirthdayBrief(brief, plan)) return null;
+  const sceneText = (plan.scenes || []).flatMap((scene) => [].concat(scene?.on_screen_text || [], scene?.voiceover || []));
+  const raw = [brief.pasteText, brief.headline, ...[].concat(brief.headlines || []), brief.extra, plan.title, ...sceneText].filter(Boolean).join('\n');
+  const found = parseBriefRules(raw);
+  const savedCategoryIsBirthday = /^(?:personal\s+)?birthday(?:\s+(?:greeting|video|film))?$/i.test(String(brief.category || '').trim());
+  const invalidName = /^(?:(?:my|our|the)\s+)?(?:brother|sister|mum|mom|mother|dad|father|friend|partner|husband|wife|son|daughter|cousin|uncle|aunt|grandma|grandmother|grandpa|grandfather|birthday|video|business|brand|product|service)$/i;
+  const savedName = String(brief.name || '').trim();
+  const name = found.name || ((brief.kind === 'personal' || savedCategoryIsBirthday) && savedName && !invalidName.test(savedName) ? savedName : '');
+  return cleanBrief({
+    ...brief,
+    kind: 'personal', category: 'Birthday', name,
+    relationship: brief.relationship || found.relationship || '',
+    milestone: brief.milestone || found.milestone || '',
+    personalMessage: found.personalMessage || brief.personalMessage || '',
+    memories: Array.isArray(brief.memories) ? brief.memories : [],
+    personalPhotoIds: brief.personalPhotoIds || [],
+    headlines: [], headline: '', goals: [], goal: '', features: [], products: [],
+    ctas: [], cta: '', contact: '', payment: '', offer: '', when: '', extra: '',
+  });
 }
 
 export async function parseBrief(text, current = {}) {
   const rules = parseBriefRules(text);
   if (!config.useGemini) return cleanBrief({ ...rules, mode: 'paste' });
   try {
-    const { text: out } = await geminiGenerate({
-      system: `You read a business owner's description of the video ad they want and fill in a form. Return JSON only with any of these keys, and ONLY for things the text clearly says (leave everything else out, never invent):
-{ "name": business name, "category": what the business does (2-4 words), "goals": ["..."] (why they want the ad),
-  "headlines": ["..."] (the main messages / slogans for the video, short), "features": ["..."] (selling points, 2-5 words each),
-  "products": ["Product ₦price", ...], "ctas": ["Order on WhatsApp", "Call now", ...] (what viewers should do), "contact": phone / website / address,
-  "aspect": "9:16" | "16:9" | "1:1", "duration": seconds, "voiceover": true/false, "sound": "all" | "sfx" | "none",
-  "extra": any other instructions about the look, scenes, pictures or style, in their words }`,
+    // never keep a person waiting: all Gemini attempts together get ~20 s, then the rules reader takes over
+    const { text: out } = await Promise.race([geminiGenerate({
+      model: BRIEF_MODEL(),
+      system: `${CREATIVE_STANDARD}
+You are a smart video director. A person describes ANY video they want: a business advert, a birthday, a wedding, a church or school event, an announcement, a tribute, a personal story, a promo, a music or lyric video. Read it and fill in a form. Return JSON only.
+Never invent facts (names, dates, places, ages, relationships, memories, prices, phone numbers, awards, or personal messages). For birthdays, set name only when the recipient's real name is clear; leave it empty when the prompt says only "my brother", "my friend" or similar so the form can ask. Extract personal wording only when the user explicitly wrote it. You MAY make sensible visual choices, but don't pretend generic filler is a personal message.
+Keys:
+{ "kind": "business" | "event" | "personal" | "announcement" | "cause" | "other"  (cause = a donation, fundraiser, charity or community appeal),
+  "name": the real recipient's name for a personal birthday (empty if not stated); otherwise a title or subject in a few words,
+  "category": what it is (2-4 words, e.g. "Birthday", "Wedding", "Church event", "Laptop repairs"),
+  "relationship": the user's relationship to the birthday person, only if stated, "milestone": age or milestone, only if stated,
+  "personalMessage": exact wording the user explicitly supplied for the birthday person, otherwise empty, "memories": ["..."], only details explicitly supplied,
+  "goals": ["..."] (why they want it), "headlines": ["2-3 short on-screen messages, under 7 words each, written from their idea"],
+  "features": ["..."] (business highlights only; don't use for birthdays), "products": ["Item ₦price"] (only if they gave prices),
+  "ctas": ["..."] (the closing line or what viewers should do; for personal videos use something fitting like "Happy birthday!" or "Join us"; a cause gets "Donate today" or "Give what you can"; only business adverts get a sales call to action),
+  "contact": phone / website / address only if given (never an account number), "payment": for a cause, the bank, account number and account name exactly as given ("GTBank · 0123456789 · Name"), "when": date, time and place if given,
+  "aspect": "9:16" | "16:9" | "1:1" (9:16 unless they say otherwise), "duration": seconds (about 20 unless they say otherwise),
+  "voiceover": true/false, "sound": "all" | "sfx" | "none",
+  "phrases": ["only if they gave specific wording for the screen: each line EXACTLY as they wrote it, in the order they gave it; never reword, never add"], "slideshow": true if they want their pictures shown one after another,
+  "extra": any instructions about look, mood, scenes or pictures, in their words }`,
       messages: [{ role: 'user', text: `Already known: ${JSON.stringify({ name: current.name, category: current.category })}\n\nTHEIR TEXT:\n${String(text).slice(0, 6000)}` }],
-      json: true, temperature: 0.2, timeoutMs: 50000, maxOutputTokens: 8192, thinking: 'low',
-    });
+      json: true, temperature: 0.2, timeoutMs: 18000, maxOutputTokens: 4096, thinking: 'low',
+    }), new Promise((_, rej) => setTimeout(() => rej(new Error('Gemini took too long to read the idea')), 20000))]);
     const g = JSON.parse(out);
     // the AI wins where it found something; rules fill gaps (phone numbers, aspect words); keep the full text for the director
     const merged = { ...rules, ...Object.fromEntries(Object.entries(g).filter(([, v]) => v !== null && v !== '' && !(Array.isArray(v) && !v.length))) };
+    if (!merged.aspect) merged.aspect = '9:16';
+    if (!merged.duration) merged.duration = 20;
     delete merged.extra;   // the last question asks for anything extra; the full text goes to the director as pasteText
     return cleanBrief({ ...merged, mode: 'paste' });
   } catch (e) {

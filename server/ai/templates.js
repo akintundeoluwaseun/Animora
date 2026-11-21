@@ -513,7 +513,7 @@ function planBeats(plan, scenes, theme, rnd, ctx) {
 // CSS
 // ---------------------------------------------------------------------------
 function css(theme, c, W, H) {
-  const side = Math.min(W, H), U = side / 1080;
+  const side = Math.min(W, H), U = side / 1080 * (W > H ? 1.4 : 1);   // landscape: same bigger factor as the motion engine
   const n = (v) => `${Math.round(v * U)}px`;
   const lightBg = luminance(c.background) > 0.45;
   const onP = luminance(c.primary) > 0.5 ? '#111111' : '#FFFFFF';

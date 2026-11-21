@@ -131,19 +131,25 @@ export function usePolling(fn, ms, active) {
  * Shrink a picture before upload: phone photos are often 4-10 MB, and the server (Vercel) accepts about 4.5 MB.
  * Keeps PNGs as PNG (logos keep their transparent background); other pictures become JPEG. Max side 1920 px.
  */
-export async function shrinkImage(file, maxSide = 1920) {
-  if (!file?.type?.startsWith('image/') || /svg|gif/.test(file.type) || file.size < 1.2e6) return file;
+// Pictures are made small before they are uploaded (the free database stays tiny): at most 1600 px on the long side,
+// saved as WebP (much smaller than PNG/JPEG and it keeps see-through logo backgrounds). Falls back to JPEG / PNG.
+export async function shrinkImage(file, maxSide = 1600) {
+  if (!file?.type?.startsWith('image/') || /svg|gif/.test(file.type) || file.size < 250e3) return file;
   try {
     const bmp = await createImageBitmap(file);
     const k = Math.min(1, maxSide / Math.max(bmp.width, bmp.height));
     const canvas = document.createElement('canvas');
     canvas.width = Math.round(bmp.width * k); canvas.height = Math.round(bmp.height * k);
     canvas.getContext('2d').drawImage(bmp, 0, 0, canvas.width, canvas.height);
-    const png = file.type === 'image/png';
-    let blob = await new Promise((r) => canvas.toBlob(r, png ? 'image/png' : 'image/jpeg', 0.85));
-    if (png && blob && blob.size > 3.5e6) blob = await new Promise((r) => canvas.toBlob(r, 'image/jpeg', 0.85));
+    const make = (type, q) => new Promise((r) => canvas.toBlob(r, type, q));
+    let blob = await make('image/webp', 0.82);
+    if (!blob || blob.type !== 'image/webp') {   // older phones can't write WebP
+      const png = file.type === 'image/png';
+      blob = await make(png ? 'image/png' : 'image/jpeg', 0.85);
+      if (png && blob && blob.size > 1.5e6) blob = await make('image/jpeg', 0.85);
+    }
     if (!blob || blob.size >= file.size) return file;
-    const ext = blob.type === 'image/png' ? 'png' : 'jpg';
+    const ext = { 'image/webp': 'webp', 'image/png': 'png' }[blob.type] || 'jpg';
     return new File([blob], `${file.name.replace(/\.[^.]+$/, '') || 'picture'}.${ext}`, { type: blob.type });
   } catch {
     return file;
@@ -163,6 +169,35 @@ export async function imageLook(file) {
       if (d[i + 3] < 200) { clear++; continue; }
       n++; lum += (0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]) / 255;
     }
-    return { alpha: clear > d.length / 4 * 0.02, light: n ? lum / n > 0.72 : null };
+    return { alpha: clear > d.length / 4 * 0.02, light: n ? lum / n > 0.72 : null, focus: tapSpot(bmp) };
   } catch { return {}; }
+}
+
+// Where a finger or mouse should tap on an app screenshot, found for free (no AI): the boldest compact block of colour,
+// which is usually the main button. Full-width coloured bars (headers, banners) count much less. Returns "x,y" (0..1) or null.
+export function tapSpot(bmp) {
+  try {
+    const k = 90 / bmp.width, w = 90, h = Math.max(1, Math.round(bmp.height * k));
+    const c = document.createElement('canvas'); c.width = w; c.height = h;
+    const g = c.getContext('2d'); g.drawImage(bmp, 0, 0, w, h);
+    const d = g.getImageData(0, 0, w, h).data, C = 6, cols = Math.floor(w / C), rows = Math.floor(h / C);
+    const hit = (x, y) => { const i = (y * w + x) * 4, mx = Math.max(d[i], d[i + 1], d[i + 2]), mn = Math.min(d[i], d[i + 1], d[i + 2]); return mx > 90 && mx && (mx - mn) / mx > 0.42; };
+    const cell = [], rowFill = [];
+    for (let r = 0; r < rows; r++) {
+      let rowHits = 0;
+      for (let q = 0; q < cols; q++) {
+        let n = 0; for (let y = r * C; y < r * C + C; y++) for (let x = q * C; x < q * C + C; x++) if (hit(x, y)) n++;
+        cell.push(n / (C * C)); rowHits += n / (C * C);
+      }
+      rowFill.push(rowHits / cols);
+    }
+    let best = -1, at = -1;
+    for (let r = Math.ceil(rows * 0.06); r < rows; r++) for (let q = 0; q < cols; q++) {
+      const v = cell[r * cols + q] * (rowFill[r] > 0.7 ? 0.25 : 1);
+      if (v > best) { best = v; at = r * cols + q; }
+    }
+    if (best < 0.3 || at < 0) return null;
+    const x = ((at % cols) + 0.5) * C / w, y = (Math.floor(at / cols) + 0.5) * C / h;
+    return `${x.toFixed(3)},${y.toFixed(3)}`;
+  } catch { return null; }
 }

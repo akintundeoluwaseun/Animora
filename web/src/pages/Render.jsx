@@ -4,7 +4,7 @@ import { publicMessage } from '../lib/errors.js';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { api, ASPECTS, clock, duration, naira, useAuth, usePolling } from '../lib.jsx';
-import { Alert, Button, Modal, PageLoader, ProjectTabs, Spinner } from '../components/ui.jsx';
+import { Alert, Burst, Button, Modal, PageLoader, ProjectTabs, Spinner } from '../components/ui.jsx';
 import { VideoPhone } from '../components/Preview.jsx';
 import { downloadVideo, fetchVideo } from '../lib/videoFile.js';
 
@@ -92,10 +92,14 @@ function Progress({ render, onCancel }) {
 // Fetch the whole MP4. Videos made online come back in 4 MB ranges, so ask for each part in turn.
 function DownloadButton({ render, title }) {
   const [pct, setPct] = useState(null);
+  const [error, setError] = useState('');
   return (
-    <Button size="lg" loading={pct != null} onClick={async () => { setPct(0); try { await downloadVideo(render, title, setPct); } finally { setPct(null); } }}>
-      {pct != null ? `Saving ${Math.round(pct * 100)}%` : 'Download MP4'}
-    </Button>
+    <>
+      <Button size="lg" loading={pct != null} onClick={async () => { setPct(0); setError(''); try { await downloadVideo(render, title, setPct); } catch (e) { setError(e.message || 'The MP4 download failed. Please try again.'); } finally { setPct(null); } }}>
+        {pct != null ? `Saving ${Math.round(pct * 100)}%` : 'Download MP4'}
+      </Button>
+      {error && <div className="basis-full"><Alert>{error}</Alert></div>}
+    </>
   );
 }
 
@@ -106,6 +110,33 @@ async function shareVideo(render, title) {
     if (navigator.canShare?.({ files: [file] })) { await navigator.share({ files: [file], title }); return true; }
   } catch { /* fall through */ }
   return false;
+}
+
+// Tell friends about Animora: a short message and the app link (no file, so it is instant and works everywhere).
+const SHARE_TEXT = 'I tried Animora and made a cool motion-graphics video in minutes. Try it here:';
+async function shareApp() {
+  const url = window.location.origin;
+  try {
+    if (navigator.share) { await navigator.share({ title: 'Animora', text: SHARE_TEXT, url }); return 'shared'; }
+  } catch (e) { if (e?.name === 'AbortError') return 'cancelled'; }
+  try { await navigator.clipboard.writeText(`${SHARE_TEXT} ${url}`); return 'copied'; } catch { return 'failed'; }
+}
+
+function ShareNudge() {
+  const [state, setState] = useState('');
+  const go = async () => { setState('busy'); const r = await shareApp(); setState(r); if (r === 'copied') setTimeout(() => setState(''), 3500); };
+  return (
+    <div className="mt-5 rounded-2xl border border-ink/12 bg-lilac/50 p-4">
+      <p className="font-extrabold leading-tight text-ink">Like it? Tell your friends</p>
+      <p className="mt-1 text-sm text-ink-soft">Share Animora, so they can make a cool video too.</p>
+      <Button size="lg" className="mt-3 w-full sm:w-auto" onClick={go} loading={state === 'busy'}>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="mr-2"><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><path d="M8.6 10.5l6.8-4M8.6 13.5l6.8 4" /></svg>
+        Share Animora
+      </Button>
+      {state === 'copied' && <p className="mt-2 text-sm font-semibold text-money" role="status">Link copied. Paste it in WhatsApp, Instagram or anywhere.</p>}
+      {state === 'failed' && <p className="mt-2 text-sm text-alert" role="alert">Sharing isn't available here. Copy this site's address and send it instead.</p>}
+    </div>
+  );
 }
 
 export default function Render() {
@@ -123,6 +154,8 @@ export default function Render() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [canShare, setCanShare] = useState(true);
+  const [quality, setQuality] = useState(() => { try { return localStorage.getItem('animora.quality') === 'hd' ? 'hd' : 'draft'; } catch { return 'draft'; } });
+  const pickQuality = (q) => { setQuality(q); try { localStorage.setItem('animora.quality', q); } catch { /* private window */ } };
   const [lastDone, setLastDone] = useState(null);   // the last finished MP4 of this video (maybe from before an edit)
 
   const loadRender = async (rid) => { const r = await api(`/renders/${rid}`); setRender(r.render); return r.render; };
@@ -141,12 +174,14 @@ export default function Render() {
         setLastDone(list.renders.find((x) => x.projectId === id && x.status === 'done') || null);
         const rid = params.get('r') || (last && (!last.stale || ['queued', 'rendering'].includes(last.status)) ? last.id : null);
         if (rid) await loadRender(rid);
-        else if (params.get('new') && c.ok !== false && !c.needsAd) autoStart.current = true;
       } catch (e) { setError(e.message); }
     })();
   }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const active = render && ['queued', 'rendering'].includes(render.status);
+  // celebrate once when the MP4 finishes while the person is watching (not when an old one is opened)
+  const wasActive = useRef(false), [justDone, setJustDone] = useState(false);
+  useEffect(() => { if (active) wasActive.current = true; else if (wasActive.current && render?.status === 'done') { wasActive.current = false; setJustDone(true); } }, [active, render?.status]);
   // the MP4 is only kept a few minutes: count down, then show "Make your MP4" again (free)
   const [now, setNow] = useState(Date.now());
   const expiresAt = render?.status === 'done' && render.expiresAt ? new Date(render.expiresAt).getTime() : 0;
@@ -162,7 +197,7 @@ export default function Render() {
   useEffect(() => {
     if (params.get('download') !== '1' || autoDl.current || render?.status !== 'done' || !render.videoUrl) return;
     autoDl.current = true;
-    downloadVideo(render, project?.title || 'video', () => {}).catch(() => {});
+    downloadVideo(render, project?.title || 'video', () => {}).catch((e) => setError(e.message || 'The MP4 download failed. Please try again.'));
   }, [render?.status]); // eslint-disable-line react-hooks/exhaustive-deps
   const autoStart = useRef(false);
   useEffect(() => { if (autoStart.current && check && !render && !busy) { autoStart.current = false; start(); } });   // "Generate Video" in the editor starts straight away
@@ -174,7 +209,7 @@ export default function Render() {
   const start = async (adViewId) => {
     setBusy(true); setError(''); setAdOpen(false);
     try {
-      const r = await api(`/projects/${id}/renders`, { method: 'POST', body: { adViewId } });
+      const r = await api(`/projects/${id}/renders`, { method: 'POST', body: { adViewId, quality } });
       setRender(r.render); setParams({ r: r.render.id }, { replace: true }); refresh();
     } catch (e) {
       if (e.data?.code === 'AD_REQUIRED') setAdOpen(true); else setError(e.message);
@@ -221,7 +256,7 @@ export default function Render() {
                   <Button size="lg" className="mt-3 w-full sm:w-auto" onClick={() => { setRender(null); begin(); }} loading={busy}>Render video again</Button>
                 </div>
               )}
-              <p className="text-sm font-semibold text-money">{render.stale ? 'Your last MP4' : 'Your video is ready'}</p>
+              <p className="relative text-sm font-semibold text-money">{!render.stale && justDone && <Burst />}{render.stale ? 'Your last MP4' : 'Your video is ready'}</p>
               <h2 className="mt-1 text-3xl font-extrabold">Download and post it</h2>
               <p className="mt-2 text-ink-soft">{duration(render.durationSeconds)} · {ASPECTS[render.aspectRatio]?.w}×{ASPECTS[render.aspectRatio]?.h} MP4 · {(render.fileSize / 1e6).toFixed(1)} MB · plays on every phone.</p>
               <div className="mt-6 flex flex-wrap gap-3">
@@ -229,8 +264,9 @@ export default function Render() {
                 {project.plan?.voiceover?.enabled && (script
                   ? <Button variant="outline" size="lg" onClick={downloadScript}>Download narration script</Button>
                   : <Button as={Link} to={`/p/${id}/studio`} variant="outline" size="lg">Open narration script</Button>)}
-                {canShare && <Button variant="outline" size="lg" onClick={async () => setCanShare(await shareVideo(render, project.title))}>Share to WhatsApp</Button>}
+                {canShare && <Button variant="outline" size="lg" onClick={async () => setCanShare(await shareVideo(render, project.title))}>Send video only</Button>}
               </div>
+              {!render.stale && <ShareNudge />}
               {left !== null && (
                 <p className={`mt-4 rounded-xl px-3.5 py-2.5 text-sm font-semibold ${left > 60 ? 'bg-lilac text-ink-soft' : 'bg-alert/10 text-alert'}`} role="status">
                   {left > 0 ? `Download it now: this MP4 is deleted in ${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}. You can make it again for free.` : 'This MP4 is being deleted. Make it again any time, for free.'}
@@ -268,6 +304,24 @@ export default function Render() {
                     : user.testMode ? <p>Test mode: no ad, no limit. Your video starts rendering straight away.</p>
                     : <p>Ad-free · uses 1 of your Pro videos ({user.proVideosRemaining} left this month).</p>}
               </div>
+              {!tooLong && !render && (
+                <div className="mt-5" role="radiogroup" aria-label="Video quality">
+                  <p className="text-sm font-semibold">Choose the quality</p>
+                  <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                    {[['hd', 'Full HD · 1080p', 'Sharpest text and logos. Best for posting.', 2.4], ['draft', 'Quick draft · 720p', 'Smaller and faster. Good for checking it first.', 1.2]].map(([k, name, note, perSec]) => {
+                      const mins = Math.max(1, Math.round((60 + project.durationSeconds * perSec) / 60));
+                      return (
+                        <button key={k} type="button" role="radio" aria-checked={quality === k} onClick={() => pickQuality(k)}
+                          className={`rounded-2xl border p-3 text-left text-sm transition ${quality === k ? 'border-brand bg-lilac' : 'border-line bg-white'}`}>
+                          <span className="block font-semibold">{name}</span>
+                          <span className="block text-ink-soft">{note}</span>
+                          <span className="mt-1 block text-ink-soft">Ready in about {mins} min for your {project.durationSeconds}-second video</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
               {tooLong
                 ? <Button as={Link} to="/checkout" size="lg" className="mt-5 w-full">Upgrade to Pro — {naira(5000)}/month</Button>
                 : <Button size="lg" className="mt-5 w-full" onClick={render?.status === 'failed' ? retry : begin} loading={busy}>{check.needsAd ? 'Watch ad & ' : ''}{lastDone ? 'Render video again' : 'Generate Video'}</Button>}

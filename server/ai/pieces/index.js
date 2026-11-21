@@ -9,10 +9,14 @@ import { GSAP_CDN } from '../../engine/prompts.js';
 import { lookFor, fontsUrl } from '../motion/looks.js';
 import { geminiGenerate } from '../../engine/gemini.js';
 import { composeStory, pickLook, lookFor as storyLook, fontLink as storyFonts, fontFamilies as storyFams, LOOK_IDS, LOOKS as STORY_LOOKS, pickTrack, trackMusic, snapToBeats, musicLibrary } from '../story/index.js';
+import { birthdayPhotoAssets, isPersonalBirthdayBrief } from '../personal.js';
 
 const dir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'motion', 'browser');
 let RUNTIME = null;
 const runtime = () => (RUNTIME ||= ['pieces.js', 'atoms.js', 'pieces2.js', 'premium.js', 'signature.js', 'story.js'].map((f) => readFileSync(path.join(dir, f), 'utf8')).join('\n;\n'));
+import { closingLine, fitCtas, videoGroup } from '../closing.js';
+import { qaFilter } from '../standard.js';
+
 export const PIECES_ASPECTS = ['9:16'];   // the library is laid out for vertical video; other sizes use the Motion engine
 const SIZES = { '9:16': [1080, 1920], '4:5': [1080, 1350] };
 // the eight signature templates (recipes live in motion/browser/signature.js); they work at every size
@@ -32,30 +36,52 @@ const hashStr = (t) => { let h = 2166136261; for (const c of String(t)) { h ^= c
 const mulberry = (a) => () => { a |= 0; a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
 const lum = (h) => { const n = parseInt(String(h || '#777777').slice(1), 16); const c = [n >> 16, (n >> 8) & 255, n & 255].map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }); return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; };
 const HEX = /^#[0-9a-f]{6}$/i;
+const ordinal = (value) => { const n = Number(String(value || '').match(/\d{1,2}/)?.[0]); return n ? `${n}${n % 100 >= 11 && n % 100 <= 13 ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' }[n % 10] || 'th')}` : ''; };
+const personalLines = (text, fallback) => {
+  if (!text) return fallback;
+  const words = String(text).replace(/\s+/g, ' ').trim().split(' ').filter(Boolean), out = [];
+  for (let i = 0; i < words.length; i += 8) out.push(str(words.slice(i, i + 8).join(' '), 90));
+  return out.slice(0, 8);
+};
+const isBirthdayBrief = (brief = {}, plan = {}) => isPersonalBirthdayBrief(brief, plan);
 
 // the facts a video may use, taken from the owner's answers (never invented)
-function factsOf(plan = {}, brief = {}, assets = []) {
-  const photos = assets.filter((a) => (a.kind || 'image') === 'image' && a.role !== 'logo' && !/logo/i.test(a.name || '')).map((a) => a.url);
+export function factsOf(plan = {}, brief = {}, assets = []) {
+  // Creative QA at the source: no sales lines on a birthday, no websites or phone numbers the owner never gave
+  brief = { ...brief, headlines: qaFilter(brief, brief.headlines), features: qaFilter(brief, brief.features), phrases: qaFilter(brief, brief.phrases), memories: qaFilter(brief, brief.memories) };
+  const birthday = isBirthdayBrief(brief, plan);
+  const photoAssets = birthday ? birthdayPhotoAssets(assets, brief) : assets.filter((a) => (a.kind || 'image') === 'image' && a.role !== 'logo' && !/logo/i.test(a.name || ''));
+  const photos = photoAssets.map((a) => a.url);
   // What each picture can honestly do: small, very wide/tall or flat pictures are shown whole on a dimmed copy of themselves, never cropped into a circle or blown up.
   const fitOf = (m) => { const w = Number(m.width) || 0, h = Number(m.height) || 0; if (!w || !h) return 'cover'; const ratio = w / h; return Math.min(w, h) < 600 || ratio > 2.1 || ratio < 0.48 ? 'contain' : 'cover'; };
-  const fits = {}, ratios = {}; for (const a of assets) if (a.url) { fits[a.url] = fitOf(a); if (Number(a.width) && Number(a.height)) ratios[a.url] = Math.round((a.width / a.height) * 1000) / 1000; }
-  const logo = assets.find((a) => (a.kind || 'image') === 'image' && (a.role === 'logo' || /logo/i.test(a.name || '')))?.url || null;
-  const name = str(brief.name || plan.business?.name || 'Your business', 40);
-  const heads = [].concat(brief.headlines || [], brief.headline || []).map((h) => str(h, 60)).filter(Boolean);
-  const features = [].concat(brief.features || []).map((f) => str(f, 34)).filter(Boolean).slice(0, 4);
-  const products = [].concat(brief.products || []).map((p) => { const m = String(p).match(/^(.*?)[\s:–-]*((?:₦|N|NGN|\$)\s?[\d,.]+\s?[km]?)\s*$/i); return m ? { title: str(m[1], 34), price: m[2].replace(/^N(?=\d)/, '₦') } : { title: str(p, 34) }; });
+  const fits = {}, ratios = {}, taps = {}; for (const a of assets) if (a.url) { fits[a.url] = fitOf(a); if (Number(a.width) && Number(a.height)) ratios[a.url] = Math.round((a.width / a.height) * 1000) / 1000; const m = String(a.focus || '').match(/^([\d.]+),([\d.]+)$/); if (m) taps[a.url] = { x: Math.min(0.95, Math.max(0.05, +m[1])), y: Math.min(0.95, Math.max(0.05, +m[2])) }; }
+  const logo = birthday ? null : assets.find((a) => (a.kind || 'image') === 'image' && (a.role === 'logo' || /logo/i.test(a.name || '')))?.url || null;
+  const name = str(brief.name || plan.business?.name || (birthday ? 'Someone special' : 'Your business'), 40);
+  const age = birthday ? ordinal(brief.milestone) : '';
+  const relationship = birthday ? str(brief.relationship, 40).replace(/^(my|our)\s+/i, '').toLowerCase() : '';
+  const heads = birthday ? [`Happy${age ? ` ${age}` : ''} Birthday${name && name !== 'Someone special' ? `, ${name}` : ''}!`] : [].concat(brief.headlines || [], brief.headline || []).map((h) => str(h, 60)).filter(Boolean);
+  const features = [].concat(birthday ? brief.memories || [] : brief.features || []).map((f) => str(f, 34)).filter(Boolean).slice(0, 4);
+  const personalCopy = birthday ? personalLines(brief.personalMessage, ['May your new age bring you many blessings.', 'Wishing you joy and wonderful things in the year ahead.', "I'm so happy to celebrate you."]) : [];
+  const products = birthday ? [] : [].concat(brief.products || []).map((p) => { const m = String(p).match(/^(.*?)[\s:–-]*((?:₦|N|NGN|\$)\s?[\d,.]+\s?[km]?)\s*$/i); return m ? { title: str(m[1], 34), price: m[2].replace(/^N(?=\d)/, '₦') } : { title: str(p, 34) }; });
   const priced = products.find((p) => p.price);
-  const contact = str(brief.contact, 120), phone = (contact.match(/(\+?\d[\d\s-]{7,}\d)/) || [])[1] || '';
+  const payment = birthday ? '' : str(brief.payment, 100), contact = payment || birthday ? '' : str(brief.contact, 120), phone = payment || birthday ? '' : (contact.match(/(\+?\d[\d\s-]{7,}\d)/) || [])[1] || '';
   // the address: given, or the part of the contact line that is not a phone number, a handle or a link
-  const segs = contact.split(/\s*[·|•;]\s*|\s+-\s+/).map((x) => x.trim()).filter(Boolean);
+  const segs = contact.split(/\s*[·|•;]\s*|\s+-\s+/).map((x) => (phone ? x.replace(phone, '') : x).replace(/^[\s,]+|[\s,]+$/g, '').trim()).filter(Boolean);
   const placeSeg = segs.find((x) => !/https?:|www\.|\.com|@/i.test(x) && /\b(street|st|road|rd|way|avenue|ave|lagos|abuja|ibadan|lekki|ikeja|island|close|estate|plaza|mall|area|crescent|junction|opposite|beside|gra|phase|market|shop|suite|floor|off)\b/i.test(x))
     || segs.find((x) => !/\d{6,}|\d[\d\s-]{7,}\d|@|https?:|www\.|\.com|whats\s?app|instagram|ig:|email/i.test(x) && /\p{L}{3,}/u.test(x));
-  const place = str(brief.address || placeSeg || '', 60);
-  const whatsapp = /whats\s?app|wa\.me/i.test(String(brief.contact || '') + ' ' + String(brief.cta || ''));
+  const linkSeg = segs.find((x) => /https?:\/\/|www\.|\b[a-z0-9-]+(\.[a-z0-9-]+)*\.(com|app|ng|net|org|io|co|shop|store|site|online)\b/i.test(x) && !/@/.test(x));
+  const link = birthday ? '' : str(String(linkSeg || '').replace(/^https?:\/\//i, '').replace(/\/$/, ''), 40);
+  const place = birthday ? '' : str(brief.address || (placeSeg && placeSeg !== linkSeg ? placeSeg : '') || '', 60);
+  const whatsapp = !birthday && /whats\s?app|wa\.me/i.test(String(brief.contact || '') + ' ' + String(brief.cta || ''));
   // pictures with a see-through background (product cut-outs) can step out of a frame
-  const cutouts = assets.filter((a) => (a.kind || 'image') === 'image' && a.role !== 'logo' && !/logo/i.test(a.name || '') && (a.transparent || a.has_alpha)).map((a) => a.url);
+  const cutouts = photoAssets.filter((a) => a.transparent || a.has_alpha).map((a) => a.url);
   const appy = /\b(app|apps|software|saas|platform|online store|e-?commerce|delivery app|mobile app|website|web ?site|game|gaming|fintech|payments?)\b/i.test([brief.category, brief.name, ...[].concat(brief.features || [])].join(' ')) && !/repair|fix|service centre|service center/i.test(brief.category || '');
-  return { cutouts, appy, whatsapp, fits, ratios, name, mono: name.replace(/[^\p{L}\p{N} ]/gu, '').split(/\s+/).filter((w) => !/^(the|and|of)$/i.test(w)).slice(0, 2).map((w) => w[0]).join('').toUpperCase() || 'A', heads, features, products, priced, offer: str(brief.offer, 30), when: str(brief.when, 60), cta: str(brief.cta || [].concat(brief.ctas || [])[0] || 'Order now', 28), phone, place, photos, logo, category: str(brief.category, 40), sub: str(heads[1] || brief.goal || '', 90) };
+  const steps = [].concat(brief.steps || []).map((x) => str(x, 40)).filter(Boolean).slice(0, 8);
+  const phrases = [].concat(brief.phrases || []).map((x) => str(x, 90)).filter(Boolean).slice(0, 12);
+  const usable = photos.filter((u) => !cutouts.includes(u));
+  // 3 or more ordinary pictures (2 if the owner asked for a slideshow) become a slideshow that shows every one of them
+  const gallery = !(appy || steps.length) && (usable.length >= 3 || (usable.length >= 2 && !!brief.slideshow));
+  return { social: videoGroup(brief) === 'social', gallery, phrases, link, note: str(brief.endNote, 60), taps, steps, cutouts, appy: !birthday && (appy || steps.length > 0), whatsapp, fits, ratios, name, mono: name.replace(/[^\p{L}\p{N} ]/gu, '').split(/\s+/).filter((w) => !/^(the|and|of)$/i.test(w)).slice(0, 2).map((w) => w[0]).join('').toUpperCase() || 'A', heads, features, personalBirthday: birthday, age, relationship, personalLines: personalCopy, products, priced, offer: birthday ? '' : str(brief.offer, 30), when: birthday ? '' : str(brief.when, 60), cta: str(birthday ? (brief.closingMessage || `Blessed new age, ${name}!`) : (fitCtas(brief)[0] || closingLine(brief)), 60), phone, place, photos, logo, category: birthday ? 'Birthday celebration' : str(brief.category, 40), sub: birthday ? (relationship ? `From your ${relationship}` : 'A day all about you') : str(heads[1] || brief.goal || '', 90) };
 }
 const split2 = (t) => { const w = String(t).split(/\s+/); if (w.length < 3) return w.join(' '); const k = Math.ceil(w.length / 2); return w.slice(0, k).join(' ') + '|' + w.slice(k).join(' '); };
 
@@ -73,9 +99,9 @@ export function composePieces({ facts: f, duration = 24, seed = 1, energy = 'med
   f.photos.slice(0, Math.max(2, Math.min(5, Math.round(duration / 9)))).forEach((img, i) => { const p = pick(i ? ['photo-pop', 'photo-split', ...(appy ? ['photo-phone'] : [])] : ['photo-depth', 'photo-cinema', 'photo-pop', ...(appy ? ['photo-phone'] : [])]); middle.push({ piece: p, data: p === 'photo-depth' ? { img, tag: f.category || f.name, headline: f.sub || head } : p === 'photo-pop' ? { img, callouts: [f.features[0], f.features[1], f.priced ? `${f.priced.title} ${f.priced.price}` : f.features[2]].filter(Boolean) } : p === 'photo-split' ? { img, headline: head } : p === 'photo-phone' ? { img, headline: head, title: f.name, subtitle: f.category, price: f.priced?.price || '', cta: f.cta.split(' ')[0] } : { img, kicker: f.category, headline: head } }); });
   if (f.offer || f.priced) middle.push({ piece: 'info-price', kind: 'brand', data: { label: f.offer && !/\d/.test(f.offer) ? f.offer : f.priced?.title || 'Now', old: '', price: /\d/.test(f.offer) ? f.offer : f.priced?.price, note: f.priced && /\d/.test(f.offer) ? f.priced.title : '' } });
   if (f.when) middle.push({ piece: 'info-countdown', data: { kicker: 'Coming up', date: f.when, days: 3, hours: 12, mins: 45 } });
-  if (f.features.length >= 3) middle.push(pick([{ piece: 'info-checks', data: { headline: `Why ${f.name}`, items: f.features } }, { piece: 'info-tiles', data: { headline: `${f.name} gives you`, items: f.features } }]));
-  if (words.length >= 2) middle.push(pick([{ piece: 'text-slot', data: { lead: 'Always', words } }, { piece: 'text-stack', data: { word: (f.name.split(/\s+/)[0].length >= 3 ? f.name.split(/\s+/)[0] : words[0]), tag: f.category || f.name } }, { piece: 'text-marquee', data: { words: words.map((w) => w.toUpperCase()), brand: f.name } }, { piece: 'text-cascade', data: { headline: split2(f.heads[1] || head), key, sub: f.sub } }]));
-  if (f.place) middle.push({ piece: 'info-location', data: { kicker: 'Find us', place: f.place, hours: '' } });
+  if (f.features.length >= 3) middle.push(pick([{ piece: 'info-checks', data: { headline: f.social ? 'Highlights' : `Why ${f.name}`, items: f.features } }, { piece: 'info-tiles', data: { headline: f.social ? 'Highlights' : `${f.name} gives you`, items: f.features } }]));
+  if (words.length >= 2) middle.push(pick([{ piece: 'text-slot', data: { lead: f.social ? 'So much' : 'Always', words } }, { piece: 'text-stack', data: { word: (f.name.split(/\s+/)[0].length >= 3 ? f.name.split(/\s+/)[0] : words[0]), tag: f.category || f.name } }, { piece: 'text-marquee', data: { words: words.map((w) => w.toUpperCase()), brand: f.name } }, { piece: 'text-cascade', data: { headline: split2(f.heads[1] || head), key, sub: f.sub } }]));
+  if (f.place) middle.push({ piece: 'info-location', data: { kicker: f.social ? 'Where' : 'Find us', place: f.place, hours: '' } });
   const shuffle = (arr) => { for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]]; } return arr; };
   // the business's photo, its offer and its date always make the cut; the rest come in a different order each time
   const must = middle.filter((m, i) => (m.piece.startsWith('photo') && middle.findIndex((x) => x.piece.startsWith('photo')) === i) || m.piece === 'info-price' || m.piece === 'info-countdown');
@@ -136,11 +162,17 @@ const AFFINITY = [
   [/real estate|property|architect|design|agency|consult|school|education|law|finance|account|photograph|media|brand/i, ['swiss-editorial', 'cinematic-logo', 'type-reactor']],
   [/food|bake|cake|restaurant|cafe|kitchen|chop|grill|drink|juice|catering|pharmacy|clinic|shop|store|market|fresh/i, ['type-reactor', 'swiss-editorial', 'luxury-product']],
 ];
-function pickDirection({ brief, plan, salt, previous, aspect }) {
+// templates that carry the headline, the strengths and the contact (the others are brand stings: logo and name only)
+const CONTENT_TEMPLATES = ['type-reactor', 'luxury-product', 'hud-tech', 'sports-hype', 'swiss-editorial'];
+function pickDirection({ brief, plan, salt, previous, aspect, templatesOnly = false }) {
+  // giant scrolling type cannot show a long name ("COMMUNITY HEALTH INITIATIVE" shows as "IATIVE"), so long names skip that template
+  const longName = String(brief.name || plan?.business?.name || '').split(/\s+/).some((w) => w.length >= 10) || String(brief.name || '').length > 20;
   const text = [brief.category, brief.name, plan?.business?.category, [].concat(brief.features || []).join(' ')].filter(Boolean).join(' ');
   const fits = new Set(AFFINITY.filter(([re]) => re.test(text)).flatMap(([, ids]) => ids));
   const prev = (String(previous || '').match(/animora-direction:([a-z-]+);/) || [])[1];
-  const options = [...(SIZES[aspect] ? [['mix', 4]] : []), ...(TPL_SIZES[aspect] ? TEMPLATE_IDS.map((id) => [id, fits.has(id) ? 3 : 0.3]) : [])].filter(([id]) => id !== prev);
+  const distinct = new Set([...[].concat(brief.headlines || [], brief.headline || []), ...[].concat(brief.features || []), ...[].concat(brief.products || []), brief.category, brief.cta].map((x) => String(x || '').toLowerCase().trim()).filter(Boolean)).size;
+  const options = [...(SIZES[aspect] && !templatesOnly && distinct >= 5 ? [['mix', 4]] : []), ...(TPL_SIZES[aspect] ? TEMPLATE_IDS  .filter((id) => !(longName && id === 'type-reactor'))
+    .filter((id) => !templatesOnly || (brief.kind && brief.kind !== 'business' ? ['type-reactor', 'swiss-editorial'] : CONTENT_TEMPLATES).includes(id)).map((id) => [id, fits.has(id) ? 3 : 0.3]) : [])].filter(([id]) => id !== prev);
   const r = mulberry(hashStr(`${brief.name}|${text}|${salt}|dir`) % 2147483647 || 5)();
   let t = r * options.reduce((n, [, w]) => n + w, 0);
   for (const [id, w] of options) { t -= w; if (t <= 0) return id; }
@@ -148,7 +180,14 @@ function pickDirection({ brief, plan, salt, previous, aspect }) {
 }
 export function piecesFilm({ plan = {}, brief = {}, assets = [], style = null, themeColors = {}, salt = '', previous = null }) {
   const aspect = TPL_SIZES[plan.aspect_ratio] ? plan.aspect_ratio : '9:16';
-  if (!(!salt && isTemplateBrief(brief)) && process.env.ANIMORA_DIRECTOR !== 'pieces') {
+  // Normal-length videos start from a signature template chosen for the business (kinetic type, chrome, HUD, editorial ...).
+  // The long-form Story engine is for videos over ~35 s, where one template would run out of things to show.
+  const seconds = Number(plan.duration_seconds) || Number(brief.duration) || 20;
+  const birthday = isBirthdayBrief(brief, plan);
+  const isGallery = factsOf(plan, brief, assets).gallery;
+  const autoTemplate = !birthday && !salt && !isTemplateBrief(brief) && !isGallery && seconds <= 35 && !!TPL_SIZES[aspect] && process.env.ANIMORA_DIRECTOR !== 'story';
+  if (autoTemplate) brief = { ...brief, template: pickDirection({ brief, plan, salt: 'first', previous, aspect, templatesOnly: true }) };
+  if (birthday || (!(!salt && isTemplateBrief(brief)) && process.env.ANIMORA_DIRECTOR !== 'pieces')) {
     const out = storyFilm({ plan, brief, assets, style, salt, previous });
     out.html = out.html.replace('</body>', `<!--animora-direction:story-${out.data.story.look.id};--></body>`);
     return out;

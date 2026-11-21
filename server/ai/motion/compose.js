@@ -3,6 +3,11 @@
 // where to find it, a real call to action, and a logo end card. What the owner never said is never invented:
 // no ratings, no customer counts, no delivery times unless they gave them.
 import { factsFrom, cleanText, fixPrices, glyphFor } from '../cinema/compose.js';
+import { isPersonalBirthdayBrief } from '../personal.js';
+import { videoGroup, closingLine, fitCtas, MEMORIAL } from '../closing.js';
+import { directionOf } from '../direction.js';
+import { conformStructure, composeMiddle } from './structure.js';
+const NEEDS_PIC = new Set(['photoFirst', 'atmospheric', 'documentary', 'reveal']);
 
 const hash = (s) => { let h = 2166136261; for (const c of String(s)) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); } return (h >>> 0) % 2147483646 + 1; };
 const OK = /^#[0-9a-f]{6}$/i;
@@ -101,7 +106,7 @@ export function accentFor(colors = {}, text = '') {
  * The storyboard. Returns { beats, font, accent, accent2 }.
  * opts: { brief, assets, salt, avoid: [types used last time], duration }
  */
-export function composeMotion(plan, { brief = {}, assets = [], salt = '', avoid = [], colors = {}, look = null } = {}) {
+export function composeMotion(plan, { brief = {}, assets = [], salt = '', avoid = [], colors = {}, look = null, angle = null, structure = null } = {}) {
   const f = factsFrom(plan, brief || {}, assets);
   f.brand = brandCase(smartClip(cleanText(brief.name || plan.business?.name || f.brand, 80, { keepCase: true }), 48) || f.brand);
   const specific = cleanText(plan.business?.category || '', 40);
@@ -112,6 +117,9 @@ export function composeMotion(plan, { brief = {}, assets = [], salt = '', avoid 
   const chance = (p) => rnd() < p;
   const text = `${f.text} ${f.features.join(' ')} ${f.headlines.join(' ')}`;
   const food = FOOD.test(text), tech = TECH.test(text), beauty = BEAUTY.test(text), fashion = FASHION.test(text), service = SERVICE.test(text), event = EVENT.test(`${brief.goal || ''} ${brief.flyerType || ''} ${(brief.headlines || []).join(' ')}`);
+  // a PRODUCT people install or log into gets phone/app screens; a business that merely deals in computers (a laptop repair shop) does not
+  const appLike = /\b(apps?|software|saas|platform|startup|fintech|wallet|crypto|download)\b/i.test(`${f.cat} ${f.brand} ${f.text} ${f.headlines.join(' ')}`) && !/\b(repairs?|fix\w*|servic\w+|shop|store|dealer|sales|accessor\w+)\b/i.test(`${f.cat} ${f.brand}`);
+  const localBiz = (service || food || beauty) && !/\b(consult\w*|advis\w*|law\w*|bank\w*|estate|summit|conference|perfume|fragrance|luxury|jewel\w*|watch\w*)\b/i.test(`${f.cat} ${f.brand} ${f.text}`);
   const duration = Math.max(10, Math.round(Number(plan.duration_seconds) || 24));
   const avoidSet = new Set(avoid || []);
   const catLabel = f.cat && !GENERIC_CATS.test(f.cat) ? f.cat : '';   // only a real description goes on screen
@@ -142,7 +150,8 @@ export function composeMotion(plan, { brief = {}, assets = [], salt = '', avoid 
   const ctaGlyph = /whatsapp|chat|message|dm/i.test(cta) ? 'chat' : /call|phone/i.test(cta) ? 'phone' : /book|reserve/i.test(cta) ? 'clock' : /visit|store|shop/i.test(cta) ? 'pin' : /download|app/i.test(cta) ? 'phone' : 'bag';
   const doneWord = /book|reserve/i.test(cta) ? 'Booked' : /call/i.test(cta) ? 'Calling…' : /download/i.test(cta) ? 'Installed' : /visit|website/i.test(cta) ? 'Opening…' : /whatsapp|message|dm|chat/i.test(cta) ? 'Sent' : 'Done';
   const H0 = heads[0] || sentence(f.goal, 40) || `Meet ${f.brand}`;
-  const tagline = sentence(heads.find((h) => h.length <= 34 && h !== H0) || (f.cat ? `${f.cat}${city ? `, ${city}` : ''}` : ''), 40);
+  const ownLine = heads.find((h) => h.length <= 34 && h !== H0);   // a line the owner wrote; otherwise the caption is only a description (category, city)
+  const tagline = sentence(ownLine || (f.cat ? `${f.cat}${city ? `, ${city}` : ''}` : ''), 40);
 
   // ---- the look: mostly light (Apple-clean) or mostly dark (premium night) ----
   const darkPref = tech || beauty ? 0.55 : fashion ? 0.5 : 0.3;
@@ -163,8 +172,21 @@ export function composeMotion(plan, { brief = {}, assets = [], salt = '', avoid 
     const mode = f.brand.length > 18 ? 'wordmark' : pick(['welcome', 'wordmark', 'wordmark']);
     return mode === 'welcome' ? { type: 'icon', bg: base, mode: 'welcome', prefix: pick(['Welcome to', 'Meet', 'Say hello to']) } : { type: 'icon', bg: base, mode: 'wordmark', tagline: catLabel ? sentence(catLabel, 30) : '' };
   };
-  B.phone = () => (tech || /app|download/i.test(cta) ? { type: 'phone', bg: base, text: heads[1] || H0 } : null);
+  B.phone = () => {   // the screen shows a line that is not the headline (the opener has already said that)
+    const line = [heads[1], feats[0], catLabel].find((t) => t && key(t) !== key(H0));
+    return appLike && line ? { type: 'phone', bg: base, text: sentence(line, 36) } : null;
+  };
   B.photos = () => (photos.length ? { type: 'photos', bg: base, urls: photos.slice(0, 5), lines: [prods[0]?.name || heads[1] || H0], accent: accentOf(prods[0]?.name || heads[1] || H0) } : null);
+  // extra picture beats for the middle: the owner's pictures again, each beat from a different starting picture, captioned with a fact not yet said
+  B.midPics = (n) => {
+    const out = [];
+    for (let k = 1; k <= n && photos.length; k++) {
+      const rot = photos.slice(k % photos.length).concat(photos.slice(0, k % photos.length));
+      const cap = [prods[k]?.name, feats[k - 1], heads[k + 1]].filter(Boolean).find((c) => fresh(c));
+      out.push({ type: 'photos', bg: k % 2 ? base : (base === 'light' ? 'dark' : 'light'), urls: rot.slice(0, k === 1 ? 3 : 2), lines: cap ? [sentence(cap, 26)] : [], accent: cap ? accentOf(cap) : [], _pic: true, _want: true });
+    }
+    return out;
+  };
   B.grid = () => (photos.length >= 4 ? { type: 'grid', bg: base, urls: photos.slice(0, 9), text: heads[2] || heads[1] || (f.cat ? sentence(f.cat, 28) : '') } : null);
   B.price = () => {
     const p = offer && /\d/.test(offer) ? offer : priced[0]?.price;
@@ -172,7 +194,7 @@ export function composeMotion(plan, { brief = {}, assets = [], salt = '', avoid 
     const hero = priced[0];   // the owner's first item is the one they lead with
     const amount = Number(String(offer && /\d/.test(offer) ? offer : hero?.price || '').replace(/[^\d.]/g, '')) || 0;
     const label = event ? 'Tickets' : offer && /%|off/i.test(offer) ? 'Now' : amount && amount < 20000 ? 'Only' : '';
-    return { type: 'price', bg: 'brand', label, value: (offer && /\d/.test(offer) ? offer : hero.price).replace(/\s/g, ''), sub: event ? '' : offer && /%|off/i.test(offer) ? (hero?.name ? `on ${hero.name.toLowerCase()}` : '') : (hero?.name || '') };
+    return { type: 'price', bg: 'brand', label, value: ((v) => (/^[\d₦$€£.,%\s]+$/.test(v) ? v.replace(/\s/g, '') : v.replace(/\s+/g, ' ').trim()))(offer && /\d/.test(offer) ? offer : hero.price), sub: event ? '' : offer && /%|off/i.test(offer) ? (hero?.name ? `on ${hero.name.toLowerCase()}` : '') : (hero?.name || '') };
   };
   B.receipt = () => (priced.length >= 2 && (food || fashion || chance(0.5)) ? (() => {
     const items = priced.slice(0, 4).map((p) => ({ name: p.name, price: p.price }));
@@ -197,14 +219,150 @@ export function composeMotion(plan, { brief = {}, assets = [], salt = '', avoid 
   });
   B.stat = () => (nums.stats[0] ? { _src: nums.stats[0].src, _num: nums.stats[0].value.replace(/\D/g, ''), type: 'stat', bg: base, value: nums.stats[0].value, label: titleish(nums.stats[0].label), lead: pick(['And counting', 'Trusted by many', '']) || undefined, accent: [1] } : null);
   B.ring = () => (nums.times[0] && !nums.times[0].always ? { _src: nums.times[0].src, _num: String(nums.times[0].n), type: 'ring', bg: base, value: nums.times[0].value, label: `Under ${nums.times[0].n} ${nums.times[0].unitWord}`.replace(/\s+$/, ''), sub: '', fill: 0.82 } : null);
-  B.search = () => ((service || food || beauty || fashion) && (catLabel || city) ? { type: 'search', bg: 'light', lead: pick(['So you search…', 'Looking for the best?', 'Next time you search…']), query: `${(catLabel || f.brand).toLowerCase()}${city ? ` in ${city.toLowerCase()}` : ' near me'}`.slice(0, 34), title: f.brand, sub: [catLabel, city].filter(Boolean).join(' · '), button: /call/i.test(cta) ? 'Call' : /book/i.test(cta) ? 'Book' : 'Open' } : null);
-  B.notif = () => ((food || service || fashion || tech) && (feats[0] || heads[1]) ? { type: 'notif', bg: base, items: [{ body: sentence(heads[1] || feats[0], 70) }, ...(feats[1] ? [{ body: sentence(feats[1], 70), time: '1m ago' }] : [])].slice(0, 2), lead: chance(0.5) ? sentence(f.cat || '', 24) || undefined : undefined } : null);
+  B.search = () => (localBiz && (catLabel || city) ? { type: 'search', bg: 'light', lead: pick(['So you search…', 'Looking for the best?', 'Next time you search…']), query: `${(catLabel || f.brand).toLowerCase()}${city ? ` in ${city.toLowerCase()}` : ' near me'}`.slice(0, 34), title: f.brand, sub: [catLabel, city].filter(Boolean).join(' · '), button: /call/i.test(cta) ? 'Call' : /book/i.test(cta) ? 'Book' : 'Open' } : null);
+  B.notif = () => ((appLike || (localBiz && !service)) && (feats[0] || heads[1]) ? { type: 'notif', bg: base, items: [{ body: sentence(heads[1] || feats[0], 70) }, ...(feats[1] ? [{ body: sentence(feats[1], 70), time: '1m ago' }] : [])].slice(0, 2), lead: chance(0.5) ? sentence(f.cat || '', 24) || undefined : undefined } : null);
   B.map = () => (address ? { type: 'map', bg: 'light', label: pick(['Find us', 'Visit us', 'Come through']), address: cleanText(address.split(/,\s*/)[0], 32), sub: address.split(/,\s*/).slice(1).join(', ') || city, area: address.split(/,\s*/)[0].replace(/^\d+\s*/, '').split(' ').slice(0, 2).join(' '), area2: city } : null);
   B.calendar = () => (when ? { type: 'calendar', bg: base, lead: pick(['Save the date', 'Mark your calendar', 'See you there']), accent: [2], month: when.month, day: when.day, title: heads[0] && heads[0].length < 28 ? heads[0] : f.brand, time: when.time, place: when.place || cleanText(address, 36) } : null);
   B.chat = () => ({ type: 'chat', bg: base, messages: [{ from: 'me', text: prods[0] ? `Hi! Do you have ${prods[0].name.toLowerCase()} today?` : `Hi ${f.brand.split(' ')[0]}, are you open today?` }, { from: 'biz', text: prods[0]?.price ? `Yes! ${prods[0].name} is ${prods[0].price}. Want one?` : 'Yes, we are! How can we help you? 😊' }, { from: 'me', text: 'Perfect, I\'ll take it 🙌' }] });
   B.steps = () => ({ type: 'steps', bg: chance(0.5) ? 'dark' : base, title: 'How it works', items: [{ t: /book/i.test(cta) ? 'Book' : /whatsapp|message|chat/i.test(cta) ? 'Message us' : 'Reach out', s: phone || handle || 'It takes a minute', glyph: ctaGlyph }, { t: food ? 'We cook it fresh' : service ? 'We get to work' : 'We get it ready', s: '', glyph: food ? 'cup' : 'bolt' }, { t: food ? 'Enjoy' : 'You are sorted', s: '', glyph: 'smile' }] });
   B.cta = () => ({ type: 'button', bg: base, lead: pick([heads[3] || '', 'Ready?', 'Don\'t wait.', 'Your turn.']) || 'Ready?', accent: [0], label: cta, done: doneWord, glyph: ctaGlyph, sub: phone || handle || site || '' });
-  B.end = () => ({ type: 'end', bg: pick(['brand', 'brand', base === 'light' ? 'dark' : 'light', base]), tagline: tagline || '', accent: tagline ? accentOf(tagline) : [], contact: handle || site || phone || '', contactGlyph: handle ? 'search' : site ? 'globe' : 'phone' });
+  B.end = () => ({ type: 'end', generic: !ownLine || undefined, bg: pick(['brand', 'brand', base === 'light' ? 'dark' : 'light', base]), tagline: tagline || '', accent: tagline ? accentOf(tagline) : [], contact: handle || site || phone || '', contactGlyph: handle ? 'search' : site ? 'globe' : 'phone' });
+
+  // A personal birthday is a greeting, not an advert. Keep each supplied thought as its own animated beat.
+  const personalBirthday = isPersonalBirthdayBrief(brief, plan);
+  const dirAvoid = new Set(directionOf(brief).avoid || []);
+  // ---- the structure: how the film opens, how it ends, how its pictures and statements are composed ----
+  const S = structure || { opening: 'typo', ending: 'card', photos: 'float', wordsLeft: 0 };
+  const solemnFilm = MEMORIAL.test(`${brief.category || ''} ${brief.name || ''}`);
+  const captionOf = () => sentence([f.brand, catLabel, [].concat(brief.when || [])[0] ? String(brief.when).split(/\s*·\s*/).slice(-1)[0] : (address || city || '')].filter(Boolean).filter((x, i, a) => a.findIndex((y) => key(y) === key(x)) === i).join(' · '), 46);
+  /** The first beat(s) of the film. `head` is the headline beat that follows when the opening does not already carry it. */
+  const openingBeats = (typoPick) => {
+    let o = S.opening;
+    if (NEEDS_PIC.has(o) && !photos.length) o = 'typo';
+    if (o === 'photoFirst') return { opener: { ...B.photos(), layout: 'full', lines: [H0], accent: accentOf(H0) }, head: null, brandDone: false };
+    if (o === 'atmospheric') return { opener: { ...B.photos(), layout: 'full', lines: [], accent: [] }, head: B.hookGlow(), brandDone: false };
+    if (o === 'documentary') { const cap = captionOf(); return { opener: { ...B.photos(), layout: 'editorial', lines: cap ? [cap] : [], accent: [] }, head: solemnFilm ? B.hookGlow() : B.hookBuild(), brandDone: false }; }
+    if (o === 'reveal') {
+      const slam = B.hookSlam();
+      const sub = [heads[1], catLabel, f.brand].find((x) => x && key(x) !== key(H0)) || '';
+      if (slam) return { opener: slam, head: { ...B.photos(), layout: 'full', lines: sub ? [sentence(sub, 30)] : [], accent: [] }, brandDone: false };
+    }
+    if (o === 'brandFirst') { const b = B.brand(); return { opener: { ...b, mode: 'wordmark', tagline: b.tagline || '' }, head: B.hookBuild(), brandDone: true }; }
+    if (o === 'story') return { opener: { ...B.hookBuild(), layout: 'left' }, head: null, brandDone: false };
+    return { opener: typoPick(), head: null, brandDone: false };
+  };
+  /** Compose the finished list: photo layouts, left-set statements and the chosen ending (the essentials stay readable). */
+  const composeLayouts = (list) => {
+    const out = conformStructure(composeMiddle(list, S, { solemn: solemnFilm }), S, { photoUrls: photos });
+    let leftLeft = S.wordsLeft ? 2 : 0, n = 0;
+    out.forEach((b, i) => { if (b.type === 'words' && !b.layout && b.mode !== 'slam' && i > 0 && i < out.length - 2 && leftLeft > 0 && n++ % 2 === 0) { b.layout = 'left'; leftLeft--; } });
+    if (S.list) { const li = out.findIndex((b) => (b.type === 'stack' || b.type === 'toggles') && !b.layout && (b.items || []).length >= 2); if (li > -1) out[li].layout = 'list'; }
+    const last = out[out.length - 1];
+    if (last && last.type === 'end' && (solemnFilm || ['luxury', 'memorial'].includes(S.direction)) && last.bg === 'brand') last.bg = 'dark';   // a solemn or luxury film never closes on bright brand orbs
+    return out;
+  };
+  // Not an advert (burial, announcement, church, school, event, cause...): their own words and pictures, never a search bar,
+  // a shop button, a price or a chat. The opener, the order and the look change every time.
+  const social = !personalBirthday && videoGroup(brief) === 'social';
+  const socialBeats = () => {
+    const closing = (fitCtas(brief)[0] || closingLine(brief)).replace(/[.!]*$/, '');
+    const opening = H0 || f.brand;
+    const solemn = solemnFilm;
+    const op = openingBeats(() => (solemn ? B.hookGlow() : (chance(slamP0) && B.hookSlam()) || (chance(0.4) ? B.hookGlow() : B.hookBuild())));
+    const opener = op.opener;
+    const lineBeat = (line, i) => {
+      if (words(line).length >= 4 && chance(0.5)) { const a = accentOf(line)[0]; return { type: 'highlight', bg: base, text: line, hot: a > 0 ? [a - 1, a] : [a] }; }
+      const ls = balance(line, 22);
+      return { type: 'words', mode: solemn || chance(0.3) ? 'glow' : undefined, bg: solemn || (i % 3 === 0 && chance(0.5)) ? 'dark' : base, lines: ls, accent: accentOf(ls[ls.length - 1], ls.length > 1 ? words(ls[0]).length : 0) };
+    };
+    const said = [...heads.slice(1), ...feats].filter((x) => x && key(x) !== key(opening));
+    const uniq = []; for (const x of said) if (!uniq.some((u) => key(u) === key(x))) uniq.push(x);
+    const mid = [];
+    if (photos.length && !op.opener.urls && !(op.head && op.head.urls)) mid.push(B.photos());
+    if (photos.length >= 2 && S.presentation?.pics) mid.push(...B.midPics(Math.min(2, S.presentation.pics)));
+    if (photos.length >= 4 && chance(0.6)) mid.push(B.grid());
+    if (when) mid.push(solemn && brief.when ? { type: 'words', mode: 'glow', bg: 'dark', lines: balance(String(brief.when).replace(/\s*·\s*/g, ', '), 24), accent: [] } : B.calendar());
+    uniq.slice(0, 4).forEach((x, i) => mid.push(lineBeat(x, i)));
+    if (address && chance(0.7)) mid.push(B.map());
+    const parts = mid.filter(Boolean);
+    for (let i = parts.length - 1; i > 0; i--) if (chance(0.4)) { const j = Math.floor(rnd() * (i + 1)); [parts[i], parts[j]] = [parts[j], parts[i]]; }   // a different order every time
+    // the name (or their uploaded logo) right after the opener; never "Welcome to", never for a burial
+    const hasLogo = (assets || []).some((a) => a.role === 'logo' || /logo/i.test(a.name || ''));
+    const nameBeat = !solemn && (hasLogo || !key(opening).includes(key(f.brand))) ? [{ type: 'icon', bg: base, mode: 'wordmark', tagline: '' }] : [];
+    // where the name lands depends on the angle: right after the opener, late (story), or only on the end card (type)
+    const nm = op.brandDone || (angle === 'type' && !hasLogo) ? [] : nameBeat;
+    if (angle === 'story' && nm.length && parts.length >= 2) { parts.splice(Math.min(2, parts.length), 0, ...nm); return [opener, ...(op.head ? [op.head] : []), ...parts, { type: 'end', bg: pick(['brand', 'dark']), tagline: closing, accent: accentOf(closing), contact: handle || site || phone || '' }]; }
+    return [opener, ...(op.head ? [op.head] : []), ...nm, ...parts, { type: 'end', bg: pick(['brand', 'dark']), tagline: closing, accent: accentOf(closing), contact: handle || site || phone || '' }];
+  };
+  const slamP0 = (look?.energy || 'medium') === 'high' ? 0.45 : 0.15;
+  if (personalBirthday || social) {
+    const storyScenes = plan.scenes || [];
+    const sceneText = (scene) => [].concat(scene?.on_screen_text || []).map((x) => cleanText(x, 90, { keepCase: true })).filter(Boolean);
+    const opening = sceneText(storyScenes.find((scene) => scene.purpose === 'hook') || storyScenes[0])[0] || `Happy Birthday, ${f.brand}!`;
+    const brandScene = storyScenes.find((scene) => scene.purpose === 'brand');
+    const relationship = sceneText(brandScene)[1] || (brief.relationship ? `From your ${String(brief.relationship).replace(/^(my|our)\s+/i, '')}` : 'A day all about you');
+    const details = storyScenes.filter((scene) => scene.purpose === 'detail').flatMap(sceneText);
+    const endingScene = storyScenes.find((scene) => scene.purpose === 'cta') || storyScenes.at(-1);
+    const closing = sceneText(endingScene)[0] || `Blessed new age, ${f.brand}!`;
+    const intro = B.brand(); intro.tagline = relationship;
+    const photoBeat = photos.length ? B.photos() : null;
+    if (photoBeat) photoBeat.lines = [f.brand];
+    const detailBeats = [...new Set(details.map((line) => line.trim()).filter(Boolean))].map((line, i) => {
+      if (words(line).length >= 4 && i % 2 === 1) {
+        const hot = accentOf(line)[0];
+        return { type: 'highlight', bg: i % 3 === 1 ? 'light' : base, text: line, hot: hot > 0 ? [hot - 1, hot] : [hot] };
+      }
+      const lines = balance(line, 22);
+      return { type: 'words', mode: i % 2 === 0 ? 'glow' : undefined, bg: i % 3 === 0 ? 'dark' : base, lines, accent: accentOf(lines[lines.length - 1], lines.length > 1 ? words(lines[0]).length : 0) };
+    });
+    // A birthday greeting is composed like every other film: its opening, picture layouts, middle compositions and ending come from the
+    // chosen structure (the words stay the owner's own), so two birthdays do not share one storyboard.
+    const birthdayBeats = () => {
+      const hello = { lines: balance(opening, 22), accent: accentOf(opening) };
+      const op = openingBeats(() => ({ type: 'words', mode: chance(0.5) ? 'slam' : 'glow', bg: 'dark', ...hello }));
+      let said = false;
+      const own = (b) => {   // the first statement of the film is the greeting itself
+        if (!b || said) return b;
+        if (b.type === 'words') { said = true; return { ...b, ...hello, mode: b.mode === 'slam' ? 'slam' : b.mode }; }
+        if (b.type === 'photos' && b.lines?.length) { said = true; return { ...b, ...hello }; }
+        return b;
+      };
+      const opener = own(op.opener), head = own(op.head);
+      if (op.brandDone && opener.type === 'icon') opener.tagline = relationship;
+      const openPic = [opener, head].some((b) => b && b.type === 'photos');
+      return [opener, ...(head ? [head] : []), ...(op.brandDone ? [] : [intro]), ...(photoBeat && !openPic ? [photoBeat] : []), ...detailBeats,
+        { type: 'end', bg: closing && S.direction === 'birthday' ? pick(['brand', 'dark', 'brand']) : 'brand', tagline: closing, accent: accentOf(closing), contact: '' }];
+    };
+    const beats = composeLayouts(social ? socialBeats() : birthdayBeats());
+    const requested = Math.max(10, Number(plan.duration_seconds) || duration);
+    const durs = beats.map((beat) => BEAT_MIN[beat.type] + extraFor(beat));
+    let room = requested - durs.reduce((sum, value) => sum + value, 0);
+    if (room < 0) {
+      const factor = requested / (requested - room);
+      for (let i = 0; i < durs.length; i++) durs[i] *= factor;
+      room = 0;
+    }
+    for (let pass = 0; pass < 6 && room > 0.01; pass++) {
+      const grow = beats.map((beat, i) => Math.max(0, BEAT_MAX[beat.type] - durs[i]));
+      const totalGrow = grow.reduce((sum, value) => sum + value, 0);
+      if (!totalGrow) break;
+      for (let i = 0; i < durs.length; i++) durs[i] += Math.min(grow[i], (room * grow[i]) / totalGrow);
+      room = requested - durs.reduce((sum, value) => sum + value, 0);
+    }
+    if (room > 0.01) durs[durs.length - 1] += room;
+    const outs = ['push', 'whip', 'zoom', 'rise', 'drop'];
+    let lastOut = '';
+    const finalBeats = beats.map((beat, i) => {
+      let out = 'push';
+      if (i < beats.length - 1) {
+        const choices = outs.filter((candidate) => candidate !== lastOut && !(i === beats.length - 2 && candidate === 'push'));   // the last beat's own exit is 'push'
+        out = choices[Math.floor(rnd() * choices.length)];
+      }
+      lastOut = out;
+      return { ...beat, dur: Math.round(durs[i] * 100) / 100, out };
+    });
+    return { beats: finalBeats, font, accent: accentFor(colors, text), theme, brand: f.brand };
+  }
 
   // ---- the owner's own scene picks come first (after the hook) ----
   const wanted = [];
@@ -229,18 +387,31 @@ export function composeMotion(plan, { brief = {}, assets = [], salt = '', avoid 
   // ---- order: hook, brand, the owner's picks, then the proof the facts support ----
   const energy = look?.energy || 'medium';
   const slamP = energy === 'high' ? 0.55 : energy === 'calm' ? 0.05 : 0.3, glowP = energy === 'calm' ? 0.5 : 0.3;
-  const opener = (event && !avoidSet.has('countdown') && chance(0.5) ? B.countdown() : null) || (chance(slamP) ? B.hookSlam() : null) || (chance(glowP) ? B.hookGlow() : B.hookBuild());
-  const brandBeat = (tech && chance(0.5) ? B.phone() : null) || B.brand();
+  // the storytelling angle decides the shape of the film: how it opens, what it is made of, how it moves
+  const ANG = angle || 'clean';
+  const typeOnly = new Set(['words', 'highlight', 'stat', 'calendar', 'price', 'countdown', 'ring']);   // a purely typographic film
+  const op = openingBeats(() => (event && !solemnFilm && ANG !== 'calm' && !dirAvoid.has('countdown') && !avoidSet.has('countdown') && chance(0.45) ? B.countdown() : null)
+    || (ANG === 'loud' && B.hookSlam())
+    || (ANG === 'type' && (chance(0.6) ? B.hookSlam() : B.hookBuild()))
+    || (ANG === 'calm' && B.hookGlow())
+    || (ANG === 'story' && B.hookBuild())
+    || (event && !avoidSet.has('countdown') && chance(0.5) ? B.countdown() : null) || (chance(slamP) ? B.hookSlam() : null) || (chance(glowP) ? B.hookGlow() : B.hookBuild()));
+  const opener = op.opener;
+  const brandBeat = op.brandDone ? null : (appLike && ANG !== 'type' && chance(0.5) ? B.phone() : null) || B.brand();
+  const headBeat = op.head;   // when the opening is a picture or the brand, the headline is the second beat
   const pool = [
     B.photos(), B.price(), B.menu(), B.receipt(), B.features(), ...B.heads(), B.stat(), B.ring(), B.calendar(), B.grid(), B.notif(), B.search(), B.map(),
-  ].filter(Boolean);
+  ].filter(Boolean).filter((b) => !dirAvoid.has(b.type))   // what suits a perfume is not what suits a school
+    .filter((b) => !(S.presentation?.avoid || []).includes(b.type))   // nor does every way of telling it want phone-screen cards
+    .filter((b) => ANG !== 'type' || typeOnly.has(b.type))                    // type film: no screens or photos, only typography
+    .filter((b) => ANG !== 'calm' || !['notif', 'search', 'receipt', 'stat', 'ring'].includes(b.type));   // calm film: nothing busy
   // a little shuffle so two businesses with the same facts still get different films (proof order matters less than hook/brand/cta)
   for (let i = pool.length - 1; i > 0; i--) { if (chance(0.35)) { const j = Math.max(0, i - 1 - Math.floor(rnd() * 2)); [pool[i], pool[j]] = [pool[j], pool[i]]; } }
   // photos first when there are photos; the map always late
   pool.sort((a, b) => (a.type === 'photos' ? -1 : b.type === 'photos' ? 1 : 0) || (a.type === 'map' ? 1 : b.type === 'map' ? -1 : 0));
-  const ctaBeat = B.cta(), endBeat = B.end();
+  const ctaBeat = dirAvoid.has('button') || (S.presentation && !S.presentation.cta) ? null : B.cta(), endBeat = B.end();
   const est = (b) => BEAT_MIN[b.type] + 0.4;
-  let budget = duration - est(opener) - est(ctaBeat) - est(endBeat);
+  let budget = duration - est(opener) - (ctaBeat ? est(ctaBeat) : 0) - est(endBeat);
   const body = [];
   const seen = new Set([opener.type === 'words' ? 'words-hook' : opener.type]);
   // beats that show the same list count as one (a menu and a receipt, or two lists of strengths)
@@ -259,8 +430,12 @@ export function composeMotion(plan, { brief = {}, assets = [], salt = '', avoid 
   };
   const rawUsed = [];
   textsOf(opener).forEach((t) => { used.add(key(t)); rawUsed.push(String(t).toLowerCase()); });
-  if (duration >= 14) take(brandBeat);
+  if (headBeat) take(headBeat);
+  // story: the brand is revealed late (after two ideas), clean: right after the opening
+  const lateBrand = ANG === 'story' && duration >= 16 && !!brandBeat;
+  if (brandBeat && duration >= 14 && !lateBrand && !(ANG === 'type' && !(assets || []).some((x) => x.role === 'logo' || /logo/i.test(x.name || '')))) take(brandBeat);
   wanted.forEach(take);
+  B.midPics(S.presentation?.pics || 0).forEach(take);
   // how much time the facts fill; with lots of time and few facts, every strength gets its own beat (one idea per beat)
   const need = pool.reduce((a, b) => a + est(b), 0);
   const spread = feats.length >= 2 && budget - need > 4;
@@ -278,11 +453,27 @@ export function composeMotion(plan, { brief = {}, assets = [], salt = '', avoid 
     if (rest.length >= 2) pool.push(rest.every((x) => x.length <= 22) && chance(0.5) ? { type: 'swap', bg: base, lead: 'There\'s more', items: rest } : { type: 'toggles', bg: base, title: 'There\'s more', items: rest });
     fb.forEach((b, i) => pool.splice(Math.min(pool.length, 1 + i * 2), 0, b));
   }
-  pool.forEach((b) => { if (!body.some((x) => x.type === b.type && !['words', 'highlight'].includes(b.type))) take(b); });
+  pool.filter((b) => !dirAvoid.has(b.type)).forEach((b) => { if (!body.some((x) => x.type === b.type && !['words', 'highlight'].includes(b.type))) take(b); });
   // still room? repeat the main message in a different form, then the strengths again
-  const fillers = [ feats.length >= 2 ? { type: 'toggles', bg: base, title: 'What you get', items: feats.slice(0, 4) } : null, B.search(), B.notif()].filter(Boolean);
+  const fillers = [ feats.length >= 2 && appLike ? { type: 'toggles', bg: base, title: 'What you get', items: feats.slice(0, 4) } : null, B.search(), B.notif()].filter(Boolean).filter((b) => !dirAvoid.has(b.type)).filter((b) => !(S.presentation?.avoid || []).includes(b.type));
   for (const fb of fillers) { if (budget < 2) break; if (!body.some((x) => x.type === fb.type && fb.type !== 'words')) take(fb); }
-  let beats = [opener, ...body, ctaBeat, endBeat];
+  if (lateBrand && !body.some((b) => b.type === 'icon')) { const at = Math.min(body.length, Math.max(1, 2)); if (est(brandBeat) <= budget + 0.01 || body.length > 2) body.splice(at, 0, brandBeat); }
+  if (ANG === 'type') {   // a type film still needs variety: some lines become a highlighted sentence, others a quiet glow
+    let n = 0;
+    body.forEach((b, i) => {
+      if (b.type !== 'words') return;
+      const line = [].concat(b.lines || []).join(' ');
+      if (words(line).length >= 4 && n++ % 2 === 0) { const a = accentOf(line)[0]; body[i] = { type: 'highlight', bg: b.bg || base, text: line, hot: a > 0 ? [a - 1, a] : [a] }; }
+    });
+  }
+  if (ANG === 'calm' && body.length > 3) body.length = 3;                       // calm: fewer ideas, each given room
+  if (ANG === 'loud' && ctaBeat && chance(0.5)) { const pi = body.findIndex((b) => b.type === 'price'); if (pi > 0) body.push(body.splice(pi, 1)[0]); }   // loud: land the offer just before the close
+  {   // the middle's pictures are spread through the film rather than bunched up front
+    const pics = body.filter((b) => b._pic), rest = body.filter((b) => !b._pic);
+    pics.forEach((p, i) => rest.splice(Math.min(rest.length, Math.max(1, Math.round(rest.length * (pics.length === 1 ? 0.45 : i === 0 ? 0.3 : 0.72))) + i), 0, p));
+    if (pics.length) body.splice(0, body.length, ...rest);
+  }
+  let beats = composeLayouts([opener, ...body, ctaBeat, endBeat].filter(Boolean));
 
   // ---- backgrounds: keep rhythm (never three of the same in a row unless it is the theme), one brand punch ----
   const punch = beats.find((b) => b.bg === 'brand' && b.type !== 'end');
@@ -312,13 +503,13 @@ export function composeMotion(plan, { brief = {}, assets = [], salt = '', avoid 
     const k = duration / tot; for (let i = 0; i < durs.length; i++) durs[i] *= k;
   }
   // ---- transitions: varied, never the same twice in a row ----
-  const outs = energy === 'high' ? ['whip', 'zoom', 'drop', 'whip', 'push', 'rise'] : energy === 'calm' ? ['push', 'fade', 'rise', 'push', 'fade'] : ['push', 'whip', 'zoom', 'rise', 'push', 'drop'];
+  const outs = ANG === 'loud' ? ['whip', 'zoom', 'drop', 'whip', 'zoom'] : ANG === 'calm' ? ['fade', 'rise', 'fade', 'push'] : ANG === 'type' ? ['push', 'rise', 'drop', 'push', 'zoom'] : ANG === 'story' ? ['push', 'rise', 'push', 'fade'] : ANG === 'photos' ? ['zoom', 'push', 'fade', 'zoom'] : energy === 'high' ? ['whip', 'zoom', 'drop', 'whip', 'push', 'rise'] : energy === 'calm' ? ['push', 'fade', 'rise', 'push', 'fade'] : ['push', 'whip', 'zoom', 'rise', 'push', 'drop'];
   let last = '';
   beats = beats.map((b, i) => {
     let out = 'push';
-    if (i < beats.length - 1) { let k = 0; do { out = pick(outs); k++; } while ((out === last || (out === 'drop' && beats[i + 1].type === 'map')) && k < 8); }
+    if (i < beats.length - 1) { let k = 0; do { out = pick(outs); k++; } while ((out === last || (out === 'drop' && beats[i + 1].type === 'map') || (i === beats.length - 2 && out === 'push')) && k < 12); }
     last = out;
-    const { _want, _src, _num, _menu, ...rest } = b;
+    const { _want, _src, _num, _menu, _pic, ...rest } = b;
     if (Array.isArray(rest.items)) rest.items = uniqueGlyphs(rest.items);
     return { ...rest, dur: Math.round(durs[i] * 100) / 100, out };
   });

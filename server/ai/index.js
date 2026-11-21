@@ -2,6 +2,7 @@
 // Real mode: Google Gemini (planner + code writer + editor), checked by our validator.
 // Offline mode (no key) or Gemini failure: our practice planner + template engine,
 // so the product never dead-ends in front of a customer (or a judge).
+import { qaPlan, qaHtml } from './standard.js';
 import { config } from '../config.js';
 import { getDbObject } from '../storage.js';
 import { planChat, generateAnimation, editAnimation } from '../engine/gemini.js';
@@ -15,6 +16,8 @@ import { THEMES } from './themes.js';
 import { directCinema, cinemaEdit, isCinema, readCinema, CINEMA_ASPECTS } from './cinema/index.js';
 import { directMotion, motionEdit, motionOfflineEdit, isMotion, readMotion, MOTION_ASPECTS } from './motion/index.js';
 import { piecesFilm, piecesEdit, isPieces, PIECES_ASPECTS, isTemplateBrief } from './pieces/index.js';
+import { premiumFilm, premiumEdit, isPremium, PREMIUM_ASPECTS } from './premium/index.js';
+import { birthdayPhotoAssets, isPersonalBirthdayBrief } from './personal.js';
 
 // 'director' (default): Gemini directs the shots, our motion engine animates them (fast, always renders).
 // 'html': Gemini writes the whole HTML/GSAP file itself (slower, experimental).
@@ -121,17 +124,38 @@ export function aiReason(e) {
 }
 
 /** Plan -> HTML. Returns { html, source, problems, notice? } */
-export async function generateCode({ plan, style, assets, brief = null, previous = null, onStatus }) {
+export async function generateCode(args) {
+  // Creative QA: clean the plan before the film is made, and check the finished film before it is delivered
+  const b = args.brief || {};
+  if (args.plan) qaPlan(b, args.plan);
+  const out = await generateCodeInner(args);
+  // the length the owner asked for was kept: say plainly if content had to be left out (or the film made longer) to stay readable
+  if (out && args.plan?.duration_note && !out.notice) out.notice = args.plan.duration_note;
+  if (out?.html && /<\/?(div|svg|canvas)/i.test(out.html)) { const r = qaHtml(b, out.html); out.html = r.html; out.qa = r.qa; }
+  return out;
+}
+async function generateCodeInner({ plan, style, assets, brief = null, previous = null, onStatus, memory = [] }) {
+  if (isPersonalBirthdayBrief(brief || {}, plan || {})) assets = birthdayPhotoAssets(assets || [], brief || {});
   const themeKey = themeKeyFor(style);
-  const motionFirst = CODE_MODE !== 'html' && process.env.ANIMORA_ENGINE !== 'cinema' && MOTION_ASPECTS.includes(plan.aspect_ratio || '9:16');
+  const engine = String(brief?.videoEngine || process.env.ANIMORA_ENGINE || 'motion').toLowerCase();
+  const motionFirst = CODE_MODE !== 'html' && engine !== 'cinema' && MOTION_ASPECTS.includes(plan.aspect_ratio || '9:16');
   // The Motion director sees the pictures itself, so it skips the separate "describe the pictures" call (one AI round trip saved).
   if (config.useGemini && !motionFirst) { onStatus?.('Looking at your pictures'); assets = await describeAssets(assets, loadImage); }
   let planWithAssets = enrichPlan(plan, assets);
-  // Every video size is made by the Motion engine (Apple-style product films): the AI directs, or the rule-based composer without a key
-  const motion = CODE_MODE !== 'html' && process.env.ANIMORA_ENGINE !== 'cinema' && MOTION_ASPECTS.includes(planWithAssets.aspect_ratio || '9:16');
-  // Vertical videos are spelled from the premium motion library: a different mix of pieces for every business and every Regenerate.
-  // ANIMORA_ENGINE=motion (or cinema) switches back to the older engines.
-  const pieces = CODE_MODE !== 'html' && !['motion', 'cinema'].includes(process.env.ANIMORA_ENGINE) && (PIECES_ASPECTS.includes(planWithAssets.aspect_ratio || '9:16') || ['16:9', '1:1', '4:5'].includes(planWithAssets.aspect_ratio));
+  // The classic Motion director is the default: it composes a beginning, distinct shots and a finish from the user's brief.
+  // Choosing "Signature visual mix" in the form opts that video into the newer template-led Pieces engine.
+  const motion = CODE_MODE !== 'html' && engine !== 'cinema' && MOTION_ASPECTS.includes(planWithAssets.aspect_ratio || '9:16');
+  const pieces = CODE_MODE !== 'html' && !['motion', 'cinema'].includes(engine) && (PIECES_ASPECTS.includes(planWithAssets.aspect_ratio || '9:16') || ['16:9', '1:1', '4:5'].includes(planWithAssets.aspect_ratio));
+  // Premium first: a designer-made template filled with the owner's details (no AI call). ANIMORA_ENGINE=pieces skips it.
+  // Premium recipes (phone-UI scenes) are off unless ANIMORA_ENGINE=premium. They only show the owner's own words; the fake friend-chat template is never auto-picked.
+  const premium = CODE_MODE !== 'html' && engine === 'premium' && PREMIUM_ASPECTS.includes(planWithAssets.aspect_ratio || '9:16');
+  if (premium) {
+    try {
+      onStatus?.('Building your film');
+      const r = premiumFilm({ plan: planWithAssets, brief: brief || {}, assets: planWithAssets.assets, salt: previous ? String(Date.now()) : '', previous });
+      return { html: r.html, source: 'template', problems: [] };
+    } catch (e) { console.warn('[premium] no fit, using pieces:', e.message); }
+  }
   if (pieces) {
     try {
       onStatus?.('Building your film');
@@ -146,9 +170,9 @@ export async function generateCode({ plan, style, assets, brief = null, previous
       const r = await directMotion({
         plan: planWithAssets, brief, assets: planWithAssets.assets, themeColors: THEMES[themeKey]?.colors || {},
         images: config.useGemini ? await imageParts(assets) : [], useAi: !!config.useGemini,
-        salt: previous ? String(Date.now()) : '', avoid: (prev?.beats || prev?.scenes || []).map((x) => x.type), style,
+        salt: previous ? String(Date.now()) : '', avoid: (prev?.beats || prev?.scenes || []).map((x) => x.type), style, prevAngle: prev?.angle || null, prevConcept: prev?.concept || '', prevLook: prev?.look?.key || null, prevSig: prev?.sig || null, memory,
       });
-      return { html: r.html, source: config.useGemini && r.source === 'gemini' ? 'gemini' : 'template', problems: [], ...(config.useGemini && r.source !== 'gemini' ? { notice: "The AI director couldn't finish, so this version was arranged automatically. Press Regenerate to try the AI again." } : {}) };
+      return { html: r.html, source: config.useGemini && r.source === 'gemini' ? 'gemini' : 'template', problems: [], ...(config.useGemini && r.source !== 'gemini' && !r.aiSkipped ? { notice: "The AI director couldn't finish, so this version was arranged automatically. Press Regenerate to try the AI again." } : {}) };
     } catch (e) { console.warn('[motion] failed, trying Cinema:', e.message); }
     // the older engines below use picture descriptions
     if (config.useGemini) { onStatus?.('Looking at your pictures'); assets = await describeAssets(assets, loadImage); planWithAssets = enrichPlan(plan, assets); }
@@ -194,6 +218,11 @@ export async function generateCode({ plan, style, assets, brief = null, previous
 
 /** Plain-words edit. Returns { html, source, summary } */
 export async function editCode({ html, instruction, aspectRatio, duration, plan = null, assets = [], onStatus }) {
+  if (isPremium(html)) {
+    try { const r = await premiumEdit({ html, instruction, useAi: !!config.useGemini }); if (r) return { html: r.html, source: config.useGemini ? 'gemini' : 'offline', summary: r.summary }; }
+    catch (e) { console.warn('[premium] edit failed:', e.message); }
+    return { html, source: 'offline', unchanged: true, summary: config.useGemini ? "I couldn't make that change just now. Please try again in a moment, or press Regenerate for a different design." : 'Press Regenerate for a different design. Changing the words needs the AI, which is off right now.' };
+  }
   if (config.useGemini && !isMotion(html) && !isPieces(html)) assets = await describeAssets(assets, loadImage);
   if (isFlyer(html)) {
     if (!config.useGemini) return { html, source: 'offline', unchanged: true, summary: 'Flyer changes need the AI, which is off right now.' };

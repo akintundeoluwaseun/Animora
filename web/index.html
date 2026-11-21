@@ -32,6 +32,7 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>/* after a new version goes live, a page opened just before it can ask for files that are gone: reload once instead of showing a blank screen */(function(){function again(){try{if(sessionStorage.getItem("animora-reloaded"))return;sessionStorage.setItem("animora-reloaded","1")}catch(e){}location.reload()}window.addEventListener("vite:preloadError",function(e){e.preventDefault();again()});setTimeout(function(){var r=document.getElementById("root");if(r&&!r.childElementCount)again();else try{sessionStorage.removeItem("animora-reloaded")}catch(e){}},8000)})()</script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

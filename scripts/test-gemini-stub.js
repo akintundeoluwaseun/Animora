@@ -2,6 +2,7 @@
 // plan extraction from chat, code generation with auto-repair, edits, and the fallback
 // to the template engine when Gemini fails.
 import { readFile } from 'node:fs/promises';
+const { isMotion, readMotion } = await import('../server/ai/motion/index.js');
 
 process.env.GEMINI_API_KEY = 'stub';
 process.env.AI_MODE = 'gemini';
@@ -15,6 +16,7 @@ let script = [];
 const calls = [];
 globalThis.fetch = async (url, init) => {
   if (!String(url).includes('generativelanguage')) throw new Error('unexpected fetch ' + url);
+  if (/\/models\?/.test(String(url))) return { ok: true, json: async () => ({ models: [{ name: 'models/gemini-3-flash', supportedGenerationMethods: ['generateContent'] }] }) };   // the live model list is not a scripted reply
   const body = JSON.parse(init.body);
   calls.push({ url: String(url), system: body.systemInstruction.parts[0].text, last: body.contents.at(-1).parts.at(-1).text, headers: init.headers });
   const next = script.shift();
@@ -42,18 +44,19 @@ ok('plan extracted from chat', r.plan?.duration_seconds === 15 && !r.reply.inclu
 const assets = [{ name: 'logo', url: 'http://img.test/logo.png', kind: 'image', role: 'logo', width: 400, height: 400, has_alpha: true }];
 const dplan = { ...plan, duration_seconds: 15, aspect_ratio: '16:9', business: { name: 'TechDesk' }, cta: 'Visit techdesk.space',
   scenes: [{ id: 1, start: 0, end: 15, purpose: 'cta', on_screen_text: ['TechDesk', 'Visit techdesk.space'] }] };
-const beatsJson = JSON.stringify({ beats: [
-  { shot: 'logo', seconds: 2.5, text: 'TechDesk', cut: 'dive' },
-  { shot: 'flip', seconds: 2, text: 'Meet your AI assistant', cut: 'focus' },
-  { shot: 'chat', seconds: 3, text: 'Can you fix my laptop?', sub: 'Yes! Book in 2 taps.', cut: 'morph' },
-  { shot: 'nonsense', seconds: 2, text: 'Built for Ado Ekiti' },
-  { shot: 'lockup', seconds: 3, text: 'TechDesk', subs: ['techdesk.space'], button: 'Try the AI chatbot' } ] });
+const beatsJson = JSON.stringify({ concept: 'Meet the assistant', font: 'Inter', beats: [
+  { type: 'icon', dur: 2.5, bg: 'dark', out: 'zoom', mode: 'wordmark', tagline: 'Your AI assistant' },
+  { type: 'words', dur: 3, bg: 'dark', out: 'push', lines: ['Meet your AI assistant'], accent: [2] },
+  { type: 'chat', dur: 4, bg: 'dark', out: 'rise', messages: [{ from: 'me', text: 'Can you fix my laptop?' }, { from: 'biz', text: 'Yes! Book in 2 taps.' }] },
+  { type: 'nonsense', dur: 2, text: 'Built for Ado Ekiti' },
+  { type: 'end', dur: 3.5, bg: 'brand', out: 'push', tagline: 'Visit techdesk.space', contact: 'techdesk.space' } ] });
 script = [beatsJson];
 const g = await generateCode({ plan: dplan, style: { name: 'Midnight Glow', palette: { theme: 'midnight' } }, assets, brief: { extra: 'Zoom into the logo of the chatbot first' } });
-ok('director builds the video', g.source === 'gemini' && g.html.includes('engine=motion-v4') && g.html.includes('"shot":"logo"'));
+const gm = readMotion(g.html);
+ok('director builds the video', g.source === 'gemini' && isMotion(g.html) && gm?.beats[0].type === 'icon' && gm.beats.at(-1).type === 'end', gm ? gm.beats.map((x) => x.type).join('>') : 'not a Motion film');
 ok('special instructions reach the director', calls.at(-1).last.includes('Zoom into the logo of the chatbot first'));
-ok('director prompt lists the shot menu', calls.at(-1).system.includes('iconmorph') && calls.at(-1).system.includes('dive'));
-ok('unknown shots are repaired', !g.html.includes('nonsense') && g.html.includes('"cut":{"type":"dive"'));
+ok('director prompt lists the beat menu and the layouts', calls.at(-1).system.includes('BEAT LIBRARY') && calls.at(-1).system.includes('editorial') && calls.at(-1).last.includes('THE STRUCTURE'));
+ok('unknown beat types are dropped', !g.html.includes('nonsense') && gm.beats.every((x) => ['icon', 'words', 'chat', 'end'].includes(x.type)));
 
 // 3. One model busy -> the next model answers (no template fallback)
 script = [new Error('overloaded'), new Error('overloaded'), beatsJson];
@@ -63,12 +66,13 @@ ok('busy model falls back to the next model', b2.source === 'gemini' && /gemini/
 // 4. Gemini fully down -> rule-based arrangement, with a notice
 script = Array(12).fill(0).map(() => new Error('overloaded'));
 const f = await generateCode({ plan: { ...plan, aspect_ratio: '16:9' }, style: { palette: { theme: 'luxe' } }, assets: [] });
-ok('falls back to the motion engine rules', f.source === 'template' && f.html.includes('window.__timeline') && !!f.notice);
+ok('falls back to the rule-based director', f.source === 'template' && isMotion(f.html) && !!f.notice);
 
 // 5. Edit by prompt on a directed video: beats + colours change
-script = [JSON.stringify({ beats: JSON.parse(beatsJson).beats.slice(1), colors: { primary: '#1F8A4C' }, summary: 'Removed the logo opening and made it green.' })];
+script = [JSON.stringify({ beats: JSON.parse(beatsJson).beats.filter((x) => x.type !== 'icon' && x.type !== 'nonsense'), accent: '#1F8A4C', summary: 'Removed the logo opening and made it green.' })];
 const e = await editCode({ html: g.html, instruction: 'remove the logo intro, make it green', aspectRatio: '16:9', duration: 15, plan: dplan, assets });
-ok('edit via the director', e.source === 'gemini' && e.html.includes('--primary: #1F8A4C') && !e.html.includes('"shot":"logo"') && e.summary.includes('green'));
+const em = readMotion(e.html);
+ok('edit via the director', e.source === 'gemini' && em?.accent === '#1F8A4C' && em.beats[0].type !== 'icon' && e.summary.includes('green'), em ? `${em.accent} ${em.beats.map((x) => x.type).join('>')}` : 'not a Motion film');
 
 // 6. Guided questions: suggestions and plan from the answers
 const { suggest, briefToPlan } = await import('../server/ai/brief.js');

@@ -71,14 +71,15 @@ function limit(x, sr, ceiling = lin(-2.2), lookMs = 5, releaseMs = 80) {   // -2
 }
 
 /** Master a mono effects track in place. Returns { gainDb, lufs } for logging. */
-export function masterTrack(x, sr, { target = -14 } = {}) {
+// true peaks stay under -4 dBFS (measured on the exported AAC), as the sound-pass method asks, so phone speakers never crackle
+export function masterTrack(x, sr, { target = -14, ceilingDb = -4.6 } = {}) {
   if (!x?.length) return { gainDb: 0, lufs: -70 };
   compress(x, sr, { attack: 0.018, release: 0.16 });   // a slower attack lets the start of each effect through, so it reads over the music
   const before = loudness(x, sr);
   const gainDb = before > -69 ? Math.max(-12, Math.min(24, target - before)) : 0;
   const g = lin(gainDb);
   for (let i = 0; i < x.length; i++) x[i] *= g;
-  limit(x, sr);
+  limit(x, sr, lin(ceilingDb));
   return { gainDb, lufs: loudness(x, sr) };
 }
 
@@ -89,7 +90,7 @@ export function masterTrack(x, sr, { target = -14 } = {}) {
  *  - faded in quickly and out over the last 2 seconds;
  *  - gently ducked (about -3.5 dB) under each sound effect so whooshes and chimes read clearly.
  */
-export function musicBed(music, n, sr, events = [], { timeScale = 1, level = -34 } = {}) {
+export function musicBed(music, n, sr, events = [], { timeScale = 1, level = -34, offset = 0 } = {}) {
   const out = new Float32Array(n);
   const len = music.length; if (!len) return out;
   // loudness-ish level: RMS over the first minute
@@ -97,6 +98,7 @@ export function musicBed(music, n, sr, events = [], { timeScale = 1, level = -34
   const rms = Math.sqrt(e / Math.max(1, m)), g = rms > 1e-6 ? lin(level) / rms : 0;
   const xf = Math.min(Math.floor(len / 4), sr * 2);
   for (let i = 0; i < n; i++) {
+    if (offset && len > offset + n) { out[i] = music[offset + i]; continue; }   // started part-way into the song (beat-aligned)
     if (len >= n || i < len - xf) { out[i] = music[i % len]; continue; }
     // past the first pass: crossfade the tail into the start, then keep looping the same way
     const period = len - xf, k = (i - (len - xf)) % period, inFade = k < xf;

@@ -9,7 +9,7 @@
 // thumbnails and downloads keep working unchanged.
 import { fontsUrl } from './motion/looks.js';
 
-export const FLYER2_LAYOUTS = ['poster', 'price', 'event', 'menu', 'photo', 'diagonal', 'collage', 'services', 'hiring'];
+export const FLYER2_LAYOUTS = ['poster', 'price', 'event', 'menu', 'photo', 'diagonal', 'collage', 'services', 'hiring', 'invite', 'blocks'];
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
 const hex = (h) => { const n = parseInt(String(h || '#000000').replace('#', ''), 16); return [n >> 16, (n >> 8) & 255, n & 255]; };
 const toHex = (c) => '#' + c.map((v) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')).join('');
@@ -31,7 +31,7 @@ const G = {
   briefcase: 'M4 8h16v11H4zM9 8V5h6v3M4 13h16',
 };
 const ic = (k, size, color, sw = 2.2) => `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${color || 'currentColor'}" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${G[k] || G.check}"/></svg>`;
-const GLYPH_WORDS = [[/deliver|ship|dispatch|logistic/i, 'truck'], [/fast|quick|instant|same.?day|express/i, 'bolt'], [/love|care|gentle|family|kid|baby/i, 'heart'], [/best|quality|premium|top|award|star/i, 'star'], [/hour|time|open|24|daily|day/i, 'clock'],
+const GLYPH_WORDS = [[/\b(deliver\w*|dispatch\w*|shipping|shipped|logistic\w*)\b/i, 'truck'], [/bible|study|scripture|prayer|word\b|teach|lesson|class|learn|school|book/i, 'book'], [/worship|fellowship|communit|church|welcome|friend|together|youth|choir|praise/i, 'heart'], [/fast|quick|instant|same.?day|express/i, 'bolt'], [/love|care|gentle|family|kid|baby/i, 'heart'], [/best|quality|premium|top|award|star/i, 'star'], [/hour|time|open|24|daily|day/i, 'clock'],
   [/where|address|location|visit|near/i, 'pin'], [/chat|whatsapp|message|support/i, 'chat'], [/secure|safe|trust|warrant|guarant/i, 'shield'], [/gift|free|bonus|offer/i, 'gift'], [/fresh|organic|natural|farm|plant/i, 'leaf'], [/drink|coffee|tea|juice|cafe/i, 'cup'],
   [/home|house|room|estate|rent/i, 'home'], [/class|learn|school|course|train|tutor/i, 'book'], [/hair|cut|barb|salon|tailor|sew/i, 'scissors'], [/job|work|career|hire|role/i, 'briefcase'], [/shop|buy|order|store|sale/i, 'bag']];
 const glyphFor = (t, i) => (GLYPH_WORDS.find(([re]) => re.test(t)) || [0, ['sparkle', 'star', 'check', 'heart', 'bolt', 'gift'][i % 6]])[1];
@@ -44,7 +44,8 @@ function contactLines(contact) {
 }
 
 /** Pick a composition from what the flyer is for, what the owner prefers, and what they gave us. */
-export function chooseFlyerLayout({ kinds = [], pref = '', photos = 0, items = 0, priced = 0, offer = '', when = null, features = 0, avoid = null, seed = 1 }) {
+export function chooseFlyerLayout({ kinds = [], direction = null, pref = '', photos = 0, items = 0, priced = 0, offer = '', when = null, features = 0, avoid = null, seed = 1 }) {
+  if (pref === 'invite') return 'invite';   // a burial or tribute: one calm framed layout
   const k = new Set([].concat(kinds).map((x) => String(x).toLowerCase()));
   const has = (re) => [...k].some((x) => re.test(x));
   const cands = [];
@@ -62,8 +63,13 @@ export function chooseFlyerLayout({ kinds = [], pref = '', photos = 0, items = 0
   if (items >= 3 && priced >= 2) add('menu', 4);
   if (features + items >= 4) add('services', 3);
   add('poster', 3);
+  // no photos: still give every flyer a real choice of composition
+  if (!photos) { if (when || has(/event|party|wedding|church|invit|concert|service/)) add('invite', 5); add('blocks', 4); }
+  if (photos >= 1) add('blocks', 1);
   if (offer || priced) add('price', 2);
-  let s = seed; const rnd = () => ((s = (s * 16807) % 2147483647) / 2147483647);
+  // the creative direction's own layouts get a strong lead, so a perfume, a school notice and a concert are composed differently
+  for (const l of direction?.layouts || []) { const c = cands.find((x) => x[0] === l); if (c) c[1] += 7; else if (l !== avoid && !(l === 'photo' || l === 'diagonal' || l === 'collage') ) cands.push([l, 6]); else if (l !== avoid && photos) cands.push([l, 6]); }
+  let s = (Math.imul(seed | 0, 2654435761) >>> 0) % 2147483647 || 1; const rnd = () => ((s = (s * 16807) % 2147483647) / 2147483647); rnd(); rnd();   // scrambled, so nearby seeds do not give the same pick
   // gentle weights: the business's signals still lead, but another good layout can win, so flyers stop looking alike
   if (photos >= 1) { add('photo', 2); add('diagonal', 2); }
   if (photos >= 2) add('collage', 2);
@@ -114,10 +120,12 @@ function decoHtml(deco, { W, H, A, A2, dark, brand, display, n, seed }) {
 
 // ---------------------------------------------------------------------------
 export function flyerHtml2(data) {
+  data = { ...data, features: (data.features || []).map((f) => String(f).trim()).filter((f, i, a) => f && a.findIndex((u) => u.toLowerCase() === f.toLowerCase()) === i) };   // never the same point twice
   const { W, H, brand, logo } = data;
   const look = data.look || { theme: 'dark', display: 'Inter', dw: 800, ui: 'Inter', text: 'plain', deco: 'none' };
   const c = data.colors || {};
-  const A = /^#[0-9a-f]{6}$/i.test(c.primary || '') ? c.primary : '#3D5AFE';
+  const solemn = /in loving memory|in memory/i.test(String(data.badge || ''));   // a burial or tribute: calm slate, no shiny button
+  const A = solemn ? '#4B5060' : /^#[0-9a-f]{6}$/i.test(c.primary || '') ? c.primary : '#3D5AFE';
   const A2 = /^#[0-9a-f]{6}$/i.test(look.accent2 || c.secondary || '') ? (look.accent2 || c.secondary) : mix(A, '#FFFFFF', 0.4);
   const dark = look.theme === 'dark';
   const BG = /^#[0-9a-f]{6}$/i.test(look.bg || c.background || '') ? (look.bg || c.background) : dark ? '#0E0E12' : '#F4F4F6';
@@ -147,11 +155,12 @@ export function flyerHtml2(data) {
   const h1 = (cls = '') => `<h1 class="fit ${cls}">${headline}</h1>`;
 
   const initials = String(brand || '?').replace(/[^\p{L}\p{N} ]/gu, '').trim().split(/\s+/).filter((x) => !/^(the|and|of)$/i.test(x)).slice(0, 2).map((x) => x[0]).join('').toUpperCase() || '?';
-  const mark = (size = 104, onBrand = false) => logo
+  const mark = (size = 104, onBrand = false, force = false) => logo
     ? `<span class="mk ${logo.transparent ? 'clear' : 'boxed'}" style="height:${n(size)};${logo.transparent ? '' : `width:${n(size)};`}"><img src="${esc(logo.url)}" crossorigin="anonymous" alt=""></span>`
+    : !force ? ''   // no logo uploaded: show the business name only, never an invented badge
     : `<span class="mk mono ${onBrand ? 'on' : ''}" style="width:${n(size)};height:${n(size)};font-size:${n(size * (initials.length > 1 ? 0.4 : 0.52))}">${esc(initials)}</span>`;
   const brandRow = (onBrand = false) => `<header class="brandrow">${mark(96, onBrand)}<span class="bn">${esc(brand)}</span></header>`;
-  const cta = (cls = '') => `<div class="cta ${cls}"><span>${esc(data.cta || 'Order now')}</span>${ic('arrow', n(40).replace('px', ''), 'currentColor', 2.6)}</div>`;
+  const cta = (cls = '') => solemn ? `<div class="cta-quiet">${esc(data.cta || 'Forever in our hearts')}</div>` : `<div class="cta ${cls}"><span>${esc(data.cta || 'Order now')}</span>${ic('arrow', n(40).replace('px', ''), 'currentColor', 2.6)}</div>`;
   const contactList = (cls = '') => (contacts.length ? `<div class="contacts ${cls}">${contacts.map((x) => `<span>${ic(x.icon, Math.round(34 * U), 'currentColor')}${esc(x.text)}</span>`).join('')}</div>` : '');
   const feats = (max = 4, cls = '') => ((data.features || []).length ? `<ul class="feats ${cls}">${data.features.slice(0, max).map((f, i) => `<li><i>${ic(glyphFor(f, i), Math.round(30 * U), 'currentColor', 2.4)}</i><span>${esc(f)}</span></li>`).join('')}</ul>` : '');
   const sub = data.subhead ? `<p class="sub">${esc(data.subhead)}</p>` : '';
@@ -187,7 +196,7 @@ export function flyerHtml2(data) {
       <section class="ev">${day ? `<div class="date"><b>${esc(day)}</b><span>${esc(mon)}</span>${when?.weekday ? `<i>${esc(when.weekday)}</i>` : ''}</div>` : ''}<div class="ev-t">${h1()}${sub}</div></section>
       ${hero ? `<div class="ev-photo"><img src="${esc(hero)}" crossorigin="anonymous" alt=""></div>` : ''}
       <ul class="ev-info">${when?.time ? `<li>${ic('clock', Math.round(40 * U), ACC)}<span>${esc(when.time)}</span></li>` : ''}${when?.place ? `<li>${ic('pin', Math.round(40 * U), ACC)}<span>${esc(when.place)}</span></li>` : ''}${(data.features || []).slice(0, 3).map((f, i) => `<li>${ic(glyphFor(f, i), Math.round(40 * U), ACC)}<span>${esc(f)}</span></li>`).join('')}</ul>
-      <footer class="ticket"><div class="t-l"><span class="lbl">${esc(offer ? (/%|off|save|sale|discount/i.test(offer) ? 'Special' : (/\d/.test(offer) ? 'From' : 'Offer')) : 'Entry')}</span><b>${esc(offer || 'Free')}</b></div><div class="t-r">${cta()}${contactList('small')}</div></footer></div>`;
+      ${offer ? `<footer class="ticket"><div class="t-l"><span class="lbl">${esc(offer ? (/%|off|save|sale|discount/i.test(offer) ? 'Special' : (/\d/.test(offer) ? 'From' : 'Offer')) : 'Entry')}</span><b>${esc(offer || 'Free')}</b></div><div class="t-r">${cta()}${contactList('small')}</div></footer>` : `<footer class="foot">${cta()}${contactList('small')}</footer>`}</footer></div>`;
   } else if (L === 'menu') {
     const list = items.slice(0, tall ? 8 : 6);
     body = `<div class="pf menu">
@@ -201,7 +210,7 @@ export function flyerHtml2(data) {
       <section class="ph-copy">${h1('onphoto')}${sub}${feats(3, 'glass')}</section>
       <footer class="foot onphoto">${cta()}${contactList()}</footer></div>`;
   } else if (L === 'diagonal') {
-    body = `<div class="pf diag"><div class="dg-top">${hero ? `<img src="${esc(hero)}" crossorigin="anonymous" alt="">` : `<div class="dg-art">${mark(240, true)}</div>`}</div>
+    body = `<div class="pf diag"><div class="dg-top">${hero ? `<img src="${esc(hero)}" crossorigin="anonymous" alt="">` : `<div class="dg-art"><span class="dg-name">${esc(brand)}</span></div>`}</div>
       <div class="dg-top-row">${brandRow(true)}</div>
       ${data.badge || offer ? `<div class="seal"><span>${esc(data.badge || offer)}</span></div>` : ''}
       <section class="dg-copy">${h1()}${sub}${feats(4)}</section>
@@ -224,6 +233,19 @@ export function flyerHtml2(data) {
       <section class="hr-head"><span class="kicker">${esc(data.badge || 'Join our team')}</span><h1 class="fit giant">We're <em>hiring</em></h1>${sub || `<p class="sub">${esc(data.headline || '')}</p>`}</section>
       <ul class="roles">${roles.map((r) => `<li>${ic('briefcase', Math.round(38 * U), ACC)}<span>${esc(r)}</span></li>`).join('')}</ul>
       <footer class="foot">${cta()}${contactList()}</footer></div>`;
+  } else if (L === 'invite') {
+    const bits = [when?.weekday && when?.day ? `${when.weekday} ${when.day} ${String(when.month || '').slice(0, 3)}` : [when?.day, when?.month].filter(Boolean).join(' '), when?.time].filter(Boolean);
+    body = `<div class="pf invite"><div class="iv-frame"></div>
+      <div class="iv-top">${mark(88)}<span class="bn">${esc(brand)}</span></div>
+      <section class="iv-main"><span class="kicker">${esc(data.badge || (when ? 'You are invited' : String((data.kinds || [])[0] || '')))}</span>${h1('giant')}<i class="iv-orn"></i>${sub}
+      ${bits.length || when?.place ? `<div class="iv-when">${bits.length ? `<b>${esc(bits.join('  ·  '))}</b>` : ''}${when?.place ? `<span>${ic('pin', Math.round(34 * U), ACC)}${esc(when.place)}</span>` : ''}</div>` : ''}</section>
+      ${(data.features || []).length ? `<ul class="iv-list">${(data.features || []).filter((f, i, a) => a.findIndex((u) => u.toLowerCase() === f.toLowerCase()) === i).slice(0, 4).map((f) => `<li>${esc(f)}</li>`).join('')}</ul>` : ''}
+      <footer class="foot center">${cta()}${contactList('small')}</footer></div>`;
+  } else if (L === 'blocks') {
+    const rows = [...(data.features || []), ...items.map((x) => (x.price ? `${x.title} · ${x.price}` : x.title))].filter(Boolean).filter((r, i, all) => all.findIndex((u) => String(u).trim().toLowerCase() === String(r).trim().toLowerCase()) === i).slice(0, 4);
+    body = `<div class="pf blocks"><section class="bk-top">${brandRow(true)}<div class="bk-h">${h1('giant')}</div>${sub}</section>
+      <section class="bk-body">${rows.length ? `<ol class="bk-rows">${rows.map((r, i) => `<li><b>${String(i + 1).padStart(2, '0')}</b><span>${esc(r)}</span></li>`).join('')}</ol>` : ''}
+      <footer class="foot">${cta(dark ? '' : 'dark')}${contactList()}</footer></section></div>`;
   }
 
   // treatment CSS for the display type
@@ -263,6 +285,7 @@ ${treat}
 .mk.mono::after { content:''; position:absolute; inset:0; background:linear-gradient(180deg, rgba(255,255,255,.35), rgba(255,255,255,0) 48%); }
 .tag { margin-left:auto; font-family:${uiF}; font-weight:800; font-size:${n(26)}; letter-spacing:.14em; text-transform:uppercase; padding:${n(12)} ${n(22)}; border-radius:999px; border:${n(2)} solid ${line}; }
 .tag.glass { color:#fff; border-color:rgba(255,255,255,.4); background:rgba(255,255,255,.12); backdrop-filter:blur(10px); }
+.cta-quiet { font-style:italic; font-weight:600; letter-spacing:.04em; font-size:${n(40)}; color:${A}; opacity:.9; text-align:center; }
 .cta { display:inline-flex; align-items:center; gap:${n(16)}; background:${A}; color:${onA}; font-weight:800; font-size:${n(42)}; padding:${n(26)} ${n(44)}; border-radius:999px; white-space:nowrap; box-shadow:0 ${n(20)} ${n(50)} ${n(-14)} ${rgba(A, 0.7)}; }
 .cta.dark { background:#111; color:#fff; box-shadow:none; }
 .contacts { display:flex; flex-direction:column; gap:${n(8)}; font-weight:700; font-size:${n(34)}; min-width:0; }
@@ -283,6 +306,21 @@ ${treat}
 .ghost { position:absolute; right:${n(40)}; top:${tall ? '44%' : '40%'}; font-family:${display}; font-weight:800; font-size:${n(tall ? 520 : 420)}; line-height:1; color:${dark ? 'rgba(255,255,255,.05)' : 'rgba(17,17,20,.05)'}; z-index:0; }
 .cols { display:grid; grid-template-columns:1fr 1fr; gap:${n(22)} ${n(40)}; position:relative; z-index:2; max-width:${hero ? '60%' : tall ? '100%' : '66%'}; }
 .col { display:flex; flex-direction:column; gap:${n(6)}; font-size:${n(32)}; font-weight:600; } .col b { font-family:${display}; font-size:${n(30)}; color:${ACC}; } .col.wide { grid-column:span 2; color:${mute}; }
+/* invite */
+.pf.invite { align-items:center; text-align:center; padding:${n(96)} ${n(96)} ${n(84)}; gap:${n(30)}; }
+.iv-frame { position:absolute; inset:${n(34)}; border:${n(3)} solid ${rgba(A, 0.7)}; border-radius:${n(26)}; pointer-events:none; } .iv-frame::after { content:''; position:absolute; inset:${n(12)}; border:${n(1.5)} solid ${rgba(A, 0.35)}; border-radius:${n(18)}; }
+.iv-top { display:flex; align-items:center; gap:${n(18)}; } .iv-main { display:flex; flex-direction:column; align-items:center; gap:${n(26)}; margin:auto 0; width:100%; }
+.iv-main h1 { text-align:center; max-height:${Math.round(H * 0.34)}px; font-size:${n(tall ? 180 : 150)}; } .iv-main .sub { text-align:center; margin:0 auto; }
+.iv-orn { width:${n(150)}; height:${n(10)}; background:linear-gradient(90deg, transparent, ${A}, transparent); border-radius:99px; display:block; }
+.iv-when { display:flex; flex-direction:column; gap:${n(8)}; align-items:center; font-size:${n(38)}; } .iv-when b { font-family:${display}; font-size:${n(52)}; color:${ACC}; letter-spacing:.02em; } .iv-when span { display:flex; align-items:center; gap:${n(10)}; font-weight:600; color:${mute}; }
+.iv-list { list-style:none; display:flex; flex-wrap:wrap; justify-content:center; gap:${n(14)} ${n(18)}; } .iv-list li { font-weight:700; font-size:${n(30)}; padding:${n(10)} ${n(24)}; border-radius:999px; border:${n(2)} solid ${rgba(A, 0.55)}; }
+/* blocks */
+.pf.blocks { padding:0; gap:0; }
+.bk-top { background:linear-gradient(160deg, ${mix(A, '#FFFFFF', 0.12)}, ${A} 55%, ${mix(A, '#000000', 0.28)}); color:${onA}; padding:${n(70)} ${n(68)} ${n(64)}; display:flex; flex-direction:column; gap:${n(26)}; flex:0 0 ${tall ? '54%' : '56%'}; border-bottom-left-radius:${n(70)}; position:relative; overflow:hidden; }
+.bk-top .bn { color:${onA}; } .bk-top .sub { color:${onA}; opacity:.85; } .bk-h { margin:auto 0; } .bk-top h1 { max-height:${Math.round(H * 0.3)}px; } .bk-top h1 em { color:${onA2 === '#111111' ? '#111' : A2}; }
+.bk-top::after { content:''; position:absolute; right:${n(-120)}; bottom:${n(-120)}; width:${n(420)}; height:${n(420)}; border-radius:50%; background:rgba(255,255,255,.14); }
+.bk-body { flex:1; display:flex; flex-direction:column; gap:${n(26)}; padding:${n(46)} ${n(68)} ${n(60)}; }
+.bk-rows { list-style:none; display:grid; grid-template-columns:1fr 1fr; gap:${n(18)} ${n(34)}; } .bk-rows li { display:flex; gap:${n(16)}; align-items:baseline; font-weight:700; font-size:${n(32)}; padding-bottom:${n(12)}; border-bottom:${n(2)} solid ${line}; } .bk-rows b { font-family:${display}; color:${ACC}; font-size:${n(30)}; }
 /* price */
 .pf.price { color:${onA}; }
 .price-bg { position:absolute; inset:0; background:radial-gradient(120% 90% at 50% 40%, ${mix(A, '#FFFFFF', 0.22)} 0%, ${A} 50%, ${mix(A, '#000000', 0.3)} 100%); }
@@ -332,9 +370,10 @@ ${treat}
 .foot.onphoto { margin-top:${n(10)}; } .onphoto .contacts svg { color:#fff; }
 /* diagonal */
 .dg-top { position:absolute; left:0; right:0; top:0; height:${tall ? 54 : 50}%; clip-path:polygon(0 0, 100% 0, 100% 78%, 0 100%); background:${A}; }
+.dg-name { font-family:${display}; font-weight:${Math.max(look.dw || 800, 500)}; font-size:${n(120)}; line-height:1; color:#fff; text-align:center; padding:0 ${n(60)}; text-shadow:0 ${n(4)} ${n(30)} rgba(0,0,0,.25); max-width:88%; overflow-wrap:anywhere; }
 .dg-art { width:100%; height:100%; display:grid; place-items:center; background:radial-gradient(circle at 50% 45%, ${mix(A, '#fff', 0.25)}, ${A} 55%, ${mix(A, '#000', 0.3)}); }
 .dg-top-row { position:relative; z-index:2; } .diag .dg-top-row .bn { color:#fff; text-shadow:0 ${n(2)} ${n(12)} rgba(0,0,0,.35); }
-.seal { position:absolute; z-index:4; right:${n(70)}; top:calc(${tall ? 54 : 50}% - ${n(190)}); width:${n(230)}; height:${n(230)}; border-radius:50%; background:${A2}; color:${onA2}; display:grid; place-items:center; text-align:center; transform:rotate(-12deg); box-shadow:${shadow}; font-family:${display}; font-weight:800; font-size:${n(48)}; line-height:1; padding:${n(24)}; }
+.seal { position:absolute; z-index:4; right:${n(70)}; top:calc(${tall ? 54 : 50}% - ${n(380)}); width:${n(230)}; height:${n(230)}; border-radius:50%; background:${A2}; color:${onA2}; display:grid; place-items:center; text-align:center; transform:rotate(-12deg); box-shadow:${shadow}; font-family:${display}; font-weight:800; font-size:${n(48)}; line-height:1; padding:${n(24)}; }
 .seal::before { content:''; position:absolute; inset:${n(12)}; border-radius:50%; border:${n(3)} dashed ${onA2 === '#FFFFFF' ? 'rgba(255,255,255,.5)' : 'rgba(0,0,0,.3)'}; }
 .dg-copy { margin-top:${tall ? Math.round(H * 0.4) : Math.round(H * 0.36)}px; display:flex; flex-direction:column; gap:${n(22)}; position:relative; z-index:2; min-height:0; overflow:hidden; } .dg-copy h1 { font-size:${n(tall ? 140 : 112)}; max-height:${n(tall ? 330 : 240)}; }
 /* collage */

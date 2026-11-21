@@ -12,11 +12,16 @@ import { inspectAnimation, snapshotFrames } from '../engine/renderer.js';
 import { probeBuffer, toMp3 } from '../media.js';
 import { voiceoverFormats, generateVoiceTrack, VOICES, hasOfflineVoice } from '../ai/voice.js';
 import { config } from '../config.js';
-import { cleanBrief, briefToPlanRules, suggest, autoStyleSlug, parseBrief } from '../ai/brief.js';
+import { cleanBrief, briefToPlanRules, suggest, autoStyleSlug, parseBrief, parseBriefRules, fillDemoBrief, repairLegacyBirthdayBrief } from '../ai/brief.js';
+import { needsBirthdayPlanRepair } from '../ai/personal.js';
 import { makeFlyer, flyerFitNotice } from '../ai/flyer.js';
 import { adjustDesign, aspectOf, currentLook } from '../ai/adjust.js';
+import { isPremium, readPremium, premiumWithAudio, VOICE_LIBRARY, SOUND_REGISTRY } from '../ai/premium/index.js';
+import { beatsFor, alignMusic } from '../engine/sfx.js';
+import { readFileSync } from 'node:fs';
 import { useCredit, NEED_CREDITS } from '../billing.js';
 import { describeAssets } from '../ai/describe.js';
+import { readMotion } from '../ai/motion/index.js';
 import { loadImage } from '../ai/index.js';
 
 const MAX_IMAGES = 10;
@@ -28,7 +33,7 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 
 const IMAGE = /^image\/(png|jpe?g|webp|gif|svg\+xml)$/;
 const AUDIO = /^audio\/(mpeg|mp3|wav|x-wav|aac|mp4|x-m4a|ogg)$/;
 
-const MAX_VERSIONS = 15;
+const MAX_VERSIONS = 5;   // Undo steps kept per design (each one is a full copy, so few keeps the database small)
 
 async function loadProject(req, res) {
   const p = await one('SELECT * FROM projects WHERE id=$1 AND user_id=$2', [req.params.id, req.user.id]);
@@ -42,7 +47,7 @@ async function loadStyle(id) {
     .then((s) => s && { ...s, creatorName: s.creator_name });
 }
 
-const projectAssets = (projectId) => q(`SELECT id, name, kind, role, mime, url, width, height, has_alpha, duration_seconds, is_light, description
+const projectAssets = (projectId) => q(`SELECT id, name, kind, role, mime, url, width, height, has_alpha, duration_seconds, is_light, description, focus
   FROM assets WHERE project_id=$1 AND (role IS NULL OR role <> 'voice') ORDER BY created_at`, [projectId]);
 
 // Whole-second total length: the final scene absorbs any fraction.
@@ -120,8 +125,8 @@ r.post('/:id/flyer', async (req, res) => {
   const f = await one(`INSERT INTO projects (user_id, title, style_id, brief_json, plan_json, aspect_ratio, duration_seconds, kind, source_project_id, status, gen_state, gen_message, gen_started_at)
     VALUES ($1,$2,$3,$4,$5,$6,$7,'flyer',$8,'coding','working','Designing your flyer',now()) RETURNING *`,
     [req.user.id, `${(p.brief_json?.name || p.title).slice(0, 80)} flyer`, p.style_id, JSON.stringify(brief), JSON.stringify(plan), brief.aspect, p.duration_seconds || 15, p.id]);
-  await q(`INSERT INTO assets (user_id, project_id, name, kind, role, mime, url, width, height, has_alpha, duration_seconds, is_light, description)
-    SELECT user_id, $2, name, kind, role, mime, url, width, height, has_alpha, duration_seconds, is_light, description FROM assets WHERE project_id=$1 AND kind='image'`, [p.id, f.id]);
+  await q(`INSERT INTO assets (user_id, project_id, name, kind, role, mime, url, width, height, has_alpha, duration_seconds, is_light, description, focus)
+    SELECT user_id, $2, name, kind, role, mime, url, width, height, has_alpha, duration_seconds, is_light, description, focus FROM assets WHERE project_id=$1 AND kind='image'`, [p.id, f.id]);
   await useCredit(req.user, f.id);
   res.status(202).json({ project: shape(f) });
   const job = runGenerate(f, req.user);
@@ -194,10 +199,11 @@ r.post('/:id/assets', upload.single('file'), async (req, res) => {
   // the browser measures how light the picture is (a white logo needs a dark card behind it)
   const isLight = req.body.light === 'true' ? true : req.body.light === 'false' ? false : null;
   const hasAlpha = meta.hasAlpha ?? (req.body.alpha === 'true' ? true : req.body.alpha === 'false' ? false : null);
-  const asset = await one(`INSERT INTO assets (user_id, project_id, name, kind, role, mime, url, width, height, has_alpha, duration_seconds, is_light)
-    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
-    RETURNING id, name, kind, role, mime, url, width, height, has_alpha, duration_seconds, is_light`,
-  [req.user.id, p.id, label, kind, role, f.mimetype, url, meta.width || null, meta.height || null, hasAlpha, meta.duration || null, isLight]);
+  const focus = /^0?\.\d+,0?\.\d+$|^(0|1)(\.\d+)?,(0|1)(\.\d+)?$/.test(String(req.body.focus || '')) ? String(req.body.focus) : null;   // where to tap (screenshots), found in the browser
+  const asset = await one(`INSERT INTO assets (user_id, project_id, name, kind, role, mime, url, width, height, has_alpha, duration_seconds, is_light, focus)
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+    RETURNING id, name, kind, role, mime, url, width, height, has_alpha, duration_seconds, is_light, focus`,
+  [req.user.id, p.id, label, kind, role, f.mimetype, url, meta.width || null, meta.height || null, hasAlpha, meta.duration || null, isLight, focus]);
   res.json({ asset });
   // Read what the picture shows now, in the background, so "Make my video / flyer" doesn't wait for the AI to look at it later.
   if (kind === 'image' && config.useGemini) {
@@ -243,11 +249,32 @@ r.post('/:id/brief/parse', async (req, res) => {
   if (text.length < 10) return res.status(400).json({ error: 'Paste a few sentences about your business and the ad you want.' });
   const current = p.brief_json || {};
   const { aiError, ...found } = await parseBrief(text, current, { flyer: p.kind === 'flyer' });
+  const rules = parseBriefRules(text);
   // never overwrite answers the user already gave one by one
   const merged = cleanBrief({ ...found, ...Object.fromEntries(Object.entries(current).filter(([, v]) => v !== undefined && v !== '')), pasteText: found.pasteText, mode: 'paste' });
-  if (!merged.name) { const nm = text.match(/^\s*([A-Z][\w'&.-]*(?:\s+[A-Z][\w'&.-]*){0,3})\s+(?:is|are|sells|makes|offers|does|runs)\b/); if (nm) merged.name = nm[1].trim(); }
+  const birthdayInput = (found.kind === 'personal' || rules.kind === 'personal') && /birthday|b-?day/i.test(`${text} ${found.category || ''} ${rules.category || ''}`);
+  if (birthdayInput) {
+    merged.kind = 'personal';
+    merged.category = found.category || rules.category || 'Birthday';
+    merged.name = rules.name || (current.kind === 'personal' && /birthday|b-?day/i.test(current.category || '') ? current.name : '');
+    merged.relationship = found.relationship || rules.relationship || current.relationship || '';
+    merged.milestone = found.milestone || rules.milestone || current.milestone || '';
+    merged.personalMessage = found.personalMessage || rules.personalMessage || current.personalMessage || '';
+    merged.memories = found.memories?.length ? found.memories : current.memories || [];
+  }
+  // No name found: the first five words of what they typed are NOT a name ("A music app c…"). Use "…called X" if they said it; otherwise leave it
+  // unnamed (the video then rests on what they described, never on an invented or quoted-sentence name).
+  if (!merged.name && merged.kind !== 'personal') {
+    const called = text.match(/\b(?:called|named)\s+["'“‘]?([A-Z0-9][\w'&.-]*(?:\s+[A-Za-z0-9][\w'&.-]*){0,3})/);
+    if (called) merged.name = called[1].trim();
+  }
+  if (!merged.name && merged.kind !== 'personal') { const nm = text.match(/^\s*([A-Z][\w'&.-]*(?:\s+[A-Z][\w'&.-]*){0,3})\s+(?:is|are|sells|makes|offers|does|runs)\b/); if (nm) merged.name = nm[1].trim(); }
+  // pictures given: a slideshow needs time for each one (about 2 s each), unless they named a length
+  const assetsNow = await projectAssets(p.id);
+  const nPics = assetsNow.filter((x) => x.kind === 'image' && x.role !== 'logo').length;
+  if (nPics >= 3 && !rules.duration && !current.duration) merged.duration = Math.min(45, Math.max(20, 6 + 2 * nPics));
   const u = await one('UPDATE projects SET brief_json=$2, updated_at=now() WHERE id=$1 RETURNING *', [p.id, JSON.stringify(merged)]);
-  res.json({ project: shape(u, { assets: await projectAssets(p.id) }), found: ['name', 'category', 'goals', 'headlines', 'features', 'products', 'ctas', 'contact', 'aspect', 'duration', 'voiceover', 'sound'].filter((k) => found[k] !== undefined && found[k] !== '' && !(Array.isArray(found[k]) && !found[k].length)), aiError });
+  res.json({ project: shape(u, { assets: assetsNow }), found: ['name', 'category', 'relationship', 'milestone', 'personalMessage', 'memories', 'goals', 'headlines', 'features', 'products', 'ctas', 'contact', 'payment', 'aspect', 'duration', 'voiceover', 'sound'].filter((k) => found[k] !== undefined && found[k] !== '' && !(Array.isArray(found[k]) && !found[k].length)), aiError });
 });
 
 r.post('/:id/suggest', async (req, res) => {
@@ -259,8 +286,11 @@ r.post('/:id/suggest', async (req, res) => {
 // All questions answered: turn the brief into the plan (Gemini, or our rules), then the studio generates the video.
 r.post('/:id/build', async (req, res) => {
   const p = await loadProject(req, res); if (!p) return;
-  const brief = cleanBrief({ ...(p.brief_json || {}), ...(req.body?.brief || {}), done: true });
-  if (!brief.name) return res.status(400).json({ error: 'Tell me your business name first.' });
+  let brief = cleanBrief({ ...(p.brief_json || {}), ...(req.body?.brief || {}), done: true });
+  // "anything" / "make a demo": invent believable sample content instead of printing those words
+  // (a missing name alone is not a demo: if the owner told us anything real we use that and never invent a business around it)
+  const saidSomething = !!(brief.headline || brief.headlines?.length || brief.features?.length || brief.products?.length || brief.pasteText || brief.extra || brief.contact || brief.offer);
+  if (brief.demo || (!brief.name && !saidSomething)) brief = await fillDemoBrief({ ...brief, demo: true }, { flyer: p.kind === 'flyer' });
   let styleId = brief.styleId && !brief.styleAuto ? brief.styleId : null;
   if (!styleId) styleId = (await one("SELECT id FROM styles WHERE slug=$1 AND status='live'", [autoStyleSlug(brief)]))?.id || p.style_id;
   const style = await loadStyle(styleId);
@@ -333,7 +363,7 @@ r.post('/:id/generate', async (req, res) => {
 
 async function runGenerate(p, user) {
   const setMsg = (m) => q('UPDATE projects SET gen_message=$2 WHERE id=$1', [p.id, String(m).slice(0, 120)]).catch(() => {});
-  const name = p.brief_json?.name || p.title;
+  let name = p.brief_json?.name || p.title;
   try {
     let out;
     if (p.kind === 'flyer') {
@@ -343,7 +373,27 @@ async function runGenerate(p, user) {
       setMsg('Designing your flyer');
       out = { html: await makeFlyer({ brief: p.brief_json || {}, plan: p.plan_json, style, assets, previous: p.code_html || null, useAI: config.useGemini }), source: config.useGemini ? 'gemini' : 'template' };
       out.notice = flyerFitNotice(out.html);
-    } else out = await generateCode({ plan: p.plan_json, style: await loadStyle(p.style_id), assets: await projectAssets(p.id), brief: p.brief_json || null, previous: p.code_html || null, onStatus: setMsg });
+    } else {
+      let brief = cleanBrief(p.brief_json || {});
+      let plan = p.plan_json;
+      const repaired = repairLegacyBirthdayBrief(brief, plan);
+      if (repaired) {
+        const shouldRebuildPlan = needsBirthdayPlanRepair(brief, plan, repaired);
+        brief = repaired;
+        if (shouldRebuildPlan) {
+          brief.aspect = p.brief_json?.aspect || plan.aspect_ratio || brief.aspect || '9:16';
+          brief.duration = Number(p.brief_json?.duration) || Number(plan.duration_seconds) || Number(brief.duration) || 20;
+          const style = await loadStyle(p.style_id);
+          const palette = style?.palette ? { primary: style.palette.primary, secondary: style.palette.secondary, background: style.palette.background, text: style.palette.text } : null;
+          plan = briefToPlanRules(brief, { assets: await projectAssets(p.id), limits: limitsFor(user), palette });
+          normalizePlan(plan);
+          await q(`UPDATE projects SET brief_json=$2, plan_json=$3, aspect_ratio=$4, duration_seconds=$5, title=$6, updated_at=now() WHERE id=$1`,
+            [p.id, JSON.stringify(brief), JSON.stringify(plan), plan.aspect_ratio, Math.round(plan.duration_seconds), (plan.title || p.title).slice(0, 120)]);
+        }
+        name = brief.name || plan.title || 'Birthday video';
+      }
+      out = await generateCode({ plan, style: await loadStyle(p.style_id), assets: await projectAssets(p.id), brief, previous: p.code_html || null, onStatus: setMsg, memory: await recentSignatures() });
+    }
     const versions = [...(p.code_versions || []), ...(p.code_html ? [p.code_html] : [])].slice(-MAX_VERSIONS);
     const u = await one(`UPDATE projects SET code_html=$2, code_versions=$3, status='ready', ai_source=$4, edit_history='[]'::jsonb, updated_at=now(),
       gen_state='done', gen_message=$5, gen_error=NULL WHERE id=$1 RETURNING *`, [p.id, out.html, JSON.stringify(versions), out.source, out.notice || '']);
@@ -357,6 +407,14 @@ async function runGenerate(p, user) {
       [p.id, `Something went wrong making the video (${String(e.message).slice(0, 120)}). Press Make my video to try again.`]).catch(() => {});
     await notifyUser(user.id, { title: "Your video didn't finish", body: `${name}: open Animora and press Make my video to try again.`, url: `/p/${p.id}/studio`, tag: `gen-${p.id}` });
   }
+}
+
+/** Creative memory: how the platform's most recent films opened, ended and looked (newest first), so a new film steers away from them. */
+async function recentSignatures() {
+  try {
+    const rows = await q(`SELECT code_html FROM projects WHERE code_html LIKE '%window.MOTION = %' ORDER BY updated_at DESC LIMIT 10`);
+    return rows.map((r) => readMotion(r.code_html)?.sig).filter(Boolean);
+  } catch (e) { console.warn('[memory] could not read recent films:', e.message); return []; }
 }
 
 r.post('/:id/edit', async (req, res) => {
@@ -423,6 +481,41 @@ r.put('/:id/code', async (req, res) => {
   const versions = [...(p.code_versions || []), p.code_html].filter(Boolean).slice(-MAX_VERSIONS);
   const u = await one(`UPDATE projects SET code_html=$2, code_versions=$3, updated_at=now() WHERE id=$1 RETURNING *`, [p.id, html, JSON.stringify(versions)]);
   res.json({ project: shape(u) });
+});
+
+// ---------------- sound: voice, captions, effects and music of premium films ----------------
+const MUSIC_LIST = (() => {
+  try {
+    const lib = JSON.parse(readFileSync(new URL('../../assets/music/library.json', import.meta.url), 'utf8')).tracks || {};
+    return Object.entries(lib).map(([id, t]) => ({ url: `/music/${id}.mp3`, title: t.title, artist: t.artist, mood: t.mood || t.look, bpm: Math.round(t.bpm || 0) }));
+  } catch { return []; }
+})();
+r.get('/:id/audio', async (req, res) => {
+  const p = await loadProject(req, res); if (!p) return;
+  if (!isPremium(p.code_html)) return res.json({ premium: false });
+  const d = readPremium(p.code_html) || {};
+  res.json({
+    premium: true, audio: d.audio || {}, voice: d.voice ? { on: true, id: d.voice.voice, captions: d.voice.captions !== false, lines: d.voice.show || d.voice.lines } : { on: false },
+    voices: VOICE_LIBRARY, music: MUSIC_LIST, sounds: SOUND_REGISTRY.map((s) => ({ key: s.key, role: s.role, useful: s.useful })),
+  });
+});
+r.patch('/:id/audio', async (req, res) => {
+  const p = await loadProject(req, res); if (!p) return;
+  if (!isPremium(p.code_html)) return res.status(400).json({ error: 'Sound settings work on the new premium videos. Press Regenerate to make this video with them.' });
+  const patch = { ...(req.body || {}) };
+  // music on the beat: the song's start is chosen so the film's big moments (hits, scene changes) land on beats.
+  // The editor sends the film's current sound events, so preview and MP4 use the same start.
+  let aligned = null;
+  if (patch.music && /^\/music\/[\w-]+\.mp3$/.test(patch.music)) {
+    const grid = beatsFor(patch.music.split('/').pop());
+    if (grid && Array.isArray(req.body.events)) { aligned = alignMusic(grid, req.body.events.slice(0, 400)); patch.musicOffset = aligned.offset; }
+    else patch.musicOffset = 0;
+  }
+  const html = premiumWithAudio(p.code_html, patch, { brief: p.brief_json || {}, plan: p.plan_json || {}, assets: await projectAssets(p.id) });
+  if (!html) return res.status(400).json({ error: 'This video has no sound settings.' });
+  const versions = [...(p.code_versions || []), p.code_html].filter(Boolean).slice(-MAX_VERSIONS);
+  const u = await one(`UPDATE projects SET code_html=$2, code_versions=$3, updated_at=now() WHERE id=$1 RETURNING *`, [p.id, html, JSON.stringify(versions)]);
+  res.json({ project: shape(u), aligned: aligned ? { offset: +aligned.offset.toFixed(3), errorMs: Math.round(aligned.errorMs), beforeMs: Math.round(aligned.baseMs) } : null });
 });
 
 // ---------------- voiceover ----------------

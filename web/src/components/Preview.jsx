@@ -18,6 +18,8 @@ const BRIDGE = `<script>(function(){
     else if(m.cmd==='seek'){ tl.seek(m.t,false); state(); } });
   // drawn at the size it is shown (not full HD shrunk down): far less work for phones
   window.addEventListener('message', function(e){ var m=e.data||{}; if(m.__adflash&&m.cmd==='zoom'&&m.z>0) document.documentElement.style.zoom=m.z; });
+  // never a scrollbar: rounding can make the page a pixel taller than the frame, and a scrollbar shows as a dark strip
+  try { var ns=document.createElement('style'); ns.textContent='html,body{overflow:hidden!important;scrollbar-width:none}::-webkit-scrollbar{display:none}'; (document.head||document.documentElement).appendChild(ns); } catch(_){}
   try { var z0=parseFloat(window.name); if(z0>0) document.documentElement.style.zoom=z0; } catch(_){}
   window.addEventListener('error', function(e){ post('error',{message:String(e.message||'Script error')}); });
   window.addEventListener('load', function(){ var n=0; (function wait(){ tl=window.__timeline;
@@ -32,7 +34,9 @@ export function prepareHtml(html) {
   // Use our own copy of GSAP (fast, same build as the renderer, works when cdnjs is slow).
   let out = html.replace(/<script([^>]*?)src=["']https?:\/\/[^"']*gsap[^"']*\/([A-Za-z]+)(?:\.min)?\.js["']/gi,
     (m, attrs, name) => `<script${attrs}src="${origin}/vendor/gsap/${name}.min.js"`);
-  out = /<\/body>/i.test(out) ? out.replace(/<\/body>/i, `${BRIDGE}</body>`) : out + BRIDGE;
+  // multi-scene films carry each scene's page as a string (escaped tags), so swap the bare CDN address too
+  out = out.replace(/https?:\/\/cdn\.jsdelivr\.net\/npm\/gsap@[\d.]+\/dist\/([A-Za-z]+)(?:\.min)?\.js/g, (m, name) => `${origin}/vendor/gsap/${name}.min.js`);
+  out =/<\/body>/i.test(out) ? out.replace(/<\/body>/i, `${BRIDGE}</body>`) : out + BRIDGE;
   return out;
 }
 
@@ -55,7 +59,7 @@ function ctx() { if (!audio) { const C = window.AudioContext || window.webkitAud
 async function sound(k) {
   if (buffers[k] !== undefined) return buffers[k];
   buffers[k] = null;
-  try { const r = await fetch(`/sfx/${k}.wav`); buffers[k] = await ctx().decodeAudioData(await r.arrayBuffer()); } catch { buffers[k] = null; }
+  try { const r = await fetch(`/sfx/${/impact|thud/.test(k) ? 'pop-soft' : k}.wav`); buffers[k] = await ctx().decodeAudioData(await r.arrayBuffer()); } catch { buffers[k] = null; }
   return buffers[k];
 }
 // every effect goes through one master bus (glue compressor + make-up gain), like the downloaded MP4
@@ -68,16 +72,26 @@ function master(c) {
   comp.connect(out).connect(c.destination);
   bus = comp; return bus;
 }
-function playSfx(e) {
+// Effects are scheduled on the audio clock a little ahead of the playhead (not fired when the playhead happens to pass
+// them), with the same length, ring-out and fades as the MP4 mixer, so what you hear here is what you download.
+function playSfx(e, when = 0) {
   const c = ctx(); const b = buffers[e.k];
-  if (!c || c.state !== 'running' || !b) return;
+  if (!c || c.state !== 'running' || !b || e.muted || !(Number(e.v) > 0)) return null;
+  const at = Math.max(c.currentTime, when || c.currentTime);
   const src = c.createBufferSource(); const g = c.createGain();
-  g.gain.value = Math.min(1.2, (e.v || 1) * 0.8); src.buffer = b; src.connect(g).connect(master(c)); src.start();
+  const v = Math.min(1.2, Number(e.v) * 0.8); src.buffer = b; src.connect(g).connect(master(c));
+  const len = Number(e.len) > 0 ? Number(e.len) : Number(e.fo) > 0 ? Math.min(b.duration, Number(e.fo) / 1000) : 0;
+  g.gain.setValueAtTime(0, at); g.gain.linearRampToValueAtTime(v, at + 0.002);
+  if (len) { src.loop = Number(e.len) > b.duration; g.gain.setValueAtTime(v, at + Math.max(0.003, len - 0.06)); g.gain.linearRampToValueAtTime(0, at + len); src.start(at); src.stop(at + len + 0.01); }
+  else src.start(at);
+  return src;
 }
 
-export function LivePreview({ html, aspect = '9:16', autoPlay = true, maxWidth = 340, onError, sound: soundOn = true, onSoundChange, still = false, onEnded, exact = false }) {
+export function LivePreview({ html, aspect = '9:16', autoPlay = true, maxWidth = 340, onError, sound: soundOn = true, onSoundChange, still = false, onEnded, exact = false, onInfo, onTime, controlRef }) {
   const sfxRef = useRef([]);
   const duckUntil = useRef(0);
+  const scheduled = useRef(new Set());
+  const live = useRef([]);
   const musicRef = useRef(null);
   useEffect(() => () => { musicRef.current?.pause(); }, []);
   const lastT = useRef(0);
@@ -93,9 +107,15 @@ export function LivePreview({ html, aspect = '9:16', autoPlay = true, maxWidth =
   const frameRef = useRef(null);
   const boxRef = useRef(null);
   const srcDoc = useMemo(() => prepareHtml(html), [html]);
+  // films made of several scenes play each scene in its own frame and must reach into them; a fully sandboxed
+  // frame gives every scene a different origin, so nothing would play. Our own template films (all text escaped) get
+  // the same origin, like the export frame already does.
+  const nested = useMemo(() => /f\.srcdoc=DOCS\[i\]/.test(html || ''), [html]);
   const scaleRef = useRef(scale);
   const wasPlaying = useRef(false);
   const onEndedRef = useRef(onEnded);
+  const onInfoRef = useRef(onInfo); const onTimeRef = useRef(onTime);
+  useEffect(() => { onInfoRef.current = onInfo; onTimeRef.current = onTime; }, [onInfo, onTime]);
   useEffect(() => { onEndedRef.current = onEnded; }, [onEnded]);
   useEffect(() => { scaleRef.current = scale; frameRef.current?.contentWindow?.postMessage({ __adflash: true, cmd: 'zoom', z: scale }, '*'); }, [scale]);
 
@@ -114,30 +134,41 @@ export function LivePreview({ html, aspect = '9:16', autoPlay = true, maxWidth =
       const m = e.data;
       if (m.type === 'ready') {
         send({ cmd: 'zoom', z: scaleRef.current });
-        setReady(true); setD(m.d); sfxRef.current = m.sfx || []; lastT.current = 0;
+        setReady(true); setD(m.d); sfxRef.current = m.sfx || []; lastT.current = 0; onInfoRef.current?.({ sfx: m.sfx || [], d: m.d, music: m.music || null });
         // background music: an <audio> element kept in step with the timeline
         if (musicRef.current) { musicRef.current.pause(); musicRef.current = null; }
-        if (m.music?.url) { const a = new Audio(m.music.url); a.loop = true; a.volume = 0.32; a.preload = 'auto'; musicRef.current = a; }
+        if (m.music?.url) { const a = new Audio(m.music.url); a.loop = true; a.volume = 0.32; a.preload = 'auto'; a.dataset.offset = String(Number(m.music.offset) || 0); a.dataset.gain = String(Math.pow(10, (Number(m.music.gain) || 0) / 20)); musicRef.current = a; }
+        scheduled.current.clear();
         if (ctx()) [...new Set(sfxRef.current.map((e) => e.k))].forEach((k) => sound(k));
         if (autoPlay) send({ cmd: 'play' });
       }
       if (m.type === 'time') {
         // play every sound cue the playhead just passed (only while playing forward, not when scrubbing)
-        if (m.playing && soundRef.current && m.t > lastT.current && m.t - lastT.current < 0.5) {
-          for (const ev of sfxRef.current) if (ev.t > lastT.current && ev.t <= m.t) { playSfx(ev); if ((ev.v || 1) >= 0.5) duckUntil.current = m.t + 0.4; }
+        // schedule every cue in the next 250 ms on the audio clock; a jump or a pause clears what was scheduled
+        const jumped = m.t < lastT.current - 0.01 || m.t - lastT.current > 0.5;
+        if (!m.playing || jumped) { scheduled.current.clear(); live.current.forEach((x) => { try { x.stop(); } catch { /* already ended */ } }); live.current = []; }
+        if (m.playing && soundRef.current && audio?.state === 'running') {
+          sfxRef.current.forEach((ev, i) => {
+            if (scheduled.current.has(i) || ev.t < m.t - 0.03 || ev.t > m.t + 0.25) return;
+            scheduled.current.add(i);
+            const src = playSfx(ev, audio.currentTime + Math.max(0, ev.t - m.t)); if (src) live.current.push(src);
+            if ((ev.v || 1) >= 0.5) duckUntil.current = ev.t + 0.4;
+          });
+          if (live.current.length > 64) live.current = live.current.slice(-64);
         }
         const mu = musicRef.current;
         if (mu) {
           if (m.playing && soundRef.current && audio?.state === 'running') {
-            if (mu.paused || Math.abs(mu.currentTime - m.t) > 0.25) { try { mu.currentTime = m.t % (mu.duration || 1e9); } catch { /* not loaded yet */ } }
+            const want = (m.t + Number(mu.dataset.offset || 0)) % (mu.duration || 1e9);   // the beat-aligned start chosen in the editor
+            if (mu.paused || Math.abs(mu.currentTime - want) > 0.25) { try { mu.currentTime = want; } catch { /* not loaded yet */ } }
             if (mu.paused) mu.play().catch(() => {});
-            mu.volume = Math.max(0, 0.32 * Math.min(1, (m.d - m.t) / 2) * (m.t < duckUntil.current ? 0.67 : 1));   // fade out at the end and dip under effects, like the MP4
+            mu.volume = Math.max(0, Math.min(1, 0.32 * Number(mu.dataset.gain || 1) * Math.min(1, (m.d - m.t) / 2) * (m.t < duckUntil.current ? 0.67 : 1)));   // fade out at the end and dip under effects, like the MP4
           } else if (!mu.paused) mu.pause();
         }
         lastT.current = m.t;
         if (!still && wasPlaying.current && !m.playing && m.d > 1 && m.t >= m.d - 0.05) onEndedRef.current?.();   // played to the end
         wasPlaying.current = m.playing;
-        setT(m.t); setD(m.d); setPlaying(m.playing);
+        setT(m.t); setD(m.d); setPlaying(m.playing); onTimeRef.current?.(m.t, m.playing);
       }
       if (m.type === 'error') { setError(m.message); onError?.(m.message); }
     };
@@ -149,6 +180,8 @@ export function LivePreview({ html, aspect = '9:16', autoPlay = true, maxWidth =
   useEffect(() => { soundRef.current = soundOn; }, [soundOn]);
   const send = (msg) => frameRef.current?.contentWindow?.postMessage({ __adflash: true, ...msg }, '*');
   const toggle = () => { unlock(); if (playing) send({ cmd: 'pause' }); else send({ cmd: 'play' }); };
+  // the sound panel can seek the preview and play from a sound's moment
+  if (controlRef) controlRef.current = { seek: (x) => { unlock(); send({ cmd: 'seek', t: x }); }, playFrom: (x) => { unlock(); send({ cmd: 'seek', t: Math.max(0, x) }); send({ cmd: 'play' }); }, pause: () => send({ cmd: 'pause' }) };
 
   useEffect(() => {
     const onKey = (e) => {
@@ -164,7 +197,7 @@ export function LivePreview({ html, aspect = '9:16', autoPlay = true, maxWidth =
       <PhoneFrame aspect={aspect} maxWidth={maxWidth} exact={exact}>
         <div ref={boxRef} className="absolute inset-0">
           {srcDoc && (
-            <iframe ref={frameRef} title="Video preview" sandbox="allow-scripts" srcDoc={srcDoc} name={String(scale)}
+            <iframe ref={frameRef} title="Video preview" sandbox={nested ? 'allow-scripts allow-same-origin' : 'allow-scripts'} srcDoc={srcDoc} name={String(scale)}
               style={{ width: Math.ceil(a.w * scale), height: Math.ceil(a.h * scale), border: 0, display: 'block', overflow: 'hidden' }} scrolling="no" />
           )}
           {!ready && !error && <div className="absolute inset-0 grid place-items-center bg-ink text-sm text-white/70">Loading preview…</div>}
@@ -178,9 +211,9 @@ export function LivePreview({ html, aspect = '9:16', autoPlay = true, maxWidth =
             ? <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><rect x="3" y="2" width="3.5" height="12" rx="1" /><rect x="9.5" y="2" width="3.5" height="12" rx="1" /></svg>
             : <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M4 2.5v11a.5.5 0 0 0 .77.42l8.5-5.5a.5.5 0 0 0 0-.84l-8.5-5.5A.5.5 0 0 0 4 2.5Z" /></svg>}
         </button>
-        <input type="range" className="range flex-1" min={0} max={d || 1} step={1 / 30} value={t} disabled={!ready}
+        <input type="range" className="range min-w-0 flex-1" min={0} max={d || 1} step={1 / 30} value={t} disabled={!ready}
           onChange={(e) => { send({ cmd: 'pause' }); send({ cmd: 'seek', t: Number(e.target.value) }); }} aria-label="Seek" />
-        <span className="w-24 text-right text-sm tabular-nums text-white/70">{clock(t)} / {clock(d)}</span>
+        <span className="shrink-0 whitespace-nowrap text-right text-xs tabular-nums text-white/70 sm:text-sm">{clock(t)} / {clock(d)}</span>
         {onSoundChange && (
           <button onClick={() => { unlock(); onSoundChange(!(soundOn && audioReady) ? true : false); }} className="press grid size-10 shrink-0 place-items-center rounded-full bg-white/10 text-white hover:bg-white/20"
             aria-label={soundOn && audioReady ? 'Turn sound effects off' : 'Turn sound effects on'} title={soundOn ? 'Sound effects on' : 'Sound effects off'}>
