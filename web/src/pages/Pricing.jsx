@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, naira, nairaExact, useAuth } from '../lib.jsx';
-import { Button } from '../components/ui.jsx';
+import { Button, Stagger, StaggerItem } from '../components/ui.jsx';
 
 function Feature({ children, off }) {
   return (
@@ -23,8 +23,8 @@ export default function Pricing() {
       <h1 className="max-w-2xl text-4xl font-extrabold sm:text-5xl">Start free. Go Pro when ads slow you down.</h1>
       <p className="mt-4 max-w-2xl text-lg text-ink-soft">Every plan uses the same AI and the same video engine. The difference is ads, length and how many videos you make.</p>
 
-      <div className="mt-10 grid gap-5 md:grid-cols-2">
-        <section className="surface p-7">
+      <Stagger className="mt-10 grid gap-5 md:grid-cols-2" step={0.1}>
+        <StaggerItem as="section" className="surface p-7">
           <h2 className="text-2xl font-extrabold">Free</h2>
           <p className="mt-3 font-display text-5xl font-extrabold">{naira(0)}</p>
           <p className="mt-1 text-ink-soft">Watch a {p.adSeconds}-second ad before each video.</p>
@@ -36,9 +36,9 @@ export default function Pricing() {
             <Feature off>1–5 minute videos</Feature>
           </ul>
           <Button as={Link} to={user ? '/new/video' : '/signup'} variant="outline" size="lg" className="mt-8 w-full">{user ? 'Make a video' : 'Start free'}</Button>
-        </section>
+        </StaggerItem>
 
-        <section className="stage p-7">
+        <StaggerItem as="section" className="stage p-7">
           <h2 className="text-2xl font-extrabold">Pro</h2>
           <p className="mt-3 font-display text-5xl font-extrabold">{naira(p.proPriceNgn)}<span className="text-xl font-bold text-white/60"> / month</span></p>
           <p className="mt-1 text-white/70">That's about {naira(Math.round(p.proPriceNgn / p.proVideosPerMonth))} per video.</p>
@@ -52,8 +52,8 @@ export default function Pricing() {
           {user?.plan === 'pro'
             ? <p className="mt-8 rounded-full bg-white/10 py-3.5 text-center font-semibold">You're on Pro</p>
             : <Button as={Link} to={user ? '/checkout' : '/signup'} size="lg" className="mt-8 w-full">Go Pro</Button>}
-        </section>
-      </div>
+        </StaggerItem>
+      </Stagger>
 
     </div>
   );

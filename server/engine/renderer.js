@@ -312,7 +312,7 @@ const BASE_ARGS = [
   '--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage',
   '--font-render-hinting=none', '--force-color-profile=srgb',
   '--hide-scrollbars', '--mute-audio', '--disable-background-timer-throttling',
-  '--disable-renderer-backgrounding', '--disable-backgrounding-occluded-windows',
+  '--disable-renderer-backgrounding', '--disable-backgrounding-occluded-windows', '--enable-unsafe-swiftshader',  // WebGL backgrounds on machines without a GPU
 ];
 const BEGIN_FRAME_ARGS = [
   '--deterministic-mode', '--enable-begin-frame-control', '--run-all-compositor-stages-before-draw',

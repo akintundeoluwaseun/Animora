@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, naira } from '../lib.jsx';
-import { Button } from '../components/ui.jsx';
+import { Button, Reveal, Stagger, StaggerItem } from '../components/ui.jsx';
 
 const STEPS = [
   ['Answer a few questions', 'Your business name, what you sell, your message and your pictures. One question at a time.'],
@@ -43,14 +43,14 @@ export default function Home() {
       <section className="home-hero">
         <div className="mx-auto grid max-w-[1180px] items-center gap-12 px-6 py-16 sm:px-10 lg:grid-cols-[minmax(0,1fr)_380px] lg:py-24">
           <div>
-            <h1 className="max-w-[14ch] text-[2.75rem] font-bold leading-[1] tracking-[-0.045em] sm:text-[4.25rem]">Motion-design video ads for your business.</h1>
-            <p className="mt-6 max-w-[46ch] text-lg leading-relaxed text-ink-soft">
+            <Reveal as="h1" className="max-w-[14ch] text-[2.75rem] font-bold leading-[1] tracking-[-0.045em] sm:text-[4.25rem]">Motion-design video ads for your business.</Reveal>
+            <Reveal as="p" delay={0.08} className="mt-6 max-w-[46ch] text-lg leading-relaxed text-ink-soft">
               Tell Animora about your business. Its AI director plans every shot, and you download a finished MP4 in a few minutes. Need something to post or print? It designs flyers too.
-            </p>
-            <div className="mt-9 grid max-w-[520px] gap-3 sm:grid-cols-2">
-              <StartCard kind="video" />
-              <StartCard kind="flyer" />
-            </div>
+            </Reveal>
+            <Stagger className="mt-9 grid max-w-[520px] gap-3 sm:grid-cols-2" step={0.09}>
+              <StaggerItem><StartCard kind="video" /></StaggerItem>
+              <StaggerItem><StartCard kind="flyer" /></StaggerItem>
+            </Stagger>
             <Link to="/styles" className="mt-5 inline-flex items-center gap-1.5 text-[15px] font-semibold text-ink-mute hover:text-ink">Browse all the styles <span aria-hidden="true">→</span></Link>
           </div>
           <figure className="mx-auto w-full max-w-[380px]" aria-label="Frames from videos made with Animora">
@@ -70,16 +70,16 @@ export default function Home() {
       </section>
 
       <section className="mx-auto max-w-[1180px] px-6 py-16 sm:px-10 lg:py-20" aria-labelledby="how">
-        <h2 id="how" className="text-3xl font-bold tracking-[-0.04em] sm:text-4xl">How it works</h2>
-        <ol className="mt-10 grid gap-10 md:grid-cols-3">
+        <Reveal as="h2" id="how" className="text-3xl font-bold tracking-[-0.04em] sm:text-4xl">How it works</Reveal>
+        <Stagger as="ol" className="mt-10 grid gap-10 md:grid-cols-3" step={0.1}>
           {STEPS.map(([title, text], i) => (
-            <li key={title} className="border-t border-ink/12 pt-6">
+            <StaggerItem as="li" key={title} className="border-t border-ink/12 pt-6">
               <span className="text-sm font-semibold tabular-nums text-ink-mute">{i + 1}</span>
               <h3 className="mt-3 text-xl font-semibold tracking-[-0.02em]">{title}</h3>
               <p className="mt-2 leading-relaxed text-ink-soft">{text}</p>
-            </li>
+            </StaggerItem>
           ))}
-        </ol>
+        </Stagger>
       </section>
 
       {more.length > 0 && (
@@ -88,10 +88,10 @@ export default function Home() {
             <h2 id="looks" className="text-3xl font-bold tracking-[-0.04em] sm:text-4xl">A few of the looks</h2>
             <Link to="/styles" className="font-semibold text-ink-soft hover:text-ink">All {styles.length} styles</Link>
           </div>
-          <div className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+          <Stagger className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
             {more.map((s) => (
-              <div key={s.id}>
-                <button type="button" className="group relative block aspect-[9/16] w-full overflow-hidden rounded-xl bg-ink" onClick={() => setPlaying(playing === s.id ? null : s.id)} aria-label={playing === s.id ? `Stop the ${s.name} video` : `Play the ${s.name} video`}>
+              <StaggerItem key={s.id}>
+                <button type="button" className="lift group relative block aspect-[9/16] w-full overflow-hidden rounded-xl bg-ink" onClick={() => setPlaying(playing === s.id ? null : s.id)} aria-label={playing === s.id ? `Stop the ${s.name} video` : `Play the ${s.name} video`}>
                   {playing === s.id
                     ? <video src={s.preview_url} poster={s.poster_url} className="absolute inset-0 size-full object-cover" muted autoPlay loop playsInline />
                     : <>
@@ -102,9 +102,9 @@ export default function Home() {
                       </>}
                 </button>
                 <p className="mt-2 text-sm font-medium">{s.name}</p>
-              </div>
+              </StaggerItem>
             ))}
-          </div>
+          </Stagger>
         </section>
       )}
 

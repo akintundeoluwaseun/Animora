@@ -292,3 +292,8 @@ html[data-theme="dark"] .dock-create { --tw-ring-color: #1A1A1F; }
 html[data-theme="dark"] .text-video { color: #A9A4FF; }
 html[data-theme="dark"] .text-flyer { color: #FF9A5E; }
 html[data-theme="dark"] .project-tabs { border-color: rgba(255, 255, 255, .12); }
+
+/* hover lift for cards and tiles: a small rise and a softer, deeper shadow (no movement for reduced motion) */
+.lift { transition: transform .25s cubic-bezier(.22, 1, .36, 1), box-shadow .25s cubic-bezier(.22, 1, .36, 1); }
+@media (hover: hover) { .lift:hover { transform: translateY(-3px); box-shadow: 0 14px 30px -14px rgba(20, 17, 43, .35); } }
+@media (prefers-reduced-motion: reduce) { .lift, .lift:hover { transition: none; transform: none; } }

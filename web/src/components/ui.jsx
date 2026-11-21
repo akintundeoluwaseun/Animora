@@ -171,6 +171,24 @@ export function Nav() {
   );
 }
 
+// Entrance presets (one calm language for the whole app): things rise a little and fade in once, as they come into view.
+// MotionConfig reducedMotion="user" (main.jsx) turns the movement off for people who ask their phone for less motion.
+const EASE_OUT = [0.22, 1, 0.36, 1];
+export function Reveal({ as = 'div', delay = 0, y = 14, className = '', children, ...rest }) {
+  const M = motion[as] || motion.div;
+  return <M className={className} initial={{ opacity: 0, y }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: '0px 0px -8% 0px' }} transition={{ duration: 0.55, ease: EASE_OUT, delay }} {...rest}>{children}</M>;
+}
+// A list whose items arrive one after another (at most ~0.4 s in total, so long lists never feel slow).
+export function Stagger({ as = 'div', className = '', children, step = 0.06, ...rest }) {
+  const M = motion[as] || motion.div;
+  const n = Array.isArray(children) ? children.length : 1;
+  return <M className={className} initial="off" whileInView="on" viewport={{ once: true, margin: '0px 0px -8% 0px' }} variants={{ on: { transition: { staggerChildren: Math.min(step, 0.4 / Math.max(1, n)) } } }} {...rest}>{children}</M>;
+}
+export function StaggerItem({ as = 'div', className = '', children, ...rest }) {
+  const M = motion[as] || motion.div;
+  return <M className={className} variants={{ off: { opacity: 0, y: 16 }, on: { opacity: 1, y: 0, transition: { duration: 0.5, ease: EASE_OUT } } }} {...rest}>{children}</M>;
+}
+
 // Chat / Edit / Video: move between a project's pages at any time, so the questions and the edits are never lost behind you.
 export function ProjectTabs({ project, current, className = '' }) {
   if (!project?.id || !project.plan) return null;

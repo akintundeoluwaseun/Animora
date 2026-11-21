@@ -291,6 +291,7 @@
     // ---------- per-look decoration behind type-only beats
     function decor(Lr, t, d, kind) {
       const id = L0.id;
+      if (curFx.bg) shaderBg(Lr, t, d, surface(kind) && Object.assign(surface(kind), { kind }), curFx.bg);
       if (id === 'noir') {
         const f = el('div', `position:absolute;left:${M * 0.45}px;right:${M * 0.45}px;top:${M * 0.45}px;bottom:${M * 0.45}px;border:${Math.max(1, 1.5 * U)}px solid ${rgba(A, 0.55)};`, Lr);
         tl.fromTo(f, { clipPath: 'inset(0 100% 100% 0)' }, { clipPath: 'inset(0 0% 0% 0)', duration: 1.6, ease: 'power2.inOut' }, t);
@@ -361,6 +362,125 @@
       return fit(L0.bg);
     }
 
+    // ---------- living backgrounds (GPU shaders, written for Animora). One kind per film, only behind type, never behind photos.
+    // Drawn at a third of the frame size (they are soft by nature) and driven by the timeline, so every frame is exact.
+    const GLSL_HEAD = `precision highp float;
+uniform float uT; uniform vec2 uR; uniform vec3 uA; uniform vec3 uB; uniform vec3 uC; uniform float uK; varying vec2 v;
+float h(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
+float n(vec2 p){vec2 i=floor(p),f=fract(p);vec2 u=f*f*(3.-2.*f);return mix(mix(h(i),h(i+vec2(1.,0.)),u.x),mix(h(i+vec2(0.,1.)),h(i+vec2(1.,1.)),u.x),u.y);}
+float fbm(vec2 p){float s=0.,a=.5;for(int i=0;i<5;i++){s+=a*n(p);p=p*2.03+vec2(1.7,9.2);a*=.5;}return s;}
+`;
+    const SHADERS = {
+      // folded light running across a sheet of silk
+      silk: `void main(){vec2 p=(v-.5)*vec2(uR.x/uR.y,1.)*2.2;float t=uT*.22;
+float w=sin(p.x*2.6+fbm(p*1.2+t)*3.6+t*1.7);float f=.5+.5*sin(p.y*3.4+w*1.8+fbm(p*1.6-t*.7)*2.8-t);
+float sheen=pow(f,4.);vec3 c=mix(uC,uA,sheen*uK)+uB*pow(f,14.)*.5*uK;gl_FragColor=vec4(c,1.);}`,
+      // aurora curtains hanging from the top
+      aurora: `void main(){vec2 p=v;float a=uR.x/uR.y;float t=uT*.12;
+float b=fbm(vec2(p.x*a*1.6+t,t*1.3));float y=.78+(b-.5)*.36;float c1=exp(-pow((p.y-y)*5.,2.))*smoothstep(.15,.9,p.y);
+float s=fbm(vec2(p.x*a*7.+t*2.,p.y*1.5));float cur=c1*(.55+.45*s);
+vec3 c=mix(uC,uA,clamp(cur*uK*1.4,0.,1.));c=mix(c,uB,clamp(cur*cur*uK*.8,0.,1.));gl_FragColor=vec4(c,1.);}`,
+      // a soft mesh of the brand colours drifting into each other
+      mesh: `void main(){vec2 p=(v-.5)*vec2(uR.x/uR.y,1.);float t=uT*.18;
+vec2 q=p+.12*vec2(fbm(p*2.+t),fbm(p*2.-t+3.));
+vec2 a1=vec2(sin(t*1.1),cos(t*.9))*.42,a2=vec2(cos(t*.7+2.),sin(t*1.3+1.))*.46;
+float w1=1./(dot(q-a1,q-a1)*7.+.35),w2=1./(dot(q-a2,q-a2)*7.+.35),w0=1.4;
+vec3 c=(uC*w0+mix(uC,uA,uK)*w1+mix(uC,uB,uK*.9)*w2)/(w0+w1+w2);gl_FragColor=vec4(c,1.);}`,
+      // thin glowing lines that ripple like a signal
+      lines: `void main(){vec2 p=(v-.5)*vec2(uR.x/uR.y,1.)*2.;float t=uT*.5;float g=0.;
+for(int i=0;i<9;i++){float fi=float(i);float y=.32*sin(p.x*(1.1+fi*.13)+t*(.6+fi*.07)+fi*1.7)*(.6+.4*sin(t*.3+fi))+(fi-4.)*.13;
+g+=.004/max(abs(p.y-y),.002);}
+g=clamp(g,0.,1.4);vec3 c=mix(uC,uA,clamp(g*uK*.55,0.,1.))+uB*pow(clamp(g-.9,0.,1.),2.)*.25*uK;gl_FragColor=vec4(c,1.);}`,
+      // light falling through blinds from above
+      rays: `void main(){vec2 p=(v-.5)*vec2(uR.x/uR.y,1.);vec2 o=vec2(-.35,.75);vec2 d=p-o;float t=uT*.1;
+float ang=atan(d.x,-d.y);float r=.5+.5*sin(ang*22.+fbm(vec2(ang*5.,t))*5.+t*2.);r=pow(r,3.);
+float fall=exp(-length(d)*1.3);vec3 c=mix(uC,uA,clamp(r*fall*uK*1.6,0.,1.));c+=uB*fall*fall*.12*uK;gl_FragColor=vec4(c,1.);}`,
+    };
+    const glsl3 = (hex) => rgb(hex).map((x) => x / 255);
+    let liveGL = 0;
+    function shaderBg(Lr, t, d, S, kind) {
+      if (!SHADERS[kind] || Lr._sbg || liveGL >= 6) return null;
+      const cw = Math.max(64, Math.round(W / 3)), ch = Math.max(64, Math.round(H / 3));
+      const cv = document.createElement('canvas'); cv.width = cw; cv.height = ch;
+      cv.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;';
+      let gl = null; try { gl = cv.getContext('webgl', { preserveDrawingBuffer: true, antialias: false, alpha: false, depth: false, stencil: false }); } catch (e) { gl = null; }
+      if (!gl) return null;
+      const sh = (type, src) => { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); return gl.getShaderParameter(s, gl.COMPILE_STATUS) ? s : null; };
+      const vs = sh(gl.VERTEX_SHADER, 'attribute vec2 p;varying vec2 v;void main(){v=p*.5+.5;gl_Position=vec4(p,0.,1.);}');
+      const fs = sh(gl.FRAGMENT_SHADER, GLSL_HEAD + SHADERS[kind]);
+      if (!vs || !fs) return null;
+      const pr = gl.createProgram(); gl.attachShader(pr, vs); gl.attachShader(pr, fs); gl.linkProgram(pr);
+      if (!gl.getProgramParameter(pr, gl.LINK_STATUS)) return null;
+      gl.useProgram(pr);
+      const buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+      const lp = gl.getAttribLocation(pr, 'p'); gl.enableVertexAttribArray(lp); gl.vertexAttribPointer(lp, 2, gl.FLOAT, false, 0, 0);
+      gl.viewport(0, 0, cw, ch);
+      const u = (n) => gl.getUniformLocation(pr, n);
+      // colours: the glow is the accent on plain surfaces, a light tint on accent ones; it stays gentle on light backgrounds so dark type keeps reading
+      const dark = lum(S.bg) < 0.3, onAcc = S.kind === 'accent';
+      const cA = onAcc ? onColor(S.bg) : S.acc, cB = onAcc ? (lum(A2) > 0.4 ? A2 : onColor(S.bg)) : (readable(A2, S.bg) || A2);
+      gl.uniform2f(u('uR'), cw, ch); gl.uniform3fv(u('uA'), glsl3(cA)); gl.uniform3fv(u('uB'), glsl3(cB)); gl.uniform3fv(u('uC'), glsl3(S.bg));
+      gl.uniform1f(u('uK'), onAcc ? 0.28 : dark ? 0.5 : 0.32);
+      const uT = u('uT'), off = (hash(Math.round(t * 10) + (cfg.seed || 1)) % 1000) / 10;
+      const st = { u: 0 };
+      const draw = () => { gl.uniform1f(uT, st.u + off); gl.drawArrays(gl.TRIANGLES, 0, 3); };
+      draw();
+      Lr.insertBefore(cv, Lr.firstChild); Lr._sbg = cv; liveGL++;
+      tl.fromTo(st, { u: 0 }, { u: d + 2, duration: d + 2, ease: 'none', onUpdate: draw }, Math.max(0, t - 0.8));
+      tl.fromTo(cv, { opacity: 0 }, { opacity: 1, duration: 0.9, ease: 'power1.out' }, Math.max(0, t - 0.6));
+      return cv;
+    }
+
+    // ---------- kinetic type (the beat's text effect is chosen by the server, within a budget)
+    // typewriter: letters appear one by one behind a blinking caret
+    function typewriter(box, t, color) {
+      const cs = charsOf(box), n = cs.length; if (!n) return 0;
+      const dt = Math.min(0.055, 1.5 / n), br = box.getBoundingClientRect(), k = br.width / (box.offsetWidth || 1) || 1;
+      const fs = parseFloat(box.style.fontSize) || 80;
+      const caret = el('div', `position:absolute;left:0;top:0;width:${Math.max(3, fs * 0.06)}px;height:${fs * 0.92}px;background:${color};opacity:0;`, box);
+      const pos = cs.map((c) => { const r = c.getBoundingClientRect(); return [(r.right - br.left) / k + fs * 0.03, (r.top - br.top) / k + (r.height / k - fs * 0.92) / 2]; });
+      tl.set(caret, { opacity: 1, x: pos[0][0] - (cs[0].offsetWidth || 0), y: pos[0][1] }, t - 0.05);
+      cs.forEach((c, i) => { c.style.opacity = 0; tl.set(c, { opacity: 1 }, t + i * dt); tl.set(caret, { x: pos[i][0], y: pos[i][1] }, t + i * dt); });
+      const endT = t + n * dt;
+      for (let b = 0; b < 6; b++) { tl.set(caret, { opacity: 0 }, endT + 0.25 + b * 0.9); tl.set(caret, { opacity: 1 }, endT + 0.7 + b * 0.9); }
+      tl.set(caret, { opacity: 0 }, endT + 5.6);
+      for (let s = 0; s < Math.min(n * dt, 1.6); s += 0.45) sound(t + s, 'type', 0.55);
+      return endT;
+    }
+    // decrypt: every word resolves out of shuffling characters, one after another
+    function decrypt(box, t) {
+      const ws = [...box.querySelectorAll('.w')]; if (!ws.length) return 0;
+      ws.forEach((w, i) => scramble(w, t + i * 0.12, 0.8));
+      return t + ws.length * 0.12 + 0.8;
+    }
+    // a number in the words counts up to its value (only real numbers of 10 or more)
+    function countUp(box, t) {
+      const w = [...box.querySelectorAll('.w')].find((x) => /\d/.test(x.textContent)); if (!w) return false;
+      const m = w.textContent.match(/^(\D*?)([\d,]+(?:\.\d+)?)(\D*)$/); if (!m) return false;
+      const target = Number(m[2].replace(/,/g, '')); if (!(target >= 10)) return false;
+      const dec = (m[2].split('.')[1] || '').length, comma = /,/.test(m[2]);
+      const fmt = (x) => { const s0 = x.toFixed(dec); const [a0, b0] = s0.split('.'); return (comma ? a0.replace(/\B(?=(\d{3})+(?!\d))/g, ',') : a0) + (b0 ? '.' + b0 : ''); };
+      w.style.minWidth = w.offsetWidth + 'px'; w.style.fontVariantNumeric = 'tabular-nums';
+      const st = { x: 0 }; const draw = () => { w.textContent = m[1] + fmt(st.x >= target - 0.5 ? target : Math.floor(st.x)) + m[3]; };
+      tl.fromTo(st, { x: 0 }, { x: target, duration: 1.1, ease: 'expo.out', onUpdate: draw }, t);
+      return true;
+    }
+    // star border: a point of light runs round the edge of a button or pill
+    function starBorder(node, t, d, color) {
+      const bw = Math.max(2, 3.5 * U);
+      const ring = el('div', `position:absolute;inset:0;border-radius:inherit;padding:${bw}px;pointer-events:none;background:conic-gradient(from var(--sa, 0deg), transparent 0deg, transparent 250deg, ${color} 320deg, transparent 360deg);-webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;`, node);
+      ring.dataset.ring = '1';
+      tl.fromTo(ring, { '--sa': '0deg' }, { '--sa': `${360 * Math.max(1, Math.round(d / 1.8))}deg`, duration: Math.max(1, d), ease: 'none' }, t);
+      return ring;
+    }
+    let curFx = {};
+    // say a block of type with the beat's text effect (typewriter or decrypt), or the look's own entrance; returns when it's done
+    function say(box, t, caret, o = {}) {
+      if (curFx.text === 'type') return typewriter(box, t, caret);
+      if (curFx.text === 'decrypt') return decrypt(box, t);
+      reveal(box, t, o); return t + 0.9;
+    }
+
     // ================================================================ beats
     const BEATS = {
       // the opening: brand + promise
@@ -406,7 +526,7 @@
         const midY = L0.id === 'bold' && port ? H * 0.4 : H / 2;
         const lab = label(Lr, data.label || cfg.brand, center ? `left:0;right:0;text-align:center;top:0` : `left:${M}px;top:0`, S.acc); lab.above(midY - hb.offsetHeight / 2);
         fadeUp(lab, t + 0.3);
-        reveal(hb, t + 0.4, { tilt: L0.id === 'bold', track: L0.id === 'noir' }); polish(hb, t + 0.4, d, S); if (L0.id === 'noir' || L0.id === 'tech') flare(Lr, t + 0.6, midY); underline(hb, t + 1.25, L0.id === 'bold' ? (S.kind === 'accent' ? onColor(A) : A2) : S.acc);
+        const hEnd = say(hb, t + 0.4, S.acc, { tilt: L0.id === 'bold', track: L0.id === 'noir' }); polish(hb, t + 0.4, d, S); if (L0.id === 'noir' || L0.id === 'tech') flare(Lr, t + 0.6, midY); underline(hb, Math.max(t + 1.25, hEnd + 0.2), L0.id === 'bold' ? (S.kind === 'accent' ? onColor(A) : A2) : S.acc);
         if (data.sub && L0.id !== 'bold') { const sw = land ? W * 0.55 : CW; const sb = textBlock(Lr, data.sub, { w: sw, size: 36 * TU, min: 24 * TU, maxLines: 2, font: ui, weight: 500, lh: 1.35, ls: '0', color: S.mute, align: center ? 'center' : 'left', css: center ? `left:${(W - sw) / 2}px;top:${H / 2 + hb.offsetHeight / 2 + 50 * U}px` : `left:${M}px;top:${H / 2 + hb.offsetHeight / 2 + 50 * U}px` }); reveal(sb, t + 1.2, { soft: true }); }
         drift(hb, t + 1.4, d - 1.2, { from: 1, to: 1.025, y: 0 });
         sound(t + 0.35, 'hook');
@@ -417,7 +537,7 @@
         const name = textBlock(Lr, cfg.brand, { w: CW * 0.9, size: (port ? 110 : 120) * TU, min: 40 * TU, maxLines: 2, color: S.ink, upper: true, ls: '0.06em', align: 'center', css: `left:${(W - CW * 0.9) / 2}px;top:50%` });
         centreY(name);
         if (cfg.logo) { mark(Lr, 150 * U, `left:${W / 2 - 75 * U}px;top:${H / 2 - name.offsetHeight / 2 - 190 * U}px`, t + 0.1); }
-        if (L0.id === 'tech') name.querySelectorAll('.w').forEach((w, i) => scramble(w, t + 0.15 + i * 0.12, 1.1));
+        if (L0.id === 'tech' || curFx.text === 'decrypt') name.querySelectorAll('.w').forEach((w, i) => scramble(w, t + 0.15 + i * 0.12, 1.1));
         else if (L0.id === 'bold') revealChars(name, t + 0.15);
         else tl.fromTo(name._lines, { letterSpacing: '0.5em', opacity: 0 }, { letterSpacing: '0.06em', opacity: 1, duration: 1.4, ease: 'expo.out' }, t + 0.15);
         sound(t + 0.1, 'sting');
@@ -437,8 +557,9 @@
           tl.fromTo([pb, back], { rotateY: land ? -10 : 8, transformPerspective: 1600 * U }, { rotateY: 0, duration: 1.6, ease: 'expo.out' }, t + 0.05);
           if (data.caption) {
             const tx = port ? { l: M, tp: box.t + box.h + 80 * U, w: CW } : land ? { l: M, tp: H * 0.36, w: W * 0.42 - M * 1.6 } : { l: M, tp: box.t + box.h + 64 * U, w: CW };
-            if (data.label) { const lb = label(Lr, data.label, `left:${tx.l}px;top:0`, S.acc).above(tx.tp); fadeUp(lb, t + 0.7); }
-            const cb = textBlock(Lr, data.caption, { w: tx.w, size: (land ? 84 : 76) * TU, min: 34 * TU, maxLines: 3, color: S.ink, accent: L0.accentWord, accentCss: acc(S), upper: L0.upper, css: `left:${tx.l}px;top:${tx.tp}px` });
+            // under the picture the label needs its own room (the frame's offset backing card sits below the photo too)
+            if (data.label) { const lb = label(Lr, data.label, `left:${tx.l}px;top:0`, S.acc); if (!land) tx.tp += lb.offsetHeight + 22 * U; lb.above(tx.tp); fadeUp(lb, t + 0.7); }
+            const cb = textBlock(Lr, data.caption, { w: tx.w, size: (land ? 84 : 76) * TU, min: 34 * TU, maxLines: 3, maxH: land ? H * 0.5 : Math.max(60 * TU, H - tx.tp - M * 0.8), color: S.ink, accent: L0.accentWord, accentCss: acc(S), upper: L0.upper, css: `left:${tx.l}px;top:${tx.tp}px` });
             reveal(cb, t + 0.8);
           }
           sound(t + 0.05, 'photo');
@@ -471,6 +592,33 @@
       // what the business offers: a numbered list, or one at a time
       features(Lr, t, d, data, v, S) {
         const items = data.items || [];
+        if (v === 'rotate') {
+          // rotating words: one slot, each selling point rolls up into it, an accent bar resizes under it
+          decor(Lr, t, d, S.kind);
+          const n = items.length, per = (d - 0.6) / n, maxW = land ? W * 0.7 : CW;
+          const font = `font-family:${disp};font-weight:${DW};letter-spacing:-.025em;${L0.upper ? 'text-transform:uppercase;' : ''}white-space:nowrap;`;
+          const probe = el('span', `position:absolute;left:0;top:0;visibility:hidden;${font}`, Lr);
+          let fs = (port ? 150 : 128) * TU; const widthAt = (f) => Math.max(...items.map((it) => { probe.style.fontSize = f + 'px'; probe.textContent = it; return probe.offsetWidth; }));
+          for (let k = 0; k < 40 && widthAt(fs) > maxW && fs > 44 * TU; k++) fs *= 0.94;
+          probe.style.fontSize = fs + 'px'; const ws = items.map((it) => { probe.textContent = it; return probe.offsetWidth; }); probe.remove();
+          const slotH = fs * 1.18, top = H / 2 - slotH / 2;
+          const slot = el('div', `position:absolute;left:0;right:0;top:${top}px;height:${slotH}px;overflow:hidden;text-align:center;color:${S.ink};font-size:${fs}px;${font}`, Lr);
+          const strip = el('div', 'position:relative;will-change:transform;', slot);
+          items.forEach((it) => el('div', `height:${slotH}px;line-height:${slotH}px;`, strip, esc(it)));
+          const bar = el('div', `position:absolute;top:${top + slotH + 18 * U}px;height:${Math.max(4, 8 * U)}px;border-radius:${8 * U}px;background:${S.acc};left:${(W - ws[0]) / 2}px;width:${ws[0]}px;transform-origin:center;`, Lr);
+          const head = label(Lr, data.title || cfg.brand, `left:0;right:0;text-align:center;top:0`, S.acc).above(top - 10 * U, 30 * U); fadeUp(head, t + 0.2);
+          const count = el('div', `position:absolute;left:0;right:0;text-align:center;top:${top + slotH + 70 * U}px;font-family:${ui};font-weight:600;font-size:${30 * TU}px;letter-spacing:.15em;color:${S.mute};`, Lr);
+          tl.fromTo(strip, { y: slotH }, { y: 0, duration: 0.7, ease: 'back.out(1.6)' }, t + 0.3);
+          tl.fromTo(bar, { scaleX: 0 }, { scaleX: 1, duration: 0.7, ease: 'expo.out' }, t + 0.45);
+          items.forEach((it, i) => {
+            const ti = t + 0.3 + i * per;
+            const c = el('span', 'position:absolute;left:0;right:0;opacity:0', count, `${String(i + 1).padStart(2, '0')} / ${String(n).padStart(2, '0')}`);
+            tl.set(c, { opacity: 1 }, ti); if (i < n - 1) tl.set(c, { opacity: 0 }, ti + per);
+            if (i) { tl.to(strip, { y: -i * slotH, duration: 0.6, ease: 'back.inOut(1.4)' }, ti - 0.3); tl.to(bar, { left: (W - ws[i]) / 2, width: ws[i], duration: 0.6, ease: 'expo.inOut' }, ti - 0.3); }
+            sound(ti, 'tick');
+          });
+          return;
+        }
         if (v === 'seq') {
           decor(Lr, t, d, S.kind);
           const n = items.length, per = (d - 0.5) / n;
@@ -534,7 +682,8 @@
         // a sweep of light across the words
         const bar = el('div', `position:absolute;left:${(W - w) / 2 - 30 * U}px;width:${w + 60 * U}px;top:${H / 2 + ob.offsetHeight / 2 + 30 * U}px;height:${Math.max(3, 5 * U)}px;background:${S.acc};transform-origin:center;`, Lr);
         fadeUp(lab, t + 0.25);
-        reveal(ob, t + 0.4, { tilt: L0.id === 'bold' });
+        reveal(ob, t + 0.4, { tilt: L0.id === 'bold' }); if (curFx.count) countUp(ob, t + 0.55);
+        if (curFx.star && lab.dataset.pill) starBorder(lab.firstChild, t + 0.4, d, S.acc);
         tl.fromTo(bar, { scaleX: 0 }, { scaleX: 1, duration: 0.9, ease: EASE_IO }, t + 0.9);
         drift(ob, t + 1.4, d - 1.2, { from: 1, to: 1.03, y: 0 });
         if (['bold', 'fresh', 'clean'].includes(L0.id)) {
@@ -644,7 +793,7 @@
         const b = textBlock(Lr, data.text, { w, size: (port ? 120 : 110) * TU, min: 44 * TU, maxLines: port ? 5 : 3, maxH: H - 2 * M - 200 * U, color: S.ink, accent: L0.accentWord, accentCss: acc(S), upper: L0.upper, align: L0.center || land ? 'center' : 'left', css: L0.center || land ? `left:${(W - w) / 2}px;top:50%` : `left:${M}px;top:50%` });
         centreY(b);
         if (data.label) { const lb = label(Lr, data.label, L0.center || land ? `left:0;right:0;text-align:center;top:0` : `left:${M}px;top:0`, S.acc).above(H / 2 - b.offsetHeight / 2); fadeUp(lb, t + 0.2); }
-        reveal(b, t + 0.35, { stagger: 0.12, track: L0.id === 'noir' || L0.id === 'editorial' }); polish(b, t + 0.35, d, S); underline(b, t + 1.2, L0.id === 'bold' ? (S.kind === 'accent' ? onColor(A) : A2) : S.acc);
+        const sEnd = say(b, t + 0.35, S.acc, { stagger: 0.12, track: L0.id === 'noir' || L0.id === 'editorial' }); polish(b, t + 0.35, d, S); underline(b, Math.max(t + 1.2, sEnd + 0.2), L0.id === 'bold' ? (S.kind === 'accent' ? onColor(A) : A2) : S.acc);
         drift(b, t + 1.3, d - 1.1, { from: 1, to: 1.03, y: 0 });
       },
       // headline stacking: each line lands as its own coloured block, one on top of the next
@@ -851,13 +1000,14 @@
         const bw = Math.min(CW, Math.max(420 * TU, String(data.cta || '').length * 30 * TU + 190 * TU));
         const btn = el('div', `position:absolute;${leftA ? `left:${M}px` : `left:${(W - bw) / 2}px`};top:${y}px;width:${bw}px;height:${btnH}px;border-radius:${L0.pill ? btnH / 2 : L0.radius * U}px;background:${S.acc};color:${onColor(S.acc)};display:flex;align-items:center;justify-content:center;gap:${18 * U}px;font-family:${ui};font-weight:700;font-size:${(port ? 46 : 42) * TU}px;letter-spacing:${L0.upper ? '.08em' : '0'};${L0.upper ? 'text-transform:uppercase;' : ''}overflow:hidden;box-shadow:0 ${20 * U}px ${50 * U}px ${rgba(S.acc, 0.35)};`, Lr);
         const btxt = el('span', 'white-space:nowrap', btn, esc(data.cta || 'Get in touch'));
+        if (curFx.star) starBorder(btn, t + 1.9, Math.max(1, d - 1.9), onColor(S.acc) === '#FFFFFF' ? 'rgba(255,255,255,.95)' : 'rgba(0,0,0,.6)');
         el('span', 'display:block', btn, icon('arrow', 40 * TU, onColor(S.acc), 2.2));
         while (btxt.offsetWidth > bw - 140 * U && parseFloat(btn.style.fontSize) > 22 * U) btn.style.fontSize = parseFloat(btn.style.fontSize) * 0.92 + 'px';
         const shine = el('div', `position:absolute;top:-20%;bottom:-20%;width:${bw * 0.3}px;left:0;background:linear-gradient(100deg, transparent, rgba(255,255,255,.45), transparent);transform:skewX(-20deg);`, btn);
         const tb = t + 1.05;
         // the button is born as a dot and springs open into its full width
         const finalL = leftA ? M : (W - bw) / 2, finalR = L0.pill ? btnH / 2 : L0.radius * U;
-        const inner = [...btn.children].filter((c) => c !== shine);
+        const inner = [...btn.children].filter((c) => c !== shine && !c.dataset.ring);
         tl.fromTo(btn, { opacity: 0, scale: 0, width: btnH, left: leftA ? M : W / 2 - btnH / 2, borderRadius: btnH / 2 }, { opacity: 1, scale: 1, duration: 0.45, ease: 'back.out(2)' }, tb);
         tl.to(btn, { width: bw, left: finalL, borderRadius: finalR, duration: 0.75, ease: 'back.out(1.25)' }, tb + 0.35);
         tl.fromTo(inner, { opacity: 0, x: -14 * U }, { opacity: 1, x: 0, duration: 0.5, ease: 'power2.out', stagger: 0.08 }, tb + 0.7);
@@ -947,6 +1097,7 @@
       const Lr = el('div', `position:absolute;inset:0;overflow:hidden;background:${S.bg};visibility:hidden;`, stage);
       tl.set(Lr, { visibility: 'visible' }, s);
       const start = i === 0 ? 0 : s + T * 0.12;
+      curFx = b.fx || {};
       try { BEATS[b.type](Lr, start, b.dur - (start - s), b.data || {}, b.v, S); } catch (e) { console.error('[story] beat', b.type, e); }
       if (prev) {
         const name = b.trans && TRANS[b.trans] ? b.trans : 'dissolve';

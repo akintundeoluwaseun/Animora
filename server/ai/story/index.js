@@ -134,7 +134,7 @@ export function composeStory({ facts: f, duration, seed, look: lookId, aspect, o
   photoBeat(hookType === 'hook' && hookV === 'type' ? (f.sub && f.sub !== head ? f.sub : '') : '', f.category || '', 6);
   if (feats.length >= 2) {
     if (f.whatsapp && r() < 0.6) add('chat', { items: feats, cta: f.cta }, 8);
-    else { const v = feats.length <= 3 && r() < 0.45 ? 'seq' : 'list'; add('features', { items: feats, title: f.category || f.name, ...(aspect === '16:9' && rest[0] && !rest[0].cut ? { photo: rest[0].url, fit: rest[0].fit, pos: rest[0].pos } : {}) }, 8, v); }
+    else { const v = feats.every((x) => x.length <= 22) && r() < 0.3 ? 'rotate' : feats.length <= 3 && r() < 0.45 ? 'seq' : 'list'; add('features', { items: feats, title: f.category || f.name, ...(aspect === '16:9' && rest[0] && !rest[0].cut ? { photo: rest[0].url, fit: rest[0].fit, pos: rest[0].pos } : {}) }, 8, v); }
     used = feats.length;
   } else if (feats.length === 1) add('statement', { text: feats[0] }, 5);
   photoBeat(cap(used) || '', f.name, 5);
@@ -204,7 +204,42 @@ export function composeStory({ facts: f, duration, seed, look: lookId, aspect, o
     if (i > 0 && beats[i - 1].surface === b.surface && b.surface === 'accent') b.surface = 'base';
     if (i) { const pool = L.trans.filter((x) => x !== lastT); b.trans = pool[Math.floor(r() * pool.length)]; lastT = b.trans; }
   });
+  assignFx(beats, L, r);
   return beats;
+}
+
+// ---------------------------------------------------------------- taste: effects with rules and a budget
+// Every effect says where it may go and when to leave it out, and each film has a small budget, so a video
+// gets one or two moments that stand out instead of everything moving at once.
+const FX = {
+  // living GPU backgrounds: one kind per film, only behind type (never photos, lists or price tables)
+  bg: { cost: 1, looks: { noir: ['rays', 'silk'], editorial: ['mesh'], fresh: ['mesh', 'aurora'], tech: ['lines', 'aurora'], clean: ['aurora', 'mesh'], bold: [] },
+    fits: (b) => (b.type === 'hook' && b.v === 'type') || ['sting', 'statement', 'stack', 'end'].includes(b.type) || (b.type === 'offer') || (b.type === 'features' && ['seq', 'rotate'].includes(b.v)) || (b.type === 'products' && b.v === 'hero') },
+  // typewriter (calm looks) or decrypt (sharp looks) on one headline; not for long lines or short beats
+  text: { cost: 1.5, kind: { clean: 'type', fresh: 'type', editorial: 'type', tech: 'decrypt', noir: 'decrypt', bold: 'decrypt' },
+    fits: (b, kind) => { const txt = String(b.data?.headline || b.data?.text || ''); if (b.type === 'sting') return kind === 'decrypt';
+      return ((b.type === 'hook' && b.v === 'type') || b.type === 'statement') && txt.length >= 8 && txt.length <= (kind === 'type' ? 48 : 36) && b.dur >= 3.4; } },
+  // a number in the offer counts up (only real numbers of 10 or more)
+  count: { cost: 0.5, fits: (b) => b.type === 'offer' && /\d{2,}|\d,\d{3}/.test(String(b.data?.offer || '')) },
+  // a point of light runs round the call-to-action button
+  star: { cost: 0.5, fits: (b) => b.type === 'end' && !!b.data?.cta },
+};
+const FX_BUDGET = 4;
+function assignFx(beats, L, r) {
+  let budget = FX_BUDGET;
+  const spend = (b, key, val, cost) => { if (budget < cost) return false; b.fx = { ...(b.fx || {}), [key]: val }; budget -= cost; return true; };
+  // the subtle ones first (they never crowd a frame), then one headline effect, then the backgrounds with what is left
+  if (r() < 0.75) { const e = beats.find((b) => FX.star.fits(b)); if (e) spend(e, 'star', true, FX.star.cost); }
+  { const o = beats.find((b) => FX.count.fits(b)); if (o) spend(o, 'count', true, FX.count.cost); }
+  const tk = FX.text.kind[L.id];
+  if (tk && r() < 0.7) { const c = beats.filter((b) => FX.text.fits(b, tk)); if (c.length) spend(c[Math.floor(r() * c.length)], 'text', tk, FX.text.cost); }
+  const kinds = FX.bg.looks[L.id] || [];
+  if (kinds.length && r() < 0.8) {
+    const kind = kinds[Math.floor(r() * kinds.length)];
+    // never on a beat that already has a headline effect, never on two beats in a row, at most three
+    let last = -2, n = 0;
+    beats.forEach((b, i) => { if (n < 3 && i - last > 1 && FX.bg.fits(b) && !b.fx?.text && spend(b, 'bg', kind, FX.bg.cost)) { last = i; n++; } });
+  }
 }
 
 // the colours: the owner's colour leads when it reads well on the look

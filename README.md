@@ -36,6 +36,7 @@ and gives back an MP4 for WhatsApp, TikTok, Instagram or YouTube. It also design
   Credits: `assets/CREDITS-SOUND.md`.
 - **Flyers** (`server/ai/flyer.js`, `server/ai/flyer2.js`): nine layouts (poster, price burst, event ticket, menu
   board, full photo, diagonal, collage, services, hiring), downloaded as pictures.
+- **Living backgrounds and kinetic type.** Some videos get a soft GPU background (silk, aurora, colour mesh, signal lines, light rays) behind their type, a typewriter or decrypt headline, a price or offer number that counts up, rotating selling points, or a light that runs round the button. Every effect has rules for where it may go and each video has a small effect budget, so it never gets busy (an idea taken from [motion-anything](https://github.com/nexu-io/motion-anything), Apache-2.0; the shaders are Animora's own).
 - **Light and dark mode**, a phone-friendly layout with a bottom bar, and an **Android app** (`mobile/`, see its README).
 - **Owner dashboard** at `/admin` (needs `ADMIN_KEY`): people, videos, flyers, MP4s, money, failures, the last 30 days,
   and **database space** with a *Free up space now* button.

@@ -16,7 +16,7 @@ export function StyleCard({ s, selected, onPick }) {
   const stop = () => { const v = ref.current; if (v) v.pause(); };
   return (
     <button onClick={() => onPick(s)} aria-pressed={selected} onMouseEnter={play} onMouseLeave={stop} onFocus={play} onBlur={stop}
-      className={`style-card group overflow-hidden rounded-3xl bg-white text-left ring-1 ${selected ? 'ring-4 ring-danfo' : 'ring-ink/8'}`}>
+      className={`style-card lift group overflow-hidden rounded-3xl bg-white text-left ring-1 ${selected ? 'ring-4 ring-danfo' : 'ring-ink/8'}`}>
       <div className="relative aspect-[9/14] overflow-hidden" style={{ background: s.palette?.background || '#1B1446' }}>
         {s.poster_url && <img src={s.poster_url} alt="" className="absolute inset-0 size-full object-cover" loading="lazy" />}
         {s.preview_url && <video ref={ref} src={s.preview_url} className="absolute inset-0 size-full object-cover opacity-0 transition-opacity duration-300 group-hover:opacity-100 group-focus-visible:opacity-100" muted loop playsInline preload="none" />}
